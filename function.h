@@ -24,15 +24,6 @@ program_init_startup_code(
   Execution_Context *context
 );
 
-static inline Instruction  *
-instruction_add_compiler_location_internal(
-  const Compiler_Source_Location compiler_source_location,
-  Instruction *instruction
-) {
-  instruction->compiler_source_location = compiler_source_location;
-  return instruction;
-}
-
 static inline Instruction *
 instruction_add_source_location_internal(
   Source_Range source_range,
@@ -42,16 +33,12 @@ instruction_add_source_location_internal(
   return instruction;
 }
 
-#define instruction_add_compiler_location(...)\
-  instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
 #define push_label(_CODE_BLOCK_, _LOCATION_, ...)\
   do {\
     Instruction to_push = (Instruction) {\
       .tag = Instruction_Tag_Label,\
       .Label.pointer = (__VA_ARGS__),\
       .source_range = (_LOCATION_),\
-      .compiler_source_location = COMPILER_SOURCE_LOCATION,\
     };\
     push_instruction((_CODE_BLOCK_), to_push);\
   } while (0)

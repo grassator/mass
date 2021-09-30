@@ -4279,7 +4279,6 @@ mass_handle_arithmetic_operation_lazy_proc(
             .tag = Instruction_Tag_Bytes,
             .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
             .source_range = result_range,
-            .compiler_source_location = COMPILER_SOURCE_LOCATION,
           });
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
@@ -6293,7 +6292,6 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     .Bytes = bytes,
     .scope = context->scope,
     .source_range = args_view.source_range,
-    .compiler_source_location = COMPILER_SOURCE_LOCATION,
   });
 
   for (s32 i = 0; i < patch_count; i += 1) {
@@ -6302,7 +6300,6 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = patches[i],
       .source_range = args_view.source_range,
-      .compiler_source_location = COMPILER_SOURCE_LOCATION,
     });
   }
 

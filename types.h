@@ -3,22 +3,6 @@
 #include <stddef.h>
 #include <limits.h>
 
-#define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
-  {\
-    .filename = __FILE__,\
-    .function_name = "GLOBAL",\
-    .line_number = __LINE__,\
-  }
-
-#define COMPILER_SOURCE_LOCATION_FIELDS\
-  {\
-    .filename = __FILE__,\
-    .function_name = __func__,\
-    .line_number = __LINE__,\
-  }
-#define COMPILER_SOURCE_LOCATION\
-  ((Compiler_Source_Location)COMPILER_SOURCE_LOCATION_FIELDS)
-
 #define MASS_DESCRIPTOR_STATIC_ARRAY(_C_TYPE_, _LENGTH_, ...)\
   {\
     .tag = Descriptor_Tag_Fixed_Size_Array,\

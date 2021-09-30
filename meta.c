@@ -1367,12 +1367,6 @@ main(void) {
     { "Storage", "address_of" },
   }));
 
-  push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
-    { "const char *", "filename" },
-    { "const char *", "function_name" },
-    { "u64", "line_number" },
-  }));
-
   push_type(type_struct("Instruction_Assembly", (Struct_Item[]){
     { "const X64_Mnemonic *", "mnemonic" },
     { "Storage", "operands", 3 },
@@ -1395,7 +1389,6 @@ main(void) {
       { "Stack_Area", "stack_area" },
     }),
   }), (Struct_Item[]){
-    { "Compiler_Source_Location", "compiler_source_location" },
     { "Source_Range", "source_range" },
     { "u32", "_source_range_padding" },
     { "Scope *", "scope" },

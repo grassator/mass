@@ -278,10 +278,6 @@ typedef struct Relocation Relocation;
 typedef dyn_array_type(Relocation *) Array_Relocation_Ptr;
 typedef dyn_array_type(const Relocation *) Array_Const_Relocation_Ptr;
 
-typedef struct Compiler_Source_Location Compiler_Source_Location;
-typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
-typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
-
 typedef struct Instruction_Assembly Instruction_Assembly;
 typedef dyn_array_type(Instruction_Assembly *) Array_Instruction_Assembly_Ptr;
 typedef dyn_array_type(const Instruction_Assembly *) Array_Const_Instruction_Assembly_Ptr;
@@ -1270,13 +1266,6 @@ typedef struct Relocation {
 } Relocation;
 typedef dyn_array_type(Relocation) Array_Relocation;
 
-typedef struct Compiler_Source_Location {
-  const char * filename;
-  const char * function_name;
-  u64 line_number;
-} Compiler_Source_Location;
-typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
-
 typedef struct Instruction_Assembly {
   const X64_Mnemonic * mnemonic;
   Storage operands[3];
@@ -1308,7 +1297,6 @@ typedef struct Instruction_Stack_Patch {
 typedef struct Instruction {
   Instruction_Tag tag;
   char _tag_padding[4];
-  Compiler_Source_Location compiler_source_location;
   Source_Range source_range;
   u32 _source_range_padding;
   Scope * scope;
@@ -2286,11 +2274,6 @@ static Descriptor descriptor_array_relocation;
 static Descriptor descriptor_array_relocation_ptr;
 static Descriptor descriptor_relocation_pointer;
 static Descriptor descriptor_relocation_pointer_pointer;
-static Descriptor descriptor_compiler_source_location;
-static Descriptor descriptor_array_compiler_source_location;
-static Descriptor descriptor_array_compiler_source_location_ptr;
-static Descriptor descriptor_compiler_source_location_pointer;
-static Descriptor descriptor_compiler_source_location_pointer_pointer;
 static Descriptor descriptor_instruction_assembly;
 static Descriptor descriptor_array_instruction_assembly;
 static Descriptor descriptor_array_instruction_assembly_ptr;
@@ -3759,29 +3742,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(relocation, Relocation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(relocation);
-MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location_ptr, Array_Compiler_Source_Location_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location, Array_Compiler_Source_Location)
-MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location, Compiler_Source_Location,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_char_pointer,
-    .name = slice_literal_fields("filename"),
-    .Base_Relative.offset = offsetof(Compiler_Source_Location, filename),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_char_pointer,
-    .name = slice_literal_fields("function_name"),
-    .Base_Relative.offset = offsetof(Compiler_Source_Location, function_name),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("line_number"),
-    .Base_Relative.offset = offsetof(Compiler_Source_Location, line_number),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(compiler_source_location);
 MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_assembly_ptr, Array_Instruction_Assembly_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_assembly, Array_Instruction_Assembly)
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
@@ -3869,12 +3829,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
     .name = slice_literal_fields("tag"),
     .descriptor = &descriptor_instruction_tag,
     .Base_Relative.offset = offsetof(Instruction, tag),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_compiler_source_location,
-    .name = slice_literal_fields("compiler_source_location"),
-    .Base_Relative.offset = offsetof(Instruction, compiler_source_location),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

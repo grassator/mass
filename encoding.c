@@ -433,40 +433,19 @@ push_instruction(
 }
 
 static inline void
-push_eagerly_encoded_assembly_internal(
-  Compiler_Source_Location compiler_source_location,
+push_eagerly_encoded_assembly(
   Code_Block *code_block,
   Source_Range source_range,
   const Instruction_Assembly *assembly
 ) {
   const Instruction_Encoding *encoding = encoding_match(assembly);
-  if (!encoding) {
-    // FIXME Since encoding is now eager, there is no reason to carry this information
-    //       as you could see who caleld
-    //printf(
-      //"Added in compiler at %s:%"PRIu64" (fn: %s)\n",
-      //compiler_source_location.filename,
-      //compiler_source_location.line_number,
-      //compiler_source_location.function_name
-    //);
-    //printf("Source code at ");
-    //source_range_print_start_position(&source_range);
-    //printf("%s", assembly->mnemonic->name);
-    //for (u32 storage_index = 0; storage_index < countof(assembly->operands); ++storage_index) {
-      //const Storage *storage = &assembly->operands[storage_index];
-      //printf(" ");
-      //print_storage(storage);
-    //}
-    //printf("\n");
-    assert(!"Did not find acceptable encoding");
-  }
+  if (!encoding) panic("Did not find acceptable encoding");
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);
 
   push_instruction(code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
     .Bytes = result.bytes,
     .source_range = source_range,
-    .compiler_source_location = compiler_source_location,
   });
 
   // Stack patch MUST go before label patches as it might change the size of the instruction
@@ -475,7 +454,6 @@ push_eagerly_encoded_assembly_internal(
       .tag = Instruction_Tag_Stack_Patch,
       .Stack_Patch = result.maybe_stack_patch,
       .source_range = source_range,
-      .compiler_source_location = compiler_source_location,
     });
   }
 
@@ -484,13 +462,9 @@ push_eagerly_encoded_assembly_internal(
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = result.label_patches[i],
       .source_range = source_range,
-      .compiler_source_location = compiler_source_location,
     });
   }
 }
-
-#define push_eagerly_encoded_assembly(...)\
-  push_eagerly_encoded_assembly_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
 
 void
 encode_instruction(
