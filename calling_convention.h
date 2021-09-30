@@ -413,7 +413,6 @@ x86_64_system_v_classify_aggregate(
   // 4. Each field of an object is classified recursively so that always two fields are
   // considered. The resulting class is calculated according to the classes of the
   // fields in the eightbyte:
-  u64 last_offset = 0;
   u64 last_eightbyte_offset = 0;
   u64 struct_eightbyte_count = 0;
   while(system_v_item_iterator_next(it)) {
@@ -429,11 +428,6 @@ x86_64_system_v_classify_aggregate(
     //       which unlike the Memory_Layout can not specify arbitrary offsets
     //       and overlaps. So we might have to convert to that representation
     //       or do some really fancy tracking of overlaps (unions).
-    if (it->offset < last_offset) {
-      panic("FIXME support unions");
-    } else {
-      last_offset = it->offset + descriptor_byte_size(it->item);
-    }
 
     System_V_Classification field_classification =
       x86_64_system_v_classify(allocator, it->item);
