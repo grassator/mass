@@ -121,7 +121,7 @@ program_patch_labels(
     s64 target_rva = program_resolve_label_to_rva(program, info->target);
 
     s64 diff = target_rva - from_rva;
-    *info->patch_target = s64_to_s32(diff);
+    *info->patch_at = s64_to_s32(diff);
   }
 }
 

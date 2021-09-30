@@ -1027,7 +1027,7 @@ typedef dyn_array_type(Label) Array_Label;
 typedef struct Label_Location_Diff_Patch_Info {
   Label * target;
   Label from;
-  s32 * patch_target;
+  s32 * patch_at;
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
@@ -3225,8 +3225,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info, Label_Location_Dif
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_s32_pointer,
-    .name = slice_literal_fields("patch_target"),
-    .Base_Relative.offset = offsetof(Label_Location_Diff_Patch_Info, patch_target),
+    .name = slice_literal_fields("patch_at"),
+    .Base_Relative.offset = offsetof(Label_Location_Diff_Patch_Info, patch_at),
   },
 );
 MASS_DEFINE_TYPE_VALUE(label_location_diff_patch_info);
