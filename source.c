@@ -6505,9 +6505,7 @@ module_compiler_init(
   const Allocator *allocator = compilation->allocator;
   Scope *scope = scope_make(allocator, compilation->root_scope);
   *out_module = (Module) {
-    .source_file = {
-      .path = slice_literal("__mass_internal__"),
-    },
+    .source_range = COMPILER_SOURCE_RANGE,
     .own_scope = scope,
     .exports = {
       .tag = Module_Exports_Tag_All,
@@ -6636,23 +6634,6 @@ module_process_exports(
   }
 }
 
-static inline void
-module_init(
-  Module *module,
-  Slice file_path,
-  Slice text,
-  Scope *scope
-) {
-  *module = (Module) {
-    .exports = {.tag = Module_Exports_Tag_Not_Specified},
-    .source_file = { // FIXME change to Source_Range
-      .path = file_path,
-      .text = text,
-    },
-    .own_scope = scope,
-  };
-}
-
 static Value *
 mass_inline_module(
   Execution_Context *context,
@@ -6663,8 +6644,10 @@ mass_inline_module(
   const Group_Curly *curly = value_as_group_curly(value_view_get(args, 1));
 
   Module *module = allocator_allocate(context->allocator, Module);
-  Scope *own_scope = scope_make(context->allocator, context->scope);
-  module_init(module, args.source_range.file->path, args.source_range.file->text, own_scope);
+  *module = (Module) {
+    .source_range = args.source_range,
+    .own_scope = scope_make(context->allocator, context->scope),
+  };
   Execution_Context import_context = execution_context_from_compilation(context->compilation);
   import_context.module = module;
   import_context.scope = module->own_scope;
@@ -6683,7 +6666,7 @@ program_parse(
   Value_View tokens;
 
   Performance_Counter perf = system_performance_counter_start();
-  MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
+  MASS_TRY(tokenize(context->compilation, context->module->source_range, &tokens));
   if (0) {
     u64 usec = system_performance_counter_end(&perf);
     printf("Tokenizer took %"PRIu64" µs\n", usec);
@@ -6771,7 +6754,15 @@ program_module_from_file(
   }
 
   Module *module = allocator_allocate(context->allocator, Module);
-  module_init(module, file_path, fixed_buffer_as_slice(buffer), scope);
+  Source_File *source_file = allocator_allocate(context->allocator, Source_File);
+  *source_file = (Source_File) {
+    .path = file_path,
+    .text = fixed_buffer_as_slice(buffer),
+  };
+  *module = (Module) {
+    .source_range = source_range_from_source_file(source_file),
+    .own_scope = scope,
+  };
   return module;
 }
 

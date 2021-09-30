@@ -218,8 +218,8 @@ compiler_scope_define_exports(
 &descriptor_compilation_pointer
     ),
     function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("file")),
-&descriptor_source_file_pointer
+      mass_ensure_symbol(compilation, slice_literal("source_range")),
+&descriptor_source_range
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("out_tokens")),

@@ -688,7 +688,7 @@ typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
 typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
 static Mass_Result tokenize
-  (Compilation * compilation, Source_File * file, Value_View * out_tokens);
+  (Compilation * compilation, Source_Range source_range, Value_View * out_tokens);
 
 static Value * mass_import
   (Execution_Context * context, Value_View args);
@@ -913,7 +913,7 @@ module_exports_as_selective(Module_Exports *module_exports) {
 }
 typedef dyn_array_type(Module_Exports) Array_Module_Exports;
 typedef struct Module {
-  Source_File source_file;
+  Source_Range source_range;
   Scope * own_scope;
   Module_Exports exports;
 } Module;
@@ -2906,9 +2906,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_module, Array_Module)
 MASS_DEFINE_STRUCT_DESCRIPTOR(module, Module,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_source_file,
-    .name = slice_literal_fields("source_file"),
-    .Base_Relative.offset = offsetof(Module, source_file),
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .Base_Relative.offset = offsetof(Module, source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

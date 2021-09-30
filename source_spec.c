@@ -69,7 +69,12 @@ test_program_source_base(
   switch(source.tag) {
     case Test_Program_Source_Tag_Inline: {
       test_module = allocator_allocate(context->allocator, Module);
-      module_init(test_module, test_file_name, source.text, context->scope);
+      Source_File *source_file = allocator_allocate(context->allocator, Source_File);
+      *source_file = (Source_File) {.path = test_file_name, .text = source.text };
+      *test_module = (Module) {
+        .source_range = source_range_from_source_file(source_file),
+        .own_scope = context->scope,
+      };
     } break;
     case Test_Program_Source_Tag_File: {
       test_module = program_module_from_file(context, source.path, context->scope);
@@ -165,6 +170,16 @@ test_program_external_source_function(
   });
 }
 
+static Source_File
+test_inline_source_file(
+  const char *source
+) {
+  return (Source_File) {
+    .path = test_file_name,
+    .text = slice_from_c_string(source),
+  };
+}
+
 spec("source") {
   static Compilation test_compilation = {0};
   static Execution_Context test_context = {0};
@@ -210,29 +225,29 @@ spec("source") {
 
   describe("Tokenizer") {
     it("should be able to tokenize an empty string") {
-      Slice source = slice_literal("");
+      Source_File source_file = test_inline_source_file("");
+      Source_Range source_range = source_range_from_source_file(&source_file);
 
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 0);
     }
 
     it("should be able to tokenize a comment") {
-      Slice source = slice_literal("// foo\n");
+      Source_File source_file = test_inline_source_file("// foo\n");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 0);
     }
 
     it("should be able to turn newlines into fake semicolon tokens on top level") {
-      Slice source = slice_literal("foo\n");
+      Source_File source_file = test_inline_source_file("foo\n");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
       Value *new_line = value_view_get(tokens, 1);
@@ -241,10 +256,10 @@ spec("source") {
     }
 
     it("should be able to parse hex integers") {
-      Slice source = slice_literal("0xCAFE");
+      Source_File source_file = test_inline_source_file("0xCAFE");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -257,10 +272,10 @@ spec("source") {
     }
 
     it("should be able to parse binary integers") {
-      Slice source = slice_literal("0b100");
+      Source_File source_file = test_inline_source_file("0b100");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -273,10 +288,10 @@ spec("source") {
     }
 
     it("should be able to tokenize a sum of integers") {
-      Slice source = slice_literal("12 + foo123");
+      Source_File source_file = test_inline_source_file("12 + foo123");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
@@ -293,10 +308,10 @@ spec("source") {
     }
 
     it("should be able to tokenize groups") {
-      Slice source = slice_literal("(x)");
+      Source_File source_file = test_inline_source_file("(x)");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -310,10 +325,10 @@ spec("source") {
     }
 
     it("should be able to tokenize strings") {
-      Slice source = slice_literal("\"foo 123\"");
+      Source_File source_file = test_inline_source_file("\"foo 123\"");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *string = value_view_get(tokens, 0);
@@ -321,10 +336,10 @@ spec("source") {
     }
 
     it("should be able to tokenize nested groups with different braces") {
-      Slice source = slice_literal("{[]}");
+      Source_File source_file = test_inline_source_file("{[]}");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -340,22 +355,22 @@ spec("source") {
     }
 
     it("should be able to tokenize complex input") {
-      Slice source = slice_literal(
+      Source_File source_file = test_inline_source_file(
         "foo :: fn(x: s8) -> {\n"
         "  return x + 3;\n"
         "}"
       );
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
     }
 
     it("should report a failure when encountering a brace that is not closed") {
-      Slice source = slice_literal("(foo");
+      Source_File source_file = test_inline_source_file("(foo");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
@@ -364,27 +379,17 @@ spec("source") {
       check(error->source_range.offsets.to == 4);
     }
 
-    it("should report a failure when encountering a mismatched brace that") {
-      Slice source = slice_literal("(foo}");
+    it("should report a failure when encountering a mismatched brace") {
+      Source_File source_file = test_inline_source_file("(foo}");
+      Source_Range source_range = source_range_from_source_file(&source_file);
       Value_View tokens;
-      Mass_Result result =
-        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
+      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
       spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-    }
-
-    it("should report a failure when encountering a mismatched brace that") {
-      Value_View tokens;
-      Source_File source_file = {test_file_name, (Slice){.bytes = 0, .length = 1llu << 33}};
-      Mass_Result result = tokenize(test_context.compilation, &source_file, &tokens);
-      check(result.tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &result.Error.error;
-      check(error->tag == Mass_Error_Tag_File_Too_Large);
-      spec_check_slice(error->File_Too_Large.path, test_file_name);
     }
   }
 

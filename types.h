@@ -99,7 +99,11 @@
       .path = COMPILER_SOURCE_FILE.path,\
       .text = slice_literal(_EXPR_),\
     };\
-    MASS_ON_ERROR(tokenize(compilation, fake_file, &_VAR_NAME_)) panic("unreached");\
+    Source_Range fake_range = {\
+      .source_file = fake_file,\
+      .offsets = {.from = 0, .to = fake_file->text.length},\
+    };\
+    MASS_ON_ERROR(tokenize(compilation, fake_range, &_VAR_NAME_)) panic("unreached");\
   }
 
 #define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _RETURN_DESCRIPTOR_, ...)\

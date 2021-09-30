@@ -8,10 +8,12 @@
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Compilation *compilation,
-  Source_File *file,
+  Source_Range source_range,
   Value_View *out_tokens
 ) {
-  Slice input = file->text;
+  // FIXME remove this cast when line offsets are gone
+  Source_File *file = (Source_File *)source_range.file;
+  Slice input = source_from_source_range(&source_range);
   if (input.length > UINT32_MAX) {
     return mass_error((Mass_Error) {
       .tag = Mass_Error_Tag_File_Too_Large,
@@ -22,6 +24,7 @@ tokenize(
 
   const Allocator *allocator = compilation->allocator;
   assert(!dyn_array_is_initialized(file->line_offsets));
+  // FIXME do this lazily
   file->line_offsets = dyn_array_make(Array_u32, .capacity = file->text.length / 40);
   dyn_array_push(file->line_offsets, 0);
 

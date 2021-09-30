@@ -1119,7 +1119,7 @@ main(void) {
 
 
   push_type(type_struct("Module", (Struct_Item[]){
-    { "Source_File", "source_file" },
+    { "Source_Range", "source_range" },
     { "Scope *", "own_scope" },
     { "Module_Exports", "exports" },
   }));
@@ -1968,7 +1968,7 @@ main(void) {
 
   export_compiler(push_type(type_function(Default, "tokenize", "Mass_Result", (Argument_Type[]){
     { "Compilation *", "compilation" },
-    { "Source_File *", "file" },
+    { "Source_Range", "source_range" },
     { "Value_View *", "out_tokens" },
   })));
 

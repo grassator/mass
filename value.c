@@ -43,6 +43,16 @@ source_from_source_range(
   return slice_sub_range(source_range->file->text,offsets);
 }
 
+static inline Source_Range
+source_range_from_source_file(
+  Source_File *file
+) {
+  return (Source_Range) {
+    .file = file,
+    .offsets = { .from = 0, .to = u64_to_u32(file->text.length), },
+  };
+}
+
 static Source_Position
 source_file_offset_to_position(
   const Source_File *file,
