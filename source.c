@@ -4720,6 +4720,117 @@ mass_handle_typed_symbol_operator(
   return value_make(context, &descriptor_typed_symbol, storage_static(typed_symbol), source_range);
 }
 
+typedef struct {
+  const Descriptor *descriptor;
+  Source_Range source_range;
+} Mass_Variable_Definition_Lazy_Payload;
+
+static Value *
+mass_handle_variable_definition_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Mass_Variable_Definition_Lazy_Payload *payload
+) {
+  if (payload->descriptor == &descriptor_void) {
+    return value_make(context, payload->descriptor, storage_none, payload->source_range);
+  } else {
+    return reserve_stack(context, builder, payload->descriptor, payload->source_range);
+  }
+}
+
+typedef struct {
+  Source_Range source_range;
+  Value *target;
+  Value *expression;
+} Mass_Assignment_Lazy_Payload;
+
+static Value *
+mass_handle_assignment_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Mass_Assignment_Lazy_Payload *payload
+) {
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
+  Expected_Result expected_target = expected_result_any(descriptor);
+  Value *target = value_force(context, builder, &expected_target, payload->target);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  value_force_exact(context, builder, target, payload->expression);
+  value_release_if_temporary(builder, target);
+
+  return expected_result_validate(expected_result, &void_value);
+}
+
+static Value *
+mass_define_stack_value_from_typed_symbol(
+  Execution_Context *context,
+  const Typed_Symbol *typed_symbol,
+  Source_Range source_range
+) {
+  Mass_Variable_Definition_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
+  *payload = (Mass_Variable_Definition_Lazy_Payload){
+    .source_range = source_range,
+    .descriptor = typed_symbol->descriptor,
+  };
+  Value *defined = mass_make_lazy_value(
+    context, source_range, payload,
+    typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
+  );
+  scope_define_value(context->scope, context->epoch, source_range, typed_symbol->symbol, defined);
+  return defined;
+}
+
+static Value *
+mass_handle_assignment_operator(
+  Execution_Context *context,
+  Value_View operands,
+  void *unused_payload
+) {
+  Value *target = token_parse_single(context, value_view_get(operands, 0));
+  Value *source = token_parse_single(context, value_view_get(operands, 1));
+
+  Mass_Assignment_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
+
+  MASS_ON_ERROR(*context->result) return 0;
+
+  if (value_is_typed_symbol(target)) {
+    const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
+    target = mass_define_stack_value_from_typed_symbol(context, typed_symbol, target->source_range);
+  }
+
+  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target);
+
+  if (
+    target_descriptor != &descriptor_void && // allow assigning to ()
+    // FIXME this repeats the logic in `assign`
+    !(value_is_non_lazy_static(source) && source->descriptor == &descriptor_tuple) &&
+    !same_value_type_or_can_implicitly_move_cast(target_descriptor, source)
+  ) {
+    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = operands.source_range,
+      .Type_Mismatch = { .expected = target_descriptor, .actual = source_descriptor },
+    });
+    return 0;
+  }
+
+  *payload = (Mass_Assignment_Lazy_Payload) {
+    .source_range = operands.source_range,
+    .target = target,
+    .expression = source,
+  };
+
+  return mass_make_lazy_value(
+    context, operands.source_range, payload,
+    &descriptor_void, mass_handle_assignment_lazy_proc
+  );
+}
+
 static Value *
 mass_fragment(
   Execution_Context *context,
@@ -6182,49 +6293,6 @@ mass_inline_machine_code_bytes(
   );
 }
 
-typedef struct {
-  const Descriptor *descriptor;
-  Source_Range source_range;
-} Mass_Variable_Definition_Lazy_Payload;
-
-static Value *
-mass_handle_variable_definition_lazy_proc(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Mass_Variable_Definition_Lazy_Payload *payload
-) {
-  if (payload->descriptor == &descriptor_void) {
-    return value_make(context, payload->descriptor, storage_none, payload->source_range);
-  } else {
-    return reserve_stack(context, builder, payload->descriptor, payload->source_range);
-  }
-}
-
-typedef struct {
-  Source_Range source_range;
-  Value *target;
-  Value *expression;
-} Mass_Assignment_Lazy_Payload;
-
-static Value *
-mass_handle_assignment_lazy_proc(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Mass_Assignment_Lazy_Payload *payload
-) {
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
-  Expected_Result expected_target = expected_result_any(descriptor);
-  Value *target = value_force(context, builder, &expected_target, payload->target);
-  MASS_ON_ERROR(*context->result) return 0;
-
-  value_force_exact(context, builder, target, payload->expression);
-  value_release_if_temporary(builder, target);
-
-  return expected_result_validate(expected_result, &void_value);
-}
-
 static void
 token_define_global_variable(
   Execution_Context *context,
@@ -6368,85 +6436,6 @@ token_parse_definition_and_assignment_statements(
   return statement_length;
 }
 
-static Value *
-mass_define_stack_value_from_typed_symbol(
-  Execution_Context *context,
-  const Typed_Symbol *typed_symbol,
-  Source_Range source_range
-) {
-  Mass_Variable_Definition_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
-  *payload = (Mass_Variable_Definition_Lazy_Payload){
-    .source_range = source_range,
-    .descriptor = typed_symbol->descriptor,
-  };
-  Value *defined = mass_make_lazy_value(
-    context, source_range, payload,
-    typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
-  );
-  scope_define_value(context->scope, context->epoch, source_range, typed_symbol->symbol, defined);
-  return defined;
-}
-
-static u64
-token_parse_assignment(
-  Execution_Context *context,
-  Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Value_View lhs;
-  Value_View rhs;
-  Value *operator;
-  u64 statement_length = 0;
-  view = value_view_match_till_end_of_statement(view, &statement_length);
-  if (!token_maybe_split_on_operator(view, slice_literal("="), &lhs, &rhs, &operator)) {
-    return 0;
-  }
-
-  Mass_Assignment_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
-
-  Value *target = token_parse_expression(context, lhs, &(u64){0}, 0);
-  Value *source = token_parse_expression(context, rhs, &(u64){0}, 0);
-  MASS_ON_ERROR(*context->result) return 0;
-
-  if (value_is_typed_symbol(target)) {
-    const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
-    target = mass_define_stack_value_from_typed_symbol(context, typed_symbol, lhs.source_range);
-  }
-
-  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target);
-
-  if (
-    target_descriptor != &descriptor_void && // allow assigning to ()
-    // FIXME this repeats the logic in `assign`
-    !(value_is_non_lazy_static(source) && source->descriptor == &descriptor_tuple) &&
-    !same_value_type_or_can_implicitly_move_cast(target_descriptor, source)
-  ) {
-    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = operator->source_range,
-      .Type_Mismatch = { .expected = target_descriptor, .actual = source_descriptor },
-    });
-    return 0;
-  }
-
-  *payload = (Mass_Assignment_Lazy_Payload) {
-    .source_range = operator->source_range,
-    .target = target,
-    .expression = source,
-  };
-
-  out_lazy_value->proc = mass_handle_assignment_lazy_proc;
-  out_lazy_value->payload = payload;
-
-  return statement_length;
-}
-
 static void
 scope_define_enum(
   Compilation *compilation,
@@ -6555,11 +6544,18 @@ scope_define_builtins(
     .handler = mass_handle_apply_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal(":"), allocator_make(allocator, Operator,
-    .precedence = 1,
+    .precedence = 2,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_typed_symbol_operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("="), allocator_make(allocator, Operator,
+    .precedence = 1,
+    .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
+    .argument_count = 2,
+    .handler = mass_handle_assignment_operator,
   )));
 
   {
@@ -6567,7 +6563,6 @@ scope_define_builtins(
       {.proc = token_parse_constant_definitions},
       {.proc = token_parse_explicit_return},
       {.proc = token_parse_definition_and_assignment_statements},
-      {.proc = token_parse_assignment},
       {.proc = token_parse_statement_label},
       {.proc = token_parse_statement_using},
       {.proc = token_parse_syntax_definition},

@@ -223,7 +223,8 @@ negate :: template_signed_integer_overloads(macro(impl, type : Type) {
 }, ())
 negate :: @fn(literal : Number_Literal) -> (Number_Literal) {
   // FIXME this cast should not be necessary
-  literal.negative = if literal.negative then cast(u32, false) else true
+  // FIXME the parens around if should not be necessary
+  literal.negative = (if literal.negative then cast(u32, false) else true)
   literal
 }
 
