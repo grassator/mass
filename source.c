@@ -361,9 +361,9 @@ assign_from_static(
   Execution_Context *context,
   Function_Builder *builder,
   Value *target,
-  Value *source
+  Value *source,
+  const Source_Range *source_range
 ) {
-  Source_Range source_range = target->source_range;
   if (
     !context_is_compile_time_eval(context) &&
     (
@@ -391,12 +391,14 @@ assign_from_static(
       Value static_source_value = {
         .descriptor = static_pointer->descriptor,
         .storage = storage_static_heap(source_memory, static_pointer->descriptor->bit_size),
-        .source_range = source->source_range,
+        .source_range = *source_range,
       };
 
       // It is important to call assign here to make sure we recursively handle
       // any complex types such as structs and arrays
-      MASS_ON_ERROR(assign(context, builder, static_pointer, &static_source_value)) return true;
+      MASS_ON_ERROR(assign(context, builder, static_pointer, &static_source_value, source_range)) {
+        return true;
+      }
     }
     assert(storage_is_label(&static_pointer->storage));
     if (storage_is_label(&target->storage)) {
@@ -405,7 +407,7 @@ assign_from_static(
         .address_of = static_pointer->storage,
       });
     } else {
-      load_address(context, builder, &source_range, target, static_pointer->storage);
+      load_address(context, builder, source_range, target, static_pointer->storage);
     }
     return true;
   } else if (storage_is_label(&target->storage)) {
@@ -739,14 +741,15 @@ assign_tuple(
   Execution_Context *context,
   Function_Builder *builder,
   Value *target,
-  Value *source
+  Value *source,
+  const Source_Range *source_range
 ) {
   assert(source->descriptor == &descriptor_tuple);
   const Tuple *tuple = storage_static_as_c_type(&source->storage, Tuple);
   if (target->descriptor->tag != Descriptor_Tag_Struct) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = target->source_range,
+      .source_range = *source_range,
       .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
       .detailed_message = slice_literal("Trying to assign a tuple to something that is not a struct"),
     });
@@ -759,7 +762,7 @@ assign_tuple(
       : slice_literal("Tuple has too many fields for the struct it is assigned to");
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = source->source_range,
+      .source_range = *source_range,
       .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
       .detailed_message = message,
     });
@@ -774,7 +777,7 @@ assign_tuple(
       .storage = memory_layout_item_storage_at_index(&target->storage, layout, index),
       .source_range = target->source_range,
     };
-    MASS_TRY(assign(context, builder, &target_field, tuple_item));
+    MASS_TRY(assign(context, builder, &target_field, tuple_item, source_range));
     index += 1;
   }
   return *context->result;
@@ -785,7 +788,8 @@ assign(
   Execution_Context *context,
   Function_Builder *builder,
   Value *target,
-  Value *source
+  Value *source,
+  const Source_Range *source_range
 ) {
   MASS_TRY(*context->result);
 
@@ -802,16 +806,15 @@ assign(
   }
 
   if (source->descriptor == &descriptor_tuple) {
-    return assign_tuple(context, builder, target, source);
+    return assign_tuple(context, builder, target, source, source_range);
   }
 
-  Source_Range source_range = target->source_range;
   if (
     source->descriptor->tag == Descriptor_Tag_Reference_To &&
     target->descriptor->tag != Descriptor_Tag_Reference_To
   ) {
     Value *referenced_value = value_indirect_from_reference(context, builder, source);
-    MASS_TRY(assign(context, builder, target, referenced_value));
+    MASS_TRY(assign(context, builder, target, referenced_value, source_range));
     value_release_if_temporary(builder, referenced_value);
     return *context->result;
   } else if (
@@ -821,13 +824,13 @@ assign(
     const Descriptor *reference_descriptor = target->descriptor->Reference_To.descriptor;
     if (!same_value_type_or_can_implicitly_move_cast(reference_descriptor, source)) goto err;
     if (source->storage.tag == Storage_Tag_Static) {
-      if (!assign_from_static(context, builder, target, source)) {
+      if (!assign_from_static(context, builder, target, source, source_range)) {
         Value *referenced_value = value_indirect_from_reference(context, builder, target);
-        MASS_TRY(assign(context, builder, referenced_value, source));
+        MASS_TRY(assign(context, builder, referenced_value, source, source_range));
         value_release_if_temporary(builder, referenced_value);
       }
     } else {
-      load_address(context, builder, &source_range, target, source->storage);
+      load_address(context, builder, source_range, target, source->storage);
     }
     return *context->result;
   } else if (
@@ -838,7 +841,7 @@ assign(
     if (!storage_equal(&target->storage, &source->storage)) {
       Value *referenced_source = value_indirect_from_reference(context, builder, source);
       Value *referenced_target = value_indirect_from_reference(context, builder, target);
-      MASS_TRY(assign(context, builder, referenced_target, referenced_source));
+      MASS_TRY(assign(context, builder, referenced_target, referenced_source, source_range));
       value_release_if_temporary(builder, referenced_source);
       value_release_if_temporary(builder, referenced_target);
     }
@@ -847,25 +850,25 @@ assign(
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       if (literal->bits == 0) {
-        source = token_value_force_immediate_integer(context, source, &descriptor_u64, &source_range);
+        source = token_value_force_immediate_integer(context, source, &descriptor_u64, source_range);
         source->descriptor = target->descriptor;
-        move_value(context->allocator, builder, &source_range, &target->storage, &source->storage);
+        move_value(context->allocator, builder, source_range, &target->storage, &source->storage);
         return *context->result;
       } else {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = source_range,
+          .source_range = *source_range,
           .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
           .detailed_message = slice_literal("Trying to assign a non-zero literal number to a pointer"),
         });
         return *context->result;
       }
     } else if (descriptor_is_integer(target->descriptor)) {
-      source = token_value_force_immediate_integer(context, source, target->descriptor, &source_range);
+      source = token_value_force_immediate_integer(context, source, target->descriptor, source_range);
     } else if (source->descriptor != target->descriptor) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = source_range,
+        .source_range = *source_range,
         .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
         .detailed_message = slice_literal("Trying to assign a literal number to a non-integer value"),
       });
@@ -891,12 +894,12 @@ assign(
         ),
         .source_range = target->source_range,
       };
-      MASS_TRY(assign(context, builder, &target_field, &source_field));
+      MASS_TRY(assign(context, builder, &target_field, &source_field, source_range));
     }
     return *context->result;
   }
   if (source->storage.tag == Storage_Tag_Static) {
-    if (assign_from_static(context, builder, target, source)) {
+    if (assign_from_static(context, builder, target, source, source_range)) {
       return *context->result;
     }
   }
@@ -907,14 +910,14 @@ assign(
 
   MASS_TRY(*context->result);
   if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
-    move_value(context->allocator, builder, &source_range, &target->storage, &source->storage);
+    move_value(context->allocator, builder, source_range, &target->storage, &source->storage);
     return *context->result;
   }
 
   err:
   context_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Type_Mismatch,
-    .source_range = source_range,
+    .source_range = *source_range,
     .Type_Mismatch = {
       .expected = target->descriptor,
       .actual = source->descriptor,
@@ -2090,7 +2093,7 @@ expected_result_ensure_value_or_temp(
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
-      MASS_ON_ERROR(assign(context, builder, result_value, value)) return 0;
+      MASS_ON_ERROR(assign(context, builder, result_value, value, &value->source_range)) return 0;
       // @Hack there should be a better and more robust way to do this
       if (
         value->storage.tag != Storage_Tag_Static &&
@@ -2149,13 +2152,13 @@ expected_result_ensure_value_or_temp(
           context, builder, register_find_available(builder, 0), expected_descriptor, value->source_range
         );
         value_release_if_temporary(builder, value);
-        MASS_ON_ERROR(assign(context, builder, temp_result, value)) return 0;
+        MASS_ON_ERROR(assign(context, builder, temp_result, value, &value->source_range)) return 0;
         return temp_result;
       }
       if (flexible->storage & Expected_Result_Storage_Memory) {
         assert(value->storage.tag != Storage_Tag_Register); // checked above
         Value *temp_result = reserve_stack(context, builder, expected_descriptor, value->source_range);
-        MASS_ON_ERROR(assign(context, builder, temp_result, value)) return 0;
+        MASS_ON_ERROR(assign(context, builder, temp_result, value, &value->source_range)) return 0;
         return temp_result;
       }
       // FIXME support floats
@@ -2851,14 +2854,14 @@ compile_time_eval(
 
   // Use memory-indirect addressing to copy
   Storage out_storage = storage_indirect(result_descriptor->bit_size, out_register);
-  Value *out_value = value_make(&eval_context, result_descriptor, out_storage, view.source_range);
+  Value *out_value = value_make(&eval_context, result_descriptor, out_storage, *source_range);
 
-  MASS_ON_ERROR(assign(&eval_context, &eval_builder, &out_value_register, &result_address)) {
+  MASS_ON_ERROR(assign(&eval_context, &eval_builder, &out_value_register, &result_address, source_range)) {
     context->result = eval_context.result;
     return 0;
   }
 
-  MASS_ON_ERROR(assign(&eval_context, &eval_builder, out_value, forced_value)) {
+  MASS_ON_ERROR(assign(&eval_context, &eval_builder, out_value, forced_value, source_range)) {
     context->result = eval_context.result;
     return 0;
   }
@@ -2879,7 +2882,7 @@ compile_time_eval(
     allocator_allocate(context->allocator, Value),
     out_value->descriptor,
     storage_static_internal(result, result_descriptor->bit_size),
-    view.source_range
+    *source_range
   );
 }
 
@@ -2993,10 +2996,9 @@ mass_handle_tuple_cast_lazy_proc(
   const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
   assert(expected_descriptor == payload->target);
   assert(payload->target->tag == Descriptor_Tag_Struct);
-  Value *result = value_from_expected_result(
-    context, builder, expected_result, payload->expression->source_range
-  );
-  MASS_ON_ERROR(assign(context, builder, result, payload->expression)) return 0;
+  const Source_Range *source_range = &payload->expression->source_range;
+  Value *result = value_from_expected_result(context, builder, expected_result, *source_range);
+  MASS_ON_ERROR(assign(context, builder, result, payload->expression, source_range)) return 0;
   return result;
 }
 
@@ -3481,7 +3483,7 @@ call_function_overload(
       }
     };
     if (should_assign) {
-      MASS_ON_ERROR(assign(context, builder, arg_value, source_arg)) return 0;
+      MASS_ON_ERROR(assign(context, builder, arg_value, source_arg, source_range)) return 0;
     }
     dyn_array_push(temp_arguments, arg_value);
     if (arg_symbol) {
@@ -3531,7 +3533,7 @@ call_function_overload(
     if (storage_is_stack(&param->storage)) continue;
 
     Value *source_arg = *dyn_array_get(temp_arguments, i);
-    MASS_ON_ERROR(assign(context, builder, param, source_arg)) return 0;
+    MASS_ON_ERROR(assign(context, builder, param, source_arg, source_range)) return 0;
   }
 
   builder->max_call_parameters_stack_size = u32_max(
@@ -3815,7 +3817,7 @@ token_handle_function_call(
       if (scope_arg->descriptor != &descriptor_scope) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = scope_arg->source_range,
+          .source_range = source_range,
           .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
           .detailed_message = slice_literal("Macro capture can only accept an optional Scope argument"),
         });
@@ -3954,7 +3956,7 @@ token_handle_parsed_function_call(
     if (!value_is_non_lazy_static(args_token)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Expected_Static,
-        .source_range = args_token->source_range,
+        .source_range = source_range,
         .detailed_message = slice_literal("Expected a static Value_View"),
       });
       goto defer;
@@ -3963,7 +3965,7 @@ token_handle_parsed_function_call(
   } else {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
-      .source_range = args_token->source_range,
+      .source_range = source_range,
       .detailed_message = slice_literal("Expected a list of arguments in ()"),
     });
     goto defer;
@@ -4004,7 +4006,7 @@ storage_load_index_address(
 
   // @Volatile :TemporaryRegisterForIndirectMemory
   Value *new_base = value_temporary_acquire_register_for_descriptor(
-    context, builder, register_find_available(builder, 0),  &descriptor_s64, index_value->source_range
+    context, builder, register_find_available(builder, 0),  &descriptor_s64, *source_range
   );
 
   // Move the index into the register
@@ -4013,11 +4015,11 @@ storage_load_index_address(
   // Multiplication by 1 byte is useless so checking it here
   if (item_descriptor->bit_size.as_u64 != 8) {
     u32 item_byte_size = u64_to_u32(descriptor_byte_size(item_descriptor));
-    Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
+    Value *byte_size_value = value_from_s32(context, item_byte_size, *source_range);
 
     // Multiply index by the item byte size
     Value *reg_byte_size_value = value_temporary_acquire_register_for_descriptor(
-      context, builder, register_find_available(builder, 0), &descriptor_s64, index_value->source_range
+      context, builder, register_find_available(builder, 0), &descriptor_s64, *source_range
     );
 
     move_value(
@@ -4039,7 +4041,7 @@ storage_load_index_address(
 
     // Load previous address into a temp register
     Value *temp_value = value_temporary_acquire_register_for_descriptor(
-      context, builder, register_find_available(builder, 0), &descriptor_void_pointer, index_value->source_range
+      context, builder, register_find_available(builder, 0), &descriptor_void_pointer, *source_range
     );
 
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
@@ -4071,6 +4073,7 @@ typedef struct {
   Mass_Arithmetic_Operator operator;
   Value *lhs;
   Value *rhs;
+  Source_Range source_range;
 } Mass_Arithmetic_Operator_Lazy_Payload;
 
 static Value *
@@ -4083,7 +4086,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   const Descriptor *descriptor = expected_result_descriptor(expected_result);
   assert(descriptor_is_integer(descriptor));
 
-  const Source_Range result_range = payload->lhs->source_range;
+  const Source_Range result_range = payload->source_range;
   Value *lhs = payload->lhs;
   Value *rhs = payload->rhs;
 
@@ -4099,7 +4102,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
       Value *temp_lhs = value_temporary_acquire_register_for_descriptor(
-        context, builder, register_find_available(builder, 0), descriptor, lhs->source_range
+        context, builder, register_find_available(builder, 0), descriptor, result_range
       );
 
       Expected_Result expected_a = expected_result_from_value(temp_lhs);
@@ -4107,7 +4110,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Value *temp_rhs = value_temporary_acquire_register_for_descriptor(
-        context, builder, register_find_available(builder, 0), descriptor, rhs->source_range
+        context, builder, register_find_available(builder, 0), descriptor, result_range
       );
       Expected_Result expected_b = expected_result_from_value(temp_rhs);
       temp_rhs = value_force(context, builder, &expected_b, payload->rhs);
@@ -4302,13 +4305,13 @@ mass_handle_arithmetic_operation(
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(descriptor);
     Mass_Arithmetic_Operator_Lazy_Payload lazy_payload =
-      { .lhs = lhs, .rhs = rhs, .operator = operator };
+      { .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range };
     return mass_handle_arithmetic_operation_lazy_proc(context, 0, &expected_result, &lazy_payload);
   } else {
     Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
       allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
     *lazy_payload = (Mass_Arithmetic_Operator_Lazy_Payload) {
-      .lhs = lhs, .rhs = rhs, .operator = operator,
+      .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range,
     };
     return mass_make_lazy_value(
       context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
@@ -5248,7 +5251,7 @@ mass_handle_if_expression_lazy_proc(
   if (result_value->storage.tag == Storage_Tag_Static) {
     Value *stack_result =
       reserve_stack(context, builder, result_value->descriptor, result_value->source_range);
-    MASS_ON_ERROR(assign(context, builder, stack_result, result_value)) return 0;
+    MASS_ON_ERROR(assign(context, builder, stack_result, result_value, dummy_range)) return 0;
     result_value = stack_result;
   }
 
@@ -6168,7 +6171,9 @@ mass_handle_explicit_return_lazy_proc(
   const Expected_Result *expected_result,
   Value *parse_result
 ) {
-  MASS_ON_ERROR(assign(context, builder, builder->return_value, parse_result)) return 0;
+  MASS_ON_ERROR(assign(context, builder, builder->return_value, parse_result, &parse_result->source_range)) {
+    return 0;
+  }
   Storage return_label = code_label32(builder->code_block.end_label);
 
   push_eagerly_encoded_assembly(
@@ -6343,7 +6348,7 @@ token_define_global_variable(
     global_value = value_make(context, descriptor, global_label, expression.source_range);
 
     if (value_is_non_lazy_static(value)) {
-      MASS_ON_ERROR(assign(context, 0, global_value, value)) return;
+      MASS_ON_ERROR(assign(context, 0, global_value, value, &expression.source_range)) return;
     } else {
       Mass_Assignment_Lazy_Payload *assignment_payload =
         allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);

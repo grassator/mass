@@ -20,7 +20,8 @@ assign(
   Execution_Context *context,
   Function_Builder *builder,
   Value *target,
-  Value *source
+  Value *source,
+  const Source_Range *source_range
 );
 
 static inline const Descriptor *
