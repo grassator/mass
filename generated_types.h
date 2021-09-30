@@ -157,10 +157,6 @@ const char *register_name(Register value) {
 typedef dyn_array_type(Register *) Array_Register_Ptr;
 typedef dyn_array_type(const Register *) Array_Const_Register_Ptr;
 
-typedef struct Label_Index Label_Index;
-typedef dyn_array_type(Label_Index *) Array_Label_Index_Ptr;
-typedef dyn_array_type(const Label_Index *) Array_Const_Label_Index_Ptr;
-
 typedef struct Label Label;
 typedef dyn_array_type(Label *) Array_Label_Ptr;
 typedef dyn_array_type(const Label *) Array_Const_Label_Ptr;
@@ -1019,22 +1015,17 @@ typedef struct Program_Memory {
 } Program_Memory;
 typedef dyn_array_type(Program_Memory) Array_Program_Memory;
 
-typedef struct Label_Index {
-  const Program * program;
-  u64 value;
-} Label_Index;
-typedef dyn_array_type(Label_Index) Array_Label_Index;
-
 typedef struct Label {
   u32 resolved;
   u32 offset_in_section;
   Slice name;
   Section * section;
+  const Program * program;
 } Label;
 typedef dyn_array_type(Label) Array_Label;
 
 typedef struct Label_Location_Diff_Patch_Info {
-  Label_Index target_label_index;
+  Label * target;
   Label from;
   s32 * patch_target;
 } Label_Location_Diff_Patch_Info;
@@ -1073,7 +1064,7 @@ typedef dyn_array_type(Syscall) Array_Syscall;
 
 typedef struct Import_Symbol {
   Slice name;
-  Label_Index label32;
+  Label * label32;
 } Import_Symbol;
 typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 
@@ -1090,7 +1081,7 @@ typedef enum {
 } Memory_Location_Tag;
 
 typedef struct Memory_Location_Instruction_Pointer_Relative {
-  Label_Index label_index;
+  Label * label;
 } Memory_Location_Instruction_Pointer_Relative;
 typedef struct Memory_Location_Indirect {
   Register base_register;
@@ -1287,7 +1278,7 @@ typedef enum {
 } Instruction_Tag;
 
 typedef struct Instruction_Label {
-  Label_Index index;
+  Label * pointer;
 } Instruction_Label;
 typedef struct Instruction_Bytes {
   u8 memory[15];
@@ -1295,7 +1286,7 @@ typedef struct Instruction_Bytes {
 } Instruction_Bytes;
 typedef struct Instruction_Label_Patch {
   s64 offset;
-  Label_Index label_index;
+  Label * label;
 } Instruction_Label_Patch;
 typedef struct Instruction_Stack_Patch {
   s32 mod_r_m_offset_in_previous_instruction;
@@ -1344,8 +1335,8 @@ typedef dyn_array_type(Instruction_Bucket) Array_Instruction_Bucket;
 
 typedef struct Code_Block {
   const Allocator * allocator;
-  Label_Index start_label;
-  Label_Index end_label;
+  Label * start_label;
+  Label * end_label;
   Instruction_Bucket * first_bucket;
   Instruction_Bucket * last_bucket;
 } Code_Block;
@@ -2008,7 +1999,6 @@ mass_result_as_error(Mass_Result *mass_result) {
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
 typedef struct Program {
   Array_Import_Library import_libraries;
-  Array_Label labels;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
   Array_Value_Ptr startup_functions;
   Array_Relocation relocations;
@@ -2192,11 +2182,6 @@ static Descriptor descriptor_array_register_ptr;
 static Descriptor descriptor_array_const_register_ptr;
 static Descriptor descriptor_register_pointer;
 static Descriptor descriptor_register_pointer_pointer;
-static Descriptor descriptor_label_index;
-static Descriptor descriptor_array_label_index;
-static Descriptor descriptor_array_label_index_ptr;
-static Descriptor descriptor_label_index_pointer;
-static Descriptor descriptor_label_index_pointer_pointer;
 static Descriptor descriptor_label;
 static Descriptor descriptor_array_label;
 static Descriptor descriptor_array_label_ptr;
@@ -3187,23 +3172,6 @@ static C_Enum_Item register_items[] = {
 { .name = slice_literal_fields("Xmm14"), .value = 30 },
 { .name = slice_literal_fields("Xmm15"), .value = 31 },
 };
-MASS_DEFINE_OPAQUE_C_TYPE(array_label_index_ptr, Array_Label_Index_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_label_index, Array_Label_Index)
-MASS_DEFINE_STRUCT_DESCRIPTOR(label_index, Label_Index,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_program_pointer,
-    .name = slice_literal_fields("program"),
-    .Base_Relative.offset = offsetof(Label_Index, program),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("value"),
-    .Base_Relative.offset = offsetof(Label_Index, value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(label_index);
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_ptr, Array_Label_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_label, Array_Label)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label, Label,
@@ -3231,6 +3199,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label, Label,
     .name = slice_literal_fields("section"),
     .Base_Relative.offset = offsetof(Label, section),
   },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_program_pointer,
+    .name = slice_literal_fields("program"),
+    .Base_Relative.offset = offsetof(Label, program),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(label);
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_location_diff_patch_info_ptr, Array_Label_Location_Diff_Patch_Info_Ptr)
@@ -3238,9 +3212,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_label_location_diff_patch_info, Array_Label_Loca
 MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info, Label_Location_Diff_Patch_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
-    .name = slice_literal_fields("target_label_index"),
-    .Base_Relative.offset = offsetof(Label_Location_Diff_Patch_Info, target_label_index),
+    .descriptor = &descriptor_label_pointer,
+    .name = slice_literal_fields("target"),
+    .Base_Relative.offset = offsetof(Label_Location_Diff_Patch_Info, target),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3364,7 +3338,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol, Import_Symbol,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
+    .descriptor = &descriptor_label_pointer,
     .name = slice_literal_fields("label32"),
     .Base_Relative.offset = offsetof(Import_Symbol, label32),
   },
@@ -3418,9 +3392,9 @@ static C_Enum_Item memory_location_tag_items[] = {
 MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_instruction_pointer_relative, Memory_Location_Instruction_Pointer_Relative,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
-    .name = slice_literal_fields("label_index"),
-    .Base_Relative.offset = offsetof(Memory_Location_Instruction_Pointer_Relative, label_index),
+    .descriptor = &descriptor_label_pointer,
+    .name = slice_literal_fields("label"),
+    .Base_Relative.offset = offsetof(Memory_Location_Instruction_Pointer_Relative, label),
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_location_instruction_pointer_relative);
@@ -3785,9 +3759,9 @@ static C_Enum_Item instruction_tag_items[] = {
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label, Instruction_Label,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
-    .name = slice_literal_fields("index"),
-    .Base_Relative.offset = offsetof(Instruction_Label, index),
+    .descriptor = &descriptor_label_pointer,
+    .name = slice_literal_fields("pointer"),
+    .Base_Relative.offset = offsetof(Instruction_Label, pointer),
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_label);
@@ -3815,9 +3789,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label_patch, Instruction_Label_Patch,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
-    .name = slice_literal_fields("label_index"),
-    .Base_Relative.offset = offsetof(Instruction_Label_Patch, label_index),
+    .descriptor = &descriptor_label_pointer,
+    .name = slice_literal_fields("label"),
+    .Base_Relative.offset = offsetof(Instruction_Label_Patch, label),
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_label_patch);
@@ -3922,13 +3896,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
+    .descriptor = &descriptor_label_pointer,
     .name = slice_literal_fields("start_label"),
     .Base_Relative.offset = offsetof(Code_Block, start_label),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_label_index,
+    .descriptor = &descriptor_label_pointer,
     .name = slice_literal_fields("end_label"),
     .Base_Relative.offset = offsetof(Code_Block, end_label),
   },
@@ -5626,12 +5600,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
     .descriptor = &descriptor_array_import_library,
     .name = slice_literal_fields("import_libraries"),
     .Base_Relative.offset = offsetof(Program, import_libraries),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_array_label,
-    .name = slice_literal_fields("labels"),
-    .Base_Relative.offset = offsetof(Program, labels),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

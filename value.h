@@ -390,7 +390,6 @@ source_from_source_range(
 
 static void *
 rip_value_pointer(
-  Program *program,
   Value *value
 );
 
@@ -412,9 +411,8 @@ value_as_function(
 );
 
 static inline void *
-rip_value_pointer_from_label_index(
-  Program *program,
-  Label_Index label_index
+rip_value_pointer_from_label(
+  const Label *label
 );
 
 static void

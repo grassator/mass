@@ -47,10 +47,9 @@ instruction_add_source_location_internal(
 
 #define push_label(_CODE_BLOCK_, _LOCATION_, ...)\
   do {\
-    Label_Index push_index = (__VA_ARGS__);\
     Instruction to_push = (Instruction) {\
       .tag = Instruction_Tag_Label,\
-      .Label = {.index = push_index},\
+      .Label.pointer = (__VA_ARGS__),\
       .source_range = (_LOCATION_),\
       .compiler_source_location = COMPILER_SOURCE_LOCATION,\
     };\

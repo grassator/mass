@@ -19,13 +19,13 @@ static inline void
 program_resolve_label(
   Program *program,
   Virtual_Memory_Buffer *buffer,
-  Label_Index label_index
+  Label *label
 );
 
 static void
 program_set_label_offset(
   Program *program,
-  Label_Index label_index,
+  Label *label,
   u32 offset_in_section
 );
 

@@ -385,8 +385,10 @@ assign_from_static(
       u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
 
       // TODO this should also be deduped
-      Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-      static_pointer->storage = data_label32(label_index, static_pointer->descriptor->bit_size);
+      Label *label = allocate_section_memory(
+        context->allocator, context->program, section, byte_size, alignment
+      );
+      static_pointer->storage = data_label32(label, static_pointer->descriptor->bit_size);
 
       Value static_source_value = {
         .descriptor = static_pointer->descriptor,
@@ -411,9 +413,9 @@ assign_from_static(
     }
     return true;
   } else if (storage_is_label(&target->storage)) {
-    Label_Index label_index =
-      target->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-    void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+    void *section_memory = rip_value_pointer_from_label(
+      target->storage.Memory.location.Instruction_Pointer_Relative.label
+    );
     const void *source_memory =
       storage_static_as_c_type_internal(&source->storage, source->storage.bit_size);
     memcpy(section_memory, source_memory, source->storage.bit_size.as_u64 / 8);
@@ -2802,14 +2804,19 @@ compile_time_eval(
   function_info_init(&fn_info, eval_context.scope);
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
-  Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
+  Section *section = &jit->program->memory.code;
+  Label *eval_label_index = make_label(
+    context->allocator, jit->program, section, slice_literal("compile_time_eval")
+  );
   Function_Builder eval_builder = {
     .function = &fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .code_block = {
       .allocator = context->allocator,
       .start_label = eval_label_index,
-      .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
+      .end_label = make_label(
+        context->allocator, jit->program, section, slice_literal("compile_time_eval_end")
+      ),
     },
     .source = source_from_source_range(source_range),
   };
@@ -3189,11 +3196,15 @@ mass_macro_lazy_proc(
   Value *result_value =
     value_from_expected_result(context, builder, expected_result, body_value->source_range);
 
-  Label_Index saved_return_label = builder->code_block.end_label;
+  Label *saved_return_label = builder->code_block.end_label;
   Value *saved_return_value = builder->return_value;
   {
-    builder->code_block.end_label =
-      make_label(context->program, &context->program->memory.code, slice_literal("macro return"));
+    builder->code_block.end_label = make_label(
+      context->allocator,
+      context->program,
+      &context->program->memory.code,
+      slice_literal("macro return")
+    );
     builder->return_value = result_value;
     result_value = value_force(context, builder, expected_result, body_value);
     MASS_ON_ERROR(*context->result) return 0;
@@ -3766,9 +3777,9 @@ mass_intrinsic_call(
   }
   fn_type_opaque jitted_code;
   if (storage_is_label(&instance->storage)) {
-    Label_Index jit_label_index =
-      instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-    jitted_code = c_function_from_label(jit->program, jit_label_index);
+    jitted_code = c_function_from_label(
+      jit->program, instance->storage.Memory.location.Instruction_Pointer_Relative.label
+    );
   } else {
     u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);
     jitted_code = (fn_type_opaque)absolute_address;
@@ -5239,7 +5250,7 @@ mass_handle_if_expression_lazy_proc(
     condition = temp_condition;
   }
 
-  Label_Index else_label = make_if(context, builder, &condition->source_range, condition);
+  Label *else_label = make_if(context, builder, &condition->source_range, condition);
 
   Value *result_value = value_force(context, builder, expected_result, then);
   MASS_ON_ERROR(*context->result) return 0;
@@ -5251,8 +5262,9 @@ mass_handle_if_expression_lazy_proc(
     result_value = stack_result;
   }
 
-  Label_Index after_label =
-    make_label(context->program, &context->program->memory.code, slice_literal("if end"));
+  Label *after_label = make_label(
+    context->allocator, context->program, &context->program->memory.code, slice_literal("if end")
+  );
 
   push_eagerly_encoded_assembly(
     &builder->code_block, *dummy_range,
@@ -6088,7 +6100,7 @@ mass_handle_label_lazy_proc(
   Value *label_value
 ) {
   Source_Range source_range = label_value->source_range;
-  if (label_value->descriptor != &descriptor_label_index) {
+  if (label_value->descriptor != &descriptor_label_pointer) {
     Slice source = source_from_source_range(&source_range);
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Redifinition,
@@ -6099,8 +6111,8 @@ mass_handle_label_lazy_proc(
     return 0;
   }
 
-  Label_Index label_index = *storage_static_as_c_type(&label_value->storage, Label_Index);
-  push_label(&builder->code_block, source_range, label_index);
+  Label *label = *storage_static_as_c_type(&label_value->storage, Label *);
+  push_label(&builder->code_block, source_range, label);
 
   return expected_result_validate(expected_result, &void_value);
 }
@@ -6141,11 +6153,12 @@ token_parse_statement_label(
   } else {
     Scope *label_scope = context->scope;
 
-    Label_Index *label = allocator_allocate(context->allocator, Label_Index);
-    *label = make_label(context->program, &context->program->memory.code, name);
+    Label *label = make_label(
+      context->allocator, context->program, &context->program->memory.code, name
+    );
     value = value_init(
       allocator_allocate(context->allocator, Value),
-      &descriptor_label_index, storage_static(label), source_range
+      &descriptor_label_pointer, storage_static_inline(&label), source_range
     );
     scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, symbol, value);
     if (placeholder) {
@@ -6245,7 +6258,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
     Value *value = value_view_get(args_view, arg_index);
 
-    if (value->descriptor == &descriptor_label_index) {
+    if (value->descriptor == &descriptor_label_pointer) {
       if (patch_count == MAX_PATCH_COUNT) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
@@ -6255,7 +6268,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
         return 0;
       }
       patches[patch_count++] = (Instruction_Label_Patch) {
-        .label_index = *storage_static_as_c_type(&value->storage, Label_Index),
+        .label = *storage_static_as_c_type(&value->storage, Label *),
         .offset = bytes.length
       };
       bytes.memory[bytes.length++] = 0;
@@ -6339,9 +6352,11 @@ token_define_global_variable(
     u64 byte_size = descriptor_byte_size(descriptor);
     u64 alignment = descriptor_byte_alignment(descriptor);
 
-    Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-    Storage global_label = data_label32(label_index, descriptor->bit_size);
-    global_value = value_make(context, descriptor, global_label, expression.source_range);
+    Label *label = allocate_section_memory(
+      context->allocator, context->program, section, byte_size, alignment
+    );
+    Storage global_storage = data_label32(label, descriptor->bit_size);
+    global_value = value_make(context, descriptor, global_storage, expression.source_range);
 
     if (value_is_non_lazy_static(value)) {
       MASS_ON_ERROR(assign(context, 0, global_value, value, &expression.source_range)) return;

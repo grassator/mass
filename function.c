@@ -426,8 +426,7 @@ fn_encode(
   const Function_Builder *builder,
   Function_Layout *out_layout
 ) {
-  Label_Index label_index = builder->code_block.start_label;
-  Label *label = program_get_label(program, label_index);
+  Label *label = builder->code_block.start_label;
   assert(!label->resolved);
 
   *out_layout = (Function_Layout) {
@@ -437,7 +436,7 @@ fn_encode(
   s64 code_base_rva = label->section->base_rva;
   out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Storage stack_size_operand = imm_auto_8_or_32(out_layout->stack_reserve);
-  program_resolve_label(program, buffer, label_index);
+  program_resolve_label(program, buffer, label);
 
   // :RegisterPushPop
   // :Win32UnwindCodes Must match what happens in the unwind code generation
@@ -484,7 +483,7 @@ fn_encode(
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 }
 
-static Label_Index
+static Label *
 make_if(
   Execution_Context *context,
   Function_Builder *builder,
@@ -493,7 +492,7 @@ make_if(
 ) {
   Program *program = context->program;
   bool is_always_true = false;
-  Label_Index label = make_label(program, &program->memory.code, slice_literal("if"));
+  Label *label = make_label(context->allocator, program, &program->memory.code, slice_literal("if"));
   if(value->storage.tag == Storage_Tag_Static) {
     s64 imm = storage_static_value_up_to_s64(&value->storage);
     if (imm == 0) return label;
@@ -761,7 +760,7 @@ ensure_function_instance(
     return cached_instance;
   }
 
-  Label_Index call_label = make_label(program, &program->memory.code, fn_name);
+  Label *call_label = make_label(context->allocator, program, &program->memory.code, fn_name);
   // It is important to cache the label here for recursive calls
   Value *cached_instance =
     value_make(context, instance_descriptor, code_label32(call_label), fn_value->source_range);
@@ -785,7 +784,7 @@ ensure_function_instance(
     .code_block = {
       .allocator = context->allocator,
       .start_label = call_label,
-      .end_label = make_label(program, &program->memory.code, end_label_name),
+      .end_label = make_label(context->allocator, program, &program->memory.code, end_label_name),
     },
   };
 
@@ -930,7 +929,9 @@ program_init_startup_code(
   Descriptor *descriptor = descriptor_function_instance(
     context->allocator, fn_name, fn_info, calling_convention
   );
-  Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
+  Label *fn_label = make_label(context->allocator, program, &program->memory.code, fn_name);
+  Label *end_label =
+    make_label(context->allocator, program, &program->memory.code, slice_literal("__startup end"));
   Storage storage = code_label32(fn_label);
 
   Source_Range source_range = COMPILER_SOURCE_RANGE;
@@ -941,7 +942,7 @@ program_init_startup_code(
     .code_block = {
       .allocator = context->allocator,
       .start_label = fn_label,
-      .end_label = make_label(program, &program->memory.code, slice_literal("__startup end")),
+      .end_label = end_label,
     },
   };
 

@@ -258,11 +258,11 @@ eager_encode_instruction_assembly(
     const Memory_Location *location = &storage->Memory.location;
     switch(location->tag) {
       case Memory_Location_Tag_Instruction_Pointer_Relative: {
-        Label_Index label_index = location->Instruction_Pointer_Relative.label_index;
+        Label *label = location->Instruction_Pointer_Relative.label;
         u8 offset_in_instruction = result.bytes.length;
         result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
           .offset = offset_in_instruction,
-          .label_index = label_index
+          .label = label
         };
         u8 empty_patch_bytes[4] = {0};
         instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
@@ -298,11 +298,11 @@ eager_encode_instruction_assembly(
     }
     const Storage *storage = &assembly->operands[storage_index];
     if (storage_is_label(storage)) {
-      Label_Index label_index = storage->Memory.location.Instruction_Pointer_Relative.label_index;
+      Label *label = storage->Memory.location.Instruction_Pointer_Relative.label;
       u8 offset_in_instruction = result.bytes.length;
       result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
         .offset = offset_in_instruction,
-        .label_index = label_index
+        .label = label,
       };
       u8 empty_patch_bytes[4] = {0};
       instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
@@ -498,7 +498,7 @@ encode_instruction(
 ) {
   switch(instruction->tag) {
     case Instruction_Tag_Label: {
-      program_resolve_label(program, buffer, instruction->Label.index);
+      program_resolve_label(program, buffer, instruction->Label.pointer);
       return;
     }
     case Instruction_Tag_Bytes: {
@@ -515,7 +515,7 @@ encode_instruction(
       s32 *patch_target = (s32 *)(buffer->memory + patch_offset_in_buffer);
       assert(*patch_target == 0);
       dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-        .target_label_index = instruction->Label_Patch.label_index,
+        .target = instruction->Label_Patch.label,
         .from = {
           .section = &program->memory.code,
           .offset_in_section = u64_to_u32(buffer->occupied),

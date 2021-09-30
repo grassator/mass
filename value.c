@@ -303,15 +303,6 @@ DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Curly, group_curly)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square)
 
-static inline Label *
-program_get_label(
-  Program *program,
-  Label_Index label
-) {
-  assert(label.program == program);
-  return dyn_array_get(program->labels, label.value);
-}
-
 static bool
 same_function_signature(
   const Function_Info *a_info,
@@ -568,20 +559,25 @@ define_xmm_register(xmm6, 0b110);
 define_xmm_register(xmm7, 0b111);
 #undef define_xmm_register
 
-static inline Label_Index
+static inline Label *
 make_label(
+  const Allocator *allocator,
   Program *program,
   Section *section,
   Slice name
 ) {
-  Label_Index index = {program, dyn_array_length(program->labels)};
-  dyn_array_push(program->labels, (Label) {.section = section, .name = name});
-  return index;
+  Label *label = allocator_allocate(allocator, Label);
+  *label = (Label) {
+    .program = program,
+    .section = section,
+    .name = name,
+  };
+  return label;
 }
 
 static inline Storage
 data_label32(
-  Label_Index label_index,
+  Label *label,
   Bits bit_size
 ) {
   return (const Storage) {
@@ -589,14 +585,14 @@ data_label32(
     .bit_size = bit_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
-      .Instruction_Pointer_Relative.label_index = label_index
+      .Instruction_Pointer_Relative.label = label
     }
   };
 }
 
 static inline Storage
 code_label32(
-  Label_Index label_index
+  Label *label
 ) {
   return (const Storage) {
     .tag = Storage_Tag_Memory,
@@ -605,7 +601,7 @@ code_label32(
     .bit_size = {32},
     .Memory.location = {
       .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
-      .Instruction_Pointer_Relative.label_index = label_index,
+      .Instruction_Pointer_Relative.label = label,
     }
   };
 }
@@ -996,8 +992,9 @@ storage_equal(
       if (a_location->tag != b_location->tag) return false;
       switch(a_location->tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          return a_location->Instruction_Pointer_Relative.label_index.value
-            == b_location->Instruction_Pointer_Relative.label_index.value;
+          // TODO Should this do a compare based on offset?
+          return a_location->Instruction_Pointer_Relative.label
+            == b_location->Instruction_Pointer_Relative.label;
         }
         case Memory_Location_Tag_Indirect: {
           return (
@@ -1116,8 +1113,9 @@ value_number_literal(
   );
 }
 
-Label_Index
+static inline Label *
 allocate_section_memory(
+  const Allocator *allocator,
   Program *program,
   Section *section,
   u64 byte_size,
@@ -1126,12 +1124,11 @@ allocate_section_memory(
   virtual_memory_buffer_allocate_bytes(&section->buffer, byte_size, alignment);
   u64 offset_in_data_section = section->buffer.occupied - byte_size;
 
-  Label_Index label_index = make_label(program, section, slice_literal("global"));
-  Label *label = program_get_label(program, label_index);
+  Label *label = make_label(allocator, program, section, slice_literal("global"));
   label->offset_in_section = u64_to_u32(offset_in_data_section);
   label->resolved = true;
 
-  return label_index;
+  return label;
 }
 
 static inline Value *
@@ -1145,8 +1142,10 @@ value_global(
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_byte_alignment(descriptor);
 
-  Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-  return value_make(context, descriptor, data_label32(label_index, descriptor->bit_size), source_range);
+  Label *label = allocate_section_memory(
+    context->allocator, context->program, section, byte_size, alignment
+  );
+  return value_make(context, descriptor, data_label32(label, descriptor->bit_size), source_range);
 }
 
 static inline Storage
@@ -1375,11 +1374,9 @@ value_release_if_temporary(
 }
 
 static inline void *
-rip_value_pointer_from_label_index(
-  Program *program,
-  Label_Index label_index
+rip_value_pointer_from_label(
+  const Label *label
 ) {
-  Label *label = program_get_label(program, label_index);
   assert(label->resolved);
   return (s8 *)label->section->buffer.memory + label->offset_in_section;
 }
@@ -1387,12 +1384,11 @@ rip_value_pointer_from_label_index(
 
 static inline void *
 rip_value_pointer(
-  Program *program,
   Value *value
 ) {
   assert(storage_is_label(&value->storage));
-  return rip_value_pointer_from_label_index(
-    program, value->storage.Memory.location.Instruction_Pointer_Relative.label_index
+  return rip_value_pointer_from_label(
+    value->storage.Memory.location.Instruction_Pointer_Relative.label
   );
 }
 
@@ -1427,7 +1423,7 @@ value_global_c_string_from_slice(
   Descriptor *descriptor = descriptor_array_of(context->allocator, &descriptor_u8, length);
 
   Value *string_value = value_global(context, descriptor, source_range);
-  s8 *memory = rip_value_pointer(context->program, string_value);
+  s8 *memory = rip_value_pointer(string_value);
   memcpy(memory, slice.bytes, slice.length);
   memory[length - 1] = 0;
   return string_value;
@@ -1499,9 +1495,8 @@ descriptor_pointer_to(
 static fn_type_opaque
 c_function_from_label(
   Program *program,
-  Label_Index label_index
+  const Label *label
 ) {
-  Label *label = program_get_label(program, label_index);
   Section *section = label->section;
   assert(section == &program->memory.code);
   s8 *target = section->buffer.memory + label->offset_in_section;

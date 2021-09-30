@@ -13,7 +13,6 @@ program_init(
   const Calling_Convention *default_calling_convention
 ) {
   *program = (Program) {
-    .labels = dyn_array_make(Array_Label, .capacity = 128, .allocator = allocator),
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
     .startup_functions = dyn_array_make(Array_Value_Ptr, .capacity = 16, .allocator = allocator),
@@ -75,7 +74,6 @@ program_deinit(
     dyn_array_destroy(library->symbols);
   }
   virtual_memory_buffer_deinit(&program->memory.buffer);
-  dyn_array_destroy(program->labels);
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
@@ -86,10 +84,10 @@ program_deinit(
 static void
 program_set_label_offset(
   Program *program,
-  Label_Index label_index,
+  Label *label,
   u32 offset_in_section
 ) {
-  Label *label = program_get_label(program, label_index);
+  assert(label->program == program);
   label->resolved = true;
   label->offset_in_section = offset_in_section;
 }
@@ -98,9 +96,9 @@ static inline void
 program_resolve_label(
   Program *program,
   Virtual_Memory_Buffer *buffer,
-  Label_Index label_index
+  Label *label
 ) {
-  Label *label = program_get_label(program, label_index);
+  assert(label->program == program);
   assert(!label->resolved);
   label->section = &program->memory.code;
   label->offset_in_section = u64_to_u32(buffer->occupied);
@@ -117,11 +115,10 @@ program_patch_labels(
     ++patch_index
   ) {
     Label_Location_Diff_Patch_Info *info = dyn_array_get(program->patch_info_array, patch_index);
-    Label *target_label = program_get_label(program, info->target_label_index);
-    assert(target_label->resolved);
+    assert(info->target->resolved);
 
     s64 from_rva = program_resolve_label_to_rva(program, &info->from);
-    s64 target_rva = program_resolve_label_to_rva(program, target_label);
+    s64 target_rva = program_resolve_label_to_rva(program, info->target);
 
     s64 diff = target_rva - from_rva;
     *info->patch_target = s64_to_s32(diff);
@@ -185,7 +182,7 @@ import_symbol(
   Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
-    Label_Index label = make_label(program, &program->memory.ro_data, symbol_name);
+    Label *label = make_label(context->allocator, program, &program->memory.ro_data, symbol_name);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .label32 = label,
@@ -226,8 +223,7 @@ program_jit_imports(
 
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      Label *label = program_get_label(program, symbol->label32);
-      if (!label->resolved) {
+      if (!symbol->label32->resolved) {
         char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque address = (fn_type_opaque)callbacks->load_symbol(handle, symbol_name);
         if (!address) return mass_error((Mass_Error) {
@@ -239,8 +235,8 @@ program_jit_imports(
           }
         });
         u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
-        label->offset_in_section = u64_to_u32(offset);
-        label->resolved = true;
+        symbol->label32->offset_in_section = u64_to_u32(offset);
+        symbol->label32->resolved = true;
       }
     }
   }
@@ -258,12 +254,12 @@ program_jit_resolve_relocations(
     Relocation *relocation = dyn_array_get(program->relocations, i);
     assert(storage_is_label(&relocation->patch_at));
     assert(storage_is_label(&relocation->address_of));
-    Label_Index patch_at_index =
-      relocation->patch_at.Memory.location.Instruction_Pointer_Relative.label_index;
-    Label_Index address_of_index =
-      relocation->address_of.Memory.location.Instruction_Pointer_Relative.label_index;
-    void *address_of = rip_value_pointer_from_label_index(program, address_of_index);
-    void **patch_at = rip_value_pointer_from_label_index(program, patch_at_index);
+    void *address_of = rip_value_pointer_from_label(
+      relocation->patch_at.Memory.location.Instruction_Pointer_Relative.label
+    );
+    void **patch_at = rip_value_pointer_from_label(
+      relocation->address_of.Memory.location.Instruction_Pointer_Relative.label
+    );
     *patch_at = address_of;
   }
   jit->previous_counts.relocations = relocation_count;

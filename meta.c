@@ -1224,22 +1224,18 @@ main(void) {
     { "Xmm15", 0b11111 },
   }));
 
-  push_type(type_struct("Label_Index", (Struct_Item[]){
-    { "const Program *", "program" },
-    { "u64", "value" },
-  }));
-
   push_type(type_struct("Label", (Struct_Item[]){
     { "u32", "resolved" },
     { "u32", "offset_in_section" },
     { "Slice", "name" },
     { "Section *", "section" },
+    { "const Program *", "program" },
   }));
 
   push_type(type_struct("Label_Location_Diff_Patch_Info", (Struct_Item[]){
-    { "Label_Index", "target_label_index" },
+    { "Label *", "target" },
     { "Label", "from" },
-    { "s32 *", "patch_target" },
+    { "s32 *", "patch_target" }, // FIXME rename to patch_at
   }));
 
   push_type(type_enum("Number_Base", (Enum_Type_Item[]){
@@ -1276,7 +1272,7 @@ main(void) {
 
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
-    { "Label_Index", "label32" },
+    { "Label *", "label32" },
   }));
 
   push_type(type_struct("Import_Library", (Struct_Item[]){
@@ -1309,7 +1305,7 @@ main(void) {
 
   push_type(type_union("Memory_Location", (Struct_Type[]){
     struct_fields("Instruction_Pointer_Relative", (Struct_Item[]){
-      { "Label_Index", "label_index" },
+      { "Label *", "label" },
     }),
     struct_fields("Indirect", (Struct_Item[]){
       { "Register", "base_register" },
@@ -1376,7 +1372,7 @@ main(void) {
 
   push_type(add_common_fields(type_union("Instruction", (Struct_Type[]){
     struct_fields("Label", (Struct_Item[]){
-      { "Label_Index", "index" },
+      { "Label *", "pointer" },
     }),
     struct_fields("Bytes", (Struct_Item[]){
       { "u8", "memory", 15 },
@@ -1384,7 +1380,7 @@ main(void) {
     }),
     struct_fields("Label_Patch", (Struct_Item[]){
       { "s64", "offset" },
-      { "Label_Index", "label_index" },
+      { "Label *", "label" },
     }),
     struct_fields("Stack_Patch", (Struct_Item[]){
       { "s32", "mod_r_m_offset_in_previous_instruction" },
@@ -1404,8 +1400,8 @@ main(void) {
 
   push_type(type_struct("Code_Block", (Struct_Item[]){
     { "const Allocator *", "allocator" },
-    { "Label_Index", "start_label" },
-    { "Label_Index", "end_label" },
+    { "Label *", "start_label" },
+    { "Label *", "end_label" },
     { "Instruction_Bucket *", "first_bucket" },
     { "Instruction_Bucket *", "last_bucket" },
   }));
@@ -1837,7 +1833,6 @@ main(void) {
 
   push_type(type_struct("Program", (Struct_Item[]){
     { "Array_Import_Library", "import_libraries" },
-    { "Array_Label", "labels" },
     { "Array_Label_Location_Diff_Patch_Info", "patch_info_array" },
     { "Array_Value_Ptr", "startup_functions" },
     { "Array_Relocation", "relocations" },
