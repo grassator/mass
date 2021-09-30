@@ -1035,37 +1035,6 @@ storage_equal(
   return false;
 }
 
-static inline bool
-instruction_equal(
-  const Instruction *a,
-  const Instruction *b
-) {
-  if (a->tag != b->tag) return false;
-  switch(a->tag) {
-    case Instruction_Tag_Label: {
-      return a->Label.index.value == b->Label.index.value;
-    }
-    case Instruction_Tag_Label_Patch: {
-      return (
-        a->Label_Patch.label_index.value == b->Label_Patch.label_index.value &&
-        a->Label_Patch.offset == b->Label_Patch.offset
-      );
-    }
-    case Instruction_Tag_Stack_Patch: {
-      return (
-        a->Stack_Patch.stack_area == b->Stack_Patch.stack_area &&
-        a->Stack_Patch.mod_r_m_offset_in_previous_instruction ==
-          b->Stack_Patch.mod_r_m_offset_in_previous_instruction
-      );
-    }
-    case Instruction_Tag_Bytes: {
-      if (a->Bytes.length != b->Bytes.length) return false;
-      return memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length) == 0;
-    }
-  }
-  return true;
-}
-
 static inline Value *
 value_init(
   Value *result,
