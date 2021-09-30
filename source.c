@@ -4154,7 +4154,6 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_a = value_temporary_acquire_register_for_descriptor(
         context, builder, Register_A, descriptor, result_range
       );
-      temp_a->is_temporary = true;
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(context, builder, &expected_a, payload->lhs);
 
