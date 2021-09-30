@@ -5350,7 +5350,8 @@ static Value *
 token_parse_intrinsic_literal(
   Execution_Context *context,
   Value_View view,
-  const Function_Info *info
+  const Function_Info *info,
+  u64 *match_length
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5358,13 +5359,7 @@ token_parse_intrinsic_literal(
   TOKEN_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("intrinsic"));
   TOKEN_EXPECT_MATCH(body, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
-  if (peek_index != view.length) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = value_view_rest(&view, peek_index).source_range,
-    });
-    return 0;
-  }
+  *match_length = peek_index;
 
   const u64 tokens_per_argument = 8;
   Array_Value_Ptr wrapped_body_children = dyn_array_make(
@@ -5590,6 +5585,14 @@ token_parse_function_literal(
 
   TOKEN_MAYBE_MATCH(body_value, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
   if (!body_value) {
+    u64 intrinsic_match_length = 0;
+    Value_View rest = value_view_rest(&view, peek_index);
+    body_value = token_parse_intrinsic_literal(context, rest, fn_info, &intrinsic_match_length);
+    if (body_value) {
+      peek_index += intrinsic_match_length;
+    }
+  }
+  if (!body_value) {
     Value_View rest = value_view_match_till(view, &peek_index, end_pattern);
     if (is_macro) {
       context_error(context, (Mass_Error) {
@@ -5599,15 +5602,11 @@ token_parse_function_literal(
       });
       return 0;
     }
-    if (rest.length) {
-      // FIXME should match as a compile time expression right away
-      body_value = token_parse_intrinsic_literal(context, rest, fn_info);
-      if (!body_value) body_value = compile_time_eval(context, rest);
-    }
+    if (rest.length) body_value = compile_time_eval(context, rest);
   }
   MASS_ON_ERROR(*context->result) return 0;
 
-  *matched_length = view.length;
+  *matched_length = peek_index;
 
   if (at) {
     fn_info->flags |= Function_Info_Flags_Compile_Time;
