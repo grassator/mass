@@ -367,6 +367,16 @@ x86_64_system_v_classify(
   const Descriptor *descriptor
 );
 
+static inline bool
+x86_64_system_v_has_unaligned(
+  System_V_Aggregate_Iterator it
+) {
+  while(system_v_item_iterator_next(&it)) {
+    if (it.offset % descriptor_byte_alignment(it.item) != 0) return true;
+  }
+  return false;
+}
+
 static System_V_Classification
 x86_64_system_v_classify_aggregate(
   const Allocator *allocator,
@@ -375,10 +385,9 @@ x86_64_system_v_classify_aggregate(
   u64 byte_size = descriptor_byte_size(it->aggregate);
   u64 eightbyte = 8;
 
-  bool has_unaligned = false; // FIXME calculate this
   // 1. If the size of an object is larger than eight eightbytes,
   // or it contains unaligned fields, it has class MEMORY
-  if (byte_size > 8 * eightbyte || has_unaligned) {
+  if (byte_size > 8 * eightbyte || x86_64_system_v_has_unaligned(*it)) {
     return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = it->aggregate };
   }
   // 2. If a C++ object is non-trivial for the purpose of calls, as specified in the
