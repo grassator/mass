@@ -36,33 +36,27 @@ value_is_non_lazy_static(
 
 static inline Slice
 source_from_source_range(
+  Compilation *compilation,
   const Source_Range *source_range
 ) {
-  if (!source_range->file) return (Slice){0};
+  if (!source_range->file_index.as_u32) return (Slice){0};
+  const Source_File *file = dyn_array_get(compilation->source_files, source_range->file_index.as_u32);
   Range_u64 offsets = {source_range->offsets.from, source_range->offsets.to};
-  return slice_sub_range(source_range->file->text,offsets);
-}
-
-static inline Source_Range
-source_range_from_source_file(
-  Source_File *file
-) {
-  return (Source_Range) {
-    .file = file,
-    .offsets = { .from = 0, .to = u64_to_u32(file->text.length), },
-  };
+  return slice_sub_range(file->text,offsets);
 }
 
 static void
 source_range_print_start_position(
+  Compilation *compilation,
   const Source_Range *source_range
 ) {
-  if (!source_range->file) {
+  if (!source_range->file_index.as_u32) {
     printf(":(0:0)\n");
     return;
   }
   Source_Position from_position = {.line = 1, .column = 0};
-  Slice source = source_range->file->text;
+  const Source_File *file = dyn_array_get(compilation->source_files, source_range->file_index.as_u32);
+  Slice source = file->text;
   u64 line_start_offset = 0;
   for (u64 i = 0; i < source.length; ++i) {
     if (source.bytes[i] != '\n') continue;
@@ -73,7 +67,7 @@ source_range_print_start_position(
     line_start_offset = i + 1;
   }
   from_position.column = source_range->offsets.from - line_start_offset;
-  slice_print(source_range->file->path);
+  slice_print(file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
 #define APPEND_SLICE(_SLICE_)\
@@ -115,6 +109,7 @@ mass_error_append_function_signature_string(
 
 static Fixed_Buffer *
 mass_error_to_string(
+  Compilation *compilation,
   Mass_Error const* error
 ) {
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
@@ -213,7 +208,7 @@ mass_error_to_string(
     } break;
     case Mass_Error_Tag_Epoch_Mismatch: {
       APPEND_LITERAL("Trying to access a value from the wrong execution epoch ");
-      Slice source = source_from_source_range(&error->source_range);
+      Slice source = source_from_source_range(compilation, &error->source_range);
       APPEND_SLICE(source);
       APPEND_LITERAL(".\n");
       APPEND_LITERAL(
@@ -230,13 +225,13 @@ mass_error_to_string(
     } break;
     case Mass_Error_Tag_Non_Function_Overload: {
       APPEND_LITERAL("Trying to define a non-function overload ");
-      Slice source = source_from_source_range(&error->source_range);
+      Slice source = source_from_source_range(compilation, &error->source_range);
       APPEND_SLICE(source);
     } break;
     case Mass_Error_Tag_No_Matching_Overload: {
       // TODO provide better error message with argument types
       APPEND_LITERAL("Could not find matching overload for call ");
-      Slice source = source_from_source_range(&error->source_range);
+      Slice source = source_from_source_range(compilation, &error->source_range);
       APPEND_SLICE(source);
     } break;
   }
@@ -1686,11 +1681,14 @@ compilation_init(
   const Calling_Convention *target_calling_convention
 ) {
   *compilation = (Compilation) {
+    .source_files = dyn_array_make(Array_Source_File),
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
     .symbol_cache_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .jit = {0},
   };
+  // First source-file is resered as an invalid value
+  dyn_array_push(compilation->source_files, (Source_File){0});
 
   // Get 16 gigabytes of virtual permanent space
   virtual_memory_buffer_init(&compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024);
@@ -1720,6 +1718,7 @@ static void
 compilation_deinit(
   Compilation *compilation
 ) {
+  dyn_array_destroy(compilation->source_files);
   hash_map_destroy(compilation->module_map);
   hash_map_destroy(compilation->static_pointer_map);
   hash_map_destroy(compilation->symbol_cache_map);
@@ -1727,6 +1726,18 @@ compilation_deinit(
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);
   virtual_memory_buffer_deinit(&compilation->temp_buffer);
+}
+
+static inline Source_File_Index
+compilation_register_source_file(
+  Compilation *compilation,
+  Source_File file
+) {
+  Source_File_Index file_index = {
+    .as_u32 = u64_to_u32(dyn_array_length(compilation->source_files))
+  };
+  dyn_array_push(compilation->source_files, file);
+  return file_index;
 }
 
 static inline bool

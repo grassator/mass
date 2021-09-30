@@ -17,6 +17,10 @@ typedef struct Source_File Source_File;
 typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
 typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
 
+typedef struct Source_File_Index Source_File_Index;
+typedef dyn_array_type(Source_File_Index *) Array_Source_File_Index_Ptr;
+typedef dyn_array_type(const Source_File_Index *) Array_Const_Source_File_Index_Ptr;
+
 typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
@@ -600,7 +604,7 @@ typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
-typedef u64 (*Token_Statement_Matcher_Proc)
+typedef u32 (*Token_Statement_Matcher_Proc)
   (Execution_Context * context, Value_View view, Lazy_Value * out_lazy_value, void * payload);
 
 typedef struct Symbol_Map Symbol_Map;
@@ -877,8 +881,13 @@ typedef struct Source_File {
 } Source_File;
 typedef dyn_array_type(Source_File) Array_Source_File;
 
+typedef struct Source_File_Index {
+  u32 as_u32;
+} Source_File_Index;
+typedef dyn_array_type(Source_File_Index) Array_Source_File_Index;
+
 typedef struct Source_Range {
-  const Source_File * file;
+  Source_File_Index file_index;
   Range_u32 offsets;
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
@@ -897,6 +906,7 @@ typedef struct Module_Exports {
   char _tag_padding[4];
   Scope * scope;
   Source_Range source_range;
+  u32 _source_range_padding;
   union {
     Module_Exports_Selective Selective;
   };
@@ -909,6 +919,7 @@ module_exports_as_selective(Module_Exports *module_exports) {
 typedef dyn_array_type(Module_Exports) Array_Module_Exports;
 typedef struct Module {
   Source_Range source_range;
+  u32 _source_range_padding;
   Scope * own_scope;
   Module_Exports exports;
 } Module;
@@ -917,12 +928,13 @@ typedef dyn_array_type(Module) Array_Module;
 typedef struct Parse_Error {
   Slice message;
   Source_Range source_range;
+  u32 _source_range_padding;
 } Parse_Error;
 typedef dyn_array_type(Parse_Error) Array_Parse_Error;
 
 typedef struct Value_View {
   Value * * values;
-  u64 length;
+  u32 length;
   Source_Range source_range;
 } Value_View;
 typedef dyn_array_type(Value_View) Array_Value_View;
@@ -1043,6 +1055,7 @@ typedef struct Macro_Capture {
   Slice name;
   Value_View view;
   Source_Range source_range;
+  u32 _source_range_padding;
 } Macro_Capture;
 typedef dyn_array_type(Macro_Capture) Array_Macro_Capture;
 
@@ -1297,6 +1310,7 @@ typedef struct Instruction {
   char _tag_padding[4];
   Compiler_Source_Location compiler_source_location;
   Source_Range source_range;
+  u32 _source_range_padding;
   Scope * scope;
   union {
     Instruction_Label Label;
@@ -1392,8 +1406,8 @@ typedef dyn_array_type(User_Defined_Operator) Array_User_Defined_Operator;
 typedef struct Operator {
   Operator_Fixity fixity;
   Operator_Associativity associativity;
-  u64 precedence;
-  u64 argument_count;
+  u32 precedence;
+  u32 argument_count;
   Mass_Handle_Operator_Proc handler;
   void * handler_payload;
 } Operator;
@@ -1437,10 +1451,10 @@ typedef struct Token_Statement_Matcher {
 typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
 typedef struct Scope_Entry {
-  u64 forced;
-  u64 epoch;
   Value * value;
   Slice name;
+  u64 epoch;
+  u32 forced;
   Source_Range source_range;
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
@@ -1514,13 +1528,14 @@ typedef struct Declaration {
   const Descriptor * descriptor;
   const Symbol * symbol;
   Source_Range source_range;
+  u32 _source_range_padding;
 } Declaration;
 typedef dyn_array_type(Declaration) Array_Declaration;
 
 typedef struct Value {
   const Descriptor * descriptor;
   Storage storage;
-  u64 is_temporary;
+  u32 is_temporary;
   Source_Range source_range;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
@@ -1589,10 +1604,9 @@ typedef struct Memory_Layout_Item {
   Memory_Layout_Item_Tag tag;
   char _tag_padding[4];
   Memory_Layout_Item_Flags flags;
-  u32 _flags_padding;
+  Source_Range source_range;
   const Descriptor * descriptor;
   Slice name;
-  Source_Range source_range;
   union {
     Memory_Layout_Item_Absolute Absolute;
     Memory_Layout_Item_Base_Relative Base_Relative;
@@ -1817,7 +1831,6 @@ typedef struct Mass_Error_User_Defined {
 } Mass_Error_User_Defined;
 typedef struct Mass_Error_Circular_Dependency {
   Slice name;
-  Source_Range previous_source_range;
 } Mass_Error_Circular_Dependency;
 typedef struct Mass_Error_Integer_Range {
   const Descriptor * descriptor;
@@ -1849,7 +1862,6 @@ typedef struct Mass_Error_Undefined_Variable {
 } Mass_Error_Undefined_Variable;
 typedef struct Mass_Error_Redifinition {
   Slice name;
-  Source_Range previous_source_range;
 } Mass_Error_Redifinition;
 typedef struct Mass_Error_Unknown_Field {
   const Descriptor * type;
@@ -2048,6 +2060,7 @@ typedef struct Compilation {
   Module compiler_module;
   Static_Pointer_Map * static_pointer_map;
   Imported_Module_Map * module_map;
+  Array_Source_File source_files;
   Scope * root_scope;
   Program * runtime_program;
   Mass_Result * result;
@@ -2108,6 +2121,11 @@ static Descriptor descriptor_array_source_file;
 static Descriptor descriptor_array_source_file_ptr;
 static Descriptor descriptor_source_file_pointer;
 static Descriptor descriptor_source_file_pointer_pointer;
+static Descriptor descriptor_source_file_index;
+static Descriptor descriptor_array_source_file_index;
+static Descriptor descriptor_array_source_file_index_ptr;
+static Descriptor descriptor_source_file_index_pointer;
+static Descriptor descriptor_source_file_index_pointer_pointer;
 static Descriptor descriptor_source_range;
 static Descriptor descriptor_array_source_range;
 static Descriptor descriptor_array_source_range_ptr;
@@ -2816,14 +2834,25 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_file, Source_File,
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_file);
+MASS_DEFINE_OPAQUE_C_TYPE(array_source_file_index_ptr, Array_Source_File_Index_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_source_file_index, Array_Source_File_Index)
+MASS_DEFINE_STRUCT_DESCRIPTOR(source_file_index, Source_File_Index,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("as_u32"),
+    .Base_Relative.offset = offsetof(Source_File_Index, as_u32),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(source_file_index);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_range_ptr, Array_Source_Range_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_range, Array_Source_Range)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_range, Source_Range,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_source_file_pointer,
-    .name = slice_literal_fields("file"),
-    .Base_Relative.offset = offsetof(Source_Range, file),
+    .descriptor = &descriptor_source_file_index,
+    .name = slice_literal_fields("file_index"),
+    .Base_Relative.offset = offsetof(Source_Range, file_index),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2872,6 +2901,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module_exports, Module_Exports,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_source_range_padding"),
+    .Base_Relative.offset = offsetof(Module_Exports, _source_range_padding),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("Selective"),
     .descriptor = &descriptor_module_exports_selective,
     .Base_Relative.offset = offsetof(Module_Exports, Selective),
@@ -2887,6 +2922,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module, Module,
     .descriptor = &descriptor_source_range,
     .name = slice_literal_fields("source_range"),
     .Base_Relative.offset = offsetof(Module, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_source_range_padding"),
+    .Base_Relative.offset = offsetof(Module, _source_range_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2917,6 +2958,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error, Parse_Error,
     .name = slice_literal_fields("source_range"),
     .Base_Relative.offset = offsetof(Parse_Error, source_range),
   },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_source_range_padding"),
+    .Base_Relative.offset = offsetof(Parse_Error, _source_range_padding),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(parse_error);
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_view_ptr, Array_Value_View_Ptr)
@@ -2930,7 +2977,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_view, Value_View,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_u32,
     .name = slice_literal_fields("length"),
     .Base_Relative.offset = offsetof(Value_View, length),
   },
@@ -3285,6 +3332,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(macro_capture, Macro_Capture,
     .descriptor = &descriptor_source_range,
     .name = slice_literal_fields("source_range"),
     .Base_Relative.offset = offsetof(Macro_Capture, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_source_range_padding"),
+    .Base_Relative.offset = offsetof(Macro_Capture, _source_range_padding),
   },
 );
 MASS_DEFINE_TYPE_VALUE(macro_capture);
@@ -3831,6 +3884,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_source_range_padding"),
+    .Base_Relative.offset = offsetof(Instruction, _source_range_padding),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_scope_pointer,
     .name = slice_literal_fields("scope"),
     .Base_Relative.offset = offsetof(Instruction, scope),
@@ -4164,13 +4223,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_u32,
     .name = slice_literal_fields("precedence"),
     .Base_Relative.offset = offsetof(Operator, precedence),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_u32,
     .name = slice_literal_fields("argument_count"),
     .Base_Relative.offset = offsetof(Operator, argument_count),
   },
@@ -4279,18 +4338,6 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry, Array_Scope_Entry)
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("forced"),
-    .Base_Relative.offset = offsetof(Scope_Entry, forced),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("epoch"),
-    .Base_Relative.offset = offsetof(Scope_Entry, epoch),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("value"),
     .Base_Relative.offset = offsetof(Scope_Entry, value),
@@ -4300,6 +4347,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
     .descriptor = &descriptor_slice,
     .name = slice_literal_fields("name"),
     .Base_Relative.offset = offsetof(Scope_Entry, name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("epoch"),
+    .Base_Relative.offset = offsetof(Scope_Entry, epoch),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("forced"),
+    .Base_Relative.offset = offsetof(Scope_Entry, forced),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4501,6 +4560,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(declaration, Declaration,
     .name = slice_literal_fields("source_range"),
     .Base_Relative.offset = offsetof(Declaration, source_range),
   },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_source_range_padding"),
+    .Base_Relative.offset = offsetof(Declaration, _source_range_padding),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(declaration);
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
@@ -4520,7 +4585,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_u32,
     .name = slice_literal_fields("is_temporary"),
     .Base_Relative.offset = offsetof(Value, is_temporary),
   },
@@ -4712,9 +4777,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item, Memory_Layout_Item,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("_flags_padding"),
-    .Base_Relative.offset = offsetof(Memory_Layout_Item, _flags_padding),
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .Base_Relative.offset = offsetof(Memory_Layout_Item, source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4727,12 +4792,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item, Memory_Layout_Item,
     .descriptor = &descriptor_slice,
     .name = slice_literal_fields("name"),
     .Base_Relative.offset = offsetof(Memory_Layout_Item, name),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .Base_Relative.offset = offsetof(Memory_Layout_Item, source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5247,12 +5306,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_circular_dependency, Mass_Error_Circula
     .name = slice_literal_fields("name"),
     .Base_Relative.offset = offsetof(Mass_Error_Circular_Dependency, name),
   },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("previous_source_range"),
-    .Base_Relative.offset = offsetof(Mass_Error_Circular_Dependency, previous_source_range),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_circular_dependency);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_integer_range, Mass_Error_Integer_Range,
@@ -5357,12 +5410,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_redifinition, Mass_Error_Redifinition,
     .descriptor = &descriptor_slice,
     .name = slice_literal_fields("name"),
     .Base_Relative.offset = offsetof(Mass_Error_Redifinition, name),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("previous_source_range"),
-    .Base_Relative.offset = offsetof(Mass_Error_Redifinition, previous_source_range),
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_redifinition);
@@ -5782,6 +5829,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_imported_module_map_pointer,
     .name = slice_literal_fields("module_map"),
     .Base_Relative.offset = offsetof(Compilation, module_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_array_source_file,
+    .name = slice_literal_fields("source_files"),
+    .Base_Relative.offset = offsetof(Compilation, source_files),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -177,7 +177,7 @@ scope_maybe_find_common_ancestor(
   return 0;
 }
 
-static inline u64
+static inline u32
 token_statement_matcher_in_scopes(
   Execution_Context *context,
   Value_View view,
@@ -188,7 +188,7 @@ token_statement_matcher_in_scopes(
   for (; scope && scope->id != common_ancestor_id; scope = scope->parent) {
     const Scope_Using *using = scope->maybe_using;
     for (; using; using = using->next) {
-      u64 match_length = token_statement_matcher_in_scopes(
+      u32 match_length = token_statement_matcher_in_scopes(
         context, view, out_lazy_value, using->scope, using->common_ancestor_id
       );
       if (match_length) return match_length;
@@ -197,7 +197,7 @@ token_statement_matcher_in_scopes(
     // to have higher precedence when parsing
     const Token_Statement_Matcher *matcher = scope->statement_matcher;
     for (; matcher; matcher = matcher->previous) {
-      u64 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
+      u32 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
       MASS_ON_ERROR(*context->result) return 0;
       if (match_length) return match_length;
     }
@@ -1221,7 +1221,7 @@ static inline Value_View
 temp_token_array_into_value_view(
   const Allocator *allocator,
   Value **children,
-  u64 child_count,
+  u32 child_count,
   Source_Range children_range
 ) {
   Value_View result = { .values = 0, .length = child_count, .source_range = children_range };
@@ -1346,7 +1346,7 @@ tokenizer_group_end(
   u64 child_count = dyn_array_length(*stack) - parent->index - 1;
 
   Value_View children = temp_token_array_into_value_view(
-    allocator, children_values, child_count, children_range
+    allocator, children_values, u64_to_u32(child_count), children_range
   );
   assert(parent_value->storage.tag == Storage_Tag_None);
   if (parent->descriptor == &descriptor_group_paren) {
@@ -1454,7 +1454,7 @@ value_view_array_push(
 
 typedef struct {
   Value_View view;
-  u64 index;
+  u32 index;
   bool done;
 } Value_View_Split_Iterator;
 
@@ -1464,7 +1464,7 @@ token_split_next(
   const Token_Pattern *separator
 ) {
   if (it->done) return (Value_View){0};
-  u64 start_index = it->index;
+  u32 start_index = it->index;
   for (
     ;
     it->index < it->view.length;
@@ -1511,10 +1511,10 @@ value_ensure_type(
 static inline Value_View
 value_view_match_till(
   Value_View view,
-  u64 *peek_index,
+  u32 *peek_index,
   const Token_Pattern *end_pattern
 ) {
-  u64 start_index = *peek_index;
+  u32 start_index = *peek_index;
   if (!end_pattern) {
     *peek_index = view.length;
     return value_view_rest(&view, start_index);
@@ -1532,7 +1532,7 @@ value_view_match_till(
 static inline Value_View
 value_view_match_till_end_of_statement(
   Value_View view,
-  u64 *peek_index
+  u32 *peek_index
 ) {
   return value_view_match_till(view, peek_index, &token_pattern_semicolon);
 }
@@ -1583,7 +1583,7 @@ token_parse_tuple(
   Value_View view
 ) {
   Value_View remaining = view;
-  u64 match_length = 0;
+  u32 match_length = 0;
 
   Value *result_value = 0;
 
@@ -1608,7 +1608,7 @@ token_parse_single(
   Value *value
 ) {
   if (value->descriptor == &descriptor_group_paren) {
-    return token_parse_expression(context, value_as_group_paren(value)->children, &(u64){0}, 0);
+    return token_parse_expression(context, value_as_group_paren(value)->children, &(u32){0}, 0);
   } else if (value->descriptor == &descriptor_group_curly) {
     return token_parse_block(context, value_as_group_curly(value));
   } else if (value->descriptor == &descriptor_group_square) {
@@ -1652,18 +1652,18 @@ typedef enum {
   Macro_Match_Mode_Statement
 } Macro_Match_Mode;
 
-static u64
+static u32
 token_match_pattern(
   Value_View view,
   Array_Macro_Pattern macro_pattern,
   Array_Value_View *out_match,
   Macro_Match_Mode mode
 ) {
-  u64 pattern_length = dyn_array_length(macro_pattern);
+  u32 pattern_length = u64_to_u32(dyn_array_length(macro_pattern));
   if (!pattern_length) panic("Zero-length pattern does not make sense");
 
-  u64 pattern_index = 0;
-  u64 view_index = 0;
+  u32 pattern_index = 0;
+  u32 view_index = 0;
 
   for (; pattern_index < pattern_length && view_index < view.length; pattern_index++) {
     Macro_Pattern *pattern = dyn_array_get(macro_pattern, pattern_index);
@@ -1681,7 +1681,7 @@ token_match_pattern(
         break;
       }
       case Macro_Pattern_Tag_Any_Token_Sequence: {
-        u64 any_token_start_view_index = view_index;
+        u32 any_token_start_view_index = view_index;
         Macro_Pattern *peek = pattern_index + 1 < pattern_length
           ? dyn_array_get(macro_pattern, pattern_index + 1)
           : 0;
@@ -1767,7 +1767,7 @@ token_apply_macro_syntax(
   if (body_context.flags & Execution_Context_Flags_Global) {
     result = compile_time_eval(&body_context, macro->replacement);
   } else {
-    result = token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
+    result = token_parse_expression(&body_context, macro->replacement, &(u32){0}, 0);
   }
   // The result of the expansion should map to the source range of the match
   if (result) result->source_range = source_range;
@@ -1785,7 +1785,7 @@ mass_handle_statement_lazy_proc(
   return value_force(context, builder, expected_result, lazy_value);
 }
 
-static u64
+static u32
 token_parse_macro_statement(
   Execution_Context *context,
   Value_View value_view,
@@ -1802,7 +1802,7 @@ token_parse_macro_statement(
     .capacity = 32,
   );
 
-  u64 match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
+  u32 match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
   if (!match_length) goto defer;
 
   Value_View rest = value_view_rest(&value_view, match_length);
@@ -1860,10 +1860,10 @@ token_maybe_split_on_operator(
   Value_View *rhs,
   Value **operator_token
 ) {
-  u64 lhs_end = 0;
-  u64 rhs_start = 0;
+  u32 lhs_end = 0;
+  u32 rhs_start = 0;
   bool found = false;
-  for (u64 i = 0; i < view.length; ++i) {
+  for (u32 i = 0; i < view.length; ++i) {
     Value *token = value_view_get(view, i);
     if (value_match_symbol(token, operator)) {
       *operator_token = token;
@@ -1975,7 +1975,7 @@ token_match_argument(
     }
     name_token = value_view_get(definition, 0);
     Value *parsed_default_expression =
-      token_parse_expression(context, default_expression, &(u64){0}, 0);
+      token_parse_expression(context, default_expression, &(u32){0}, 0);
     descriptor = deduce_runtime_descriptor_for_value(context, parsed_default_expression);
   } else {
     Value_View name_tokens;
@@ -2236,7 +2236,7 @@ token_match_call_arguments(
   while (!it.done) {
     if (context->result->tag != Mass_Result_Tag_Success) return;
     Value_View view = token_split_next(&it, &token_pattern_comma_operator);
-    Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
+    Value *parse_result = token_parse_expression(context, view, &(u32){0}, 0);
     dyn_array_push(*out_args, parse_result);
   }
 }
@@ -2374,7 +2374,7 @@ mass_exports(
   return result;
 }
 
-static u64
+static u32
 token_parse_operator_definition(
   Execution_Context *context,
   Value_View view,
@@ -2385,7 +2385,7 @@ token_parse_operator_definition(
 
   User_Defined_Operator *user_defined_operator = 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
   TOKEN_MAYBE_MATCH(intrinsic_token, TOKEN_PATTERN_SYMBOL("intrinsic"));
   TOKEN_EXPECT(precedence_token);
@@ -2409,7 +2409,7 @@ token_parse_operator_definition(
   MASS_ON_ERROR(*context->result) goto err;
 
   assert(precedence_value->storage.tag == Storage_Tag_Static);
-  u64 precendence = storage_static_value_up_to_u64(&precedence_value->storage);
+  u32 precendence = u64_to_u32(storage_static_value_up_to_u64(&precedence_value->storage));
 
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
@@ -2547,7 +2547,7 @@ mass_import(
   return 0;
 }
 
-static u64
+static u32
 token_parse_syntax_definition(
   Execution_Context *context,
   Value_View view,
@@ -2556,7 +2556,7 @@ token_parse_syntax_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(name, TOKEN_PATTERN_SYMBOL("syntax"));
   TOKEN_EXPECT_MATCH(statement_token, TOKEN_PATTERN_SYMBOL("statement"));
 
@@ -2671,7 +2671,7 @@ token_match_struct_field(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return false;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(symbol, .tag = Token_Pattern_Tag_Symbol);
   TOKEN_MATCH(define, TOKEN_PATTERN_SYMBOL(":"));
 
@@ -2818,10 +2818,10 @@ compile_time_eval(
         context->allocator, jit->program, section, slice_literal("compile_time_eval_end")
       ),
     },
-    .source = source_from_source_range(source_range),
+    .source = source_from_source_range(context->compilation, source_range),
   };
 
-  Value *expression_result_value = token_parse_expression(&eval_context, view, &(u64){0}, 0);
+  Value *expression_result_value = token_parse_expression(&eval_context, view, &(u32){0}, 0);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
     return 0;
@@ -3109,7 +3109,7 @@ token_handle_operator(
   return true;
 }
 
-static u64
+static u32
 token_parse_constant_definitions(
   Execution_Context *context,
   Value_View view,
@@ -3122,7 +3122,7 @@ token_parse_constant_definitions(
   Value_View rhs;
   Value *operator;
 
-  u64 statement_length = 0;
+  u32 statement_length = 0;
   view = value_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
     return 0;
@@ -3247,7 +3247,7 @@ mass_handle_macro_call(
         assert(default_expression.length);
         Execution_Context arg_context = *context;
         arg_context.scope = body_scope;
-        arg_value = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+        arg_value = token_parse_expression(&arg_context, default_expression, &(u32){0}, 0);
       } else {
         arg_value = value_view_get(args_view, i);
       }
@@ -3395,7 +3395,7 @@ call_function_overload(
         assert(default_expression.length);
         Execution_Context arg_context = *context;
         arg_context.scope = default_arguments_scope;
-        source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+        source_arg = token_parse_expression(&arg_context, default_expression, &(u32){0}, 0);
         MASS_ON_ERROR(*arg_context.result) return 0;
       }
     } else {
@@ -5085,7 +5085,7 @@ mass_handle_dot_operator(
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
           .Unknown_Field = {
-            .name = source_from_source_range(&rhs_range),
+            .name = source_from_source_range(context->compilation, &rhs_range),
             .type = unwrapped_descriptor,
           },
         });
@@ -5185,7 +5185,7 @@ token_dispatch_operator(
 
   Operator *operator = stack_entry->operator;
 
-  u64 argument_count = operator->argument_count;
+  u32 argument_count = operator->argument_count;
 
   if (dyn_array_length(*stack) < argument_count) {
     context_error(context, (Mass_Error) {
@@ -5199,16 +5199,12 @@ token_dispatch_operator(
   u64 start_index = dyn_array_length(*stack) - argument_count;
   Value *first_arg = *dyn_array_get(*stack, start_index);
   Value *last_arg = *dyn_array_last(*stack);
+  Source_Range source_range = last_arg->source_range;
+  source_range.offsets.from = first_arg->source_range.offsets.from;
   Value_View args_view = {
     .values = dyn_array_get(*stack, start_index),
     .length = argument_count,
-    .source_range = {
-      .file = last_arg->source_range.file,
-      .offsets = {
-        .from = first_arg->source_range.offsets.from,
-        .to = last_arg->source_range.offsets.to,
-      },
-    },
+    .source_range = source_range,
   };
 
   assert(operator->handler);
@@ -5286,12 +5282,12 @@ static Value *
 token_parse_if_expression(
   Execution_Context *context,
   Value_View view,
-  u64 *matched_length,
+  u32 *matched_length,
   const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("if"));
 
   Source_Range dummy_range = keyword->source_range;
@@ -5306,7 +5302,7 @@ token_parse_if_expression(
       .Symbol.name = slice_literal_fields("then"),
     };
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
-    u64 condition_length;
+    u32 condition_length;
     payload->condition =
       token_parse_expression(context, condition_view, &condition_length, &then_pattern);
     peek_index += condition_length;
@@ -5319,7 +5315,7 @@ token_parse_if_expression(
       .Symbol.name = slice_literal_fields("else"),
     };
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
-    u64 then_length;
+    u32 then_length;
     payload->then = token_parse_expression(context, then_view, &then_length, &else_pattern);
     peek_index += then_length;
     MASS_ON_ERROR(*context->result) return 0;
@@ -5327,7 +5323,7 @@ token_parse_if_expression(
 
   {
     Value_View else_view = value_view_slice(&view, peek_index, view.length);
-    u64 else_length;
+    u32 else_length;
     payload->else_ = token_parse_expression(context, else_view, &else_length, end_pattern);
     peek_index += else_length;
   }
@@ -5378,11 +5374,11 @@ token_parse_intrinsic_literal(
   Execution_Context *context,
   Value_View view,
   const Function_Info *info,
-  u64 *match_length
+  u32 *match_length
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("intrinsic"));
   TOKEN_EXPECT_MATCH(body, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
@@ -5562,12 +5558,12 @@ static Value *
 token_parse_function_literal(
   Execution_Context *context,
   Value_View view,
-  u64 *matched_length,
+  u32 *matched_length,
   const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   bool is_macro = false;
   TOKEN_MAYBE_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
   TOKEN_MAYBE_MATCH(keyword, TOKEN_PATTERN_SYMBOL("fn"));
@@ -5612,7 +5608,7 @@ token_parse_function_literal(
 
   TOKEN_MAYBE_MATCH(body_value, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
   if (!body_value) {
-    u64 intrinsic_match_length = 0;
+    u32 intrinsic_match_length = 0;
     Value_View rest = value_view_rest(&view, peek_index);
     body_value = token_parse_intrinsic_literal(context, rest, fn_info, &intrinsic_match_length);
     if (body_value) {
@@ -5707,7 +5703,7 @@ token_parse_function_literal(
 typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
   Value_View view,
-  u64 *out_match_length,
+  u32 *out_match_length,
   const Token_Pattern *end_pattern
 );
 
@@ -5720,7 +5716,7 @@ static PRELUDE_NO_DISCARD Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
-  u64 *out_match_length,
+  u32 *out_match_length,
   const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -5749,21 +5745,21 @@ token_parse_expression(
   );
 
   bool is_previous_an_operator = true;
-  u64 matched_length = view.length;
+  u32 matched_length = view.length;
 
   static const Expression_Matcher expression_matchers[] = {
     { .proc = token_parse_if_expression, .matches_end_of_expression = true },
     { .proc = token_parse_function_literal, .matches_end_of_expression = false },
   };
 
-  for (u64 i = 0; ; ++i) {
+  for (u32 i = 0; ; ++i) {
     repeat:
     if (i >= view.length) break;
 
     Value_View rest = value_view_rest(&view, i);
     for (u64 matcher_index = 0; matcher_index < countof(expression_matchers); matcher_index += 1) {
       const Expression_Matcher *matcher = &expression_matchers[matcher_index];
-      u64 match_length = 0;
+      u32 match_length = 0;
       Value *match_result = matcher->proc(context, rest, &match_length, end_pattern);
       MASS_ON_ERROR(*context->result) goto defer;
       if (!match_length) continue;
@@ -5856,7 +5852,7 @@ mass_handle_block_lazy_proc(
     u64 registers_before = builder ? builder->register_occupied_bitset : 0;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     Source_Range debug_source_range = lazy_statement->source_range;
-    Slice debug_source = source_from_source_range(&debug_source_range);
+    Slice debug_source = source_from_source_range(context->compilation, &debug_source_range);
     // This is an easy way to break on the statement based on source text
     if (slice_starts_with(debug_source, slice_literal("")) && false) {
       printf("%"PRIslice"\n", SLICE_EXPAND_PRINTF(debug_source));
@@ -5924,8 +5920,8 @@ token_parse_block_view(
     .capacity = 32,
   );
 
-  u64 match_length = 0;
-  for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
+  u32 match_length = 0;
+  for(u32 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) goto defer;
     Value_View rest = value_view_rest(&children_view, start_index);
     // Skipping over empty statements
@@ -6053,7 +6049,7 @@ token_parse_block(
   return token_parse_block_no_scope(&body_context, group);
 }
 
-static u64
+static u32
 token_parse_statement_using(
   Execution_Context *context,
   Value_View view,
@@ -6062,7 +6058,7 @@ token_parse_statement_using(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("using"));
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
@@ -6101,11 +6097,12 @@ mass_handle_label_lazy_proc(
 ) {
   Source_Range source_range = label_value->source_range;
   if (label_value->descriptor != &descriptor_label_pointer) {
-    Slice source = source_from_source_range(&source_range);
+    Slice source = source_from_source_range(context->compilation, &source_range);
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Redifinition,
       .source_range = source_range,
-      .Redifinition = { .name = source, .previous_source_range = label_value->source_range },
+      .other_source_range = label_value->source_range,
+      .Redifinition = { .name = source, },
       .detailed_message = slice_literal("Trying to redefine a non-label variable as a label"),
     });
     return 0;
@@ -6117,7 +6114,7 @@ mass_handle_label_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-static u64
+static u32
 token_parse_statement_label(
   Execution_Context *context,
   Value_View view,
@@ -6126,7 +6123,7 @@ token_parse_statement_label(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("label"));
   TOKEN_MAYBE_MATCH(placeholder, TOKEN_PATTERN_SYMBOL("placeholder"));
 
@@ -6194,7 +6191,7 @@ mass_handle_explicit_return_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-static u64
+static u32
 token_parse_explicit_return(
   Execution_Context *context,
   Value_View view,
@@ -6203,12 +6200,12 @@ token_parse_explicit_return(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  u64 peek_index = 0;
+  u32 peek_index = 0;
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("return"));
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   bool has_return_expression = rest.length > 0;
 
-  Value *parse_result = token_parse_expression(context, rest, &(u64){0}, 0);
+  Value *parse_result = token_parse_expression(context, rest, &(u32){0}, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(parse_result);
 
   if (descriptor == &descriptor_void && !has_return_expression) {
@@ -6340,7 +6337,7 @@ token_define_global_variable(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
+  Value *value = token_parse_expression(context, expression, &(u32){0}, 0);
   MASS_ON_ERROR(*context->result) return;
 
   const Descriptor *descriptor = deduce_runtime_descriptor_for_value(context, value);
@@ -6397,7 +6394,7 @@ token_define_local_variable(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
+  Value *value = token_parse_expression(context, expression, &(u32){0}, 0);
   MASS_ON_ERROR(*context->result) return;
   const Descriptor *variable_descriptor =
     deduce_runtime_descriptor_for_value(context, value);
@@ -6430,7 +6427,7 @@ token_define_local_variable(
   out_lazy_value->payload = assignment_payload;
 }
 
-static u64
+static u32
 token_parse_definition_and_assignment_statements(
   Execution_Context *context,
   Value_View view,
@@ -6443,7 +6440,7 @@ token_parse_definition_and_assignment_statements(
   Value_View rhs;
   Value *operator;
 
-  u64 statement_length = 0;
+  u32 statement_length = 0;
   view = value_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
     return 0;
@@ -6767,23 +6764,28 @@ program_module_from_file(
     });
     return 0;
   }
-  Source_File *source_file = allocator_allocate(context->allocator, Source_File);
-  *source_file = (Source_File) {
+  Source_File_Index file_index = compilation_register_source_file(context->compilation, (Source_File) {
     .path = file_path,
     .text = fixed_buffer_as_slice(buffer),
-  };
+  });
   if (buffer->occupied > UINT32_MAX) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Too_Large,
       .File_Too_Large = { .path = file_path },
-      .source_range = { .file = source_file, .offsets = {.from = UINT32_MAX, .to = UINT32_MAX} },
+      .source_range = {
+        .file_index = file_index,
+        .offsets = {.from = UINT32_MAX, .to = UINT32_MAX}
+      },
     });
     return 0;
   }
 
   Module *module = allocator_allocate(context->allocator, Module);
   *module = (Module) {
-    .source_range = source_range_from_source_file(source_file),
+    .source_range = {
+      .file_index = file_index,
+      .offsets = {.from = 0, .to = u64_to_u32(buffer->occupied)}
+    },
     .own_scope = scope,
   };
   return module;

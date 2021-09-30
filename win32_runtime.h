@@ -182,10 +182,11 @@ win32_instruction_for_address(
   return 0;
 }
 
-void
+static void
 win32_print_stack(
   DWORD64 stack_pointer,
   DWORD64 instruction_address,
+  Compilation *compilation,
   Jit *jit
 ) {
   s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
@@ -198,7 +199,7 @@ win32_print_stack(
   const Instruction *instruction = win32_instruction_for_address(instruction_address, jit);
   if (instruction) {
     printf("  at ");
-    source_range_print_start_position(&instruction->source_range);
+    source_range_print_start_position(compilation, &instruction->source_range);
   }
 
   Win32_Jit_Info *info = jit->platform_specific_payload;
@@ -226,7 +227,7 @@ win32_print_stack(
   //      which means there should not be any adjustment.
   stack_pointer += 0x8; // simulate return address pop with `ret` instruction
 
-  win32_print_stack(stack_pointer, return_address, jit);
+  win32_print_stack(stack_pointer, return_address, compilation, jit);
 }
 
 EXCEPTION_DISPOSITION
@@ -269,7 +270,12 @@ win32_program_test_exception_handler(
             slice_equal(command, slice_literal("backtrace")) ||
             slice_equal(command, slice_literal("bt"))
           ) {
-            win32_print_stack(ContextRecord->Rsp, ContextRecord->Rip, exception_data->jit);
+            win32_print_stack(
+              ContextRecord->Rsp,
+              ContextRecord->Rip,
+              exception_data->compilation,
+              exception_data->jit
+            );
           } else if (
             slice_equal(command, slice_literal("registers"))
           ) {
@@ -450,7 +456,12 @@ win32_program_test_exception_handler(
         break;
       }
     }
-    win32_print_stack(ContextRecord->Rsp, ContextRecord->Rip, exception_data->jit);
+    win32_print_stack(
+      ContextRecord->Rsp,
+      ContextRecord->Rip,
+      exception_data->compilation,
+      exception_data->jit
+    );
     win32_print_register_state(ContextRecord);
     exception_data->jit->is_stack_unwinding_in_progress = true;
   }

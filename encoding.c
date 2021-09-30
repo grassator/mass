@@ -441,21 +441,23 @@ push_eagerly_encoded_assembly_internal(
 ) {
   const Instruction_Encoding *encoding = encoding_match(assembly);
   if (!encoding) {
-    printf(
-      "Added in compiler at %s:%"PRIu64" (fn: %s)\n",
-      compiler_source_location.filename,
-      compiler_source_location.line_number,
-      compiler_source_location.function_name
-    );
-    printf("Source code at ");
-    source_range_print_start_position(&source_range);
-    printf("%s", assembly->mnemonic->name);
-    for (u32 storage_index = 0; storage_index < countof(assembly->operands); ++storage_index) {
-      const Storage *storage = &assembly->operands[storage_index];
-      printf(" ");
-      print_storage(storage);
-    }
-    printf("\n");
+    // FIXME Since encoding is now eager, there is no reason to carry this information
+    //       as you could see who caleld
+    //printf(
+      //"Added in compiler at %s:%"PRIu64" (fn: %s)\n",
+      //compiler_source_location.filename,
+      //compiler_source_location.line_number,
+      //compiler_source_location.function_name
+    //);
+    //printf("Source code at ");
+    //source_range_print_start_position(&source_range);
+    //printf("%s", assembly->mnemonic->name);
+    //for (u32 storage_index = 0; storage_index < countof(assembly->operands); ++storage_index) {
+      //const Storage *storage = &assembly->operands[storage_index];
+      //printf(" ");
+      //print_storage(storage);
+    //}
+    //printf("\n");
     assert(!"Did not find acceptable encoding");
   }
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);

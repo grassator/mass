@@ -1100,8 +1100,12 @@ main(void) {
     { "Slice", "text" },
   }));
 
+  push_type(type_struct("Source_File_Index", (Struct_Item[]){
+    { "u32", "as_u32" },
+  }));
+
   push_type(type_struct("Source_Range", (Struct_Item[]){
-    { "const Source_File *", "file" },
+    { "Source_File_Index", "file_index" },
     { "Range_u32", "offsets" },
   }));
 
@@ -1114,11 +1118,13 @@ main(void) {
   }), (Struct_Item[]){
     { "Scope *", "scope" },
     { "Source_Range", "source_range" },
+    { "u32", "_source_range_padding" },
   }));
 
 
   push_type(type_struct("Module", (Struct_Item[]){
     { "Source_Range", "source_range" },
+    { "u32", "_source_range_padding" },
     { "Scope *", "own_scope" },
     { "Module_Exports", "exports" },
   }));
@@ -1126,11 +1132,12 @@ main(void) {
   push_type(type_struct("Parse_Error", (Struct_Item[]){
     { "Slice", "message" },
     { "Source_Range", "source_range" },
+    { "u32", "_source_range_padding" },
   }));
 
   export_compiler(push_type(type_struct("Value_View", (Struct_Item[]){
     { "Value * *", "values" },
-    { "u64", "length" },
+    { "u32", "length" },
     { "Source_Range", "source_range" },
   })));
 
@@ -1255,6 +1262,7 @@ main(void) {
     { "Slice", "name" },
     { "Value_View", "view" },
     { "Source_Range", "source_range" },
+    { "u32", "_source_range_padding" },
   }));
 
   export_compiler(push_type(type_struct("Quoted", (Struct_Item[]){
@@ -1389,6 +1397,7 @@ main(void) {
   }), (Struct_Item[]){
     { "Compiler_Source_Location", "compiler_source_location" },
     { "Source_Range", "source_range" },
+    { "u32", "_source_range_padding" },
     { "Scope *", "scope" },
   }));
 
@@ -1473,8 +1482,8 @@ main(void) {
   push_type(type_struct("Operator", (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
-    { "u64", "precedence" },
-    { "u64", "argument_count" },
+    { "u32", "precedence" },
+    { "u32", "argument_count" },
     { "Mass_Handle_Operator_Proc", "handler" },
     { "void *", "handler_payload" },
   }));
@@ -1502,10 +1511,10 @@ main(void) {
   }));
 
   push_type(type_struct("Scope_Entry", (Struct_Item[]){
-    { "u64", "forced" },
-    { "u64", "epoch" },
     { "Value *", "value" },
     { "Slice", "name" },
+    { "u64", "epoch" },
+    { "u32", "forced" },
     { "Source_Range", "source_range" },
   }));
 
@@ -1557,12 +1566,13 @@ main(void) {
     { "const Descriptor *", "descriptor" },
     { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
+    { "u32", "_source_range_padding" },
   })));
 
   export_compiler(push_type(type_struct("Value", (Struct_Item[]){
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
-    { "u64", "is_temporary" },
+    { "u32", "is_temporary" },
     { "Source_Range", "source_range" },
   })));
 
@@ -1629,10 +1639,9 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Memory_Layout_Item_Flags", "flags" },
-    { "u32", "_flags_padding" },
+    { "Source_Range", "source_range" },
     { "const Descriptor *", "descriptor" },
     { "Slice", "name" },
-    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Memory_Layout", (Struct_Item[]){
@@ -1761,7 +1770,6 @@ main(void) {
     }),
     struct_fields("Circular_Dependency", (Struct_Item[]){
       { "Slice", "name" },
-      { "Source_Range", "previous_source_range" },
     }),
     struct_empty("Non_Trailing_Default_Argument"),
     struct_empty("Expected_Static"),
@@ -1795,7 +1803,6 @@ main(void) {
     }),
     struct_fields("Redifinition", (Struct_Item[]){
       { "Slice", "name" },
-      { "Source_Range", "previous_source_range" },
     }),
     struct_fields("Unknown_Field", (Struct_Item[]){
       { "const Descriptor *", "type" },
@@ -1852,7 +1859,7 @@ main(void) {
     { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
   }));
 
-  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
+  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u32", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "Lazy_Value *", "out_lazy_value" },
@@ -1918,6 +1925,7 @@ main(void) {
     { "Module", "compiler_module" },
     { "Static_Pointer_Map *", "static_pointer_map" },
     { "Imported_Module_Map *", "module_map" },
+    { "Array_Source_File", "source_files" },
     { "Scope *", "root_scope" },
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },

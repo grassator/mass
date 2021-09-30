@@ -31,15 +31,16 @@ mass_cli_print_usage() {
   return -1;
 }
 
-s32
+static s32
 mass_cli_print_error(
+  Compilation *compilation,
   Mass_Error *error
 ) {
-  Fixed_Buffer *error_buffer = mass_error_to_string(error);
+  Fixed_Buffer *error_buffer = mass_error_to_string(compilation, error);
   slice_print(fixed_buffer_as_slice(error_buffer));
   fixed_buffer_destroy(error_buffer);
   printf("\n  at ");
-  source_range_print_start_position(&error->source_range);
+  source_range_print_start_position(compilation, &error->source_range);
   return -1;
 }
 
@@ -108,12 +109,12 @@ int main(s32 argc, char **argv) {
   Mass_Result result =
     program_load_file_module_into_root_scope(&context, slice_literal("std/prelude"));
   if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&result.Error.error);
+    return mass_cli_print_error(&compilation, &result.Error.error);
   }
   Module *root_module = program_module_from_file(&context, file_path, context.scope);
   program_import_module(&context, root_module);
   if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&result.Error.error);
+    return mass_cli_print_error(&compilation, &result.Error.error);
   }
 
   const Symbol *main_symbol = mass_ensure_symbol(&compilation, slice_literal("main"));
@@ -126,7 +127,7 @@ int main(s32 argc, char **argv) {
   context.program->entry_point = main;
   ensure_function_instance(&context, main, (Value_View){0});
   if(context.result->tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&context.result->Error.error);
+    return mass_cli_print_error(&compilation, &context.result->Error.error);
   }
 
   switch(mode) {
@@ -155,7 +156,7 @@ int main(s32 argc, char **argv) {
       jit_init(&jit, context.program);
       result = program_jit(context.compilation, &jit);
       if(result.tag != Mass_Result_Tag_Success) {
-        return mass_cli_print_error(&result.Error.error);
+        return mass_cli_print_error(&compilation, &result.Error.error);
       }
       fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);
       main();

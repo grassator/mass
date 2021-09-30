@@ -4,13 +4,8 @@
 #include <inttypes.h>
 #include "types.h"
 
-static const Source_File COMPILER_SOURCE_FILE = {
-  .path = slice_literal_fields("__mass_compiler__"),
-  .text = {0},
-};
-
 static const Source_Range COMPILER_SOURCE_RANGE = {
-  .file = &COMPILER_SOURCE_FILE,
+  .file_index = {0},
   .offsets = {0},
 };
 
@@ -147,8 +142,8 @@ value_view_last(
 static Value_View
 value_view_slice(
   const Value_View *view,
-  u64 start_index,
-  u64 end_index
+  u32 start_index,
+  u32 end_index
 ) {
   assert(end_index <= view->length);
   assert(start_index <= end_index);
@@ -173,7 +168,7 @@ value_view_slice(
 static inline Value_View
 value_view_rest(
   const Value_View *view,
-  u64 index
+  u32 index
 ) {
   return value_view_slice(view, index, view->length);
 }
@@ -185,7 +180,7 @@ value_view_from_value_array(
 ) {
   return (Value_View) {
     .values = dyn_array_raw(value_array),
-    .length = dyn_array_length(value_array),
+    .length = u64_to_u32(dyn_array_length(value_array)),
     .source_range = *source_range
   };
 }
@@ -288,6 +283,7 @@ MASS_SUCCESS() {
 
 static Fixed_Buffer *
 mass_error_to_string(
+  Compilation *compilation,
   Mass_Error const* error
 );
 
@@ -380,11 +376,13 @@ same_value_type(
 
 static void
 source_range_print_start_position(
+  Compilation *compilation,
   const Source_Range *source_range
 );
 
 static Slice
 source_from_source_range(
+  Compilation *compilation,
   const Source_Range *source_range
 );
 

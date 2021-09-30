@@ -11,8 +11,7 @@ tokenize(
   Source_Range source_range,
   Value_View *out_tokens
 ) {
-  const Source_File *file = source_range.file;
-  Slice input = source_from_source_range(&source_range);
+  Slice input = source_from_source_range(compilation, &source_range);
 
   const Allocator *allocator = compilation->allocator;
 
@@ -33,7 +32,7 @@ tokenize(
 
   #define TOKENIZER_CURRENT_RANGE()\
     (Source_Range){\
-      .file = file,\
+      .file_index = source_range.file_index,\
       .offsets = {\
         .from = u64_to_u32(token_start_offset),\
         .to = u64_to_u32(offset),\
@@ -53,7 +52,7 @@ tokenize(
           .tag = Mass_Error_Tag_Unexpected_Token,\
           .Unexpected_Token = { .expected = (_EXPECTED_SLICE_), },\
           .source_range = {\
-            .file = file,\
+            .file_index = source_range.file_index,\
             .offsets = {.from = u64_to_u32(offset) - 1, .to = u64_to_u32(offset) - 1},\
           }\
         }\
@@ -165,11 +164,11 @@ tokenize(
   done:
   if (result.tag == Mass_Result_Tag_Success) {
     Source_Range children_range = {
-      .file = file,
+      .file_index = source_range.file_index,
       .offsets = {.from = 0, .to = u64_to_u32(input.length)},
     };
     *out_tokens = temp_token_array_into_value_view(
-      allocator, dyn_array_raw(stack), dyn_array_length(stack), children_range
+      allocator, dyn_array_raw(stack), u64_to_u32(dyn_array_length(stack)), children_range
     );
   }
   fixed_buffer_destroy(string_buffer);
