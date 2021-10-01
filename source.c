@@ -807,10 +807,6 @@ assign(
     return *context->result;
   }
 
-  if (source->descriptor == &descriptor_tuple) {
-    return assign_tuple(context, builder, target, source, source_range);
-  }
-
   if (
     source->descriptor->tag == Descriptor_Tag_Reference_To &&
     target->descriptor->tag != Descriptor_Tag_Reference_To
@@ -823,15 +819,20 @@ assign(
     target->descriptor->tag == Descriptor_Tag_Reference_To &&
     source->descriptor->tag != Descriptor_Tag_Reference_To
   ) {
-    const Descriptor *reference_descriptor = target->descriptor->Reference_To.descriptor;
-    if (!same_value_type_or_can_implicitly_move_cast(reference_descriptor, source)) goto err;
-    if (source->storage.tag == Storage_Tag_Static) {
-      if (!assign_from_static(context, builder, target, source, source_range)) {
-        Value *referenced_value = value_indirect_from_reference(context, builder, target);
-        MASS_TRY(assign(context, builder, referenced_value, source, source_range));
-        value_release_if_temporary(builder, referenced_value);
-      }
+    if (
+      (
+        source->storage.tag == Storage_Tag_Static &&
+        !assign_from_static(context, builder, target, source, source_range)
+      ) ||
+      source->descriptor == &descriptor_tuple
+    ) {
+      Value *referenced_target = value_indirect_from_reference(context, builder, target);
+      MASS_TRY(assign(context, builder, referenced_target, source, source_range));
+      value_release_if_temporary(builder, referenced_target);
+      return *context->result;
     } else {
+      const Descriptor *reference_descriptor = target->descriptor->Reference_To.descriptor;
+      if (!same_value_type_or_can_implicitly_move_cast(reference_descriptor, source)) goto err;
       load_address(context, builder, source_range, target, source->storage);
     }
     return *context->result;
@@ -877,6 +878,11 @@ assign(
       return *context->result;
     }
   }
+
+  if (source->descriptor == &descriptor_tuple) {
+    return assign_tuple(context, builder, target, source, source_range);
+  }
+
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
 

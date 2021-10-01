@@ -201,12 +201,8 @@ multiply :: Array
 external :: fn(
   library_name : String,
   symbol_name : String
-) -> (
-  result : MASS.External_Symbol
-) {
-  result.library_name = library_name
-  result.symbol_name = symbol_name
-  result
+) -> (MASS.External_Symbol) {
+  [library_name, symbol_name]
 }
 
 syscall :: fn(number : s64) -> (MASS.Syscall) { [number] }
