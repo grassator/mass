@@ -570,6 +570,251 @@ x86_64_system_v_classify(
   return (System_V_Classification){0};
 }
 
+typedef struct {
+  u32 byte_size;
+  SYSTEM_V_ARGUMENT_CLASS class;
+} System_V_Flat_Field;
+
+typedef struct {
+  // Assuming fields can not be smaller than 1 byte, 8 eightbytes is 64 fields max
+  System_V_Flat_Field fields[64];
+  u32 field_count;
+} System_V_Flat_Aggregate;
+
+static void
+x86_64_system_v_flatten_aggregate(
+  System_V_Flat_Aggregate *flat_aggregate,
+  System_V_Aggregate_Iterator *it
+) {
+  u32 eightbyte = 8;
+  while(system_v_item_iterator_next(it)) {
+    u32 item_byte_size = u64_to_u32(descriptor_byte_size(it->item));
+    switch(it->item->tag) {
+      case Descriptor_Tag_Function_Instance:
+      case Descriptor_Tag_Pointer_To:
+      case Descriptor_Tag_Reference_To:
+      case Descriptor_Tag_Opaque: {
+        SYSTEM_V_ARGUMENT_CLASS class;
+        if (item_byte_size == 0) {
+          class = SYSTEM_V_NO_CLASS;
+        } else {
+          if (item_byte_size <= eightbyte) {
+            class = descriptor_is_float(it->item) ? SYSTEM_V_SSE : SYSTEM_V_INTEGER;
+          } else {
+            class = SYSTEM_V_MEMORY;
+          }
+        }
+        assert(flat_aggregate->field_count < countof(flat_aggregate->fields));
+        flat_aggregate->fields[flat_aggregate->field_count++] = (System_V_Flat_Field) {
+          .class = class,
+          .byte_size = item_byte_size,
+        };
+        break;
+      }
+      case Descriptor_Tag_Struct: {
+        System_V_Aggregate_Iterator nested_it = {
+          .tag = System_V_Aggregate_Iterator_Tag_Struct,
+          .aggregate = it->item,
+        };
+        x86_64_system_v_flatten_aggregate(flat_aggregate, &nested_it);
+        break;
+      }
+      case Descriptor_Tag_Fixed_Size_Array: {
+        System_V_Aggregate_Iterator nested_it = {
+          .tag = System_V_Aggregate_Iterator_Tag_Array,
+          .aggregate = it->item,
+        };
+        x86_64_system_v_flatten_aggregate(flat_aggregate, &nested_it);
+        break;
+      }
+      default: {
+        panic("Unexpected descriptor tag");
+        break;
+      }
+    }
+  }
+}
+
+static System_V_Classification
+x86_64_system_v_classify_root(
+  const Allocator *allocator,
+  const Descriptor *descriptor
+) {
+  u64 byte_size = descriptor_byte_size(descriptor);
+  u64 eightbyte = 8;
+
+  System_V_Aggregate_Iterator it;
+  switch(descriptor->tag) {
+    case Descriptor_Tag_Function_Instance:
+    case Descriptor_Tag_Pointer_To:
+    case Descriptor_Tag_Reference_To:
+    case Descriptor_Tag_Opaque: {
+      if (descriptor->bit_size.as_u64 == 0) {
+        return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
+      }
+      if (byte_size <= eightbyte) {
+        SYSTEM_V_ARGUMENT_CLASS class =
+          descriptor_is_float(descriptor) ? SYSTEM_V_SSE : SYSTEM_V_INTEGER;
+        return (System_V_Classification){
+          .class = class,
+          .descriptor = descriptor,
+          .eightbyte_count = 1,
+        };
+      } else {
+        return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
+      }
+    }
+    case Descriptor_Tag_Struct: {
+      it = (System_V_Aggregate_Iterator) {
+        .tag = System_V_Aggregate_Iterator_Tag_Struct,
+        .aggregate = descriptor,
+      };
+      break;
+    }
+    case Descriptor_Tag_Fixed_Size_Array: {
+      it = (System_V_Aggregate_Iterator) {
+        .tag = System_V_Aggregate_Iterator_Tag_Array,
+        .aggregate = descriptor,
+      };
+      break;
+    }
+    default: {
+      panic("Unexpected descriptor tag");
+      return (System_V_Classification){0};
+    }
+  }
+
+  // 1. If the size of an object is larger than eight eightbytes,
+  // or it contains unaligned fields, it has class MEMORY
+  if (byte_size > 8 * eightbyte || x86_64_system_v_has_unaligned(it)) {
+    return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
+  }
+  // 2. If a C++ object is non-trivial for the purpose of calls, as specified in the
+  // C++ ABI 13, it is passed by invisible reference (the object is replaced in the
+  // parameter list by a pointer that has class INTEGER)
+  bool is_c_plus_plus_non_trivial = false; // TODO allow to specify / detect this
+  if (is_c_plus_plus_non_trivial) {
+    descriptor = descriptor_reference_to(allocator, descriptor);
+    return (System_V_Classification){ .class = SYSTEM_V_INTEGER, .descriptor = descriptor };
+  }
+
+  // 3. If the size of the aggregate exceeds a single eightbyte, each is classified
+  // separately. Each eightbyte gets initialized to class NO_CLASS.
+  SYSTEM_V_ARGUMENT_CLASS *eightbyte_class = 0;
+
+  // TODO use a temp allocator
+  Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
+    Array_SYSTEM_V_ARGUMENT_CLASS,
+    .allocator = allocator_default,
+    .capacity = 8,
+  );
+
+  // 4. Each field of an object is classified recursively so that always two fields are
+  // considered. The resulting class is calculated according to the classes of the
+  // fields in the eightbyte:
+  System_V_Flat_Aggregate flat_aggregate = {0};
+  x86_64_system_v_flatten_aggregate(&flat_aggregate, &it);
+
+  u64 offset = 0;
+  for (u32 i = 0; i < flat_aggregate.field_count; ++i) {
+    // This is also a part of step 3. for each eightbyte
+    if (offset % eightbyte == 0) {
+      eightbyte_class = dyn_array_push(eightbyte_classes, SYSTEM_V_NO_CLASS);
+    }
+
+    System_V_Flat_Field flat_field = flat_aggregate.fields[i];
+    offset += flat_field.byte_size;
+
+    // 4(a) If both classes are equal, this is the resulting class.
+    if (*eightbyte_class == flat_field.class) {
+      *eightbyte_class = flat_field.class;
+    } else
+    // 4(b) If one of the classes is NO_CLASS, the resulting class is the other class.
+    if (flat_field.class == SYSTEM_V_NO_CLASS) {
+      eightbyte_class = eightbyte_class;
+    } else if (eightbyte_class == SYSTEM_V_NO_CLASS) {
+      *eightbyte_class = flat_field.class;
+    } else
+    // 4(c) If one of the classes is MEMORY, the result is the MEMORY class.
+    if (flat_field.class == SYSTEM_V_MEMORY) {
+      *eightbyte_class = SYSTEM_V_MEMORY;
+    } else
+    // 4(d) If one of the classes is INTEGER, the result is the INTEGER class.
+    if (*eightbyte_class == SYSTEM_V_INTEGER || flat_field.class == SYSTEM_V_INTEGER) {
+      *eightbyte_class = SYSTEM_V_INTEGER;
+    } else
+    // 4(e) If one of the classes is X87, X87UP, COMPLEX_X87 class, MEMORY is used as class.
+    if (
+      *eightbyte_class == SYSTEM_V_X87 ||
+      *eightbyte_class == SYSTEM_V_X87UP ||
+      *eightbyte_class == SYSTEM_V_COMPLEX_X87 ||
+      flat_field.class == SYSTEM_V_X87 ||
+      flat_field.class == SYSTEM_V_X87UP ||
+      flat_field.class == SYSTEM_V_COMPLEX_X87
+    ) {
+      *eightbyte_class = SYSTEM_V_MEMORY;
+    }
+    // 4(f) Otherwise class SSE is used.
+    else {
+      *eightbyte_class = SYSTEM_V_SSE;
+    }
+  }
+
+  // A sanity check that our flattened fields add up to the same size as the descriptor
+  // FIXME this will break for structs with padding
+  assert(offset == byte_size);
+
+  SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
+
+  // 5. Then a post merger cleanup is done:
+  DYN_ARRAY_FOREACH(SYSTEM_V_ARGUMENT_CLASS, class, eightbyte_classes) {
+    // 5(a) If one of the classes is MEMORY, the whole argument is passed in memory.
+    if (*class == SYSTEM_V_MEMORY) {
+      struct_class = SYSTEM_V_MEMORY;
+      break;
+    }
+    // 5(b) If X87UP is not preceded by X87, the whole argument is passed in memory.
+    if (0) {
+      // TODO
+    }
+    // 5(c) If the size of the aggregate exceeds two eightbytes and the first eightbyte
+    // isn't SSE or any other eightbyte isn’t SSEUP, the whole argument is passed in memory.
+    bool is_first = class == dyn_array_get(eightbyte_classes, 0);
+    if (byte_size > 2 * eightbyte) {
+      if (is_first) {
+        if (*class != SYSTEM_V_SSE) {
+          struct_class = SYSTEM_V_MEMORY;
+          break;
+        }
+      } else {
+        if (*class != SYSTEM_V_SSEUP) {
+          struct_class = SYSTEM_V_MEMORY;
+          break;
+        }
+      }
+    }
+    // 5(d) If SSEUP is not preceded by SSE or SSEUP, it is converted to SSE.
+    if (*class == SYSTEM_V_SSEUP) {
+      SYSTEM_V_ARGUMENT_CLASS previous = is_first ? SYSTEM_V_NO_CLASS : *(class - 1);
+      if (previous != SYSTEM_V_SSE && previous != SYSTEM_V_SSEUP) {
+        *class = SYSTEM_V_SSE;
+      }
+    }
+  }
+  if (struct_class == SYSTEM_V_NO_CLASS) {
+    struct_class = *dyn_array_get(eightbyte_classes, 0);
+  }
+
+  System_V_Classification classification = {
+    .descriptor = descriptor,
+    .eightbyte_count = dyn_array_length(eightbyte_classes),
+    .class = struct_class,
+  };
+  dyn_array_destroy(eightbyte_classes);
+
+  return classification;
+}
+
 static Function_Call_Setup
 calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
@@ -601,6 +846,10 @@ calling_convention_x86_64_system_v_call_setup_proc(
 
     System_V_Classification classification =
       x86_64_system_v_classify(allocator, function->returns.declaration.descriptor);
+
+    System_V_Classification new_classification =
+      x86_64_system_v_classify_root(allocator, function->returns.declaration.descriptor);
+    assert(classification.class == new_classification.class);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
     if (classification.class == SYSTEM_V_MEMORY) {
       result.flags |= Function_Call_Setup_Flags_Indirect_Return;
