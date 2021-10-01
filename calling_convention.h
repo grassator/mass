@@ -498,31 +498,25 @@ x86_64_system_v_classify(
     descriptor = descriptor_reference_to(allocator, descriptor);
     return (System_V_Classification){ .class = SYSTEM_V_INTEGER, .descriptor = descriptor };
   }
+  SYSTEM_V_ARGUMENT_CLASS eightbyte_classes[8];
+  SYSTEM_V_ARGUMENT_CLASS *eightbyte_class = eightbyte_classes;
+  u32 eightbyte_count = 0;
 
-  // 3. If the size of the aggregate exceeds a single eightbyte, each is classified
-  // separately. Each eightbyte gets initialized to class NO_CLASS.
-  SYSTEM_V_ARGUMENT_CLASS *eightbyte_class = 0;
-
-  // TODO use a temp allocator
-  Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
-    Array_SYSTEM_V_ARGUMENT_CLASS,
-    .allocator = allocator_default,
-    .capacity = 8,
-  );
-
-  // 4. Each field of an object is classified recursively so that always two fields are
-  // considered. The resulting class is calculated according to the classes of the
-  // fields in the eightbyte:
   System_V_Flat_Aggregate flat_aggregate = {0};
   x86_64_system_v_flatten_aggregate(&flat_aggregate, &it);
 
   u64 offset = 0;
   for (u32 i = 0; i < flat_aggregate.field_count; ++i) {
-    // This is also a part of step 3. for each eightbyte
+    // 3. If the size of the aggregate exceeds a single eightbyte, each is classified
+    // separately. Each eightbyte gets initialized to class NO_CLASS.
     if (offset % eightbyte == 0) {
-      eightbyte_class = dyn_array_push(eightbyte_classes, SYSTEM_V_NO_CLASS);
+      eightbyte_class = &eightbyte_classes[eightbyte_count++];
+      *eightbyte_class = SYSTEM_V_NO_CLASS;
     }
 
+    // 4. Each field of an object is classified recursively so that always two fields are
+    // considered. The resulting class is calculated according to the classes of the
+    // fields in the eightbyte:
     System_V_Flat_Field flat_field = flat_aggregate.fields[i];
     offset += flat_field.byte_size;
 
@@ -568,9 +562,10 @@ x86_64_system_v_classify(
   SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
 
   // 5. Then a post merger cleanup is done:
-  DYN_ARRAY_FOREACH(SYSTEM_V_ARGUMENT_CLASS, class, eightbyte_classes) {
+  for (u32 i = 0; i < eightbyte_count; ++i) {
+    SYSTEM_V_ARGUMENT_CLASS class = eightbyte_classes[i];
     // 5(a) If one of the classes is MEMORY, the whole argument is passed in memory.
-    if (*class == SYSTEM_V_MEMORY) {
+    if (class == SYSTEM_V_MEMORY) {
       struct_class = SYSTEM_V_MEMORY;
       break;
     }
@@ -580,38 +575,37 @@ x86_64_system_v_classify(
     }
     // 5(c) If the size of the aggregate exceeds two eightbytes and the first eightbyte
     // isn't SSE or any other eightbyte isn’t SSEUP, the whole argument is passed in memory.
-    bool is_first = class == dyn_array_get(eightbyte_classes, 0);
+    bool is_first = i == 0;
     if (byte_size > 2 * eightbyte) {
       if (is_first) {
-        if (*class != SYSTEM_V_SSE) {
+        if (class != SYSTEM_V_SSE) {
           struct_class = SYSTEM_V_MEMORY;
           break;
         }
       } else {
-        if (*class != SYSTEM_V_SSEUP) {
+        if (class != SYSTEM_V_SSEUP) {
           struct_class = SYSTEM_V_MEMORY;
           break;
         }
       }
     }
     // 5(d) If SSEUP is not preceded by SSE or SSEUP, it is converted to SSE.
-    if (*class == SYSTEM_V_SSEUP) {
-      SYSTEM_V_ARGUMENT_CLASS previous = is_first ? SYSTEM_V_NO_CLASS : *(class - 1);
+    if (class == SYSTEM_V_SSEUP) {
+      SYSTEM_V_ARGUMENT_CLASS previous = is_first ? SYSTEM_V_NO_CLASS : eightbyte_classes[i - 1];
       if (previous != SYSTEM_V_SSE && previous != SYSTEM_V_SSEUP) {
-        *class = SYSTEM_V_SSE;
+        class = SYSTEM_V_SSE;
       }
     }
   }
   if (struct_class == SYSTEM_V_NO_CLASS) {
-    struct_class = *dyn_array_get(eightbyte_classes, 0);
+    struct_class = eightbyte_classes[0];
   }
 
   System_V_Classification classification = {
     .descriptor = descriptor,
-    .eightbyte_count = dyn_array_length(eightbyte_classes),
+    .eightbyte_count = eightbyte_count,
     .class = struct_class,
   };
-  dyn_array_destroy(eightbyte_classes);
 
   return classification;
 }
