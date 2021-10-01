@@ -556,7 +556,9 @@ x86_64_system_v_classify(
   }
 
   // A sanity check that our flattened fields add up to the same size as the descriptor
-  // FIXME this will break for structs with padding
+  // FIXME this will break for structs with padding, but probably C structs should just
+  //       include padding fields explicitly in their definition.
+  // FIXME it is also unclear how this will work with the unions
   assert(offset == byte_size);
 
   SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
