@@ -209,14 +209,7 @@ external :: fn(
   result
 }
 
-syscall :: fn(
-  number : s64
-) -> (
-  result : MASS.Syscall
-) {
-  result.number = number
-  result
-}
+syscall :: fn(number : s64) -> (MASS.Syscall) { [number] }
 
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {
   macro(x : type) -> (type) { 0 - x }
