@@ -3,18 +3,18 @@ global_char_pointer := &global_char
 
 global_static_string :: "b"
 
-test :: fn() {
-  io :: import("std/io")
-  char_string : String
+test :: fn() -> (char_string : String) {
   char_string.bytes = global_char_pointer
   char_string.length = 1
-  io.print(char_string)
-  io.print(global_static_string)
-  io.print("\n")
+  char_string
 }
 
 main :: fn() {
   process :: import("std/process")
-  test()
+  char_string := test()
+  io :: import("std/io")
+  io.print(char_string)
+  io.print(global_static_string)
+  io.print("\n")
   process.exit(0)
 }

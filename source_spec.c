@@ -2210,15 +2210,14 @@ spec("source") {
   }
 
   describe("Relocations") {
-    #if defined(_WIN32) // TODO support on Linux
     it("should work in JIT code") {
-      fn_type_opaque checker = test_program_external_source_function(
+      Slice(*checker)(void) = (Slice(*)(void))test_program_external_source_function(
         "test", &test_context, "fixtures/relocations"
       );
       check(spec_check_mass_result(test_context.result));
-      checker();
+      Slice result = checker();
+      spec_check_slice(result, slice_literal("a"));
     }
-    #endif
 
     it("should work in an executable") {
       Program *test_program = test_context.program;
