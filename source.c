@@ -1559,9 +1559,6 @@ context_parse_error(
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
   if (_id_) (++peek_index)
 
-#define TOKEN_PATTERN_SYMBOL(_symbol_)\
-  .tag = Token_Pattern_Tag_Symbol,  .Symbol.name = slice_literal_fields(_symbol_)
-
 typedef struct {
   Slice name;
   Value *value;
@@ -5662,7 +5659,9 @@ token_parse_function_literal(
   }
 
   Value *returns;
-  TOKEN_MAYBE_MATCH(arrow, TOKEN_PATTERN_SYMBOL("->"));
+  Value *arrow = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator_arrow
+  );
   if (arrow) {
     returns = value_view_next(view, &peek_index);
     if (!returns) {

@@ -1924,6 +1924,7 @@ main(void) {
     { "const Symbol *", "using" },
     { "const Symbol *", "_if" },
     { "const Symbol *", "_return" },
+    { "const Symbol *", "operator_arrow" },
     { "const Symbol *", "operator_at" },
     { "const Symbol *", "operator_colon" },
   }));
