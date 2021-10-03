@@ -3360,7 +3360,10 @@ call_function_overload(
     .capacity = 32,
   );
 
-  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
+  bool has_default_arguments = dyn_array_length(arguments) != dyn_array_length(target_params);
+  Scope *default_arguments_scope = has_default_arguments
+    ? scope_make(context->allocator, fn_info->scope)
+    : 0;
   Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Call_Target_Argument);
 
   u64 all_used_arguments_register_bitset = 0;
@@ -3502,7 +3505,7 @@ call_function_overload(
       MASS_ON_ERROR(assign(context, builder, arg_value, source_arg, source_range)) return 0;
     }
     dyn_array_push(temp_arguments, arg_value);
-    if (arg_symbol) {
+    if (has_default_arguments && arg_symbol) {
       scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, arg_symbol, arg_value);
     }
   }
