@@ -1244,9 +1244,10 @@ tokenizer_maybe_push_fake_semicolon(
   if (!has_children) return;
   // :FakeSemicolon
   assert(range_length(source_range.offsets) == 0);
-  dyn_array_push(*stack, token_make_symbol_value(
-    compilation, slice_literal(";"), source_range
-  ));
+  Value *token = allocator_allocate(compilation->allocator, Value);
+  const Symbol *symbol = compilation->common_symbols.operator_semicolon;
+  value_init(token, &descriptor_symbol, storage_static(symbol), source_range);
+  dyn_array_push(*stack, token);
 }
 
 static inline void
@@ -1523,10 +1524,20 @@ value_view_match_till(
 
 static inline Value_View
 value_view_match_till_end_of_statement(
+  Execution_Context *context,
   Value_View view,
   u32 *peek_index
 ) {
-  return value_view_match_till(view, peek_index, &token_pattern_semicolon);
+  const Symbol *semicolon = context->compilation->common_symbols.operator_semicolon;
+  u32 start_index = *peek_index;
+  for (; *peek_index < view.length; *peek_index += 1) {
+    Value *token = value_view_get(view, *peek_index);
+    if (value_is_symbol(token) && value_as_symbol(token) == semicolon) {
+      *peek_index += 1;
+      return value_view_slice(&view, start_index, *peek_index - 1);
+    }
+  }
+  return value_view_slice(&view, start_index, *peek_index);
 }
 
 static inline Value *
@@ -2606,7 +2617,7 @@ token_parse_syntax_definition(
     return 0;
   }
 
-  Value_View replacement = value_view_match_till_end_of_statement(view, &peek_index);
+  Value_View replacement = value_view_match_till_end_of_statement(context, view, &peek_index);
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
@@ -3171,7 +3182,7 @@ token_parse_constant_definitions(
   Value *operator;
 
   u32 statement_length = 0;
-  view = value_view_match_till_end_of_statement(view, &statement_length);
+  view = value_view_match_till_end_of_statement(context, view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
     return 0;
   }
@@ -6158,7 +6169,7 @@ token_parse_statement_using(
     view, &peek_index, context->compilation->common_symbols.using
   );
   if (!keyword) return 0;
-  Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
+  Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
 
   Value *result = compile_time_eval(context, rest);
 
@@ -6230,7 +6241,7 @@ token_parse_statement_label(
     view, &peek_index, context->compilation->common_symbols.placeholder
   );
 
-  Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
+  Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
 
   if (rest.length != 1 || !value_is_symbol(value_view_get(rest, 0))) {
     context_error(context, (Mass_Error) {
@@ -6308,7 +6319,7 @@ token_parse_explicit_return(
     view, &peek_index, context->compilation->common_symbols._return
   );
   if (!keyword) return 0;
-  Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
+  Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
   bool has_return_expression = rest.length > 0;
 
   Value *parse_result = token_parse_expression(context, rest, &(u32){0}, 0);
@@ -6548,7 +6559,7 @@ token_parse_definition_and_assignment_statements(
   Value *operator;
 
   u32 statement_length = 0;
-  view = value_view_match_till_end_of_statement(view, &statement_length);
+  view = value_view_match_till_end_of_statement(context, view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
     return 0;
   }
