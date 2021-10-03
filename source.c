@@ -1569,10 +1569,6 @@ context_parse_error(
   TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
   if (!_id_) TOKEN_ERROR_WHEN_MATCHING()
 
-#define TOKEN_EXPECT(_id_)\
-  if (peek_index >= view.length) TOKEN_ERROR_WHEN_MATCHING();\
-  Value *(_id_) = value_view_get(view, peek_index++)
-
 #define TOKEN_MATCH(_id_, ...)\
   TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
   if (!(_id_)) return 0
@@ -5650,8 +5646,11 @@ token_parse_function_literal(
   Value *returns;
   TOKEN_MAYBE_MATCH(arrow, TOKEN_PATTERN_SYMBOL("->"));
   if (arrow) {
-    TOKEN_EXPECT(raw_return);
-    returns = raw_return;
+    returns = value_view_next(view, &peek_index);
+    if (!returns) {
+      context_parse_error(context, view, peek_index);
+      return 0;
+    }
   } else {
     Group_Paren *group = allocator_allocate(context->allocator, Group_Paren);
     *group = (Group_Paren){0};
