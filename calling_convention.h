@@ -137,7 +137,8 @@ calling_convention_x86_64_common_end_proc(
       Instruction *instruction = &bucket->items[i];
       switch(instruction->tag) {
         case Instruction_Tag_Label:
-        case Instruction_Tag_Label_Patch: {
+        case Instruction_Tag_Label_Patch:
+        case Instruction_Tag_Location: {
           // Nothing to do
         } break;
         case Instruction_Tag_Bytes: {

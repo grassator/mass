@@ -4284,7 +4284,6 @@ mass_handle_arithmetic_operation_lazy_proc(
           push_instruction(&builder->code_block, (Instruction) {
             .tag = Instruction_Tag_Bytes,
             .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
-            .source_range = result_range,
           });
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
@@ -5272,13 +5271,13 @@ mass_handle_if_expression_lazy_proc(
     &(Instruction_Assembly){jmp, {code_label32(after_label)}}
   );
 
-  push_label(&builder->code_block, *dummy_range, else_label);
+  push_label(&builder->code_block, else_label);
 
   Expected_Result expected_else = expected_result_from_value(result_value);
   result_value = value_force(context, builder, &expected_else, else_);
   MASS_ON_ERROR(*context->result) return 0;
 
-  push_label(&builder->code_block, *dummy_range, after_label);
+  push_label(&builder->code_block, after_label);
 
   return result_value;
 }
@@ -6114,7 +6113,7 @@ mass_handle_label_lazy_proc(
   }
 
   Label *label = *storage_static_as_c_type(&label_value->storage, Label *);
-  push_label(&builder->code_block, source_range, label);
+  push_label(&builder->code_block, label);
 
   return expected_result_validate(expected_result, &void_value);
 }
@@ -6294,10 +6293,14 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   }
 
   push_instruction(&builder->code_block, (Instruction) {
+    .tag = Instruction_Tag_Location,
+    .Location = { .source_range = args_view.source_range },
+  });
+
+  push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
     .Bytes = bytes,
     .scope = context->scope,
-    .source_range = args_view.source_range,
   });
 
   for (s32 i = 0; i < patch_count; i += 1) {
@@ -6305,7 +6308,6 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     push_instruction(&builder->code_block, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = patches[i],
-      .source_range = args_view.source_range,
     });
   }
 

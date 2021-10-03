@@ -149,10 +149,12 @@ win32_get_runtime_function_callback(
   return dyn_array_get(info->function_table, runtime_function_index);
 }
 
+
 const Instruction *
 win32_instruction_for_address(
   DWORD64 instruction_address,
-  Jit *jit
+  Jit *jit,
+  Source_Range *maybe_out_source_range
 ) {
   s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
   if (runtime_function_index < 0) return 0;
@@ -172,6 +174,9 @@ win32_instruction_for_address(
   for (Instruction_Bucket *bucket = builder->code_block.first_bucket; bucket; bucket = bucket->next) {
     for (u64 i = 0; i < bucket->length; ++i) {
       Instruction *instruction = &bucket->items[i];
+      if (maybe_out_source_range && instruction->tag == Instruction_Tag_Location) {
+        *maybe_out_source_range = instruction->Location.source_range;
+      }
       if (instruction->tag != Instruction_Tag_Bytes) continue;
       current_offset += instruction->Bytes.length;
       if (current_offset == relative_instruction_byte_offset) {
@@ -196,10 +201,12 @@ win32_print_stack(
     return;
   }
 
-  const Instruction *instruction = win32_instruction_for_address(instruction_address, jit);
+  Source_Range source_range;
+  const Instruction *instruction =
+    win32_instruction_for_address(instruction_address, jit, &source_range);
   if (instruction) {
     printf("  at ");
-    source_range_print_start_position(compilation, &instruction->source_range);
+    source_range_print_start_position(compilation, &source_range);
   }
 
   Win32_Jit_Info *info = jit->platform_specific_payload;
@@ -285,7 +292,7 @@ win32_program_test_exception_handler(
             slice_equal(command, slice_literal("locals"))
           ) {
             const Instruction *instruction =
-              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
+              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit, 0);
             if (instruction && instruction->scope) {
               scope_print_names(instruction->scope);
             } else {
@@ -295,7 +302,7 @@ win32_program_test_exception_handler(
             Slice variable_name = slice_sub(command, strlen("print "), command.length);
             variable_name = slice_trim_whitespace(variable_name);
             const Instruction *instruction =
-              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
+              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit, 0);
             if (instruction && instruction->scope) {
               const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
               Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_symbol);

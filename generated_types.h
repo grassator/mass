@@ -1277,6 +1277,7 @@ typedef enum {
   Instruction_Tag_Bytes = 1,
   Instruction_Tag_Label_Patch = 2,
   Instruction_Tag_Stack_Patch = 3,
+  Instruction_Tag_Location = 4,
 } Instruction_Tag;
 
 typedef struct Instruction_Label {
@@ -1294,17 +1295,20 @@ typedef struct Instruction_Stack_Patch {
   s32 mod_r_m_offset_in_previous_instruction;
   Stack_Area stack_area;
 } Instruction_Stack_Patch;
+typedef struct Instruction_Location {
+  Source_Range source_range;
+  u32 _padding;
+} Instruction_Location;
 typedef struct Instruction {
   Instruction_Tag tag;
   char _tag_padding[4];
-  Source_Range source_range;
-  u32 _source_range_padding;
   Scope * scope;
   union {
     Instruction_Label Label;
     Instruction_Bytes Bytes;
     Instruction_Label_Patch Label_Patch;
     Instruction_Stack_Patch Stack_Patch;
+    Instruction_Location Location;
   };
 } Instruction;
 static inline Instruction_Label *
@@ -1326,6 +1330,11 @@ static inline Instruction_Stack_Patch *
 instruction_as_stack_patch(Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Stack_Patch);
   return &instruction->Stack_Patch;
+}
+static inline Instruction_Location *
+instruction_as_location(Instruction *instruction) {
+  assert(instruction->tag == Instruction_Tag_Location);
+  return &instruction->Location;
 }
 typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct Instruction_Bucket {
@@ -3768,6 +3777,7 @@ static C_Enum_Item instruction_tag_items[] = {
 { .name = slice_literal_fields("Bytes"), .value = 1 },
 { .name = slice_literal_fields("Label_Patch"), .value = 2 },
 { .name = slice_literal_fields("Stack_Patch"), .value = 3 },
+{ .name = slice_literal_fields("Location"), .value = 4 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label, Instruction_Label,
   {
@@ -3823,24 +3833,27 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_stack_patch, Instruction_Stack_Patch,
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_stack_patch);
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_location, Instruction_Location,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .Base_Relative.offset = offsetof(Instruction_Location, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_padding"),
+    .Base_Relative.offset = offsetof(Instruction_Location, _padding),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_location);
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
     .descriptor = &descriptor_instruction_tag,
     .Base_Relative.offset = offsetof(Instruction, tag),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .Base_Relative.offset = offsetof(Instruction, source_range),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("_source_range_padding"),
-    .Base_Relative.offset = offsetof(Instruction, _source_range_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3871,6 +3884,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
     .name = slice_literal_fields("Stack_Patch"),
     .descriptor = &descriptor_instruction_stack_patch,
     .Base_Relative.offset = offsetof(Instruction, Stack_Patch),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Location"),
+    .descriptor = &descriptor_instruction_location,
+    .Base_Relative.offset = offsetof(Instruction, Location),
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction);

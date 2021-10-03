@@ -831,7 +831,6 @@ ensure_function_instance(
 
   push_label(
     &builder->code_block,
-    return_value->source_range,
     builder->code_block.end_label
   );
 

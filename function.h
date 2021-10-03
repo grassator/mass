@@ -24,21 +24,11 @@ program_init_startup_code(
   Execution_Context *context
 );
 
-static inline Instruction *
-instruction_add_source_location_internal(
-  Source_Range source_range,
-  Instruction *instruction
-) {
-  instruction->source_range = source_range;
-  return instruction;
-}
-
-#define push_label(_CODE_BLOCK_, _LOCATION_, ...)\
+#define push_label(_CODE_BLOCK_, ...)\
   do {\
     Instruction to_push = (Instruction) {\
       .tag = Instruction_Tag_Label,\
       .Label.pointer = (__VA_ARGS__),\
-      .source_range = (_LOCATION_),\
     };\
     push_instruction((_CODE_BLOCK_), to_push);\
   } while (0)

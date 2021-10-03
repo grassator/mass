@@ -2197,7 +2197,7 @@ spec("source") {
       write_executable(slice_literal("build/folding.exe"), &test_context, Executable_Type_Cli);
     }
 
-    xit("should parse and write an executable with a lot of print statements") {
+    xit("should parse and write an executable with a 1 million function calls") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
         "main", &test_context, "../compile-time-benchmark/print"

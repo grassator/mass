@@ -967,15 +967,17 @@
   <DisplayString Condition="tag == Instruction_Tag_Stack_Patch">
     Stack_Patch { Stack_Patch }
   </DisplayString>
+  <DisplayString Condition="tag == Instruction_Tag_Location">
+    Location { Location }
+  </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
-    <Item Name="source_range">source_range</Item>
-    <Item Name="_source_range_padding">_source_range_padding</Item>
     <Item Name="scope">scope</Item>
     <Item Name="Label" Condition="tag == Instruction_Tag_Label">Label</Item>
     <Item Name="Bytes" Condition="tag == Instruction_Tag_Bytes">Bytes</Item>
     <Item Name="Label_Patch" Condition="tag == Instruction_Tag_Label_Patch">Label_Patch</Item>
     <Item Name="Stack_Patch" Condition="tag == Instruction_Tag_Stack_Patch">Stack_Patch</Item>
+    <Item Name="Location" Condition="tag == Instruction_Tag_Location">Location</Item>
   </Expand>
 </Type>
 <Type Name="Array_Instruction_Bucket">

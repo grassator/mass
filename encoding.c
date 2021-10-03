@@ -443,9 +443,13 @@ push_eagerly_encoded_assembly(
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);
 
   push_instruction(code_block, (Instruction) {
+    .tag = Instruction_Tag_Location,
+    .Location = { .source_range = source_range },
+  });
+
+  push_instruction(code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
     .Bytes = result.bytes,
-    .source_range = source_range,
   });
 
   // Stack patch MUST go before label patches as it might change the size of the instruction
@@ -453,7 +457,6 @@ push_eagerly_encoded_assembly(
     push_instruction(code_block, (Instruction) {
       .tag = Instruction_Tag_Stack_Patch,
       .Stack_Patch = result.maybe_stack_patch,
-      .source_range = source_range,
     });
   }
 
@@ -461,12 +464,11 @@ push_eagerly_encoded_assembly(
     push_instruction(code_block, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = result.label_patches[i],
-      .source_range = source_range,
     });
   }
 }
 
-void
+static void
 encode_instruction(
   Program *program,
   Virtual_Memory_Buffer *buffer,
@@ -502,6 +504,10 @@ encode_instruction(
     }
     case Instruction_Tag_Stack_Patch: {
       // Handled in :StackPatch
+      return;
+    }
+    case Instruction_Tag_Location: {
+      // Nothing to do
       return;
     }
   }

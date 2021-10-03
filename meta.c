@@ -1388,9 +1388,11 @@ main(void) {
       { "s32", "mod_r_m_offset_in_previous_instruction" },
       { "Stack_Area", "stack_area" },
     }),
+    struct_fields("Location", (Struct_Item[]){
+      { "Source_Range", "source_range" },
+      { "u32", "_padding" },
+    }),
   }), (Struct_Item[]){
-    { "Source_Range", "source_range" },
-    { "u32", "_source_range_padding" },
     { "Scope *", "scope" },
   }));
 
