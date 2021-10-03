@@ -5669,11 +5669,10 @@ token_parse_function_literal(
       return 0;
     }
   } else {
-    Group_Paren *group = allocator_allocate(context->allocator, Group_Paren);
-    *group = (Group_Paren){0};
+    static const Group_Paren empty_group_paren = {0};
     returns = value_init(
       allocator_allocate(context->allocator, Value),
-      &descriptor_group_paren, storage_static(group), keyword->source_range
+      &descriptor_group_paren, storage_static(&empty_group_paren), keyword->source_range
     );
   }
 
