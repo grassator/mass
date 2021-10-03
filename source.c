@@ -3217,7 +3217,6 @@ mass_macro_lazy_proc(
 
     push_label(
       &builder->code_block,
-      body_value->source_range,
       builder->code_block.end_label
     );
   }
