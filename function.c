@@ -132,17 +132,22 @@ move_value(
     panic("Internal Error: Trying to move into Eflags");
   }
 
+  push_instruction(&builder->code_block, (Instruction) {
+    .tag = Instruction_Tag_Location,
+    .Location = { .source_range = *source_range },
+  });
+
   u64 target_bit_size = target->bit_size.as_u64;
   u64 source_bit_size = source->bit_size.as_u64;
 
   if (target->tag == Storage_Tag_Xmm || source->tag == Storage_Tag_Xmm) {
     assert(target_bit_size == source_bit_size);
     if (target_bit_size == 32) {
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){movss, {*target, *source}}
       );
     } else if (target_bit_size == 64) {
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){movsd, {*target, *source}}
       );
     } else {
@@ -163,63 +168,63 @@ move_value(
     }
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){sete, {temp}}
         );
         break;
       }
       case Compare_Type_Not_Equal: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setne, {temp}}
         );
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setb, {temp}}
         );
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setbe, {temp}}
         );
         break;
       }
       case Compare_Type_Unsigned_Above: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){seta, {temp}}
         );
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setae, {temp}}
         );
         break;
       }
 
       case Compare_Type_Signed_Less: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setl, {temp}}
         );
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setle, {temp}}
         );
         break;
       }
       case Compare_Type_Signed_Greater: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setg, {temp}}
         );
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range, &(Instruction_Assembly){setge, {temp}}
         );
         break;
@@ -232,10 +237,10 @@ move_value(
       assert(temp.tag == Storage_Tag_Register);
       Storage resized_temp = temp;
       resized_temp.bit_size = target->bit_size;
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){movsx, {resized_temp, temp}}
       );
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, resized_temp}}
       );
       register_release(builder, temp.Register.index);
@@ -255,11 +260,11 @@ move_value(
       .bit_size = {64},
       .Register.index = source->Register.index,
     };
-    push_eagerly_encoded_assembly(
+    push_eagerly_encoded_assembly_no_source_range(
       &builder->code_block, *source_range,
       &(Instruction_Assembly){mov, {temp_full_register, source_full_register}}
     );
-    push_eagerly_encoded_assembly(
+    push_eagerly_encoded_assembly_no_source_range(
       &builder->code_block, *source_range,
       &(Instruction_Assembly){shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
     );
@@ -291,11 +296,11 @@ move_value(
 
     // Clear bits from the target register
     {
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range,
         &(Instruction_Assembly){mov, {temp_full_register, imm64(clear_mask)}}
       );
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range,
         &(Instruction_Assembly){and, {target_full_register, temp_full_register}}
       );
@@ -303,7 +308,7 @@ move_value(
 
     // Prepare new bits from the source register
     {
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range,
         &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
       );
@@ -311,7 +316,7 @@ move_value(
       right_size_temp.bit_size = source->bit_size;
       move_value(allocator, builder, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range,
           &(Instruction_Assembly){shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
         );
@@ -319,7 +324,7 @@ move_value(
     }
 
     // Merge new bits into the target register
-    push_eagerly_encoded_assembly(
+    push_eagerly_encoded_assembly_no_source_range(
       &builder->code_block, *source_range,
       &(Instruction_Assembly){or, {target_full_register, temp_full_register}}
     );
@@ -332,7 +337,7 @@ move_value(
     s64 immediate = storage_static_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){xor, {*target, *target}}
       );
       return;
@@ -374,15 +379,15 @@ move_value(
         .bit_size = adjusted_source.bit_size,
         .Register.index = register_acquire_temp(builder),
       };
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){mov, {temp, adjusted_source}}
       );
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, temp}}
       );
       register_release(builder, temp.Register.index);
     } else {
-      push_eagerly_encoded_assembly(
+      push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, adjusted_source}}
       );
     }
@@ -397,13 +402,14 @@ move_value(
       .bit_size = target->bit_size,
       .Register.index = register_acquire_temp(builder),
     };
+    // TODO avoid and extra source range push for recursion
     move_value(allocator, builder, source_range, &temp, source);
     move_value(allocator, builder, source_range, target, &temp);
     register_release(builder, temp.Register.index);
     return;
   }
 
-  push_eagerly_encoded_assembly(
+  push_eagerly_encoded_assembly_no_source_range(
     &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, *source}}
   );
 }
