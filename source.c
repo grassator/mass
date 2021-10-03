@@ -1536,8 +1536,22 @@ value_view_maybe_match_cached_symbol(
   const Symbol *cached_symbol
 ) {
   Value *value = value_view_peek(view, *peek_index);
-  if (!value_is_symbol(value)) return 0;
+  if (!value) return 0;
+  if (value->descriptor != &descriptor_symbol) return 0;
   if (value_as_symbol(value) != cached_symbol) return 0;
+  *peek_index += 1;
+  return value;
+}
+
+static inline Value *
+value_view_maybe_match_any_of(
+  Value_View view,
+  u32 *peek_index,
+  const Descriptor *descriptor
+) {
+  Value *value = value_view_peek(view, *peek_index);
+  if (!value) return 0;
+  if (value->descriptor != descriptor) return 0;
   *peek_index += 1;
   return value;
 }
@@ -1553,11 +1567,6 @@ context_parse_error(
     .source_range = value_view_slice(&view, peek_index, peek_index).source_range,
   });
 }
-
-#define TOKEN_MAYBE_MATCH(_id_, ...)\
-  static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
-  Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
-  if (_id_) (++peek_index)
 
 typedef struct {
   Slice name;
@@ -5651,7 +5660,7 @@ token_parse_function_literal(
     return 0;
   }
 
-  TOKEN_MAYBE_MATCH(maybe_name, .tag = Token_Pattern_Tag_Symbol);
+  Value *maybe_name = value_view_maybe_match_any_of(view, &peek_index, &descriptor_symbol);
   Value *args = value_view_next(view, &peek_index);
   if (!value_is_group_paren(args)) {
     context_parse_error(context, view, peek_index);
@@ -5682,7 +5691,7 @@ token_parse_function_literal(
     function_info_from_parameters_and_return_type(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
-  TOKEN_MAYBE_MATCH(body_value, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
+  Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_group_curly);
   if (!body_value) {
     u32 intrinsic_match_length = 0;
     Value_View rest = value_view_rest(&view, peek_index);
