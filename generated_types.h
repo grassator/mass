@@ -2056,6 +2056,8 @@ typedef struct Common_Symbols {
   const Symbol * apply;
   const Symbol * fn;
   const Symbol * macro;
+  const Symbol * intrinsic;
+  const Symbol * operator;
   const Symbol * _if;
   const Symbol * operator_at;
 } Common_Symbols;
@@ -5791,6 +5793,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("macro"),
     .Base_Relative.offset = offsetof(Common_Symbols, macro),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("intrinsic"),
+    .Base_Relative.offset = offsetof(Common_Symbols, intrinsic),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

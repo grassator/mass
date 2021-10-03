@@ -1684,6 +1684,8 @@ compilation_init(
     .apply = mass_ensure_symbol(compilation, slice_literal("apply")),
     .fn = mass_ensure_symbol(compilation, slice_literal("fn")),
     .macro = mass_ensure_symbol(compilation, slice_literal("macro")),
+    .intrinsic = mass_ensure_symbol(compilation, slice_literal("intrinsic")),
+    .operator = mass_ensure_symbol(compilation, slice_literal("operator")),
     ._if = mass_ensure_symbol(compilation, slice_literal("if")),
     .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
   };

@@ -1915,6 +1915,8 @@ main(void) {
     { "const Symbol *", "apply" },
     { "const Symbol *", "fn" },
     { "const Symbol *", "macro" },
+    { "const Symbol *", "intrinsic" },
+    { "const Symbol *", "operator" },
     { "const Symbol *", "_if" },
     { "const Symbol *", "operator_at" },
   }));

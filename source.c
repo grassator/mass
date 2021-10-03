@@ -1542,6 +1542,18 @@ value_view_maybe_match_cached_symbol(
   return value;
 }
 
+static inline void
+context_parse_error(
+  Execution_Context *context,
+  Value_View view,
+  u32 peek_index
+) {
+  context_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Parse,
+    .source_range = value_view_slice(&view, peek_index, peek_index).source_range,
+  });
+}
+
 #define TOKEN_MAYBE_MATCH(_id_, ...)\
   static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
@@ -1549,10 +1561,7 @@ value_view_maybe_match_cached_symbol(
 
 #define TOKEN_ERROR_WHEN_MATCHING() \
   do {\
-    context_error(context, (Mass_Error) {\
-      .tag = Mass_Error_Tag_Parse,\
-      .source_range = value_view_slice(&view, peek_index, peek_index).source_range,\
-    });\
+    context_parse_error(context, view, peek_index);\
     return 0;\
   } while(0)
 
@@ -2410,11 +2419,19 @@ token_parse_operator_definition(
   User_Defined_Operator *user_defined_operator = 0;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
-  TOKEN_MAYBE_MATCH(intrinsic_token, TOKEN_PATTERN_SYMBOL("intrinsic"));
-  TOKEN_EXPECT(precedence_token);
-  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
-  TOKEN_EXPECT(alias_token);
+  Value *keyword_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator
+  );
+  if (!keyword_token) return 0;
+  Value *intrinsic_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.intrinsic
+  );
+  Value *precedence_token = value_view_next(view, &peek_index);
+  if (!precedence_token) { context_parse_error(context, view, peek_index); goto err; }
+  Value *pattern_token = value_view_next(view, &peek_index);
+  if (!value_is_group_paren(pattern_token)) { context_parse_error(context, view, peek_index); goto err; }
+  Value *alias_token = value_view_next(view, &peek_index);
+  if (!alias_token) { context_parse_error(context, view, peek_index); goto err; }
 
   if (!value_is_symbol(alias_token)) {
     context_error(context, (Mass_Error) {

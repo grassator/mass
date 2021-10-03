@@ -132,6 +132,16 @@ value_view_get(
 }
 
 static inline Value *
+value_view_next(
+  Value_View view,
+  u32 *peek_index
+) {
+  Value *peek = value_view_peek(view, *peek_index);
+  if (peek) *peek_index += 1;
+  return peek;
+}
+
+static inline Value *
 value_view_last(
   Value_View view
 ) {
