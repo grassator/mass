@@ -941,14 +941,20 @@ value_wrap_in_overload_set(
   Slice name,
   const Source_Range *lookup_range
 ) {
-  Overload_Set *set = allocator_allocate(scope->allocator, Overload_Set);
+  allocator_allocate_bulk(scope->allocator, combined, {
+    Overload_Set overload_set;
+    Value value;
+  });
+
+  Overload_Set *set = &combined->overload_set;
   *set = (Overload_Set) {
     .items = dyn_array_make(Array_Value_Ptr), // @Leak should use proper allocator
   };
   dyn_array_push(set->items, value);
-  Value *overload_set_value = allocator_allocate(scope->allocator, Value);
-  value_init(overload_set_value, &descriptor_overload_set, storage_static(set), value->source_range);
-  return overload_set_value;
+
+  return value_init(
+    &combined->value, &descriptor_overload_set, storage_static(set), value->source_range
+  );
 }
 
 static inline Value *
@@ -1423,10 +1429,15 @@ tokenizer_push_string_literal(
     value_init(pointer_value, bytes_descriptor, storage_none, source_range);
   }
 
-  Slice *string = allocator_allocate(compilation->allocator, Slice);
+  allocator_allocate_bulk(compilation->allocator, combined, {
+    Slice slice;
+    Value value;
+  });
+
+  Slice *string = &combined->slice;
   *string = (Slice){bytes, (*string_buffer)->occupied};
   Value *string_value = value_init(
-    allocator_allocate(compilation->allocator, Value),
+    &combined->value,
     &descriptor_slice, storage_static(string), source_range
   );
   dyn_array_push(*stack, string_value);
@@ -1593,17 +1604,23 @@ token_parse_tuple(
 
   Value *result_value = 0;
 
+  // Use temp allocator first for the parse
   Array_Value_Ptr items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
   for (; remaining.length; remaining = value_view_rest(&remaining, match_length)) {
     MASS_ON_ERROR(*context->result) goto err;
     Value *item = token_parse_expression(context, remaining, &match_length, &token_pattern_comma_operator);
     dyn_array_push(items, item);
   }
-  Tuple *tuple = allocator_allocate(context->allocator, Tuple);
-  *tuple = (Tuple){
-    .items = items,
-  };
-  result_value = value_make(context, &descriptor_tuple, storage_static(tuple), view.source_range);
+
+  allocator_allocate_bulk(context->allocator, combined, {
+    Tuple tuple;
+    Value value;
+  });
+  Tuple *tuple = &combined->tuple;
+  *tuple = (Tuple) { .items = items, };
+  result_value = value_init(
+    &combined->value, &descriptor_tuple, storage_static(tuple), view.source_range
+  );
   err:
   return result_value;
 }
@@ -1751,14 +1768,18 @@ token_apply_macro_syntax(
 
     if (!capture_name.length) continue;
     Value_View capture_view = *dyn_array_get(match, i);
-    Macro_Capture *capture = allocator_allocate(context->allocator, Macro_Capture);
+    allocator_allocate_bulk(context->allocator, combined, {
+      Macro_Capture capture;
+      Value value;
+    });
+    Macro_Capture *capture = &combined->capture;
     *capture = (Macro_Capture){
       .name = item->capture_name,
       .view = capture_view,
       .scope = captured_scope,
     };
     Value *result = value_init(
-      allocator_allocate(context->allocator, Value),
+      &combined->value,
       &descriptor_macro_capture, storage_static(capture), capture_view.source_range
     );
     const Symbol *capture_symbol =
@@ -2279,7 +2300,12 @@ mass_make_lazy_value_with_epoch(
   u64 epoch,
   Lazy_Value_Proc proc
 ) {
-  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
+  allocator_allocate_bulk(context->allocator, combined, {
+    Lazy_Value lazy_value;
+    Value value;
+  });
+
+  Lazy_Value *lazy = &combined->lazy_value;
   *lazy = (Lazy_Value) {
     .context = *context,
     .descriptor = descriptor,
@@ -2288,7 +2314,7 @@ mass_make_lazy_value_with_epoch(
     .epoch = epoch,
   };
   return value_init(
-    allocator_allocate(context->allocator, Value),
+    &combined->value,
     &descriptor_lazy_value, storage_static(lazy), source_range
   );
 }
@@ -2313,13 +2339,17 @@ scope_define_lazy_compile_time_expression(
   const Symbol *symbol,
   Value_View view
 ) {
-  Lazy_Static_Value *lazy_static_value = allocator_allocate(context->allocator, Lazy_Static_Value);
+  allocator_allocate_bulk(context->allocator, combined, {
+    Lazy_Static_Value lazy_static_value;
+    Value value;
+  });
+  Lazy_Static_Value *lazy_static_value = &combined->lazy_static_value;
   *lazy_static_value = (Lazy_Static_Value){
     .context = *context,
     .expression = view,
   };
   Value *value = value_init(
-    allocator_allocate(context->allocator, Value),
+    &combined->value,
     &descriptor_lazy_static_value,
     storage_static(lazy_static_value),
     view.source_range
@@ -4634,14 +4664,20 @@ mass_size_of(
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 
-  Number_Literal *literal = allocator_allocate(context->allocator, Number_Literal);
+  allocator_allocate_bulk(context->allocator, combined, {
+    Number_Literal number_literal;
+    Value value;
+  });
+
+  Number_Literal *literal = &combined->number_literal;
   *literal = (Number_Literal) {
-    .base = 10,
+    .base = Number_Base_10,
     .negative = false,
     .bits = byte_size,
   };
-
-  return value_make(context, &descriptor_number_literal, storage_static(literal), args.source_range);
+  return value_init(
+    &combined->value, &descriptor_number_literal, storage_static(literal), args.source_range
+  );
 }
 
 static Value *
@@ -5958,12 +5994,16 @@ token_parse_block_view(
       if (lazy_value.proc) {
         assert(lazy_value.descriptor);
         Value_View matched_view = value_view_slice(&rest, 0, match_length);
-        Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
+        allocator_allocate_bulk(context->allocator, combined, {
+          Lazy_Value lazy_value;
+          Value value;
+        });
+
+        Lazy_Value *lazy_value_storage = &combined->lazy_value;
         *lazy_value_storage = lazy_value;
-        Value *lazy_statement = allocator_allocate(context->allocator, Value);
         Storage storage = storage_static(lazy_value_storage);
-        value_init(lazy_statement, &descriptor_lazy_value, storage, matched_view.source_range);
-        dyn_array_push(temp_lazy_statements, lazy_statement);
+        value_init(&combined->value, &descriptor_lazy_value, storage, matched_view.source_range);
+        dyn_array_push(temp_lazy_statements, &combined->value);
       }
       continue;
     }

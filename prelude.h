@@ -671,6 +671,11 @@ allocator_allocate_bytes(
 #define allocator_allocate_array(_allocator_, _type_, _count_)\
   (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_) * (_count_), _Alignof(_type_))
 
+#define allocator_allocate_bulk(_ALLOCATOR_, _NAME_, ...)\
+  struct __VA_ARGS__ *_NAME_ = allocator_allocate_bytes(\
+    (_ALLOCATOR_), sizeof(struct __VA_ARGS__), _Alignof(struct __VA_ARGS__)\
+  )
+
 static inline void
 allocator_deallocate(
   const Allocator *allocator,

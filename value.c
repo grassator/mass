@@ -1083,6 +1083,10 @@ value_number_literal(
     assert(byte >= '0' && byte <= '9');
     byte -= '0';
     literal = &single_decimal_digits[byte];
+    return value_init(
+      allocator_allocate(allocator, Value),
+      &descriptor_number_literal, storage_static(literal), source_range
+    );
   } else {
     u64 bits = 0;
     bool ok = true;
@@ -1094,18 +1098,21 @@ value_number_literal(
     }
     if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
 
-    Number_Literal *heap_literal = allocator_allocate(allocator, Number_Literal);
+    allocator_allocate_bulk(allocator, combined, {
+      Number_Literal number_literal;
+      Value value;
+    });
+
+    Number_Literal *heap_literal = &combined->number_literal;
     *heap_literal = (Number_Literal) {
       .base = base,
       .negative = false,
       .bits = bits,
     };
-    literal = heap_literal;
+    return value_init(
+      &combined->value, &descriptor_number_literal, storage_static(heap_literal), source_range
+    );
   }
-  return value_init(
-    allocator_allocate(allocator, Value),
-    &descriptor_number_literal, storage_static(literal), source_range
-  );
 }
 
 static inline Label *
