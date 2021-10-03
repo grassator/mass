@@ -433,7 +433,7 @@ push_instruction(
 }
 
 static inline void
-push_eagerly_encoded_assembly(
+push_eagerly_encoded_assembly_no_source_range(
   Code_Block *code_block,
   Source_Range source_range,
   const Instruction_Assembly *assembly
@@ -441,11 +441,6 @@ push_eagerly_encoded_assembly(
   const Instruction_Encoding *encoding = encoding_match(assembly);
   if (!encoding) panic("Did not find acceptable encoding");
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);
-
-  push_instruction(code_block, (Instruction) {
-    .tag = Instruction_Tag_Location,
-    .Location = { .source_range = source_range },
-  });
 
   push_instruction(code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
@@ -466,6 +461,20 @@ push_eagerly_encoded_assembly(
       .Label_Patch = result.label_patches[i],
     });
   }
+}
+
+static inline void
+push_eagerly_encoded_assembly(
+  Code_Block *code_block,
+  Source_Range source_range,
+  const Instruction_Assembly *assembly
+) {
+  push_instruction(code_block, (Instruction) {
+    .tag = Instruction_Tag_Location,
+    .Location = { .source_range = source_range },
+  });
+
+  push_eagerly_encoded_assembly_no_source_range(code_block, source_range, assembly);
 }
 
 static void

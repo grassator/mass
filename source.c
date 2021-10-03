@@ -4187,6 +4187,11 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       MASS_ON_ERROR(*context->result) return 0;
 
+      push_instruction(&builder->code_block, (Instruction) {
+        .tag = Instruction_Tag_Location,
+        .Location = { .source_range = result_range },
+      });
+
       const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
       push_eagerly_encoded_assembly(
         &builder->code_block, result_range,
@@ -4241,6 +4246,11 @@ mass_handle_arithmetic_operation_lazy_proc(
       Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
       temp_divisor = value_force(context, builder, &expected_divisor, payload->rhs);
 
+      push_instruction(&builder->code_block, (Instruction) {
+        .tag = Instruction_Tag_Location,
+        .Location = { .source_range = result_range },
+      });
+
       MASS_ON_ERROR(*context->result) return 0;
 
       if (descriptor_is_signed_integer(descriptor)){
@@ -4252,26 +4262,26 @@ mass_handle_arithmetic_operation_lazy_proc(
           case 1: widen = cbw; break;
         }
         assert(widen);
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, result_range, &(Instruction_Assembly){widen}
         );
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, result_range, &(Instruction_Assembly){idiv, {temp_divisor->storage}}
         );
       } else {
         if (byte_size == 1) {
           Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
-          push_eagerly_encoded_assembly(
+          push_eagerly_encoded_assembly_no_source_range(
             &builder->code_block, result_range, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend->storage}}
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
           Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
-          push_eagerly_encoded_assembly(
+          push_eagerly_encoded_assembly_no_source_range(
             &builder->code_block, result_range, &(Instruction_Assembly){xor, {reg_d, reg_d}}
           );
         }
-        push_eagerly_encoded_assembly(
+        push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, result_range, &(Instruction_Assembly){asm_div, {temp_divisor->storage}}
         );
       }
