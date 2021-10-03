@@ -2676,7 +2676,7 @@ virtual_memory_buffer_deinit(
   Virtual_Memory_Buffer *buffer
 ) {
 #ifdef _WIN32
-  VirtualFree(buffer->memory, buffer->capacity, MEM_RELEASE);
+  VirtualFree(buffer->memory, 0, MEM_RELEASE);
 #else
   munmap(buffer->memory, buffer->capacity);
 #endif
