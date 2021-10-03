@@ -488,72 +488,6 @@ print_storage(
   }
 }
 
-#define define_register(reg_name, reg_index, reg_bit_size) \
-const Storage reg_name = { \
-  .tag = Storage_Tag_Register, \
-  .bit_size = reg_bit_size, \
-  .Register = {.index = (reg_index)}, \
-};
-define_register(al, 0b0000, 8);
-
-define_register(rax, 0b0000, 64);
-define_register(rcx, 0b0001, 64);
-define_register(rdx, 0b0010, 64);
-define_register(rbx, 0b0011, 64);
-define_register(rsp, 0b0100, 64);
-define_register(rbp, 0b0101, 64);
-define_register(rsi, 0b0110, 64);
-define_register(rdi, 0b0111, 64);
-
-define_register(eax, 0b0000, 32);
-define_register(ecx, 0b0001, 32);
-define_register(edx, 0b0010, 32);
-define_register(ebx, 0b0011, 32);
-define_register(esp, 0b0100, 32);
-define_register(ebp, 0b0101, 32);
-define_register(esi, 0b0110, 32);
-define_register(edi, 0b0111, 32);
-
-define_register(r8,  0b1000, 64);
-define_register(r9,  0b1001, 64);
-define_register(r10, 0b1010, 64);
-define_register(r11, 0b1011, 64);
-define_register(r12, 0b1100, 64);
-define_register(r13, 0b1101, 64);
-define_register(r14, 0b1110, 64);
-define_register(r15, 0b1111, 64);
-
-define_register(r8d,  0b1000, 32);
-define_register(r9d,  0b1001, 32);
-define_register(r10d, 0b1010, 32);
-define_register(r11d, 0b1011, 32);
-define_register(r12d, 0b1100, 32);
-define_register(r13d, 0b1101, 32);
-define_register(r14d, 0b1110, 32);
-define_register(r15d, 0b1111, 32);
-#undef define_register
-
-#define define_xmm_register(reg_name, reg_index) \
-const Storage reg_name##_32 = { \
-  .tag = Storage_Tag_Xmm, \
-  .bit_size = {32}, \
-  .Register = {.index = (reg_index)}, \
-};\
-const Storage reg_name##_64 = { \
-  .tag = Storage_Tag_Xmm, \
-  .bit_size = {64}, \
-  .Register = {.index = (reg_index)}, \
-};
-define_xmm_register(xmm0, 0b000);
-define_xmm_register(xmm1, 0b001);
-define_xmm_register(xmm2, 0b010);
-define_xmm_register(xmm3, 0b011);
-define_xmm_register(xmm4, 0b100);
-define_xmm_register(xmm5, 0b101);
-define_xmm_register(xmm6, 0b110);
-define_xmm_register(xmm7, 0b111);
-#undef define_xmm_register
-
 static inline Label *
 make_label(
   const Allocator *allocator,
@@ -1652,7 +1586,7 @@ memory_layout_item_storage_at_index(
   return memory_layout_item_storage(base, layout, dyn_array_get(layout->items, index));
 }
 
-const Calling_Convention *
+static const Calling_Convention *
 host_calling_convention() {
   #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
   return &calling_convention_x86_64_windows;
@@ -1663,7 +1597,7 @@ host_calling_convention() {
   #endif
 }
 
-void
+static void
 jit_init(
   Jit *jit,
   Program *program
@@ -1674,7 +1608,7 @@ jit_init(
   };
 }
 
-void
+static void
 jit_deinit(
   Jit *jit
 ) {

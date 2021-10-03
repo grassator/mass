@@ -420,6 +420,7 @@ make_trampoline(
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
+  Storage rax = storage_register_for_descriptor(Register_A, &descriptor_u64);
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {mov, {rax, imm64(address)}});
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {jmp, {rax}});
   return result;
@@ -459,6 +460,7 @@ fn_encode(
     }
   }
 
+  Storage rsp = storage_register_for_descriptor(Register_SP, &descriptor_u64);
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {sub, {rsp, stack_size_operand}});
   out_layout->stack_allocation_offset_in_prolog =
     u64_to_u8(code_base_rva + buffer->occupied -out_layout->begin_rva);
