@@ -1682,6 +1682,10 @@ compilation_init(
   // Intern common symbols used during parsing
   compilation->common_symbols = (Common_Symbols) {
     .apply = mass_ensure_symbol(compilation, slice_literal("apply")),
+    .fn = mass_ensure_symbol(compilation, slice_literal("fn")),
+    .macro = mass_ensure_symbol(compilation, slice_literal("macro")),
+    ._if = mass_ensure_symbol(compilation, slice_literal("if")),
+    .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
   };
 }
 

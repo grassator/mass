@@ -2054,6 +2054,10 @@ typedef dyn_array_type(Jit) Array_Jit;
 hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
 typedef struct Common_Symbols {
   const Symbol * apply;
+  const Symbol * fn;
+  const Symbol * macro;
+  const Symbol * _if;
+  const Symbol * operator_at;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -5775,6 +5779,30 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("apply"),
     .Base_Relative.offset = offsetof(Common_Symbols, apply),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("fn"),
+    .Base_Relative.offset = offsetof(Common_Symbols, fn),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("macro"),
+    .Base_Relative.offset = offsetof(Common_Symbols, macro),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("_if"),
+    .Base_Relative.offset = offsetof(Common_Symbols, _if),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_at"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_at),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);

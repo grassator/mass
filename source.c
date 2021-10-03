@@ -1529,6 +1529,19 @@ value_view_match_till_end_of_statement(
   return value_view_match_till(view, peek_index, &token_pattern_semicolon);
 }
 
+static inline Value *
+value_view_maybe_match_cached_symbol(
+  Value_View view,
+  u32 *peek_index,
+  const Symbol *cached_symbol
+) {
+  Value *value = value_view_peek(view, *peek_index);
+  if (!value_is_symbol(value)) return 0;
+  if (value_as_symbol(value) != cached_symbol) return 0;
+  *peek_index += 1;
+  return value;
+}
+
 #define TOKEN_MAYBE_MATCH(_id_, ...)\
   static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
@@ -5311,7 +5324,10 @@ token_parse_if_expression(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("if"));
+  Value *keyword = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols._if
+  );
+  if (!keyword) return 0;
 
   Source_Range dummy_range = keyword->source_range;
 
@@ -5588,11 +5604,16 @@ token_parse_function_literal(
 
   u32 peek_index = 0;
   bool is_macro = false;
-  TOKEN_MAYBE_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
-  TOKEN_MAYBE_MATCH(keyword, TOKEN_PATTERN_SYMBOL("fn"));
+  Value *at = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator_at
+  );
+  Value *keyword = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.fn
+  );
   if (!keyword) {
-    TOKEN_MAYBE_MATCH(macro, TOKEN_PATTERN_SYMBOL("macro"));
-    keyword = macro;
+    keyword = value_view_maybe_match_cached_symbol(
+      view, &peek_index, context->compilation->common_symbols.macro
+    );
     is_macro = true;
   }
   if (!keyword) return 0;
@@ -6226,6 +6247,7 @@ token_parse_explicit_return(
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
 
   u32 peek_index = 0;
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("return"));

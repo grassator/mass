@@ -1913,6 +1913,10 @@ main(void) {
 
   push_type(type_struct("Common_Symbols", (Struct_Item[]){
     { "const Symbol *", "apply" },
+    { "const Symbol *", "fn" },
+    { "const Symbol *", "macro" },
+    { "const Symbol *", "_if" },
+    { "const Symbol *", "operator_at" },
   }));
 
   push_type(type_struct("Compilation", (Struct_Item[]){
