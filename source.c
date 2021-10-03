@@ -1142,31 +1142,6 @@ scope_lookup_operator(
   return 0;
 }
 
-static inline const Symbol *
-mass_ensure_symbol(
-  Compilation *compilation,
-  Slice name
-) {
-  s32 hash = Symbol_Map__hash(name);
-  const Symbol *symbol = 0;
-  if (!symbol) {
-    // Symbol type is derived from name anyway so it does not need to be part of the key
-    Symbol **cache_entry = hash_map_get_by_hash(compilation->symbol_cache_map, hash, name);
-    if (cache_entry) {
-      symbol = *cache_entry;
-    }
-  }
-  if (!symbol) {
-    Symbol *heap_symbol = allocator_allocate(compilation->allocator, Symbol);
-    *heap_symbol = (Symbol){
-      .name = name,
-    };
-    symbol = heap_symbol;
-    hash_map_set_by_hash(compilation->symbol_cache_map, hash, name, heap_symbol);
-  }
-  return symbol;
-}
-
 static inline Value *
 token_make_symbol_value(
   Compilation *compilation,
@@ -4745,11 +4720,7 @@ mass_handle_apply_operator(
     return token_handle_function_call(context, lhs_value, args_view, source_range);
   }
 
-  // FIXME Store "common" compiler symbols
-  const Symbol *apply_symbol =
-    mass_ensure_symbol(context->compilation, slice_literal("apply"));
-
-  Scope_Entry *apply_entry = scope_lookup(context->scope, apply_symbol);
+  Scope_Entry *apply_entry = scope_lookup(context->scope, context->compilation->common_symbols.apply);
   if (!apply_entry) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,

@@ -1597,6 +1597,31 @@ host_calling_convention() {
   #endif
 }
 
+static inline const Symbol *
+mass_ensure_symbol(
+  Compilation *compilation,
+  Slice name
+) {
+  s32 hash = Symbol_Map__hash(name);
+  const Symbol *symbol = 0;
+  if (!symbol) {
+    // Symbol type is derived from name anyway so it does not need to be part of the key
+    Symbol **cache_entry = hash_map_get_by_hash(compilation->symbol_cache_map, hash, name);
+    if (cache_entry) {
+      symbol = *cache_entry;
+    }
+  }
+  if (!symbol) {
+    Symbol *heap_symbol = allocator_allocate(compilation->allocator, Symbol);
+    *heap_symbol = (Symbol){
+      .name = name,
+    };
+    symbol = heap_symbol;
+    hash_map_set_by_hash(compilation->symbol_cache_map, hash, name, heap_symbol);
+  }
+  return symbol;
+}
+
 static void
 jit_init(
   Jit *jit,
@@ -1653,6 +1678,11 @@ compilation_init(
   compilation->root_scope = scope_make(compilation->allocator, 0);
   module_compiler_init(compilation, &compilation->compiler_module);
   scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
+
+  // Intern common symbols used during parsing
+  compilation->common_symbols = (Common_Symbols) {
+    .apply = mass_ensure_symbol(compilation, slice_literal("apply")),
+  };
 }
 
 static void

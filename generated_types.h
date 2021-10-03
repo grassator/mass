@@ -623,6 +623,10 @@ typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
 
 typedef struct Static_Pointer_Map Static_Pointer_Map;
 
+typedef struct Common_Symbols Common_Symbols;
+typedef dyn_array_type(Common_Symbols *) Array_Common_Symbols_Ptr;
+typedef dyn_array_type(const Common_Symbols *) Array_Const_Common_Symbols_Ptr;
+
 typedef struct Compilation Compilation;
 typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
@@ -2048,6 +2052,11 @@ typedef struct Jit {
 typedef dyn_array_type(Jit) Array_Jit;
 
 hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
+typedef struct Common_Symbols {
+  const Symbol * apply;
+} Common_Symbols;
+typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
+
 typedef struct Compilation {
   Virtual_Memory_Buffer temp_buffer;
   Allocator * temp_allocator;
@@ -2062,6 +2071,7 @@ typedef struct Compilation {
   Program * runtime_program;
   Mass_Result * result;
   Symbol_Map * symbol_cache_map;
+  Common_Symbols common_symbols;
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
 
@@ -2568,6 +2578,11 @@ static Descriptor descriptor_array_jit_ptr;
 static Descriptor descriptor_jit_pointer;
 static Descriptor descriptor_jit_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_map, Static_Pointer_Map);
+static Descriptor descriptor_common_symbols;
+static Descriptor descriptor_array_common_symbols;
+static Descriptor descriptor_array_common_symbols_ptr;
+static Descriptor descriptor_common_symbols_pointer;
+static Descriptor descriptor_common_symbols_pointer_pointer;
 static Descriptor descriptor_compilation;
 static Descriptor descriptor_array_compilation;
 static Descriptor descriptor_array_compilation_ptr;
@@ -5752,6 +5767,17 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
   },
 );
 MASS_DEFINE_TYPE_VALUE(jit);
+MASS_DEFINE_OPAQUE_C_TYPE(array_common_symbols_ptr, Array_Common_Symbols_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_common_symbols, Array_Common_Symbols)
+MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("apply"),
+    .Base_Relative.offset = offsetof(Common_Symbols, apply),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(common_symbols);
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation_ptr, Array_Compilation_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation, Array_Compilation)
 MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
@@ -5832,6 +5858,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_symbol_map_pointer,
     .name = slice_literal_fields("symbol_cache_map"),
     .Base_Relative.offset = offsetof(Compilation, symbol_cache_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_common_symbols,
+    .name = slice_literal_fields("common_symbols"),
+    .Base_Relative.offset = offsetof(Compilation, common_symbols),
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);

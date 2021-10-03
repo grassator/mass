@@ -1911,6 +1911,10 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
+  push_type(type_struct("Common_Symbols", (Struct_Item[]){
+    { "const Symbol *", "apply" },
+  }));
+
   push_type(type_struct("Compilation", (Struct_Item[]){
     { "Virtual_Memory_Buffer", "temp_buffer" },
     { "Allocator *", "temp_allocator" },
@@ -1925,6 +1929,7 @@ main(void) {
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },
     { "Symbol_Map *", "symbol_cache_map" },
+    { "Common_Symbols", "common_symbols" },
   }));
 
   push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){
