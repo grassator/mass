@@ -5847,29 +5847,31 @@ token_parse_expression(
   bool is_previous_an_operator = true;
   u32 matched_length = view.length;
 
-  static const Expression_Matcher expression_matchers[] = {
-    { .proc = token_parse_if_expression, .matches_end_of_expression = true },
-    { .proc = token_parse_function_literal, .matches_end_of_expression = false },
-  };
-
   for (u32 i = 0; ; ++i) {
     repeat:
     if (i >= view.length) break;
 
     Value_View rest = value_view_rest(&view, i);
-    for (u64 matcher_index = 0; matcher_index < countof(expression_matchers); matcher_index += 1) {
-      const Expression_Matcher *matcher = &expression_matchers[matcher_index];
+
+    { // if expression
       u32 match_length = 0;
-      Value *match_result = matcher->proc(context, rest, &match_length, end_symbol);
+      Value *match_result = token_parse_if_expression(context, rest, &match_length, end_symbol);
       MASS_ON_ERROR(*context->result) goto defer;
-      if (!match_length) continue;
-      assert(match_result);
-      dyn_array_push(value_stack, match_result);
-      i += match_length; // Skip over the matched slice
-      if (matcher->matches_end_of_expression) {
+      if (match_length) {
+        dyn_array_push(value_stack, match_result);
+        i += match_length; // Skip over the matched slice
         matched_length = i;
         goto drain;
-      } else {
+      }
+    }
+
+    { // function literal
+      u32 match_length = 0;
+      Value *match_result = token_parse_function_literal(context, rest, &match_length, end_symbol);
+      MASS_ON_ERROR(*context->result) goto defer;
+      if (match_length) {
+        dyn_array_push(value_stack, match_result);
+        i += match_length; // Skip over the matched slice
         goto repeat;
       }
     }
