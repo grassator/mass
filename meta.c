@@ -1914,9 +1914,10 @@ main(void) {
   push_type(type_struct("Common_Symbols", (Struct_Item[]){
     { "const Symbol *", "apply" },
     { "const Symbol *", "fn" },
-    { "const Symbol *", "macro" },
     { "const Symbol *", "intrinsic" },
+    { "const Symbol *", "macro" },
     { "const Symbol *", "operator" },
+    { "const Symbol *", "statement" },
     { "const Symbol *", "_if" },
     { "const Symbol *", "operator_at" },
   }));

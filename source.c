@@ -1559,16 +1559,6 @@ context_parse_error(
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
   if (_id_) (++peek_index)
 
-#define TOKEN_ERROR_WHEN_MATCHING() \
-  do {\
-    context_parse_error(context, view, peek_index);\
-    return 0;\
-  } while(0)
-
-#define TOKEN_EXPECT_MATCH(_id_, ...)\
-  TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
-  if (!_id_) TOKEN_ERROR_WHEN_MATCHING()
-
 #define TOKEN_MATCH(_id_, ...)\
   TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
   if (!(_id_)) return 0
@@ -2595,9 +2585,19 @@ token_parse_syntax_definition(
 
   u32 peek_index = 0;
   TOKEN_MATCH(name, TOKEN_PATTERN_SYMBOL("syntax"));
-  TOKEN_EXPECT_MATCH(statement_token, TOKEN_PATTERN_SYMBOL("statement"));
+  Value *statement_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.statement
+  );
+  if (!statement_token) {
+    context_parse_error(context, view, peek_index);
+    return 0;
+  }
 
-  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
+  Value *pattern_token = value_view_next(view, &peek_index);
+  if (!value_is_group_paren(pattern_token)) {
+    context_parse_error(context, view, peek_index);
+    return 0;
+  }
 
   Value_View replacement = value_view_match_till_end_of_statement(view, &peek_index);
   Value_View definition = value_as_group_paren(pattern_token)->children;
@@ -5433,7 +5433,12 @@ token_parse_intrinsic_literal(
   u32 peek_index = 0;
   TOKEN_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("intrinsic"));
-  TOKEN_EXPECT_MATCH(body, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
+
+  Value *body = value_view_next(view, &peek_index);
+  if (!value_is_group_curly(body)) {
+    context_parse_error(context, view, peek_index);
+    return 0;
+  }
   *match_length = peek_index;
 
   const u64 tokens_per_argument = 8;
@@ -5641,7 +5646,11 @@ token_parse_function_literal(
   }
 
   TOKEN_MAYBE_MATCH(maybe_name, .tag = Token_Pattern_Tag_Symbol);
-  TOKEN_EXPECT_MATCH(args, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
+  Value *args = value_view_next(view, &peek_index);
+  if (!value_is_group_paren(args)) {
+    context_parse_error(context, view, peek_index);
+    return 0;
+  }
 
   Value *returns;
   TOKEN_MAYBE_MATCH(arrow, TOKEN_PATTERN_SYMBOL("->"));
