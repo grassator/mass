@@ -1229,7 +1229,6 @@ typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 static inline void
 tokenizer_maybe_push_fake_semicolon(
   Compilation *compilation,
-  const Allocator *allocator, // FIXME not necessary
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
   Source_Range source_range

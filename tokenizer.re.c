@@ -125,7 +125,7 @@ tokenize(
       newline {
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
-          compilation, allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
+          compilation, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
         );
         continue;
       }
