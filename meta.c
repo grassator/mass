@@ -1923,10 +1923,14 @@ main(void) {
     { "const Symbol *", "syntax" },
     { "const Symbol *", "using" },
     { "const Symbol *", "_if" },
+    { "const Symbol *", "then" },
+    { "const Symbol *", "_else" },
     { "const Symbol *", "_return" },
     { "const Symbol *", "operator_arrow" },
     { "const Symbol *", "operator_at" },
     { "const Symbol *", "operator_colon" },
+    { "const Symbol *", "operator_comma" },
+    { "const Symbol *", "operator_semicolon" },
   }));
 
   push_type(type_struct("Compilation", (Struct_Item[]){

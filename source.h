@@ -110,7 +110,7 @@ token_parse_expression(
   Execution_Context *context,
   Value_View view,
   u32 *out_match_length,
-  const Token_Pattern *end_pattern
+  const Symbol *end_symbol
 );
 
 static Value *

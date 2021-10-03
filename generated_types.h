@@ -2064,10 +2064,14 @@ typedef struct Common_Symbols {
   const Symbol * syntax;
   const Symbol * using;
   const Symbol * _if;
+  const Symbol * then;
+  const Symbol * _else;
   const Symbol * _return;
   const Symbol * operator_arrow;
   const Symbol * operator_at;
   const Symbol * operator_colon;
+  const Symbol * operator_comma;
+  const Symbol * operator_semicolon;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -5853,6 +5857,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("then"),
+    .Base_Relative.offset = offsetof(Common_Symbols, then),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("_else"),
+    .Base_Relative.offset = offsetof(Common_Symbols, _else),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("_return"),
     .Base_Relative.offset = offsetof(Common_Symbols, _return),
   },
@@ -5873,6 +5889,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_colon"),
     .Base_Relative.offset = offsetof(Common_Symbols, operator_colon),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_comma"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_comma),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_semicolon"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_semicolon),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);

@@ -1593,7 +1593,9 @@ token_parse_tuple(
   Array_Value_Ptr items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
   for (; remaining.length; remaining = value_view_rest(&remaining, match_length)) {
     MASS_ON_ERROR(*context->result) goto err;
-    Value *item = token_parse_expression(context, remaining, &match_length, &token_pattern_comma_operator);
+    Value *item = token_parse_expression(
+      context, remaining, &match_length, context->compilation->common_symbols.operator_comma
+    );
     dyn_array_push(items, item);
   }
 
@@ -5341,7 +5343,7 @@ token_parse_if_expression(
   Execution_Context *context,
   Value_View view,
   u32 *matched_length,
-  const Token_Pattern *end_pattern
+  const Symbol *end_symbol
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5358,14 +5360,11 @@ token_parse_if_expression(
   *payload = (Mass_If_Expression_Lazy_Payload){0};
 
   {
-    static const Token_Pattern then_pattern = {
-      .tag = Token_Pattern_Tag_Symbol,
-      .Symbol.name = slice_literal_fields("then"),
-    };
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
     u32 condition_length;
-    payload->condition =
-      token_parse_expression(context, condition_view, &condition_length, &then_pattern);
+    payload->condition = token_parse_expression(
+      context, condition_view, &condition_length, context->compilation->common_symbols.then
+    );
     peek_index += condition_length;
     MASS_ON_ERROR(*context->result) return 0;
   }
@@ -5377,7 +5376,9 @@ token_parse_if_expression(
     };
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
     u32 then_length;
-    payload->then = token_parse_expression(context, then_view, &then_length, &else_pattern);
+    payload->then = token_parse_expression(
+      context, then_view, &then_length,  context->compilation->common_symbols._else
+    );
     peek_index += then_length;
     MASS_ON_ERROR(*context->result) return 0;
   }
@@ -5385,7 +5386,7 @@ token_parse_if_expression(
   {
     Value_View else_view = value_view_slice(&view, peek_index, view.length);
     u32 else_length;
-    payload->else_ = token_parse_expression(context, else_view, &else_length, end_pattern);
+    payload->else_ = token_parse_expression(context, else_view, &else_length, end_symbol);
     peek_index += else_length;
   }
 
@@ -5631,7 +5632,7 @@ token_parse_function_literal(
   Execution_Context *context,
   Value_View view,
   u32 *matched_length,
-  const Token_Pattern *end_pattern
+  const Symbol *end_symbol
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5701,7 +5702,11 @@ token_parse_function_literal(
     }
   }
   if (!body_value) {
-    Value_View rest = value_view_match_till(view, &peek_index, end_pattern);
+    Token_Pattern end_pattern = {
+      .tag = Token_Pattern_Tag_Cached_Symbol,
+      .Cached_Symbol.pointer = end_symbol
+    };
+    Value_View rest = value_view_match_till(view, &peek_index, &end_pattern);
     if (is_macro) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
@@ -5789,7 +5794,7 @@ typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
   Value_View view,
   u32 *out_match_length,
-  const Token_Pattern *end_pattern
+  const Symbol *end_symbol
 );
 
 typedef struct {
@@ -5802,7 +5807,7 @@ token_parse_expression(
   Execution_Context *context,
   Value_View view,
   u32 *out_match_length,
-  const Token_Pattern *end_pattern
+  const Symbol *end_symbol
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5845,7 +5850,7 @@ token_parse_expression(
     for (u64 matcher_index = 0; matcher_index < countof(expression_matchers); matcher_index += 1) {
       const Expression_Matcher *matcher = &expression_matchers[matcher_index];
       u32 match_length = 0;
-      Value *match_result = matcher->proc(context, rest, &match_length, end_pattern);
+      Value *match_result = matcher->proc(context, rest, &match_length, end_symbol);
       MASS_ON_ERROR(*context->result) goto defer;
       if (!match_length) continue;
       assert(match_result);
@@ -5865,7 +5870,7 @@ token_parse_expression(
 
     Value *value = value_view_get(view, i);
 
-    if (end_pattern && value_match(value, end_pattern)) {
+    if (end_symbol && value_is_symbol(value) && value_as_symbol(value) == end_symbol) {
       matched_length = i + 1;
       goto drain;
     }
@@ -6040,8 +6045,9 @@ token_parse_block_view(
       }
       continue;
     }
-    Value *parse_result =
-      token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
+    Value *parse_result = token_parse_expression(
+      context, rest, &match_length, context->compilation->common_symbols.operator_semicolon
+    );
     MASS_ON_ERROR(*context->result) goto defer;
 
     if (parse_result->storage.tag == Storage_Tag_Static) {

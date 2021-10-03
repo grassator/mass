@@ -1692,10 +1692,14 @@ compilation_init(
     .syntax = mass_ensure_symbol(compilation, slice_literal("syntax")),
     .using = mass_ensure_symbol(compilation, slice_literal("using")),
     ._if = mass_ensure_symbol(compilation, slice_literal("if")),
+    .then = mass_ensure_symbol(compilation, slice_literal("then")),
+    ._else = mass_ensure_symbol(compilation, slice_literal("else")),
     ._return = mass_ensure_symbol(compilation, slice_literal("return")),
     .operator_arrow = mass_ensure_symbol(compilation, slice_literal("->")),
     .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
     .operator_colon = mass_ensure_symbol(compilation, slice_literal(":")),
+    .operator_comma = mass_ensure_symbol(compilation, slice_literal(",")),
+    .operator_semicolon = mass_ensure_symbol(compilation, slice_literal(";")),
   };
 }
 
