@@ -1684,11 +1684,17 @@ compilation_init(
     .apply = mass_ensure_symbol(compilation, slice_literal("apply")),
     .fn = mass_ensure_symbol(compilation, slice_literal("fn")),
     .intrinsic = mass_ensure_symbol(compilation, slice_literal("intrinsic")),
+    .label = mass_ensure_symbol(compilation, slice_literal("label")),
     .macro = mass_ensure_symbol(compilation, slice_literal("macro")),
     .operator = mass_ensure_symbol(compilation, slice_literal("operator")),
+    .placeholder = mass_ensure_symbol(compilation, slice_literal("placeholder")),
     .statement = mass_ensure_symbol(compilation, slice_literal("statement")),
+    .syntax = mass_ensure_symbol(compilation, slice_literal("syntax")),
+    .using = mass_ensure_symbol(compilation, slice_literal("using")),
     ._if = mass_ensure_symbol(compilation, slice_literal("if")),
+    ._return = mass_ensure_symbol(compilation, slice_literal("return")),
     .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
+    .operator_colon = mass_ensure_symbol(compilation, slice_literal(":")),
   };
 }
 

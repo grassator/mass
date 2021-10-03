@@ -1559,10 +1559,6 @@ context_parse_error(
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
   if (_id_) (++peek_index)
 
-#define TOKEN_MATCH(_id_, ...)\
-  TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
-  if (!(_id_)) return 0
-
 #define TOKEN_PATTERN_SYMBOL(_symbol_)\
   .tag = Token_Pattern_Tag_Symbol,  .Symbol.name = slice_literal_fields(_symbol_)
 
@@ -2584,7 +2580,10 @@ token_parse_syntax_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(name, TOKEN_PATTERN_SYMBOL("syntax"));
+  Value *syntax_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.syntax
+  );
+  if (!syntax_token) return 0;
   Value *statement_token = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.statement
   );
@@ -2709,8 +2708,12 @@ token_match_struct_field(
   if (context->result->tag != Mass_Result_Tag_Success) return false;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(symbol, .tag = Token_Pattern_Tag_Symbol);
-  TOKEN_MATCH(define, TOKEN_PATTERN_SYMBOL(":"));
+  Value *symbol = value_view_next(view, &peek_index);
+  if (!value_is_symbol(symbol)) return 0;
+  Value *define = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator_colon
+  );
+  if (!define) return 0;
 
   Value_View rest = value_view_rest(&view, peek_index);
   const Descriptor *field_descriptor = token_match_type(context, rest);
@@ -5431,8 +5434,14 @@ token_parse_intrinsic_literal(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
-  TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("intrinsic"));
+  Value *at = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator_at
+  );
+  if (!at) return 0;
+  Value *keyword = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.intrinsic
+  );
+  if (!keyword) return 0;
 
   Value *body = value_view_next(view, &peek_index);
   if (!value_is_group_curly(body)) {
@@ -6132,7 +6141,10 @@ token_parse_statement_using(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("using"));
+  Value *keyword = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.using
+  );
+  if (!keyword) return 0;
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
   Value *result = compile_time_eval(context, rest);
@@ -6197,8 +6209,13 @@ token_parse_statement_label(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u32 peek_index = 0;
-  TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("label"));
-  TOKEN_MAYBE_MATCH(placeholder, TOKEN_PATTERN_SYMBOL("placeholder"));
+  Value *keyword = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.label
+  );
+  if (!keyword) return 0;
+  Value *placeholder = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.placeholder
+  );
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
@@ -6273,9 +6290,11 @@ token_parse_explicit_return(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-
   u32 peek_index = 0;
-  TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("return"));
+  Value *keyword = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols._return
+  );
+  if (!keyword) return 0;
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   bool has_return_expression = rest.length > 0;
 

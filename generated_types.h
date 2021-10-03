@@ -2056,11 +2056,17 @@ typedef struct Common_Symbols {
   const Symbol * apply;
   const Symbol * fn;
   const Symbol * intrinsic;
+  const Symbol * label;
   const Symbol * macro;
   const Symbol * operator;
+  const Symbol * placeholder;
   const Symbol * statement;
+  const Symbol * syntax;
+  const Symbol * using;
   const Symbol * _if;
+  const Symbol * _return;
   const Symbol * operator_at;
+  const Symbol * operator_colon;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -5798,6 +5804,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("label"),
+    .Base_Relative.offset = offsetof(Common_Symbols, label),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("macro"),
     .Base_Relative.offset = offsetof(Common_Symbols, macro),
   },
@@ -5810,8 +5822,26 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("placeholder"),
+    .Base_Relative.offset = offsetof(Common_Symbols, placeholder),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("statement"),
     .Base_Relative.offset = offsetof(Common_Symbols, statement),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("syntax"),
+    .Base_Relative.offset = offsetof(Common_Symbols, syntax),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("using"),
+    .Base_Relative.offset = offsetof(Common_Symbols, using),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5822,8 +5852,20 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("_return"),
+    .Base_Relative.offset = offsetof(Common_Symbols, _return),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_at"),
     .Base_Relative.offset = offsetof(Common_Symbols, operator_at),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_colon"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_colon),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);

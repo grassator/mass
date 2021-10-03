@@ -1915,11 +1915,17 @@ main(void) {
     { "const Symbol *", "apply" },
     { "const Symbol *", "fn" },
     { "const Symbol *", "intrinsic" },
+    { "const Symbol *", "label" },
     { "const Symbol *", "macro" },
     { "const Symbol *", "operator" },
+    { "const Symbol *", "placeholder" },
     { "const Symbol *", "statement" },
+    { "const Symbol *", "syntax" },
+    { "const Symbol *", "using" },
     { "const Symbol *", "_if" },
+    { "const Symbol *", "_return" },
     { "const Symbol *", "operator_at" },
+    { "const Symbol *", "operator_colon" },
   }));
 
   push_type(type_struct("Compilation", (Struct_Item[]){
