@@ -65,12 +65,13 @@ test_inline_source_range(
   const char *source
 ) {
   Slice text = slice_from_c_string(source);
-  Source_File_Index file_index = compilation_register_source_file(compilation, (Source_File) {
+  Source_File *file = allocator_allocate(compilation->allocator, Source_File);
+  *file = (Source_File) {
     .path = test_file_name,
     .text = text,
-  });
+  };
   return (Source_Range) {
-    .file_index = file_index,
+    .file = file,
     .offsets = {.from = 0, .to = u64_to_u32(text.length), },
   };
 }
@@ -373,7 +374,7 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
-      check(error->source_range.file_index.as_u32 == source_range.file_index.as_u32);
+      check(error->source_range.file == source_range.file);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
     }
@@ -385,7 +386,7 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
-      check(error->source_range.file_index.as_u32 == source_range.file_index.as_u32);
+      check(error->source_range.file == source_range.file);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
     }

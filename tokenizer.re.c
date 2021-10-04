@@ -32,7 +32,7 @@ tokenize(
 
   #define TOKENIZER_CURRENT_RANGE()\
     (Source_Range){\
-      .file_index = source_range.file_index,\
+      .file = source_range.file,\
       .offsets = {\
         .from = u64_to_u32(token_start_offset),\
         .to = u64_to_u32(offset),\
@@ -52,7 +52,7 @@ tokenize(
           .tag = Mass_Error_Tag_Unexpected_Token,\
           .Unexpected_Token = { .expected = (_EXPECTED_SLICE_), },\
           .source_range = {\
-            .file_index = source_range.file_index,\
+            .file = source_range.file,\
             .offsets = {.from = u64_to_u32(offset) - 1, .to = u64_to_u32(offset) - 1},\
           }\
         }\
@@ -164,7 +164,7 @@ tokenize(
   done:
   if (result.tag == Mass_Result_Tag_Success) {
     Source_Range children_range = {
-      .file_index = source_range.file_index,
+      .file = source_range.file,
       .offsets = {.from = 0, .to = u64_to_u32(input.length)},
     };
     *out_tokens = temp_token_array_into_value_view(

@@ -6883,16 +6883,17 @@ program_module_from_file(
     });
     return 0;
   }
-  Source_File_Index file_index = compilation_register_source_file(context->compilation, (Source_File) {
+  Source_File *file = allocator_allocate(context->allocator, Source_File);
+  *file = (Source_File) {
     .path = file_path,
     .text = fixed_buffer_as_slice(buffer),
-  });
+  };
   if (buffer->occupied > UINT32_MAX) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Too_Large,
       .File_Too_Large = { .path = file_path },
       .source_range = {
-        .file_index = file_index,
+        .file = file,
         .offsets = {.from = UINT32_MAX, .to = UINT32_MAX}
       },
     });
@@ -6902,7 +6903,7 @@ program_module_from_file(
   Module *module = allocator_allocate(context->allocator, Module);
   *module = (Module) {
     .source_range = {
-      .file_index = file_index,
+      .file = file,
       .offsets = {.from = 0, .to = u64_to_u32(buffer->occupied)}
     },
     .own_scope = scope,

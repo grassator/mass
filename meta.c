@@ -1100,12 +1100,8 @@ main(void) {
     { "Slice", "text" },
   }));
 
-  push_type(type_struct("Source_File_Index", (Struct_Item[]){
-    { "u32", "as_u32" },
-  }));
-
   push_type(type_struct("Source_Range", (Struct_Item[]){
-    { "Source_File_Index", "file_index" },
+    { "Source_File *", "file" },
     { "Range_u32", "offsets" },
   }));
 
@@ -1118,13 +1114,11 @@ main(void) {
   }), (Struct_Item[]){
     { "Scope *", "scope" },
     { "Source_Range", "source_range" },
-    { "u32", "_source_range_padding" },
   }));
 
 
   push_type(type_struct("Module", (Struct_Item[]){
     { "Source_Range", "source_range" },
-    { "u32", "_source_range_padding" },
     { "Scope *", "own_scope" },
     { "Module_Exports", "exports" },
   }));
@@ -1132,12 +1126,12 @@ main(void) {
   push_type(type_struct("Parse_Error", (Struct_Item[]){
     { "Slice", "message" },
     { "Source_Range", "source_range" },
-    { "u32", "_source_range_padding" },
   }));
 
   export_compiler(push_type(type_struct("Value_View", (Struct_Item[]){
     { "Value * *", "values" },
     { "u32", "length" },
+    { "u32", "_length_padding" },
     { "Source_Range", "source_range" },
   })));
 
@@ -1262,7 +1256,6 @@ main(void) {
     { "Slice", "name" },
     { "Value_View", "view" },
     { "Source_Range", "source_range" },
-    { "u32", "_source_range_padding" },
   }));
 
   export_compiler(push_type(type_struct("Quoted", (Struct_Item[]){
@@ -1390,7 +1383,6 @@ main(void) {
     }),
     struct_fields("Location", (Struct_Item[]){
       { "Source_Range", "source_range" },
-      { "u32", "_padding" },
     }),
   }), (Struct_Item[]){
     { "Scope *", "scope" },
@@ -1509,7 +1501,7 @@ main(void) {
     { "Value *", "value" },
     { "Slice", "name" },
     { "u64", "epoch" },
-    { "u32", "forced" },
+    { "u64", "forced" },
     { "Source_Range", "source_range" },
   }));
 
@@ -1561,13 +1553,12 @@ main(void) {
     { "const Descriptor *", "descriptor" },
     { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
-    { "u32", "_source_range_padding" },
   })));
 
   export_compiler(push_type(type_struct("Value", (Struct_Item[]){
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
-    { "u32", "is_temporary" },
+    { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
   })));
 
@@ -1634,6 +1625,7 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Memory_Layout_Item_Flags", "flags" },
+    { "u32", "_flags_padding" },
     { "Source_Range", "source_range" },
     { "const Descriptor *", "descriptor" },
     { "Slice", "name" },
@@ -1942,7 +1934,6 @@ main(void) {
     { "Module", "compiler_module" },
     { "Static_Pointer_Map *", "static_pointer_map" },
     { "Imported_Module_Map *", "module_map" },
-    { "Array_Source_File", "source_files" },
     { "Scope *", "root_scope" },
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },

@@ -39,10 +39,9 @@ source_from_source_range(
   Compilation *compilation,
   const Source_Range *source_range
 ) {
-  if (!source_range->file_index.as_u32) return (Slice){0};
-  const Source_File *file = dyn_array_get(compilation->source_files, source_range->file_index.as_u32);
+  if (!source_range->file) return (Slice){0};
   Range_u64 offsets = {source_range->offsets.from, source_range->offsets.to};
-  return slice_sub_range(file->text,offsets);
+  return slice_sub_range(source_range->file->text, offsets);
 }
 
 static void
@@ -50,12 +49,12 @@ source_range_print_start_position(
   Compilation *compilation,
   const Source_Range *source_range
 ) {
-  if (!source_range->file_index.as_u32) {
+  if (!source_range->file) {
     printf(":(0:0)\n");
     return;
   }
   Source_Position from_position = {.line = 1, .column = 0};
-  const Source_File *file = dyn_array_get(compilation->source_files, source_range->file_index.as_u32);
+  const Source_File *file = source_range->file;
   Slice source = file->text;
   u64 line_start_offset = 0;
   for (u64 i = 0; i < source.length; ++i) {
@@ -1647,14 +1646,11 @@ compilation_init(
   const Calling_Convention *target_calling_convention
 ) {
   *compilation = (Compilation) {
-    .source_files = dyn_array_make(Array_Source_File),
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
     .symbol_cache_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .jit = {0},
   };
-  // First source-file is resered as an invalid value
-  dyn_array_push(compilation->source_files, (Source_File){0});
 
   // Get 16 gigabytes of virtual permanent space
   virtual_memory_buffer_init(&compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024);
@@ -1707,7 +1703,6 @@ static void
 compilation_deinit(
   Compilation *compilation
 ) {
-  dyn_array_destroy(compilation->source_files);
   hash_map_destroy(compilation->module_map);
   hash_map_destroy(compilation->static_pointer_map);
   hash_map_destroy(compilation->symbol_cache_map);
@@ -1715,18 +1710,6 @@ compilation_deinit(
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);
   virtual_memory_buffer_deinit(&compilation->temp_buffer);
-}
-
-static inline Source_File_Index
-compilation_register_source_file(
-  Compilation *compilation,
-  Source_File file
-) {
-  Source_File_Index file_index = {
-    .as_u32 = u64_to_u32(dyn_array_length(compilation->source_files))
-  };
-  dyn_array_push(compilation->source_files, file);
-  return file_index;
 }
 
 static inline bool

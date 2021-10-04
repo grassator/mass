@@ -5,7 +5,7 @@
 #include "types.h"
 
 static const Source_Range COMPILER_SOURCE_RANGE = {
-  .file_index = {0},
+  .file = 0,
   .offsets = {0},
 };
 
