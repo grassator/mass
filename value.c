@@ -290,6 +290,7 @@ storage_static_as_c_type_internal(
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal)
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple)
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
@@ -1838,6 +1839,18 @@ same_value_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   Value *source
 ) {
+  if (value_is_tuple(source)) {
+    if (target->tag != Descriptor_Tag_Struct) return false;
+    const Memory_Layout *layout = &target->Struct.memory_layout;
+    const Tuple *tuple = value_as_tuple(source);
+    if ((dyn_array_length(layout->items) != dyn_array_length(tuple->items))) return false;
+    for (u64 i = 0; i < dyn_array_length(tuple->items); i += 1) {
+      Value *item = *dyn_array_get(tuple->items, i);
+      Memory_Layout_Item *field = dyn_array_get(layout->items, i);
+      if (!same_value_type_or_can_implicitly_move_cast(field->descriptor, item)) return false;
+    }
+    return true;
+  }
   if (target->tag == Descriptor_Tag_Function_Instance) {
     if (source->descriptor == &descriptor_overload_set) {
       const Overload_Set *set = storage_static_as_c_type(&source->storage, Overload_Set);

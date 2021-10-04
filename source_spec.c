@@ -669,6 +669,19 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_Undecidable_Overload);
     }
 
+    it("should support overload resolution based on fields in the tuple") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn(x : [s64]) -> (s64) { 21 }\n"
+        "foo :: fn(x : [String]) -> (s64) { 42 }\n"
+        "checker :: fn() -> (s64) {"
+          "foo([\"bar\"])"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when trying to overload a non-function") {
       test_program_inline_source_base(
         "overload", &test_context,

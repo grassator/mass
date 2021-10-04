@@ -738,6 +738,7 @@ assign_integers(
   return *context->result;
 }
 
+// TODO :AssignCleanup Merge this with `same_type_or_can_implicitly_move_cast`
 static PRELUDE_NO_DISCARD Mass_Result
 assign_tuple(
   Execution_Context *context,
@@ -746,8 +747,7 @@ assign_tuple(
   Value *source,
   const Source_Range *source_range
 ) {
-  assert(source->descriptor == &descriptor_tuple);
-  const Tuple *tuple = storage_static_as_c_type(&source->storage, Tuple);
+  const Tuple *tuple = value_as_tuple(source);
   if (target->descriptor->tag != Descriptor_Tag_Struct) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
