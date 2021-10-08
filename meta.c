@@ -1246,8 +1246,6 @@ main(void) {
   }));
 
   export_global(push_type(type_struct("Number_Literal", (Struct_Item[]){
-    { "Number_Base", "base" },
-    { "u32", "negative" },
     { "u64", "bits" },
   })));
 

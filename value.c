@@ -999,16 +999,8 @@ value_number_literal(
   Source_Range source_range
 ) {
   static const Number_Literal single_decimal_digits[10] = {
-    {.base = Number_Base_10, .bits = 0},
-    {.base = Number_Base_10, .bits = 1},
-    {.base = Number_Base_10, .bits = 2},
-    {.base = Number_Base_10, .bits = 3},
-    {.base = Number_Base_10, .bits = 4},
-    {.base = Number_Base_10, .bits = 5},
-    {.base = Number_Base_10, .bits = 6},
-    {.base = Number_Base_10, .bits = 7},
-    {.base = Number_Base_10, .bits = 8},
-    {.base = Number_Base_10, .bits = 9},
+    {.bits = 0}, {.bits = 1}, {.bits = 2}, {.bits = 3}, {.bits = 4},
+    {.bits = 5}, {.bits = 6}, {.bits = 7}, {.bits = 8}, {.bits = 9},
   };
 
   const Number_Literal *literal;
@@ -1032,19 +1024,11 @@ value_number_literal(
     }
     if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
 
-    allocator_allocate_bulk(allocator, combined, {
-      Number_Literal number_literal;
-      Value value;
-    });
+    Value *value = allocator_allocate(allocator, Value);
 
-    Number_Literal *heap_literal = &combined->number_literal;
-    *heap_literal = (Number_Literal) {
-      .base = base,
-      .negative = false,
-      .bits = bits,
-    };
+    Number_Literal literal = { .bits = bits, };
     return value_init(
-      &combined->value, &descriptor_number_literal, storage_static(heap_literal), source_range
+      value, &descriptor_number_literal, storage_static_inline(&literal), source_range
     );
   }
 }
@@ -1775,20 +1759,11 @@ value_number_literal_cast_to(
   }
   u64 shift = 64 - bit_size;
   max >>= shift;
-  if (descriptor_is_signed_integer(target_descriptor)) {
-    max >>= 1;
-    if (!literal->negative) max--;
-  } else if (literal->negative) {
-    return Literal_Cast_Result_Unsigned_Target_For_Negative_Literal;
-  }
 
   if (bits > max) {
     return Literal_Cast_Result_Target_Too_Small;
   }
 
-  if(literal->negative) {
-    bits = UINT64_MAX - bits + 1;
-  }
   *out_bits = bits;
   *out_bit_size = bit_size;
   return Literal_Cast_Result_Success;

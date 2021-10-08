@@ -2962,7 +2962,6 @@ mass_number_literal_logical_shift_left(
   Number_Literal input,
   Number_Literal shift
 ) {
-  // TODO use proper bigint / bigdecimal library
   Number_Literal result = input;
   result.bits = input.bits << shift.bits;
   return result;
@@ -2973,7 +2972,6 @@ mass_number_literal_logical_shift_right(
   Number_Literal input,
   Number_Literal shift
 ) {
-  // TODO use proper bigint / bigdecimal library
   Number_Literal result = input;
   result.bits = input.bits >> shift.bits;
   return result;
@@ -2984,10 +2982,8 @@ mass_number_literal_bitwise_and(
   Number_Literal a,
   Number_Literal b
 ) {
-  // TODO use proper bigint / bigdecimal library
   Number_Literal result = a;
   result.bits = a.bits & b.bits;
-  result.negative = a.negative & b.negative;
   return result;
 }
 
@@ -2996,10 +2992,8 @@ mass_number_literal_bitwise_or(
   Number_Literal a,
   Number_Literal b
 ) {
-  // TODO use proper bigint / bigdecimal library
   Number_Literal result = a;
   result.bits = a.bits | b.bits;
-  result.negative = a.negative | b.negative;
   return result;
 }
 
@@ -4693,8 +4687,6 @@ mass_size_of(
 
   Number_Literal *literal = &combined->number_literal;
   *literal = (Number_Literal) {
-    .base = Number_Base_10,
-    .negative = false,
     .bits = byte_size,
   };
   return value_init(
@@ -5504,7 +5496,7 @@ token_parse_intrinsic_literal(
     dyn_array_push(wrapped_body_children, values_symbol);
     dyn_array_push(wrapped_body_children, dot_symbol);
     Number_Literal *literal = allocator_allocate(context->allocator, Number_Literal);
-    *literal = (Number_Literal){.base = Number_Base_10, .bits = param_index};
+    *literal = (Number_Literal){.bits = param_index};
     Value *literal_value = value_make(
       context, &descriptor_number_literal, storage_static(literal), view.source_range
     );

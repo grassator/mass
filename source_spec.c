@@ -273,7 +273,6 @@ spec("source") {
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = storage_static_as_c_type(&token->storage, Number_Literal);
-      check(!literal->negative);
       check(literal->bits == 0xCAFE);
     }
 
@@ -289,7 +288,6 @@ spec("source") {
       check(token->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = storage_static_as_c_type(&token->storage, Number_Literal);
       check(literal->bits == 0b100);
-      check(!literal->negative);
     }
 
     it("should be able to tokenize a sum of integers") {
@@ -1430,7 +1428,6 @@ spec("source") {
       check(value->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
       check(literal->bits == 42);
-      check(literal->negative == false);
     }
 
     it("should be able combine if / else, inline modules and `using` for conditional definitions") {
@@ -1445,7 +1442,6 @@ spec("source") {
       check(value->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
       check(literal->bits == 42);
-      check(literal->negative == false);
     }
 
     it("should not be able to use runtime values in a static context (when not causing force)") {

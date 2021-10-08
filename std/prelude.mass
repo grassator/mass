@@ -210,9 +210,7 @@ syscall :: fn(number : s64) -> (MASS.Syscall) { [number] }
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {
   macro(x : type) -> (type) { 0 - x }
 }, ())
-negate :: @fn(literal : Number_Literal) -> (Number_Literal) {
-  // FIXME this cast should not be necessary
-  literal.negative = if literal.negative then cast(u32, false) else true
-  literal
+negate :: macro(literal : Number_Literal) -> (s64) {
+  -cast(s64, literal)
 }
 

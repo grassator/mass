@@ -1033,8 +1033,6 @@ typedef struct Label_Location_Diff_Patch_Info {
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
 typedef struct Number_Literal {
-  Number_Base base;
-  u32 negative;
   u64 bits;
 } Number_Literal;
 typedef dyn_array_type(Number_Literal) Array_Number_Literal;
@@ -3269,18 +3267,6 @@ static C_Enum_Item number_base_items[] = {
 MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal_ptr, Array_Number_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal, Array_Number_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal, Number_Literal,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_number_base,
-    .name = slice_literal_fields("base"),
-    .Base_Relative.offset = offsetof(Number_Literal, base),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("negative"),
-    .Base_Relative.offset = offsetof(Number_Literal, negative),
-  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_u64,
