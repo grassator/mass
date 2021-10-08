@@ -4,10 +4,10 @@
 #include "calling_convention.h"
 
 static inline bool
-value_is_static_number_literal(
+value_is_static_i64(
   const Value *value
 ) {
-  if (value->descriptor != &descriptor_number_literal) return false;
+  if (value->descriptor != &descriptor_i64) return false;
   if (value->storage.tag != Storage_Tag_Static) return false;
   return true;
 }
@@ -292,7 +292,7 @@ DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple)
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol)
-DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
+DEFINE_VALUE_IS_AS_HELPERS(i64, i64)
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Curly, group_curly)
@@ -992,18 +992,18 @@ value_make(
 }
 
 static inline Value *
-value_number_literal(
+value_i64(
   const Allocator *allocator,
   Slice digits,
   Number_Base base,
   Source_Range source_range
 ) {
-  static const Number_Literal single_decimal_digits[10] = {
+  static const i64 single_decimal_digits[10] = {
     {.bits = 0}, {.bits = 1}, {.bits = 2}, {.bits = 3}, {.bits = 4},
     {.bits = 5}, {.bits = 6}, {.bits = 7}, {.bits = 8}, {.bits = 9},
   };
 
-  const Number_Literal *literal;
+  const i64 *literal;
   if (base == Number_Base_10 && digits.length == 1) {
     char byte = digits.bytes[0];
     assert(byte >= '0' && byte <= '9');
@@ -1011,7 +1011,7 @@ value_number_literal(
     literal = &single_decimal_digits[byte];
     return value_init(
       allocator_allocate(allocator, Value),
-      &descriptor_number_literal, storage_static(literal), source_range
+      &descriptor_i64, storage_static(literal), source_range
     );
   } else {
     u64 bits = 0;
@@ -1026,9 +1026,9 @@ value_number_literal(
 
     Value *value = allocator_allocate(allocator, Value);
 
-    Number_Literal literal = { .bits = bits, };
+    i64 literal = { .bits = bits, };
     return value_init(
-      value, &descriptor_number_literal, storage_static_inline(&literal), source_range
+      value, &descriptor_i64, storage_static_inline(&literal), source_range
     );
   }
 }
@@ -1737,19 +1737,19 @@ typedef enum {
 } Literal_Cast_Result;
 
 static Literal_Cast_Result
-value_number_literal_cast_to(
+value_i64_cast_to(
   const Value *value,
   const Descriptor *target_descriptor,
   u64 *out_bits,
   u64 *out_bit_size
 ) {
-  assert(value_is_static_number_literal(value));
+  assert(value_is_static_i64(value));
 
   if (!descriptor_is_integer(target_descriptor)) {
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  const Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
+  const i64 *literal = storage_static_as_c_type(&value->storage, i64);
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
@@ -1840,14 +1840,13 @@ same_value_type_or_can_implicitly_move_cast(
       return same_function_signature(target->Function_Instance.info, literal->info);
     }
   }
-  if (value_is_static_number_literal(source) && target != &descriptor_number_literal) {
+  if (value_is_static_i64(source) && target != &descriptor_i64) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer_To) {
-      const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
+      const i64 *literal = storage_static_as_c_type(&source->storage, i64);
       return literal->bits == 0;
     } else {
-      Literal_Cast_Result cast_result =
-        value_number_literal_cast_to(source, target, &(u64){0}, &(u64){0});
+      Literal_Cast_Result cast_result = value_i64_cast_to(source, target, &(u64){0}, &(u64){0});
       return cast_result == Literal_Cast_Result_Success;
     }
   }

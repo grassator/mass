@@ -68,7 +68,7 @@ typedef struct {
 typedef struct {
   u64 bits;
   bool negative;
-} Meta_Number_Literal;
+} Meta_i64;
 
 typedef enum {
   Meta_Type_Tag_C_Opaque,
@@ -77,7 +77,7 @@ typedef enum {
   Meta_Type_Tag_Enum,
   Meta_Type_Tag_Function,
   Meta_Type_Tag_Hash_Map,
-  Meta_Type_Tag_Number_Literal,
+  Meta_Type_Tag_i64,
 } Meta_Type_Tag;
 
 typedef enum {
@@ -104,7 +104,7 @@ typedef struct {
     Tagged_Union_Type union_;
     Function_Type function;
     Hash_Map_Type hash_map;
-    Meta_Number_Literal number_literal;
+    Meta_i64 i64;
   };
 } Meta_Type;
 
@@ -188,11 +188,11 @@ print_c_type_forward_declaration(
       }
       break;
     }
-    case Meta_Type_Tag_Number_Literal: {
+    case Meta_Type_Tag_i64: {
       name = 0;
       if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
         fprintf(file, "#define %s (%s%"PRIu64")\n", type->name,
-          type->number_literal.negative ? "-" : "", type->number_literal.bits);
+          type->i64.negative ? "-" : "", type->i64.bits);
       }
       break;
     }
@@ -329,7 +329,7 @@ print_c_type(
       }
       break;
     }
-    case Meta_Type_Tag_Number_Literal:
+    case Meta_Type_Tag_i64:
     case Meta_Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
       break;
@@ -535,7 +535,7 @@ print_scope_export(
       print_scope_define(file, type->name, type->export_name);
       break;
     }
-    case Meta_Type_Tag_Number_Literal: {
+    case Meta_Type_Tag_i64: {
       panic("NOT SUPPORTED");
       break;
     }
@@ -625,7 +625,7 @@ print_natvis(
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
-    case Meta_Type_Tag_Number_Literal: {
+    case Meta_Type_Tag_i64: {
       // Nothing to do
       break;
     }
@@ -684,7 +684,7 @@ print_mass_descriptor_fixed_array_types(
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
-    case Meta_Type_Tag_Number_Literal:
+    case Meta_Type_Tag_i64:
     case Meta_Type_Tag_Hash_Map: {
       break;
     }
@@ -746,7 +746,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s);\n", lowercase_name, type->name);
       break;
     }
-    case Meta_Type_Tag_Number_Literal: {
+    case Meta_Type_Tag_i64: {
       // TODO define global number literal values
       break;
     }
@@ -912,7 +912,7 @@ print_mass_descriptor_and_type(
       // TODO
       break;
     }
-    case Meta_Type_Tag_Number_Literal: {
+    case Meta_Type_Tag_i64: {
       // TODO define global number literal values
       break;
     }
@@ -989,11 +989,11 @@ add_common_fields_internal(
     .hash_map = __VA_ARGS__\
   }
 
-#define meta_number_literal(_NAME_STRING_, ...)\
+#define meta_i64(_NAME_STRING_, ...)\
   (Meta_Type){\
-    .tag = Meta_Type_Tag_Number_Literal,\
+    .tag = Meta_Type_Tag_i64,\
     .name = (_NAME_STRING_),\
-    .number_literal = __VA_ARGS__\
+    .i64 = __VA_ARGS__\
   }
 
 static inline Meta_Type
@@ -1245,7 +1245,7 @@ main(void) {
     { "16", 16 },
   }));
 
-  export_global(push_type(type_struct("Number_Literal", (Struct_Item[]){
+  export_global(push_type(type_struct("i64", (Struct_Item[]){
     { "u64", "bits" },
   })));
 
@@ -2013,31 +2013,31 @@ main(void) {
     })
   ));
 
-  export_compiler_custom_name("number_literal_logical_shift_left", push_type(
-    type_function(Compile_Time, "mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
-      { "Number_Literal", "input" },
-      { "Number_Literal", "shift" },
+  export_compiler_custom_name("i64_logical_shift_left", push_type(
+    type_function(Compile_Time, "mass_i64_logical_shift_left", "i64", (Argument_Type[]){
+      { "i64", "input" },
+      { "i64", "shift" },
     })
   ));
 
-  export_compiler_custom_name("number_literal_logical_shift_right", push_type(
-    type_function(Compile_Time, "mass_number_literal_logical_shift_right", "Number_Literal", (Argument_Type[]){
-      { "Number_Literal", "input" },
-      { "Number_Literal", "shift" },
+  export_compiler_custom_name("i64_logical_shift_right", push_type(
+    type_function(Compile_Time, "mass_i64_logical_shift_right", "i64", (Argument_Type[]){
+      { "i64", "input" },
+      { "i64", "shift" },
     })
   ));
 
-  export_compiler_custom_name("number_literal_bitwise_or", push_type(
-    type_function(Compile_Time, "mass_number_literal_bitwise_or", "Number_Literal", (Argument_Type[]){
-      { "Number_Literal", "a" },
-      { "Number_Literal", "b" },
+  export_compiler_custom_name("i64_bitwise_or", push_type(
+    type_function(Compile_Time, "mass_i64_bitwise_or", "i64", (Argument_Type[]){
+      { "i64", "a" },
+      { "i64", "b" },
     })
   ));
 
-  export_compiler_custom_name("number_literal_bitwise_and", push_type(
-    type_function(Compile_Time, "mass_number_literal_bitwise_and", "Number_Literal", (Argument_Type[]){
-      { "Number_Literal", "a" },
-      { "Number_Literal", "b" },
+  export_compiler_custom_name("i64_bitwise_and", push_type(
+    type_function(Compile_Time, "mass_i64_bitwise_and", "i64", (Argument_Type[]){
+      { "i64", "a" },
+      { "i64", "b" },
     })
   ));
 

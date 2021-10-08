@@ -182,9 +182,9 @@ const char *number_base_name(Number_Base value) {
 typedef dyn_array_type(Number_Base *) Array_Number_Base_Ptr;
 typedef dyn_array_type(const Number_Base *) Array_Const_Number_Base_Ptr;
 
-typedef struct Number_Literal Number_Literal;
-typedef dyn_array_type(Number_Literal *) Array_Number_Literal_Ptr;
-typedef dyn_array_type(const Number_Literal *) Array_Const_Number_Literal_Ptr;
+typedef struct i64 i64;
+typedef dyn_array_type(i64 *) Array_i64_Ptr;
+typedef dyn_array_type(const i64 *) Array_Const_i64_Ptr;
 
 typedef struct Macro_Capture Macro_Capture;
 typedef dyn_array_type(Macro_Capture *) Array_Macro_Capture_Ptr;
@@ -737,17 +737,17 @@ static void * allocator_allocate_bytes
 static Descriptor * descriptor_pointer_to
   (const Allocator * allocator, const Descriptor * descriptor);
 
-static Number_Literal mass_number_literal_logical_shift_left
-  (Number_Literal input, Number_Literal shift);
+static i64 mass_i64_logical_shift_left
+  (i64 input, i64 shift);
 
-static Number_Literal mass_number_literal_logical_shift_right
-  (Number_Literal input, Number_Literal shift);
+static i64 mass_i64_logical_shift_right
+  (i64 input, i64 shift);
 
-static Number_Literal mass_number_literal_bitwise_or
-  (Number_Literal a, Number_Literal b);
+static i64 mass_i64_bitwise_or
+  (i64 a, i64 b);
 
-static Number_Literal mass_number_literal_bitwise_and
-  (Number_Literal a, Number_Literal b);
+static i64 mass_i64_bitwise_and
+  (i64 a, i64 b);
 
 static Value * mass_add
   (Execution_Context * context, Value_View args);
@@ -1032,10 +1032,10 @@ typedef struct Label_Location_Diff_Patch_Info {
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
-typedef struct Number_Literal {
+typedef struct i64 {
   u64 bits;
-} Number_Literal;
-typedef dyn_array_type(Number_Literal) Array_Number_Literal;
+} i64;
+typedef dyn_array_type(i64) Array_i64;
 
 typedef struct Macro_Capture {
   Scope * scope;
@@ -2220,11 +2220,11 @@ static Descriptor descriptor_array_number_base_ptr;
 static Descriptor descriptor_array_const_number_base_ptr;
 static Descriptor descriptor_number_base_pointer;
 static Descriptor descriptor_number_base_pointer_pointer;
-static Descriptor descriptor_number_literal;
-static Descriptor descriptor_array_number_literal;
-static Descriptor descriptor_array_number_literal_ptr;
-static Descriptor descriptor_number_literal_pointer;
-static Descriptor descriptor_number_literal_pointer_pointer;
+static Descriptor descriptor_i64;
+static Descriptor descriptor_array_i64;
+static Descriptor descriptor_array_i64_ptr;
+static Descriptor descriptor_i64_pointer;
+static Descriptor descriptor_i64_pointer_pointer;
 static Descriptor descriptor_macro_capture;
 static Descriptor descriptor_array_macro_capture;
 static Descriptor descriptor_array_macro_capture_ptr;
@@ -2630,10 +2630,10 @@ static Descriptor descriptor_mass_inline_machine_code_bytes;
 static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_descriptor_pointer_to;
-static Descriptor descriptor_mass_number_literal_logical_shift_left;
-static Descriptor descriptor_mass_number_literal_logical_shift_right;
-static Descriptor descriptor_mass_number_literal_bitwise_or;
-static Descriptor descriptor_mass_number_literal_bitwise_and;
+static Descriptor descriptor_mass_i64_logical_shift_left;
+static Descriptor descriptor_mass_i64_logical_shift_right;
+static Descriptor descriptor_mass_i64_bitwise_or;
+static Descriptor descriptor_mass_i64_bitwise_and;
 static Descriptor descriptor_mass_add;
 static Descriptor descriptor_mass_subtract;
 static Descriptor descriptor_mass_multiply;
@@ -3264,17 +3264,17 @@ static C_Enum_Item number_base_items[] = {
 { .name = slice_literal_fields("10"), .value = 10 },
 { .name = slice_literal_fields("16"), .value = 16 },
 };
-MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal_ptr, Array_Number_Literal_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal, Array_Number_Literal)
-MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal, Number_Literal,
+MASS_DEFINE_OPAQUE_C_TYPE(array_i64_ptr, Array_i64_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_i64, Array_i64)
+MASS_DEFINE_STRUCT_DESCRIPTOR(i64, i64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_u64,
     .name = slice_literal_fields("bits"),
-    .Base_Relative.offset = offsetof(Number_Literal, bits),
+    .Base_Relative.offset = offsetof(i64, bits),
   },
 );
-MASS_DEFINE_TYPE_VALUE(number_literal);
+MASS_DEFINE_TYPE_VALUE(i64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture_ptr, Array_Macro_Capture_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture, Array_Macro_Capture)
 MASS_DEFINE_STRUCT_DESCRIPTOR(macro_capture, Macro_Capture,

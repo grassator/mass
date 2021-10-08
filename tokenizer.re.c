@@ -41,7 +41,7 @@ tokenize(
 
   #define TOKENIZER_PUSH_LITERAL(_BASE_, _SLICE_)\
     dyn_array_push(stack, \
-      value_number_literal(allocator, (_SLICE_), (_BASE_), TOKENIZER_CURRENT_RANGE())\
+      value_i64(allocator, (_SLICE_), (_BASE_), TOKENIZER_CURRENT_RANGE())\
     )
 
   #define TOKENIZER_HANDLE_ERROR(_EXPECTED_SLICE_)\

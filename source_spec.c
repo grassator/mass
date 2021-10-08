@@ -270,9 +270,9 @@ spec("source") {
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0xCAFE"));
-      check(token->descriptor == &descriptor_number_literal);
+      check(token->descriptor == &descriptor_i64);
       check(token->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = storage_static_as_c_type(&token->storage, Number_Literal);
+      i64 *literal = storage_static_as_c_type(&token->storage, i64);
       check(literal->bits == 0xCAFE);
     }
 
@@ -284,9 +284,9 @@ spec("source") {
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0b100"));
-      check(token->descriptor == &descriptor_number_literal);
+      check(token->descriptor == &descriptor_i64);
       check(token->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = storage_static_as_c_type(&token->storage, Number_Literal);
+      i64 *literal = storage_static_as_c_type(&token->storage, i64);
       check(literal->bits == 0b100);
     }
 
@@ -897,7 +897,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: @fn(a : Number_Literal, b : Number_Literal) -> (Number_Literal)"
+          "my_intrinsic :: @fn(a : i64, b : i64) -> (i64)"
             "@intrinsic { arguments.values.1 }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
@@ -909,7 +909,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: @fn(a : Number_Literal, b : Number_Literal) -> (Number_Literal)"
+          "my_intrinsic :: @fn(a : i64, b : i64) -> (i64)"
             "@intrinsic { b }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
@@ -1316,7 +1316,7 @@ spec("source") {
     it("should support defining a custom 'empty space' operator handler") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "apply :: macro(symbol :: 'foo, literal : Number_Literal) -> (Number_Literal) { literal }\n"
+        "apply :: macro(symbol :: 'foo, literal : i64) -> (i64) { literal }\n"
         "checker :: fn() -> (s64) { foo 42 }"
       );
       check(spec_check_mass_result(test_context.result));
@@ -1424,9 +1424,9 @@ spec("source") {
       );
 
       check(value);
-      check(value->descriptor == &descriptor_number_literal);
+      check(value->descriptor == &descriptor_i64);
       check(value->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
+      i64 *literal = storage_static_as_c_type(&value->storage, i64);
       check(literal->bits == 42);
     }
 
@@ -1438,9 +1438,9 @@ spec("source") {
       );
 
       check(value);
-      check(value->descriptor == &descriptor_number_literal);
+      check(value->descriptor == &descriptor_i64);
       check(value->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
+      i64 *literal = storage_static_as_c_type(&value->storage, i64);
       check(literal->bits == 42);
     }
 

@@ -289,11 +289,11 @@ token_value_force_immediate_integer(
   MASS_ON_ERROR(*context->result) return 0;
 
   assert(descriptor_is_integer(target_descriptor));
-  if (value_is_static_number_literal(value)) {
+  if (value_is_static_i64(value)) {
     u64 bits = 0xCCccCCccCCccCCcc;
     u64 bit_size = 0xCCccCCccCCccCCcc;
     Literal_Cast_Result cast_result =
-      value_number_literal_cast_to(value, target_descriptor, &bits, &bit_size);
+      value_i64_cast_to(value, target_descriptor, &bits, &bit_size);
     switch(cast_result) {
       case Literal_Cast_Result_Success: {
         return value_init(
@@ -345,14 +345,14 @@ token_value_force_immediate_integer(
 }
 
 static inline Value *
-maybe_coerce_number_literal_to_integer(
+maybe_coerce_i64_to_integer(
   Execution_Context *context,
   Value *value,
   const Descriptor *target_descriptor,
   const Source_Range *source_range
 ) {
   if (!descriptor_is_integer(target_descriptor)) return value;
-  if (value->descriptor != &descriptor_number_literal) return value;
+  if (value->descriptor != &descriptor_i64) return value;
   return token_value_force_immediate_integer(context, value, target_descriptor, source_range);
 }
 
@@ -571,7 +571,7 @@ deduce_runtime_descriptor_for_value(
   Value *value
 ) {
   if (value_is_non_lazy_static(value)) {
-    if (value->descriptor == &descriptor_number_literal) {
+    if (value->descriptor == &descriptor_i64) {
       return &descriptor_s64;
     }
     if (value->descriptor == &descriptor_tuple) {
@@ -612,8 +612,8 @@ large_enough_common_integer_descriptor_for_values(
   bool left_is_integer = descriptor_is_integer(left);
   bool right_is_integer = descriptor_is_integer(right);
 
-  bool left_is_literal = value_is_static_number_literal(left_value);
-  bool right_is_literal = value_is_static_number_literal(right_value);
+  bool left_is_literal = value_is_static_i64(left_value);
+  bool right_is_literal = value_is_static_i64(right_value);
 
   if (!left_is_integer && !left_is_literal) {
     // TODO :GenericIntegerType
@@ -849,9 +849,9 @@ assign(
       value_release_if_temporary(builder, referenced_target);
     }
     return *context->result;
-  } else if (value_is_static_number_literal(source)) {
+  } else if (value_is_static_i64(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
+      const i64 *literal = storage_static_as_c_type(&source->storage, i64);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(context, source, &descriptor_u64, source_range);
         source->descriptor = target->descriptor;
@@ -2141,7 +2141,7 @@ expected_result_ensure_value_or_temp(
         value->storage.tag == Storage_Tag_Static &&
         (flexible->storage & Expected_Result_Storage_Static)
       ) {
-        value = maybe_coerce_number_literal_to_integer(
+        value = maybe_coerce_i64_to_integer(
           context, value, expected_descriptor, &value->source_range
         );
         if (!same_type_or_can_implicitly_move_cast(expected_descriptor, value->descriptor)) {
@@ -2957,42 +2957,42 @@ typedef struct {
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
-static Number_Literal
-mass_number_literal_logical_shift_left(
-  Number_Literal input,
-  Number_Literal shift
+static i64
+mass_i64_logical_shift_left(
+  i64 input,
+  i64 shift
 ) {
-  Number_Literal result = input;
+  i64 result = input;
   result.bits = input.bits << shift.bits;
   return result;
 }
 
-static Number_Literal
-mass_number_literal_logical_shift_right(
-  Number_Literal input,
-  Number_Literal shift
+static i64
+mass_i64_logical_shift_right(
+  i64 input,
+  i64 shift
 ) {
-  Number_Literal result = input;
+  i64 result = input;
   result.bits = input.bits >> shift.bits;
   return result;
 }
 
-static Number_Literal
-mass_number_literal_bitwise_and(
-  Number_Literal a,
-  Number_Literal b
+static i64
+mass_i64_bitwise_and(
+  i64 a,
+  i64 b
 ) {
-  Number_Literal result = a;
+  i64 result = a;
   result.bits = a.bits & b.bits;
   return result;
 }
 
-static Number_Literal
-mass_number_literal_bitwise_or(
-  Number_Literal a,
-  Number_Literal b
+static i64
+mass_i64_bitwise_or(
+  i64 a,
+  i64 b
 ) {
-  Number_Literal result = a;
+  i64 result = a;
   result.bits = a.bits | b.bits;
   return result;
 }
@@ -3022,7 +3022,7 @@ mass_handle_cast_lazy_proc(
   Bits original_bit_size = source_descriptor->bit_size;
 
   Value *result_value = value;
-  if (value_is_static_number_literal(expression)) {
+  if (value_is_static_i64(expression)) {
     result_value = token_value_force_immediate_integer(
       context, value, target_descriptor, source_range
     );
@@ -3303,7 +3303,7 @@ mass_handle_macro_call(
         arg_value = value_view_get(args_view, i);
       }
 
-      arg_value = maybe_coerce_number_literal_to_integer(
+      arg_value = maybe_coerce_i64_to_integer(
         context, arg_value, arg->declaration.descriptor, &source_range
       );
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
@@ -3457,7 +3457,7 @@ call_function_overload(
       arg_symbol = declared_argument->declaration.symbol;
       source_arg = *dyn_array_get(arguments, i);
     }
-    source_arg = maybe_coerce_number_literal_to_integer(
+    source_arg = maybe_coerce_i64_to_integer(
       context, source_arg, target_item->descriptor, source_range
     );
     const Descriptor *stack_descriptor = target_item->descriptor;
@@ -4681,16 +4681,16 @@ mass_size_of(
   u64 byte_size = descriptor_byte_size(descriptor);
 
   allocator_allocate_bulk(context->allocator, combined, {
-    Number_Literal number_literal;
+    i64 i64;
     Value value;
   });
 
-  Number_Literal *literal = &combined->number_literal;
-  *literal = (Number_Literal) {
+  i64 *literal = &combined->i64;
+  *literal = (i64) {
     .bits = byte_size,
   };
   return value_init(
-    &combined->value, &descriptor_number_literal, storage_static(literal), args.source_range
+    &combined->value, &descriptor_i64, storage_static(literal), args.source_range
   );
 }
 
@@ -5053,7 +5053,7 @@ mass_handle_array_access_lazy_proc(
 
   MASS_ON_ERROR(*context->result) return 0;
 
-  index = maybe_coerce_number_literal_to_integer(
+  index = maybe_coerce_i64_to_integer(
     context, index, &descriptor_u64, &index->source_range
   );
   Value *array_element_value;
@@ -5135,7 +5135,7 @@ mass_handle_dot_operator(
     unwrapped_descriptor->tag == Descriptor_Tag_Struct ||
     lhs_forced_descriptor == &descriptor_scope
   ) {
-    if (value_is_number_literal(rhs)) {
+    if (value_is_i64(rhs)) {
       Value *index_value = token_value_force_immediate_integer(
         context, rhs, &descriptor_u64, &rhs_range
       );
@@ -5203,7 +5203,7 @@ mass_handle_dot_operator(
     lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
     lhs_forced_descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
-    if (value_is_group_paren(rhs) || value_is_number_literal(rhs)) {
+    if (value_is_group_paren(rhs) || value_is_i64(rhs)) {
       const Descriptor *descriptor = lhs_forced_descriptor;
       if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
         descriptor = descriptor->Fixed_Size_Array.item;
@@ -5296,7 +5296,7 @@ mass_handle_if_expression_lazy_proc(
 
   const Source_Range *dummy_range = &payload->condition->source_range;
 
-  if (value_is_static_number_literal(condition)) {
+  if (value_is_static_i64(condition)) {
     condition = token_value_force_immediate_integer(
       context, condition, &descriptor_s64, dummy_range
     );
@@ -5495,10 +5495,10 @@ token_parse_intrinsic_literal(
     dyn_array_push(wrapped_body_children, dot_symbol);
     dyn_array_push(wrapped_body_children, values_symbol);
     dyn_array_push(wrapped_body_children, dot_symbol);
-    Number_Literal *literal = allocator_allocate(context->allocator, Number_Literal);
-    *literal = (Number_Literal){.bits = param_index};
+    i64 *literal = allocator_allocate(context->allocator, i64);
+    *literal = (i64){.bits = param_index};
     Value *literal_value = value_make(
-      context, &descriptor_number_literal, storage_static(literal), view.source_range
+      context, &descriptor_i64, storage_static(literal), view.source_range
     );
     dyn_array_push(wrapped_body_children, literal_value);
     dyn_array_push(wrapped_body_children, semicolon_symbol);

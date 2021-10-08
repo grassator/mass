@@ -436,50 +436,50 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
-    mass_number_literal_logical_shift_left, "number_literal_logical_shift_left", &descriptor_number_literal,
+    mass_i64_logical_shift_left, "i64_logical_shift_left", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("input")),
-&descriptor_number_literal
+&descriptor_i64
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("shift")),
-&descriptor_number_literal
+&descriptor_i64
     )
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
-    mass_number_literal_logical_shift_right, "number_literal_logical_shift_right", &descriptor_number_literal,
+    mass_i64_logical_shift_right, "i64_logical_shift_right", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("input")),
-&descriptor_number_literal
+&descriptor_i64
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("shift")),
-&descriptor_number_literal
+&descriptor_i64
     )
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
-    mass_number_literal_bitwise_or, "number_literal_bitwise_or", &descriptor_number_literal,
+    mass_i64_bitwise_or, "i64_bitwise_or", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_number_literal
+&descriptor_i64
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_number_literal
+&descriptor_i64
     )
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
-    mass_number_literal_bitwise_and, "number_literal_bitwise_and", &descriptor_number_literal,
+    mass_i64_bitwise_and, "i64_bitwise_and", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_number_literal
+&descriptor_i64
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_number_literal
+&descriptor_i64
     )
   );
   MASS_DEFINE_FUNCTION(
@@ -633,8 +633,8 @@ global_scope_define_exports(
   (void)calling_convention;
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    mass_ensure_symbol(compilation, slice_literal("Number_Literal")),
-    type_number_literal_value
+    mass_ensure_symbol(compilation, slice_literal("i64")),
+    type_i64_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,

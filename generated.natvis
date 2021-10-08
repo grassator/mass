@@ -500,7 +500,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Number_Literal">
+<Type Name="Array_i64">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -509,7 +509,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Number_Literal_Ptr">
+<Type Name="Array_i64_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -518,7 +518,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Const_Number_Literal_Ptr">
+<Type Name="Array_Const_i64_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
