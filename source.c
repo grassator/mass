@@ -6298,39 +6298,19 @@ mass_handle_explicit_return_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-static u32
-token_parse_explicit_return(
+static Value *
+mass_handle_return_operator(
   Execution_Context *context,
-  Value_View view,
-  Lazy_Value *out_lazy_value,
+  Value_View args,
   void *unused_payload
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  assert(args.length == 1);
+  Value *return_value = token_parse_single(context, value_view_get(args, 0));
 
-  u32 peek_index = 0;
-  Value *keyword = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols._return
+  return mass_make_lazy_value(
+    context, args.source_range, return_value, &descriptor_void,
+    mass_handle_explicit_return_lazy_proc
   );
-  if (!keyword) return 0;
-  Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
-  bool has_return_expression = rest.length > 0;
-
-  Value *parse_result = token_parse_expression(context, rest, &(u32){0}, 0);
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(parse_result);
-
-  if (descriptor == &descriptor_void && !has_return_expression) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = parse_result->source_range,
-      .detailed_message = slice_literal("Explicit return from a non-void function requires a value"),
-    });
-    return 0;
-  }
-
-  out_lazy_value->proc = mass_handle_explicit_return_lazy_proc;
-  out_lazy_value->payload = parse_result;
-
-  return peek_index;
 }
 
 typedef struct {
@@ -6704,11 +6684,17 @@ scope_define_builtins(
     .argument_count = 2,
     .handler = mass_handle_assignment_operator,
   )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("return"), allocator_make(allocator, Operator,
+    .precedence = 0,
+    .fixity = Operator_Fixity_Prefix,
+    .associativity = Operator_Associativity_Right,
+    .argument_count = 1,
+    .handler = mass_handle_return_operator,
+  )));
 
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
-      {.proc = token_parse_explicit_return},
       {.proc = token_parse_definition_and_assignment_statements},
       {.proc = token_parse_statement_label},
       {.proc = token_parse_statement_using},
