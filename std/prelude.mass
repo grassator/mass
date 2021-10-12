@@ -38,7 +38,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   if condition() {
     body(module {
       break :: ~> { goto _loop_done }
-      continue :: ~> { goto _loop_start }
+      continue :: ~> { goto _loop_post }
     })
     label _loop_post
     post()
