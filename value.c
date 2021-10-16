@@ -1775,8 +1775,10 @@ same_type_or_can_implicitly_move_cast(
   const Descriptor *source
 ) {
   if (same_type(target, source)) return true;
-  if (target == source) return true;
-  if (target == &descriptor_void) return true;
+  if (target == &descriptor_void) {
+    panic("should be handled before");
+    return true;
+  }
   if (target->tag != source->tag) return false;
   if (
     target->tag == Descriptor_Tag_Struct &&

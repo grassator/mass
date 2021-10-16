@@ -3316,6 +3316,7 @@ mass_handle_macro_call(
   const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
   if (
     literal->info->returns.declaration.descriptor &&
+    literal->info->returns.declaration.descriptor != &descriptor_void &&
     !same_type_or_can_implicitly_move_cast(literal->info->returns.declaration.descriptor, return_descriptor)
   ) {
     context_error(context, (Mass_Error) {
@@ -5952,6 +5953,7 @@ mass_handle_block_lazy_proc(
       const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
       if (
         expected_descriptor &&
+        expected_descriptor != &descriptor_void &&
         !same_value_type_or_can_implicitly_move_cast(expected_descriptor, lazy_statement)
       ) {
         context_error(context, (Mass_Error) {
