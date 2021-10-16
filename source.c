@@ -1850,12 +1850,6 @@ token_parse_block_view(
   Value_View children_view
 );
 
-static Descriptor *
-token_match_fixed_array_type(
-  Execution_Context *context,
-  Value_View view
-);
-
 static inline const Descriptor *
 token_match_type(
   Execution_Context *context,
