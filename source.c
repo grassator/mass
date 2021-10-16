@@ -574,7 +574,7 @@ deduce_runtime_descriptor_for_value(
       return &descriptor_s64;
     }
     if (value->descriptor == &descriptor_tuple) {
-    const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
+      const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
       return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
     }
   }
@@ -2716,50 +2716,49 @@ token_match_struct_field(
 static Value *
 token_process_c_struct_definition(
   Execution_Context *context,
-  Value *layout_block
+  Value *definition
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   Value *result = 0;
   Temp_Mark temp_mark = context_temp_mark(context);
 
-  C_Struct_Aligner struct_aligner = {0};
-  Array_Memory_Layout_Item temp_fields = dyn_array_make(
-    Array_Memory_Layout_Item,
-    .allocator = context->temp_allocator,
-    .capacity = 32,
-  );
-
-  const Group_Square *layout_group = value_as_group_square(layout_block);
-  if (layout_group->children.length != 0) {
-    Value_View_Split_Iterator it = { .view = layout_group->children };
-    while (!it.done) {
-      Value_View field_view = token_split_next(&it, &token_pattern_comma_operator);
-      if (!field_view.length) continue;
-      Slice field_name;
-      const Descriptor *field_descriptor;
-      if (!token_match_struct_field(context, field_view, &field_name, &field_descriptor)) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = field_view.source_range,
-          .detailed_message = slice_literal("Invalid field definition")
-        });
-        return 0;
-      }
-      u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
-
-      dyn_array_push(temp_fields, (Memory_Layout_Item) {
-        .tag = Memory_Layout_Item_Tag_Base_Relative,
-        .name = field_name,
-        .descriptor = field_descriptor,
-        .source_range = field_view.source_range,
-        .Base_Relative.offset = field_byte_offset,
-      });
-    }
+  Value *tuple_value = token_parse_single(context, definition);
+  if (!value_is_tuple(tuple_value)) {
+    panic("TODO user error");
   }
-  c_struct_aligner_end(&struct_aligner);
 
-  Array_Memory_Layout_Item fields;
-  dyn_array_copy_from_temp(Array_Memory_Layout_Item, context, &fields, temp_fields);
+  C_Struct_Aligner struct_aligner = {0};
+
+  // FIXME unify this with anonymous_struct_descriptor_from_tuple
+  const Tuple *tuple = value_as_tuple(tuple_value);
+  Array_Memory_Layout_Item fields = dyn_array_make(
+    Array_Memory_Layout_Item,
+    .allocator = context->allocator,
+    .capacity = dyn_array_length(tuple->items),
+  );
+  for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
+    Value *tuple_item = *dyn_array_get(tuple->items, i);
+    if (!value_is_typed_symbol(tuple_item)) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = tuple_item->source_range,
+        .detailed_message = slice_literal("Invalid field definition")
+      });
+      return 0;
+    }
+    const Typed_Symbol *field = value_as_typed_symbol(tuple_item);
+    u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field->descriptor);
+
+    dyn_array_push(fields, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Base_Relative,
+      .name = field->symbol->name,
+      .descriptor = field->descriptor,
+      .source_range = tuple_item->source_range,
+      .Base_Relative.offset = field_byte_offset,
+    });
+  }
+
+  c_struct_aligner_end(&struct_aligner);
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
