@@ -2729,11 +2729,11 @@ token_process_c_struct_definition(
     .capacity = 32,
   );
 
-  const Group_Curly *layout_group = value_as_group_curly(layout_block);
+  const Group_Square *layout_group = value_as_group_square(layout_block);
   if (layout_group->children.length != 0) {
     Value_View_Split_Iterator it = { .view = layout_group->children };
     while (!it.done) {
-      Value_View field_view = token_split_next(&it, &token_pattern_semicolon);
+      Value_View field_view = token_split_next(&it, &token_pattern_comma_operator);
       if (!field_view.length) continue;
       Slice field_name;
       const Descriptor *field_descriptor;

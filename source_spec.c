@@ -1781,7 +1781,7 @@ spec("source") {
     it("should be able to parse struct definitions") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p : Point; p.x = 20; p.y = 22;"
           "p.x + p.y"
@@ -1818,7 +1818,7 @@ spec("source") {
     it("should be able to parse struct definitions") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p : Point = [20, 22]\n"
           "p.x + p.y"
@@ -1831,7 +1831,7 @@ spec("source") {
     it("should be able to explicitly cast a tuple to a struct type that matches it") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "cast(Point, [42, 0]).x"
         "}"
@@ -1843,7 +1843,7 @@ spec("source") {
     it("should support C-style literal syntax") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p := Point [20, 22]\n"
           "p.x + p.y"
@@ -1884,7 +1884,7 @@ spec("source") {
     it("should report an error when tuple does not have enough fields for a struct") {
       test_program_inline_source_base(
         "test", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p : Point = [20]\n"
           "p.x + p.y"
@@ -1898,7 +1898,7 @@ spec("source") {
     it("should report an error when tuple has too many fields for a struct") {
       test_program_inline_source_base(
         "test", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p : Point = [20, 1, 1]\n"
           "p.x + p.y"
@@ -1912,7 +1912,7 @@ spec("source") {
     it("should report an error when field name is not an identifier") {
       test_program_inline_source_base(
         "main", &test_context,
-        "Point :: c_struct { x : s32; y : s32; };"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "main :: fn() -> () { p : Point; p.(x) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1923,7 +1923,7 @@ spec("source") {
     it("should report an error when a struct does not have the requested field") {
       test_program_inline_source_base(
         "main", &test_context,
-        "Point :: c_struct { x : s32; y : s32; }\n"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "main :: fn() -> () { p : Point; p.foo }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1936,7 +1936,7 @@ spec("source") {
       struct Point { s32 x; s32 y;};
       s32(*checker)(struct Point) = (s32(*)(struct Point))test_program_inline_source_function(
         "checker", &test_context,
-        "Point :: c_struct { x : s32; y : s32; }\n"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "checker :: fn(p: Point) -> (s32) {"
           "p.x - p.y"
         "}"
@@ -1949,7 +1949,7 @@ spec("source") {
     it("should support passing register-sized structs into the function") {
       s32(*checker)() = (s32(*)())test_program_inline_source_function(
         "checker", &test_context,
-        "Point :: c_struct { x : s32; y : s32; }\n"
+        "Point :: c_struct [x : s32, y : s32]\n"
         "nested :: fn(p: Point) -> (s32) {"
           "p.x - p.y"
         "}\n"
@@ -1967,8 +1967,8 @@ spec("source") {
     it("should support passing register-sized structs in larger structs into the function") {
       s32(*checker)() = (s32(*)())test_program_inline_source_function(
         "checker", &test_context,
-        "Point :: c_struct { x : s32; y : s32; }\n"
-        "Line :: c_struct { from : Point; to : Point; }\n"
+        "Point :: c_struct [x : s32, y : s32]\n"
+        "Line :: c_struct [from : Point, to : Point]\n"
         "nested :: fn(line: Line) -> (s32) {"
           "line.to.y - line.from.y"
         "}\n"
@@ -1986,7 +1986,7 @@ spec("source") {
     it("should support passing register-sized arrays in larger structs into the function") {
       s32(*checker)() = (s32(*)())test_program_inline_source_function(
         "checker", &test_context,
-        "Line :: c_struct { from : s32 * 2; to : s32 * 2; }\n"
+        "Line :: c_struct [from : s32 * 2, to : s32 * 2]\n"
         "nested :: fn(line: Line) -> (s32) {"
           "line.to.1 - line.from.1"
         "}\n"
@@ -2004,7 +2004,7 @@ spec("source") {
     it("should auto-dereference pointers to struct on field access") {
       s64(*checker)(Test_128bit*) = (s64(*)(Test_128bit*))test_program_inline_source_function(
         "checker", &test_context,
-        "Test_128bit :: c_struct { x : s64; y : s64 }\n"
+        "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
         "checker :: fn(input : &Test_128bit) -> (s64) {\n"
           "input.y\n"
         "}"
@@ -2018,7 +2018,7 @@ spec("source") {
     it("should be able to return structs while accepting other arguments") {
       Test_128bit(*checker)(s64) = (Test_128bit(*)(s64))test_program_inline_source_function(
         "return_struct", &test_context,
-        "Test_128bit :: c_struct { x : s64; y : s64 };"
+        "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
         "return_struct :: fn(x : s64) -> (Test_128bit) {"
           "result : Test_128bit;"
           "result.x = x;"
@@ -2036,7 +2036,7 @@ spec("source") {
     it("should correctly handle struct argument fields as arguments to another call") {
       s64(*checker)(Test_128bit) = (s64(*)(Test_128bit))test_program_inline_source_function(
         "checker", &test_context,
-        "Test_128bit :: c_struct { x : s64; y : s64 };"
+        "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
         "test_sum :: fn(x : s64, y : s64) -> (s64) { x + y }\n"
         "checker :: fn(x : Test_128bit) -> (s64) {"
           "test_sum(x.x, x.y)"
@@ -2053,7 +2053,7 @@ spec("source") {
       s8(*checker)(s8, s8, s8, s8, s8, s8, Test_128bit) =
         (s8(*)(s8, s8, s8, s8, s8, s8, Test_128bit))test_program_inline_source_function(
           "foo", &test_context,
-          "Test_128bit :: c_struct { x : s64; y : s64 }\n"
+          "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
           "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8, x6 : s8, x7 : Test_128bit ) -> (s64) { x7.x }"
         );
       check(spec_check_mass_result(test_context.result));
