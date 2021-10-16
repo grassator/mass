@@ -2694,13 +2694,14 @@ token_parse_syntax_definition(
 }
 
 static Value *
-token_process_c_struct_definition(
+mass_c_struct(
   Execution_Context *context,
-  Value *definition
+  Value_View args
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  assert(args.length == 2);
+  assert(value_match_symbol(value_view_get(args, 0), slice_literal("c_struct")));
 
-  Value *tuple_value = token_parse_single(context, definition);
+  Value *tuple_value = token_parse_single(context, value_view_get(args, 1));
   const Tuple *tuple = value_as_tuple(tuple_value);
 
   Descriptor *descriptor =
@@ -2712,17 +2713,6 @@ token_process_c_struct_definition(
   *result = type_value_for_descriptor(descriptor);
 
   return result;
-}
-
-static Value *
-mass_c_struct(
-  Execution_Context *context,
-  Value_View args
-) {
-  assert(args.length == 2);
-  assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(args, 0), slice_literal("c_struct")));
-  return token_process_c_struct_definition(context, value_view_get(args, 1));
 }
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
