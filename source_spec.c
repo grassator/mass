@@ -1868,6 +1868,18 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support named fields in a tuple as a type") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (s64) {"
+          "tuple : [foo : s64] = [42]\n"
+          "tuple.foo"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when tuple is assigned to something that is not a struct") {
       test_program_inline_source_base(
         "test", &test_context,

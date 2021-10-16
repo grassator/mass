@@ -522,6 +522,7 @@ anonymous_struct_descriptor_from_tuple(
   );
   for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
     Value *item = *dyn_array_get(tuple->items, i);
+    Slice name = {0};
 
     const Descriptor *field_descriptor;
     switch(tuple_eval_mode) {
@@ -529,7 +530,13 @@ anonymous_struct_descriptor_from_tuple(
         field_descriptor = deduce_runtime_descriptor_for_value(context, item);
       } break;
       case Tuple_Eval_Mode_Type: {
-        field_descriptor = value_ensure_type(context, item, item->source_range);
+        if (value_is_typed_symbol(item)) {
+          const Typed_Symbol *typed_symbol = value_as_typed_symbol(item);
+          name = typed_symbol->symbol->name;
+          field_descriptor = typed_symbol->descriptor;
+        } else {
+          field_descriptor = value_ensure_type(context, item, item->source_range);
+        }
       } break;
       default: {
         panic("UNREACHABLE");
@@ -540,7 +547,7 @@ anonymous_struct_descriptor_from_tuple(
 
     dyn_array_push(fields, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
-      .name = {0},
+      .name = name,
       .descriptor = field_descriptor,
       .source_range = item->source_range,
       .Base_Relative.offset = field_byte_offset,
@@ -2686,33 +2693,6 @@ token_parse_syntax_definition(
   return peek_index;
 }
 
-static bool
-token_match_struct_field(
-  Execution_Context *context,
-  Value_View view,
-  Slice *out_name,
-  const Descriptor **out_descriptor
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return false;
-
-  u32 peek_index = 0;
-  Value *symbol = value_view_next(view, &peek_index);
-  if (!value_is_symbol(symbol)) return 0;
-  Value *define = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.operator_colon
-  );
-  if (!define) return 0;
-
-  Value_View rest = value_view_rest(&view, peek_index);
-  const Descriptor *field_descriptor = token_match_type(context, rest);
-  if (!field_descriptor) return false;
-
-  *out_name = value_as_symbol(symbol)->name;
-  *out_descriptor = field_descriptor;
-
-  return true;
-}
-
 static Value *
 token_process_c_struct_definition(
   Execution_Context *context,
@@ -2720,7 +2700,6 @@ token_process_c_struct_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   Value *result = 0;
-  Temp_Mark temp_mark = context_temp_mark(context);
 
   Value *tuple_value = token_parse_single(context, definition);
   if (!value_is_tuple(tuple_value)) {
@@ -2775,7 +2754,6 @@ token_process_c_struct_definition(
   result = allocator_allocate(context->allocator, Value);
   *result = type_value_for_descriptor(descriptor);
 
-  context_temp_reset_to_mark(context, temp_mark);
   return result;
 }
 
