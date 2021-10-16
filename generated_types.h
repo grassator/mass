@@ -1445,7 +1445,7 @@ typedef struct Scope_Entry {
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
-hash_map_slice_template(Operator_Map, Operator *)
+hash_map_template(Operator_Map, const Symbol *, Operator *, hash_pointer, const_void_pointer_equal)
 typedef struct Scope_Using {
   const Scope_Using * next;
   const Scope * scope;
@@ -2055,7 +2055,10 @@ typedef struct Common_Symbols {
   const Symbol * operator_at;
   const Symbol * operator_colon;
   const Symbol * operator_comma;
+  const Symbol * operator_dot;
+  const Symbol * operator_equal;
   const Symbol * operator_semicolon;
+  const Symbol * operator_space;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -5824,8 +5827,26 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_dot"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_dot),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_equal"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_equal),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_semicolon"),
     .Base_Relative.offset = offsetof(Common_Symbols, operator_semicolon),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_space"),
+    .Base_Relative.offset = offsetof(Common_Symbols, operator_space),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);

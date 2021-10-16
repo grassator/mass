@@ -1658,7 +1658,6 @@ compilation_init(
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
   module_compiler_init(compilation, &compilation->compiler_module);
-  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
 
   // Intern common symbols used during parsing
   compilation->common_symbols = (Common_Symbols) {
@@ -1680,8 +1679,13 @@ compilation_init(
     .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
     .operator_colon = mass_ensure_symbol(compilation, slice_literal(":")),
     .operator_comma = mass_ensure_symbol(compilation, slice_literal(",")),
+    .operator_dot = mass_ensure_symbol(compilation, slice_literal(".")),
+    .operator_equal = mass_ensure_symbol(compilation, slice_literal("=")),
     .operator_semicolon = mass_ensure_symbol(compilation, slice_literal(";")),
+    .operator_space = mass_ensure_symbol(compilation, slice_literal(" ")),
   };
+
+  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
 }
 
 static void

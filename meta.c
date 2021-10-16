@@ -1504,8 +1504,10 @@ main(void) {
   }));
 
   push_type(type_hash_map("Operator_Map", {
-    .key_type = "Slice",
+    .key_type = "const Symbol *",
     .value_type = "Operator *",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
   }));
 
   push_type(type_struct("Scope_Using", (Struct_Item[]){
@@ -1919,7 +1921,10 @@ main(void) {
     { "const Symbol *", "operator_at" },
     { "const Symbol *", "operator_colon" },
     { "const Symbol *", "operator_comma" },
+    { "const Symbol *", "operator_dot" },
+    { "const Symbol *", "operator_equal" },
     { "const Symbol *", "operator_semicolon" },
+    { "const Symbol *", "operator_space" },
   }));
 
   push_type(type_struct("Compilation", (Struct_Item[]){

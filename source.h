@@ -77,7 +77,7 @@ PRELUDE_NO_DISCARD static inline Mass_Result
 scope_define_operator(
   Scope *scope,
   Source_Range source_range,
-  Slice name,
+  const Symbol *symbol,
   Operator *operator
 );
 
