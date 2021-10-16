@@ -2710,7 +2710,7 @@ mass_c_struct(
   descriptor->Struct.is_tuple = false;
 
   Value *result = allocator_allocate(context->allocator, Value);
-  *result = type_value_for_descriptor(descriptor);
+  *result = MASS_TYPE_VALUE(descriptor);
 
   return result;
 }

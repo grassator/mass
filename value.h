@@ -297,13 +297,6 @@ mass_error_to_string(
   Mass_Error const* error
 );
 
-static inline Value
-type_value_for_descriptor(
-  Descriptor *descriptor
-) {
-  return MASS_TYPE_VALUE(descriptor);
-}
-
 Value void_value = {
   .descriptor = &descriptor_void,
   .storage = { .tag = Storage_Tag_None },
