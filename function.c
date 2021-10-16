@@ -901,8 +901,6 @@ calculate_arguments_match_score(
           same_value_type_or_can_implicitly_move_cast(target_descriptor, source_arg)
         ) {
           score += Score_Cast;
-        } else if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
-          score += Score_Cast;
         } else {
           return -1;
         }
