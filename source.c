@@ -508,7 +508,7 @@ value_ensure_type(
   Source_Range source_range
 );
 
-static const Descriptor *
+static Descriptor *
 anonymous_struct_descriptor_from_tuple(
   Execution_Context *context,
   const Tuple *tuple,
@@ -2699,59 +2699,16 @@ token_process_c_struct_definition(
   Value *definition
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  Value *result = 0;
 
   Value *tuple_value = token_parse_single(context, definition);
-  if (!value_is_tuple(tuple_value)) {
-    panic("TODO user error");
-  }
-
-  C_Struct_Aligner struct_aligner = {0};
-
-  // FIXME unify this with anonymous_struct_descriptor_from_tuple
   const Tuple *tuple = value_as_tuple(tuple_value);
-  Array_Memory_Layout_Item fields = dyn_array_make(
-    Array_Memory_Layout_Item,
-    .allocator = context->allocator,
-    .capacity = dyn_array_length(tuple->items),
-  );
-  for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
-    Value *tuple_item = *dyn_array_get(tuple->items, i);
-    if (!value_is_typed_symbol(tuple_item)) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = tuple_item->source_range,
-        .detailed_message = slice_literal("Invalid field definition")
-      });
-      return 0;
-    }
-    const Typed_Symbol *field = value_as_typed_symbol(tuple_item);
-    u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field->descriptor);
 
-    dyn_array_push(fields, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Base_Relative,
-      .name = field->symbol->name,
-      .descriptor = field->descriptor,
-      .source_range = tuple_item->source_range,
-      .Base_Relative.offset = field_byte_offset,
-    });
-  }
+  Descriptor *descriptor =
+    anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  descriptor->Struct.is_tuple = false;
 
-  c_struct_aligner_end(&struct_aligner);
-
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Struct,
-    .bit_size = {struct_aligner.bit_size},
-    .bit_alignment = struct_aligner.bit_alignment,
-    .Struct = {
-      .memory_layout = {
-        .items = fields,
-      }
-    },
-  };
-
-  result = allocator_allocate(context->allocator, Value);
+  Value *result = allocator_allocate(context->allocator, Value);
   *result = type_value_for_descriptor(descriptor);
 
   return result;
