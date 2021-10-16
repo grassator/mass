@@ -5930,7 +5930,7 @@ static Value *
 mass_handle_block_lazy_proc(
   Execution_Context *context,
   Function_Builder *builder,
-  const Expected_Result *expected_result,
+  const Expected_Result *expected_block_result,
   void *raw_payload
 ) {
   Array_Value_Ptr lazy_statements;
@@ -5938,6 +5938,7 @@ mass_handle_block_lazy_proc(
   u64 statement_count = dyn_array_length(lazy_statements);
   assert(statement_count);
   Value *result_value = 0;
+  Expected_Result expected_void = expected_result_from_value(&void_value);
   for (u64 i = 0; i < statement_count; ++i) {
     MASS_ON_ERROR(*context->result) return 0;
     u64 registers_before = builder ? builder->register_occupied_bitset : 0;
@@ -5948,30 +5949,10 @@ mass_handle_block_lazy_proc(
     if (slice_starts_with(debug_source, slice_literal("")) && false) {
       printf("%"PRIslice"\n", SLICE_EXPAND_PRINTF(debug_source));
     }
-    if (i == statement_count - 1) {
-      // TODO extract this into a helper and use for any "return" scenarios
-      const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
-      if (
-        expected_descriptor &&
-        expected_descriptor != &descriptor_void &&
-        !same_value_type_or_can_implicitly_move_cast(expected_descriptor, lazy_statement)
-      ) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = lazy_statement->source_range,
-          .Type_Mismatch = {
-            .expected = expected_descriptor,
-            .actual = value_or_lazy_value_descriptor(lazy_statement),
-          },
-        });
-        return 0;
-      }
-      result_value = value_force(context, builder, expected_result, lazy_statement);
-      result_value = expected_result_ensure_value_or_temp(context, builder, expected_result, result_value);
-    } else {
-      Expected_Result expected_void = expected_result_from_value(&void_value);
-      result_value = value_force(context, builder, &expected_void, lazy_statement);
-    }
+    bool is_last_statement = i == statement_count - 1;
+    const Expected_Result *expected_result =
+      is_last_statement ? expected_block_result : &expected_void;
+    result_value = value_force(context, builder, expected_result, lazy_statement);
     MASS_ON_ERROR(*context->result) return 0;
     // We do not do cross-statement register allocation so can check that there
     // are no stray registers retained across statement boundaries
