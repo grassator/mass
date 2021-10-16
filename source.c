@@ -1666,17 +1666,11 @@ mass_unquote(
   return token_parse_single(context, value_view_get(args, 0));
 }
 
-typedef enum {
-  Macro_Match_Mode_Expression,
-  Macro_Match_Mode_Statement
-} Macro_Match_Mode;
-
 static u32
 token_match_pattern(
   Value_View view,
   Array_Macro_Pattern macro_pattern,
-  Array_Value_View *out_match,
-  Macro_Match_Mode mode
+  Array_Value_View *out_match
 ) {
   u32 pattern_length = u64_to_u32(dyn_array_length(macro_pattern));
   if (!pattern_length) panic("Zero-length pattern does not make sense");
@@ -1708,10 +1702,8 @@ token_match_pattern(
         const Token_Pattern *end_pattern = 0;
         if (peek) {
           end_pattern = &peek->Single_Token.token_pattern;
-        } else if (mode == Macro_Match_Mode_Statement) {
-          end_pattern = &token_pattern_semicolon;
         } else {
-          panic("UNIMPLEMENTED");
+          end_pattern = &token_pattern_semicolon;
         }
 
         for (; view_index < view.length; ++view_index) {
@@ -1825,7 +1817,7 @@ token_parse_macro_statement(
     .capacity = 32,
   );
 
-  u32 match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
+  u32 match_length = token_match_pattern(value_view, macro->pattern, &match);
   if (!match_length) goto defer;
 
   Value_View rest = value_view_rest(&value_view, match_length);
