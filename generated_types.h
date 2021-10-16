@@ -1536,8 +1536,7 @@ typedef struct Expected_Result_Exact {
 typedef struct Expected_Result_Flexible {
   const Descriptor * descriptor;
   Expected_Result_Storage storage;
-  s32 _storage_padding;
-  u64 register_bitset;
+  u32 _storage_padding;
 } Expected_Result_Flexible;
 typedef struct Expected_Result {
   Expected_Result_Tag tag;
@@ -4571,15 +4570,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(expected_result_flexible, Expected_Result_Flexible
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_u32,
     .name = slice_literal_fields("_storage_padding"),
     .Base_Relative.offset = offsetof(Expected_Result_Flexible, _storage_padding),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("register_bitset"),
-    .Base_Relative.offset = offsetof(Expected_Result_Flexible, register_bitset),
   },
 );
 MASS_DEFINE_TYPE_VALUE(expected_result_flexible);

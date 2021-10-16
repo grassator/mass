@@ -1577,8 +1577,7 @@ main(void) {
     struct_fields("Flexible", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
       { "Expected_Result_Storage", "storage" },
-      { "s32", "_storage_padding" },
-      { "u64", "register_bitset"},
+      { "u32", "_storage_padding" },
     }),
   }));
 

@@ -73,7 +73,6 @@ expected_result_any(
         | Expected_Result_Storage_Register
         | Expected_Result_Storage_Xmm
         | Expected_Result_Storage_Eflags,
-      .register_bitset = 0xffffffffffffffffllu,
     },
   };
 }
@@ -2168,10 +2167,7 @@ expected_result_ensure_value_or_temp(
         return value;
       }
       if (flexible->storage & Expected_Result_Storage_Register) {
-        if (
-          value->storage.tag == Storage_Tag_Register &&
-          (flexible->register_bitset & (1llu << value->storage.Register.index))
-        ) {
+        if (value->storage.tag == Storage_Tag_Register) {
           return value;
         }
         Value *temp_result = value_temporary_acquire_register_for_descriptor(
