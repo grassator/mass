@@ -1431,18 +1431,6 @@ token_peek_match(
   return token;
 }
 
-static inline const Value_View *
-value_view_array_push(
-  Array_Value_View *array,
-  Value_View to_push
-) {
-  const Value_View *view = dyn_array_push_uninitialized(*array);
-  // Need to cast here because we need to initialize somehow
-  // a const pointer and that is not allowed
-  *(Value_View *)view = to_push;
-  return view;
-}
-
 typedef struct {
   Value_View view;
   u32 index;
