@@ -73,14 +73,6 @@ scope_define_value(
   Value *value
 );
 
-PRELUDE_NO_DISCARD static inline Mass_Result
-scope_define_operator(
-  Scope *scope,
-  Source_Range source_range,
-  const Symbol *symbol,
-  Operator *operator
-);
-
 static void
 module_compiler_init(
   Compilation *compilation,

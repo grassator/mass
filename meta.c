@@ -1522,8 +1522,6 @@ main(void) {
     { "const Scope *", "parent" },
     { "const Scope_Using *", "maybe_using" },
     { "Scope_Map *", "map" },
-    { "Operator_Map *", "prefix_operator_map"},
-    { "Operator_Map *", "infix_or_suffix_operator_map"},
     { "const Token_Statement_Matcher *", "statement_matcher" },
   }));
 
@@ -1940,6 +1938,8 @@ main(void) {
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },
     { "Symbol_Map *", "symbol_cache_map" },
+    { "Symbol_Map *", "prefix_operator_symbol_map" },
+    { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Common_Symbols", "common_symbols" },
   }));
 

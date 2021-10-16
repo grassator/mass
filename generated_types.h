@@ -1459,8 +1459,6 @@ typedef struct Scope {
   const Scope * parent;
   const Scope_Using * maybe_using;
   Scope_Map * map;
-  Operator_Map * prefix_operator_map;
-  Operator_Map * infix_or_suffix_operator_map;
   const Token_Statement_Matcher * statement_matcher;
 } Scope;
 typedef dyn_array_type(Scope) Array_Scope;
@@ -2075,6 +2073,8 @@ typedef struct Compilation {
   Program * runtime_program;
   Mass_Result * result;
   Symbol_Map * symbol_cache_map;
+  Symbol_Map * prefix_operator_symbol_map;
+  Symbol_Map * infix_or_suffix_operator_symbol_map;
   Common_Symbols common_symbols;
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
@@ -4366,18 +4366,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_operator_map_pointer,
-    .name = slice_literal_fields("prefix_operator_map"),
-    .Base_Relative.offset = offsetof(Scope, prefix_operator_map),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_operator_map_pointer,
-    .name = slice_literal_fields("infix_or_suffix_operator_map"),
-    .Base_Relative.offset = offsetof(Scope, infix_or_suffix_operator_map),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_token_statement_matcher_pointer,
     .name = slice_literal_fields("statement_matcher"),
     .Base_Relative.offset = offsetof(Scope, statement_matcher),
@@ -5924,6 +5912,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_symbol_map_pointer,
     .name = slice_literal_fields("symbol_cache_map"),
     .Base_Relative.offset = offsetof(Compilation, symbol_cache_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_map_pointer,
+    .name = slice_literal_fields("prefix_operator_symbol_map"),
+    .Base_Relative.offset = offsetof(Compilation, prefix_operator_symbol_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_map_pointer,
+    .name = slice_literal_fields("infix_or_suffix_operator_symbol_map"),
+    .Base_Relative.offset = offsetof(Compilation, infix_or_suffix_operator_symbol_map),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

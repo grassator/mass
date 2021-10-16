@@ -1091,61 +1091,54 @@ scope_define_value(
 
 PRELUDE_NO_DISCARD static inline Mass_Result
 scope_define_operator(
+  Compilation *compilation,
   Scope *scope,
   Source_Range source_range,
-  const Symbol *symbol,
+  Slice name,
   Operator *operator
 ) {
-  Operator_Map **operator_map_pointer = operator->fixity == Operator_Fixity_Prefix
-    ? &scope->prefix_operator_map
-    : &scope->infix_or_suffix_operator_map;
-  Operator **operator_entry = 0;
-  if (*operator_map_pointer) {
-    operator_entry = hash_map_get(*operator_map_pointer, symbol);
-    if (operator_entry) {
-      return mass_error((Mass_Error) {
-        .tag = Mass_Error_Tag_Operator_Fixity_Conflict,
-        .source_range = source_range,
-        .Operator_Fixity_Conflict = {
-          .fixity = operator->fixity,
-          .symbol = symbol->name,
-        },
-      });
-    }
-  } else {
-    *operator_map_pointer = hash_map_make(Operator_Map);
+  Symbol_Map *map = operator->fixity == Operator_Fixity_Prefix
+    ? compilation->prefix_operator_symbol_map
+    : compilation->infix_or_suffix_operator_symbol_map;
+  const Symbol *symbol = mass_ensure_symbol_for_map(compilation->allocator, map, name);
+
+  if (scope_lookup_shallow(scope, symbol)) {
+    return mass_error((Mass_Error) {
+      .tag = Mass_Error_Tag_Operator_Fixity_Conflict,
+      .source_range = source_range,
+      .Operator_Fixity_Conflict = {
+        .fixity = operator->fixity,
+        .symbol = symbol->name,
+      },
+    });
   }
-  hash_map_set(*operator_map_pointer, symbol, operator);
+
+  Value *operator_value = allocator_allocate(compilation->allocator, Value);
+  value_init(operator_value, &descriptor_operator, storage_static(operator), source_range);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, symbol, operator_value);
+
   return mass_success();
 }
 
-static inline Operator *
-scope_lookup_operator_shallow(
-  const Scope *scope,
-  const Symbol *symbol,
-  Operator_Fixity fixity
-) {
-  Operator **operator_entry = 0;
-  Operator_Map * const *operator_map_pointer = fixity == Operator_Fixity_Prefix
-    ? &scope->prefix_operator_map
-    : &scope->infix_or_suffix_operator_map;
-  if (*operator_map_pointer) {
-    operator_entry = hash_map_get(*operator_map_pointer, symbol);
-  }
-  return operator_entry ? *operator_entry : 0;
-}
-
-static inline Operator *
+static inline const Operator *
 scope_lookup_operator(
+  Compilation *compilation,
   const Scope *scope,
-  const Symbol *symbol,
+  Slice name,
   Operator_Fixity fixity
 ) {
-  for (; scope; scope = scope->parent) {
-    Operator *operator = scope_lookup_operator_shallow(scope, symbol, fixity);
-    if (operator) return operator;
-  }
-  return 0;
+  Symbol_Map *map = fixity == Operator_Fixity_Prefix
+    ? compilation->prefix_operator_symbol_map
+    : compilation->infix_or_suffix_operator_symbol_map;
+
+  // TODO use symbol lookups instead of string-based ones
+  Symbol *const *operator_symbol_pointer = hash_map_get(map, name);
+  if (!operator_symbol_pointer) return 0;
+  const Symbol *operator_symbol = *operator_symbol_pointer;
+  Scope_Entry *maybe_operator_entry = scope_lookup(scope, operator_symbol);
+  if (!maybe_operator_entry) return 0;
+  if (maybe_operator_entry->value->descriptor != &descriptor_operator) return 0;
+  return storage_static_as_c_type(&maybe_operator_entry->value->storage, Operator);
 }
 
 static inline Value *
@@ -2493,7 +2486,11 @@ token_parse_operator_definition(
   };
 
   *context->result = scope_define_operator(
-    context->scope, keyword_token->source_range, value_as_symbol(operator_token), operator
+    context->compilation,
+    context->scope,
+    keyword_token->source_range,
+    value_as_symbol(operator_token)->name,
+    operator
   );
 
   err:
@@ -2842,7 +2839,7 @@ compile_time_eval(
 
 typedef struct {
   Source_Range source_range;
-  Operator *operator;
+  const Operator *operator;
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
@@ -3023,7 +3020,7 @@ token_handle_operator(
   Value_View view,
   Array_Value_Ptr *stack,
   Array_Operator_Stack_Entry *operator_stack,
-  Operator *operator,
+  const Operator *operator,
   Source_Range source_range
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -5135,7 +5132,7 @@ token_dispatch_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Operator *operator = stack_entry->operator;
+  const Operator *operator = stack_entry->operator;
 
   u32 argument_count = operator->argument_count;
 
@@ -5770,8 +5767,9 @@ token_parse_expression(
     }
 
     if (value_is_symbol(value)) {
-      Operator *maybe_operator =
-        scope_lookup_operator(context->scope, value_as_symbol(value), fixity_mask);
+      const Operator *maybe_operator = scope_lookup_operator(
+        context->compilation, context->scope, value_as_symbol(value)->name, fixity_mask
+      );
       if (maybe_operator) {
         if (!token_handle_operator(
           context, view, &value_stack, &operator_stack, maybe_operator, value->source_range
@@ -5782,8 +5780,8 @@ token_parse_expression(
     }
 
     if (!is_previous_an_operator) {
-      Operator *empty_space_operator = scope_lookup_operator(
-        context->scope, context->compilation->common_symbols.operator_space, Operator_Fixity_Infix
+      const Operator *empty_space_operator = scope_lookup_operator(
+        context->compilation, context->scope, slice_literal(" "), Operator_Fixity_Infix
       );
       assert(empty_space_operator);
       if (!token_handle_operator(
@@ -6510,7 +6508,6 @@ scope_define_builtins(
   Execution_Context *context = &(Execution_Context){0};
   *context = execution_context_from_compilation(compilation);
   const Allocator *allocator = context->allocator;
-  const Common_Symbols *symbols = &context->compilation->common_symbols;
 
   global_scope_define_exports(compilation, scope);
   scope_define_value(
@@ -6529,35 +6526,35 @@ scope_define_builtins(
     mass_ensure_symbol(compilation, slice_literal("MASS")), compiler_module_value
   );
 
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, symbols->operator_dot, allocator_make(allocator, Operator,
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, symbols->operator_space, allocator_make(allocator, Operator,
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(" "), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_apply_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, symbols->operator_colon, allocator_make(allocator, Operator,
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(":"), allocator_make(allocator, Operator,
     .precedence = 2,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_typed_symbol_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, symbols->operator_equal, allocator_make(allocator, Operator,
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("="), allocator_make(allocator, Operator,
     .precedence = 1,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_assignment_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, symbols->_return, allocator_make(allocator, Operator,
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("return"), allocator_make(allocator, Operator,
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,

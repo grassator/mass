@@ -1582,28 +1582,37 @@ host_calling_convention() {
 }
 
 static inline const Symbol *
-mass_ensure_symbol(
-  Compilation *compilation,
+mass_ensure_symbol_for_map(
+  const Allocator *allocator,
+  Symbol_Map *map,
   Slice name
 ) {
   s32 hash = Symbol_Map__hash(name);
   const Symbol *symbol = 0;
   if (!symbol) {
     // Symbol type is derived from name anyway so it does not need to be part of the key
-    Symbol **cache_entry = hash_map_get_by_hash(compilation->symbol_cache_map, hash, name);
+    Symbol **cache_entry = hash_map_get_by_hash(map, hash, name);
     if (cache_entry) {
       symbol = *cache_entry;
     }
   }
   if (!symbol) {
-    Symbol *heap_symbol = allocator_allocate(compilation->allocator, Symbol);
+    Symbol *heap_symbol = allocator_allocate(allocator, Symbol);
     *heap_symbol = (Symbol){
       .name = name,
     };
     symbol = heap_symbol;
-    hash_map_set_by_hash(compilation->symbol_cache_map, hash, name, heap_symbol);
+    hash_map_set_by_hash(map, hash, name, heap_symbol);
   }
   return symbol;
+}
+
+static inline const Symbol *
+mass_ensure_symbol(
+  Compilation *compilation,
+  Slice name
+) {
+  return mass_ensure_symbol_for_map(compilation->allocator, compilation->symbol_cache_map, name);
 }
 
 static void
@@ -1634,6 +1643,8 @@ compilation_init(
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
     .symbol_cache_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
+    .prefix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
+    .infix_or_suffix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .jit = {0},
   };
 
@@ -1695,6 +1706,8 @@ compilation_deinit(
   hash_map_destroy(compilation->module_map);
   hash_map_destroy(compilation->static_pointer_map);
   hash_map_destroy(compilation->symbol_cache_map);
+  hash_map_destroy(compilation->prefix_operator_symbol_map);
+  hash_map_destroy(compilation->infix_or_suffix_operator_symbol_map);
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);
