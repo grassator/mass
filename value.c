@@ -1811,12 +1811,12 @@ same_type_or_can_implicitly_move_cast(
   if (descriptor_is_integer(source) && descriptor_is_integer(target)) {
     if (
       descriptor_is_unsigned_integer(source) &&
-      descriptor_byte_size(target) > descriptor_byte_size(source)
+      target->bit_size.as_u64 > source->bit_size.as_u64
     ) {
       return true;
     } else if (
       descriptor_is_signed_integer(target) &&
-      descriptor_byte_size(target) > descriptor_byte_size(source)
+      target->bit_size.as_u64 > source->bit_size.as_u64
     ) {
       return true;
     }

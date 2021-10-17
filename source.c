@@ -656,8 +656,8 @@ large_enough_common_integer_descriptor_for_values(
   bool left_signed = descriptor_is_signed_integer(left);
   bool right_signed = descriptor_is_signed_integer(right);
 
-  u64 left_size = descriptor_byte_size(left);
-  u64 right_size = descriptor_byte_size(right);
+  u64 left_size = left->bit_size.as_u64;
+  u64 right_size = right->bit_size.as_u64;
 
   if (left_signed == right_signed) {
     if (left_size == right_size) return left;
@@ -668,7 +668,7 @@ large_enough_common_integer_descriptor_for_values(
     // If the signed and unsigned have the same size need to
     // increase the size of the signed one so it fits the unsigned
     if (left_size == right_size) {
-      if (left_size == 8) {
+      if (left_size == 64) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = left_value->source_range,
@@ -696,7 +696,7 @@ assign_integers(
     large_enough_common_integer_descriptor_for_values(context, source, target);
   MASS_TRY(*context->result);
 
-  if (descriptor_byte_size(target->descriptor) < descriptor_byte_size(descriptor)) {
+  if (target->descriptor->bit_size.as_u64 < descriptor->bit_size.as_u64) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = target->source_range,
@@ -708,7 +708,7 @@ assign_integers(
   bool is_temp = false;
   Storage adjusted_source;
   if (
-    descriptor_byte_size(source->descriptor) == descriptor_byte_size(target->descriptor) ||
+    source->descriptor->bit_size.as_u64 == target->descriptor->bit_size.as_u64 ||
     source->storage.tag == Storage_Tag_Static
   ) {
     adjusted_source = source->storage;
@@ -4134,7 +4134,7 @@ mass_handle_arithmetic_operation_lazy_proc(
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
       Allocator *allocator = context->allocator;
-      u64 byte_size = descriptor_byte_size(descriptor);
+      u64 bit_size = descriptor->bit_size.as_u64;
 
       if (payload->operator == Mass_Arithmetic_Operator_Divide) {
         maybe_constant_fold(context, builder, &result_range, expected_result, lhs, rhs, /);
@@ -4184,11 +4184,11 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       if (descriptor_is_signed_integer(descriptor)){
         const X64_Mnemonic *widen = 0;
-        switch (byte_size) {
-          case 8: widen = cqo; break;
-          case 4: widen = cdq; break;
-          case 2: widen = cwd; break;
-          case 1: widen = cbw; break;
+        switch (bit_size) {
+          case 64: widen = cqo; break;
+          case 32: widen = cdq; break;
+          case 16: widen = cwd; break;
+          case 8: widen = cbw; break;
         }
         assert(widen);
         push_eagerly_encoded_assembly_no_source_range(
@@ -4198,7 +4198,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           &builder->code_block, result_range, &(Instruction_Assembly){idiv, {temp_divisor->storage}}
         );
       } else {
-        if (byte_size == 1) {
+        if (bit_size == 8) {
           Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
           push_eagerly_encoded_assembly_no_source_range(
             &builder->code_block, result_range, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend->storage}}
@@ -4216,7 +4216,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       }
 
       if (payload->operator == Mass_Arithmetic_Operator_Remainder) {
-        if (byte_size == 1) {
+        if (bit_size == 8) {
           // :64bitMode8BitOperations
           // The encoder does not support access to AH so we hardcode byte of `mov AL, AH`
           // This is not optimal, but it should do for now.

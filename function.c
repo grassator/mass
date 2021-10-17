@@ -543,13 +543,13 @@ make_if(
         );
         if (is_packed) register_release(builder, test_storage.Register.index);
       } else {
-        u64 byte_size = descriptor_byte_size(value->descriptor);
-        if (byte_size == 4 || byte_size == 8) {
+        u64 bit_size = value->descriptor->bit_size.as_u64;
+        if (bit_size == 32 || bit_size == 64) {
           push_eagerly_encoded_assembly(
             &builder->code_block, *source_range,
             &(Instruction_Assembly){cmp, {value->storage, imm32(0)}}
           );
-        } else if (byte_size == 1) {
+        } else if (bit_size == 8) {
           push_eagerly_encoded_assembly(
             &builder->code_block, *source_range,
             &(Instruction_Assembly){cmp, {value->storage, imm8(0)}}
@@ -578,11 +578,11 @@ maybe_constant_fold_internal(
   const Descriptor *descriptor = expected_result_descriptor(expected_result);
   if (!descriptor) descriptor = &descriptor_s64;
   Storage imm_storage;
-  switch(descriptor_byte_size(descriptor)) {
-    case 1: imm_storage = imm8(s64_to_s8(constant_result)); break;
-    case 2: imm_storage = imm16(s64_to_s16(constant_result)); break;
-    case 4: imm_storage = imm32(s64_to_s32(constant_result)); break;
-    case 8: imm_storage = imm64(s64_to_s64(constant_result)); break;
+  switch(descriptor->bit_size.as_u64) {
+    case 8: imm_storage = imm8(s64_to_s8(constant_result)); break;
+    case 16: imm_storage = imm16(s64_to_s16(constant_result)); break;
+    case 32: imm_storage = imm32(s64_to_s32(constant_result)); break;
+    case 64: imm_storage = imm64(s64_to_s64(constant_result)); break;
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
   Value *imm_value = value_make(context, descriptor, imm_storage, *source_range);
