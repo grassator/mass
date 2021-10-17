@@ -2239,7 +2239,7 @@ static Value *
 token_handle_user_defined_operator_proc(
   Execution_Context *context,
   Value_View args,
-  User_Defined_Operator *operator
+  const Operator *operator
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -2386,8 +2386,6 @@ token_parse_operator_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  User_Defined_Operator *user_defined_operator = 0;
-
   u32 peek_index = 0;
   Value *keyword_token = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.operator
@@ -2424,14 +2422,10 @@ token_parse_operator_definition(
 
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
-  user_defined_operator = allocator_allocate(context->allocator, User_Defined_Operator);
-  *user_defined_operator = (User_Defined_Operator) {
-    .is_intrinsic = !!intrinsic_token,
-    .alias = alias,
-  };
-
   Value *operator_token;
   Value *arguments[2] = {0};
+  Operator_Fixity fixity = Operator_Fixity_Prefix;
+  u16 argument_count = 1;
 
   // prefix and postfix
   if (definition.length == 2) {
@@ -2441,9 +2435,8 @@ token_parse_operator_definition(
       Slice operator_string = value_as_symbol(first)->name;
       is_first_operator_like = operator_string.length && !isalpha(operator_string.bytes[0]);
     }
-    user_defined_operator->fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
-    user_defined_operator->argument_count = 1;
-    if (user_defined_operator->fixity == Operator_Fixity_Prefix) {
+    fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
+    if (fixity == Operator_Fixity_Prefix) {
       operator_token = value_view_get(definition, 0);
       arguments[0] = value_view_get(definition, 1);
     } else {
@@ -2451,8 +2444,8 @@ token_parse_operator_definition(
       arguments[0] = value_view_get(definition, 0);
     }
   } else if (definition.length == 3) { // infix
-    user_defined_operator->argument_count = 2;
-    user_defined_operator->fixity = Operator_Fixity_Infix;
+    argument_count = 2;
+    fixity = Operator_Fixity_Infix;
     operator_token = value_view_get(definition, 1);
     arguments[0] = value_view_get(definition, 0);
     arguments[1] = value_view_get(definition, 2);
@@ -2466,7 +2459,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  for (u8 i = 0; i < user_defined_operator->argument_count; ++i) {
+  for (u8 i = 0; i < argument_count; ++i) {
     if (!value_is_symbol(arguments[i])) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
@@ -2478,11 +2471,12 @@ token_parse_operator_definition(
 
   Operator *operator = allocator_allocate(context->allocator, Operator);
   *operator = (Operator){
-    .fixity = user_defined_operator->fixity,
+    .argument_count = argument_count,
+    .is_intrinsic = !!intrinsic_token,
+    .alias = alias,
+    .fixity = fixity,
     .precedence = precendence,
-    .argument_count = user_defined_operator->argument_count,
     .handler = token_handle_user_defined_operator_proc,
-    .handler_payload = user_defined_operator,
   };
 
   *context->result = scope_define_operator(
@@ -4629,7 +4623,7 @@ static Value *
 mass_handle_apply_operator(
   Execution_Context *context,
   Value_View operands_view,
-  void *unused_payload
+  const Operator *operator
 ) {
   Value *lhs_value = value_view_get(operands_view, 0);
   Value *rhs_value = value_view_get(operands_view, 1);
@@ -4664,7 +4658,7 @@ static Value *
 mass_handle_typed_symbol_operator(
   Execution_Context *context,
   Value_View operands,
-  void *unused_payload
+  const Operator *operator
 ) {
   Value *lhs_value = value_view_get(operands, 0);
   Value *rhs_value = token_parse_single(context, value_view_get(operands, 1));
@@ -4756,7 +4750,7 @@ static Value *
 mass_handle_assignment_operator(
   Execution_Context *context,
   Value_View operands,
-  void *unused_payload
+  const Operator *operator
 ) {
   Value *target = token_parse_single(context, value_view_get(operands, 0));
   Value *source = token_parse_single(context, value_view_get(operands, 1));
@@ -5006,7 +5000,7 @@ static Value *
 mass_handle_dot_operator(
   Execution_Context *context,
   Value_View args_view,
-  void *unused_payload
+  const Operator *operator
 ) {
   Value *lhs = token_parse_single(context, value_view_get(args_view, 0));
   Value *rhs = value_view_get(args_view, 1);
@@ -5156,8 +5150,7 @@ token_dispatch_operator(
     .source_range = source_range,
   };
 
-  assert(operator->handler);
-  Value *result_value = operator->handler(context, args_view, operator->handler_payload);
+  Value *result_value = operator->handler(context, args_view, operator);
   MASS_ON_ERROR(*context->result) return;
 
   // Pop off current arguments and push a new one
@@ -6172,7 +6165,7 @@ static Value *
 mass_handle_return_operator(
   Execution_Context *context,
   Value_View args,
-  void *unused_payload
+  const Operator *operator
 ) {
   assert(args.length == 1);
   Value *return_value = token_parse_single(context, value_view_get(args, 0));

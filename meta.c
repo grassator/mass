@@ -1457,20 +1457,14 @@ main(void) {
     { "Mass_Result *", "result" },
   })));
 
-  push_type(type_struct("User_Defined_Operator", (Struct_Item[]){
-    { "Operator_Fixity", "fixity" },
-    { "u16", "argument_count" },
-    { "u16", "is_intrinsic" },
-    { "const Symbol *", "alias" },
-  }));
-
   push_type(type_struct("Operator", (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
     { "u32", "precedence" },
-    { "u32", "argument_count" },
+    { "u16", "argument_count" },
+    { "u16", "is_intrinsic" },
+    { "const Symbol *", "alias" },
     { "Mass_Handle_Operator_Proc", "handler" },
-    { "void *", "handler_payload" },
   }));
 
   push_type(add_common_fields(type_union("Macro_Pattern", (Struct_Type[]){
@@ -1605,7 +1599,7 @@ main(void) {
   push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
-    { "void *", "payload" },
+    { "const Operator *", "operator" },
   }));
 
   push_type(type_enum("Memory_Layout_Item_Flags", (Enum_Type_Item[]){

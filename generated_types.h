@@ -364,10 +364,6 @@ typedef struct Execution_Context Execution_Context;
 typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
 typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
 
-typedef struct User_Defined_Operator User_Defined_Operator;
-typedef dyn_array_type(User_Defined_Operator *) Array_User_Defined_Operator_Ptr;
-typedef dyn_array_type(const User_Defined_Operator *) Array_Const_User_Defined_Operator_Ptr;
-
 typedef struct Operator Operator;
 typedef dyn_array_type(Operator *) Array_Operator_Ptr;
 typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
@@ -459,7 +455,7 @@ typedef dyn_array_type(Lazy_Static_Value *) Array_Lazy_Static_Value_Ptr;
 typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_Ptr;
 
 typedef Value * (*Mass_Handle_Operator_Proc)
-  (Execution_Context * context, Value_View view, void * payload);
+  (Execution_Context * context, Value_View view, const Operator * operator);
 
 typedef enum Memory_Layout_Item_Flags {
   Memory_Layout_Item_Flags_None = 0,
@@ -1381,21 +1377,14 @@ typedef struct Execution_Context {
 } Execution_Context;
 typedef dyn_array_type(Execution_Context) Array_Execution_Context;
 
-typedef struct User_Defined_Operator {
-  Operator_Fixity fixity;
-  u16 argument_count;
-  u16 is_intrinsic;
-  const Symbol * alias;
-} User_Defined_Operator;
-typedef dyn_array_type(User_Defined_Operator) Array_User_Defined_Operator;
-
 typedef struct Operator {
   Operator_Fixity fixity;
   Operator_Associativity associativity;
   u32 precedence;
-  u32 argument_count;
+  u16 argument_count;
+  u16 is_intrinsic;
+  const Symbol * alias;
   Mass_Handle_Operator_Proc handler;
-  void * handler_payload;
 } Operator;
 typedef dyn_array_type(Operator) Array_Operator;
 
@@ -2352,11 +2341,6 @@ static Descriptor descriptor_array_execution_context;
 static Descriptor descriptor_array_execution_context_ptr;
 static Descriptor descriptor_execution_context_pointer;
 static Descriptor descriptor_execution_context_pointer_pointer;
-static Descriptor descriptor_user_defined_operator;
-static Descriptor descriptor_array_user_defined_operator;
-static Descriptor descriptor_array_user_defined_operator_ptr;
-static Descriptor descriptor_user_defined_operator_pointer;
-static Descriptor descriptor_user_defined_operator_pointer_pointer;
 static Descriptor descriptor_operator;
 static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
@@ -4117,35 +4101,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
   },
 );
 MASS_DEFINE_TYPE_VALUE(execution_context);
-MASS_DEFINE_OPAQUE_C_TYPE(array_user_defined_operator_ptr, Array_User_Defined_Operator_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_user_defined_operator, Array_User_Defined_Operator)
-MASS_DEFINE_STRUCT_DESCRIPTOR(user_defined_operator, User_Defined_Operator,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_operator_fixity,
-    .name = slice_literal_fields("fixity"),
-    .Base_Relative.offset = offsetof(User_Defined_Operator, fixity),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u16,
-    .name = slice_literal_fields("argument_count"),
-    .Base_Relative.offset = offsetof(User_Defined_Operator, argument_count),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u16,
-    .name = slice_literal_fields("is_intrinsic"),
-    .Base_Relative.offset = offsetof(User_Defined_Operator, is_intrinsic),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("alias"),
-    .Base_Relative.offset = offsetof(User_Defined_Operator, alias),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(user_defined_operator);
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator_ptr, Array_Operator_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator, Array_Operator)
 MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
@@ -4169,21 +4124,27 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_u16,
     .name = slice_literal_fields("argument_count"),
     .Base_Relative.offset = offsetof(Operator, argument_count),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u16,
+    .name = slice_literal_fields("is_intrinsic"),
+    .Base_Relative.offset = offsetof(Operator, is_intrinsic),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("alias"),
+    .Base_Relative.offset = offsetof(Operator, alias),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_mass_handle_operator_proc,
     .name = slice_literal_fields("handler"),
     .Base_Relative.offset = offsetof(Operator, handler),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_void_pointer,
-    .name = slice_literal_fields("handler_payload"),
-    .Base_Relative.offset = offsetof(Operator, handler_payload),
   },
 );
 MASS_DEFINE_TYPE_VALUE(operator);
