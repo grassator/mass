@@ -1804,7 +1804,7 @@ same_type_or_can_implicitly_move_cast(
     for (u64 i = 0; i < dyn_array_length(source_fields); ++i) {
       const Descriptor *source_field = dyn_array_get(source_fields, i)->descriptor;
       const Descriptor *target_field = dyn_array_get(target_fields, i)->descriptor;
-      if (!same_type_or_can_implicitly_move_cast(target_field, source_field)) return false;
+      if (!same_type(target_field, source_field)) return false;
     }
     return true;
   }
