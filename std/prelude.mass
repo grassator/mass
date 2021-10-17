@@ -65,7 +65,7 @@ bool :: s8
 true :: 1
 false :: 0
 
-compile_time_error :: @fn(name : String, description : String) -> () MASS.compile_time_error
+compile_time_error :: fn(name : String, description : String) => () MASS.compile_time_error
 
 static_assert :: macro(condition : bool, message : String) {
   @{if condition { compile_time_error("Static Assert Failed", message) }}
@@ -116,8 +116,8 @@ compile_time_allocate :: macro(type : Type) {
 quote :: @fn(x) MASS.quote
 unquote :: @fn(x) MASS.unquote
 
-type_of :: @fn(x) -> (Type) MASS.type_of
-size_of :: @fn(x) -> (i64) MASS.size_of
+type_of :: fn(x) => (Type) MASS.type_of
+size_of :: fn(x) => (i64) MASS.size_of
 
 Pointer_To :: macro(type : Type) -> (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
@@ -127,7 +127,7 @@ address_of :: Pointer_To
 // It is technically not necessary to specify the return type here,
 // but it is nice as an extra stress to the compiler.
 // FIXME Using `address_of` instead of `Pointer_To` results in an infinite loop
-address_of :: @fn(x) -> (Pointer_To(type_of(x))) MASS.address_of
+address_of :: fn(x) => (Pointer_To(type_of(x))) MASS.address_of
 
 template_signed_integer_overloads :: macro(template, impl) {
   f :: template(impl, s64)
@@ -153,11 +153,11 @@ template_integer_overloads :: macro(template, impl) {
 }
 
 arithmetic_template :: macro(impl, type : Type) {
-  @fn(x : type, y : type) -> (bool) impl
+  fn(x : type, y : type) => (bool) impl
 }
 // TODO support arithmetic on i64 and remove this overload
 arithmetic_template :: macro(impl, type :: i64) {
-  @fn(x : i64, y : i64) -> (s64) impl
+  fn(x : i64, y : i64) => (s64) impl
 }
 
 add :: template_integer_overloads(arithmetic_template, MASS.add)
@@ -167,7 +167,7 @@ divide :: template_integer_overloads(arithmetic_template, MASS.divide)
 remainder :: template_integer_overloads(arithmetic_template, MASS.remainder)
 
 comparison_template :: macro(impl, type : Type) {
-  @fn(x : type, y : type) -> (bool) impl
+  fn(x : type, y : type) => (bool) impl
 }
 
 less :: template_integer_overloads(comparison_template, MASS.less)
@@ -182,7 +182,7 @@ logical_shift_right :: MASS.i64_logical_shift_right
 bitwise_or :: MASS.i64_bitwise_or
 bitwise_and :: MASS.i64_bitwise_and
 
-Array :: @fn(item : Type, length : u64) -> (Type) {
+Array :: fn(item : Type, length : u64) => (Type) {
   byte_size :: MASS.Descriptor.bit_size.as_u64 / 8
   byte_alignment :: MASS.Descriptor.bit_alignment.as_u64 / 8
   t : Type = MASS.allocator_allocate_bytes(MASS.allocator, byte_size, byte_alignment)

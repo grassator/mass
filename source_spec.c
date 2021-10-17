@@ -865,7 +865,7 @@ spec("source") {
     it("should support defining a compile-time function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "compile_time_fn :: @fn() -> (s64) { 42 }\n"
+        "compile_time_fn :: fn() => (s64) { 42 }\n"
         "checker :: fn() -> (s64) { compile_time_fn() }"
       );
       check(spec_check_mass_result(test_context.result));
@@ -897,7 +897,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: @fn(a : i64, b : i64) -> (i64)"
+          "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
             "@intrinsic { arguments.values.1 }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
@@ -909,7 +909,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: @fn(a : i64, b : i64) -> (i64)"
+          "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
             "@intrinsic { b }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );

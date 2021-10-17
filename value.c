@@ -1692,6 +1692,7 @@ compilation_init(
     .operator_comma = mass_ensure_symbol(compilation, slice_literal(",")),
     .operator_dot = mass_ensure_symbol(compilation, slice_literal(".")),
     .operator_equal = mass_ensure_symbol(compilation, slice_literal("=")),
+    .operator_fat_arrow = mass_ensure_symbol(compilation, slice_literal("=>")),
     .operator_semicolon = mass_ensure_symbol(compilation, slice_literal(";")),
     .operator_space = mass_ensure_symbol(compilation, slice_literal(" ")),
   };

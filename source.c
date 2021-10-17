@@ -5560,6 +5560,13 @@ token_parse_function_literal(
   Value *arrow = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.operator_arrow
   );
+  bool is_compile_time = !!at;
+  if (!arrow) {
+    arrow = value_view_maybe_match_cached_symbol(
+      view, &peek_index, context->compilation->common_symbols.operator_fat_arrow
+    );
+    if (arrow) is_compile_time = true;
+  }
   if (arrow) {
     returns = value_view_next(view, &peek_index);
     if (!returns) {
@@ -5609,7 +5616,7 @@ token_parse_function_literal(
 
   *matched_length = peek_index;
 
-  if (at) {
+  if (is_compile_time) {
     fn_info->flags |= Function_Info_Flags_Compile_Time;
   }
   bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
