@@ -837,10 +837,10 @@ ensure_function_instance(
 
   value_force_exact(&body_context, builder, return_value, parse_result);
 
-  push_label(
-    &builder->code_block,
-    builder->code_block.end_label
-  );
+  push_instruction(&builder->code_block, (Instruction) {
+    .tag = Instruction_Tag_Label,
+    .Label.pointer = builder->code_block.end_label,
+  });
 
   const Storage *callee_return_storage = &call_setup->callee_return_value->storage;
   const Storage *caller_return_storage = &call_setup->caller_return_value->storage;

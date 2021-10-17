@@ -24,15 +24,6 @@ program_init_startup_code(
   Execution_Context *context
 );
 
-#define push_label(_CODE_BLOCK_, ...)\
-  do {\
-    Instruction to_push = (Instruction) {\
-      .tag = Instruction_Tag_Label,\
-      .Label.pointer = (__VA_ARGS__),\
-    };\
-    push_instruction((_CODE_BLOCK_), to_push);\
-  } while (0)
-
 #define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     const Expected_Result *fold_result = (_result_);\
