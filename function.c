@@ -921,7 +921,7 @@ calculate_arguments_match_score(
   return score;
 }
 
-void
+static void
 program_init_startup_code(
   Execution_Context *context
 ) {
@@ -966,7 +966,6 @@ program_init_startup_code(
       &(Instruction_Assembly){mov, {relocation->patch_at, register_a}}
     );
   }
-
 
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);

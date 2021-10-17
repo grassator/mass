@@ -19,7 +19,7 @@ reserve_stack(
   Source_Range source_range
 );
 
-void
+static void
 program_init_startup_code(
   Execution_Context *context
 );

@@ -1392,7 +1392,7 @@ descriptor_reference_to(
     .tag = Descriptor_Tag_Reference_To,
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Pointer_To.descriptor = descriptor,
+    .Reference_To.descriptor = descriptor,
   };
   return result;
 }

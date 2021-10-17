@@ -306,7 +306,7 @@ pe32_checksum(
     _Pragma("warning (push)") _Pragma(ID) X; \
     _Pragma("warning (pop)")
 
-void
+static void
 write_executable(
   Slice file_path,
   Execution_Context *context,
