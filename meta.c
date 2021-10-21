@@ -1859,9 +1859,25 @@ main(void) {
     { "void *", "payload" },
   }));
 
+  push_type(type_function(Typedef, "Mass_Trampoline_Proc", "void", (Argument_Type[]){
+    { "void *", "payload" },
+  }));
+
+  push_type(type_struct("Mass_Trampoline", (Struct_Item[]){
+    { "const Descriptor *", "args_descriptor" },
+    { "Mass_Trampoline_Proc", "proc"},
+  }));
+
   push_type(type_hash_map("Symbol_Map", {
     .key_type = "Slice",
     .value_type = "Symbol *",
+  }));
+
+  push_type(type_hash_map("Trampoline_Map", {
+    .key_type = "const Value *",
+    .value_type = "const Mass_Trampoline *",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
   }));
 
   push_type(type_hash_map("Scope_Map", {
@@ -1944,6 +1960,7 @@ main(void) {
     { "Module", "compiler_module" },
     { "Static_Pointer_Map *", "static_pointer_map" },
     { "Imported_Module_Map *", "module_map" },
+    { "Trampoline_Map *", "trampoline_map" },
     { "Scope *", "root_scope" },
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },

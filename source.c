@@ -3723,16 +3723,20 @@ value_is_intrinsic(
   return !!(info && info->flags & Function_Info_Flags_Intrinsic);
 }
 
-typedef void(*Mass_Trampoline_Proc)(void *);
-
-static Value *
-mass_trampoline_call(
+static const Mass_Trampoline *
+mass_ensure_trampoline(
   Execution_Context *context,
   Value *original,
   Value_View args_view
 ) {
   const Function_Info *original_info = maybe_function_info_from_value(original, args_view);
   assert(original_info);
+
+  const Mass_Trampoline **maybe_trampoline_pointer =
+    hash_map_get(context->compilation->trampoline_map, original);
+  if (maybe_trampoline_pointer) {
+    return *maybe_trampoline_pointer;
+  }
 
   C_Struct_Aligner struct_aligner = {0};
   Array_Memory_Layout_Item fields = dyn_array_make(
@@ -3854,18 +3858,32 @@ mass_trampoline_call(
     context_error(context, jit_result.Error.error);
     return 0;
   }
+  Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
+  *trampoline = (Mass_Trampoline) {
+    .args_descriptor = args_struct_descriptor,
+    .proc = (Mass_Trampoline_Proc)value_as_function(trampoline_context.program, instance),
+  };
+  hash_map_set(context->compilation->trampoline_map, original, trampoline);
+  return trampoline;
+}
 
-  Mass_Trampoline_Proc trampoline_proc =
-    (Mass_Trampoline_Proc)value_as_function(trampoline_context.program, instance);
+static Value *
+mass_trampoline_call(
+  Execution_Context *context,
+  Value *original,
+  Value_View args_view
+) {
+  const Mass_Trampoline *trampoline = mass_ensure_trampoline(context, original, args_view);
 
-  // ---- Actual call
-
+  // TODO @Speed technically only return value need to be permanently allocated
   u8 *args_struct_memory = allocator_allocate_bytes(
     context->allocator,
-    descriptor_byte_size(args_struct_descriptor),
-    descriptor_byte_alignment(args_struct_descriptor)
+    descriptor_byte_size(trampoline->args_descriptor),
+    descriptor_byte_alignment(trampoline->args_descriptor)
   );
 
+  Array_Memory_Layout_Item fields = trampoline->args_descriptor->Struct.memory_layout.items;
+  assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < args_view.length; ++i) {
     Value *item = value_view_get(args_view, i);
     assert(value_is_non_lazy_static(item));
@@ -3878,13 +3896,14 @@ mass_trampoline_call(
     );
     memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
   }
-  trampoline_proc(args_struct_memory);
-  void *return_memory = args_struct_memory + return_byte_offset;
-  Storage return_storage = storage_static_internal(return_memory, return_descriptor->bit_size);
+  const Memory_Layout_Item *return_field = dyn_array_last(fields);
+  assert(slice_equal(return_field->name, slice_literal("returns")));
+  assert(return_field->tag == Memory_Layout_Item_Tag_Base_Relative);
+  trampoline->proc(args_struct_memory);
+  void *return_memory = args_struct_memory + return_field->Base_Relative.offset;
+  Storage return_storage = storage_static_internal(return_memory, return_field->descriptor->bit_size);
 
-  Value *result = value_make(
-    context, return_descriptor, return_storage, original_info->returns.declaration.source_range
-  );
+  Value *result = value_make(context, return_field->descriptor, return_storage, args_view.source_range);
 
   return result;
 }
@@ -3994,13 +4013,6 @@ token_handle_function_call(
     overload != context->current_compile_time_function_call_target &&
     info && (info->flags & Function_Info_Flags_Compile_Time)
   ) {
-    // It is important to create a new value with the range of the original expression,
-    // otherwise Value_View slicing will not work correctly
-    Value *temp_overload = value_make(context, overload->descriptor, overload->storage, source_range);
-    // This is necessary to avoid infinite recursion as the compile_time_eval called below
-    // will end up here as well. Indirect calls are allowed so we do not need a full stack
-    const Value *saved_call_target = context->current_compile_time_function_call_target;
-    context->current_compile_time_function_call_target = temp_overload;
     Value *result;
     const Descriptor *expected_descriptor = info->returns.declaration.descriptor;
     if (info->flags & Function_Info_Flags_Intrinsic) {
@@ -4013,8 +4025,20 @@ token_handle_function_call(
         result = mass_intrinsic_call(context, maybe_literal->body, args_view);
       } else {
         if (mass_can_trampoline_call(info, args_view)) {
-          result = mass_trampoline_call(context, temp_overload, args_view);
+          // This is necessary to avoid infinite recursion as the `mass_trampoline_call` called below
+          // will end up here as well. Indirect calls are allowed so we do not need a full stack
+          const Value *saved_call_target = context->current_compile_time_function_call_target;
+          context->current_compile_time_function_call_target = overload;
+          result = mass_trampoline_call(context, overload, args_view);
+          context->current_compile_time_function_call_target = saved_call_target;
         } else {
+          // It is important to create a new value with the range of the original expression,
+          // otherwise Value_View slicing will not work correctly
+          Value *temp_overload = value_make(context, overload->descriptor, overload->storage, source_range);
+          // This is necessary to avoid infinite recursion as the `compile_time_eval` called below
+          // will end up here as well. Indirect calls are allowed so we do not need a full stack
+          const Value *saved_call_target = context->current_compile_time_function_call_target;
+          context->current_compile_time_function_call_target = temp_overload;
           Value *fake_args_token = value_make(
             context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
           );
@@ -4024,6 +4048,7 @@ token_handle_function_call(
             .source_range = source_range,
           };
           result = compile_time_eval(context, fake_eval_view);
+          context->current_compile_time_function_call_target = saved_call_target;
         }
       }
     }
@@ -4038,7 +4063,6 @@ token_handle_function_call(
         return 0;
       }
     }
-    context->current_compile_time_function_call_target = saved_call_target;
     return result;
   }
 

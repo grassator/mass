@@ -1643,6 +1643,7 @@ compilation_init(
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
     .symbol_cache_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
+    .trampoline_map = hash_map_make(Trampoline_Map, .initial_capacity = 256),
     .prefix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .infix_or_suffix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .jit = {0},
@@ -1709,6 +1710,7 @@ compilation_deinit(
   hash_map_destroy(compilation->symbol_cache_map);
   hash_map_destroy(compilation->prefix_operator_symbol_map);
   hash_map_destroy(compilation->infix_or_suffix_operator_symbol_map);
+  hash_map_destroy(compilation->trampoline_map);
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);

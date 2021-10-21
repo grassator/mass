@@ -595,7 +595,16 @@ typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Conventio
 typedef u32 (*Token_Statement_Matcher_Proc)
   (Execution_Context * context, Value_View view, Lazy_Value * out_lazy_value, void * payload);
 
+typedef void (*Mass_Trampoline_Proc)
+  (void * payload);
+
+typedef struct Mass_Trampoline Mass_Trampoline;
+typedef dyn_array_type(Mass_Trampoline *) Array_Mass_Trampoline_Ptr;
+typedef dyn_array_type(const Mass_Trampoline *) Array_Const_Mass_Trampoline_Ptr;
+
 typedef struct Symbol_Map Symbol_Map;
+
+typedef struct Trampoline_Map Trampoline_Map;
 
 typedef struct Scope_Map Scope_Map;
 
@@ -2011,7 +2020,14 @@ typedef struct Calling_Convention {
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
+typedef struct Mass_Trampoline {
+  const Descriptor * args_descriptor;
+  Mass_Trampoline_Proc proc;
+} Mass_Trampoline;
+typedef dyn_array_type(Mass_Trampoline) Array_Mass_Trampoline;
+
 hash_map_slice_template(Symbol_Map, Symbol *)
+hash_map_template(Trampoline_Map, const Value *, const Mass_Trampoline *, hash_pointer, const_void_pointer_equal)
 hash_map_template(Scope_Map, const Symbol *, Scope_Entry *, hash_pointer, const_void_pointer_equal)
 hash_map_slice_template(Macro_Replacement_Map, Value_View)
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
@@ -2071,6 +2087,7 @@ typedef struct Compilation {
   Module compiler_module;
   Static_Pointer_Map * static_pointer_map;
   Imported_Module_Map * module_map;
+  Trampoline_Map * trampoline_map;
   Scope * root_scope;
   Program * runtime_program;
   Mass_Result * result;
@@ -2558,7 +2575,14 @@ static Descriptor descriptor_array_calling_convention_ptr;
 static Descriptor descriptor_calling_convention_pointer;
 static Descriptor descriptor_calling_convention_pointer_pointer;
 static Descriptor descriptor_token_statement_matcher_proc;
+static Descriptor descriptor_mass_trampoline_proc;
+static Descriptor descriptor_mass_trampoline;
+static Descriptor descriptor_array_mass_trampoline;
+static Descriptor descriptor_array_mass_trampoline_ptr;
+static Descriptor descriptor_mass_trampoline_pointer;
+static Descriptor descriptor_mass_trampoline_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(symbol_map, Symbol_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(trampoline_map, Trampoline_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(scope_map, Scope_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(macro_replacement_map, Macro_Replacement_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
@@ -5609,6 +5633,23 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline_ptr, Array_Mass_Trampoline_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline, Array_Mass_Trampoline)
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_trampoline, Mass_Trampoline,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("args_descriptor"),
+    .Base_Relative.offset = offsetof(Mass_Trampoline, args_descriptor),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_mass_trampoline_proc,
+    .name = slice_literal_fields("proc"),
+    .Base_Relative.offset = offsetof(Mass_Trampoline, proc),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_trampoline);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters_ptr, Array_Jit_Counters_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters, Array_Jit_Counters)
 MASS_DEFINE_STRUCT_DESCRIPTOR(jit_counters, Jit_Counters,
@@ -5872,6 +5913,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_imported_module_map_pointer,
     .name = slice_literal_fields("module_map"),
     .Base_Relative.offset = offsetof(Compilation, module_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_trampoline_map_pointer,
+    .name = slice_literal_fields("trampoline_map"),
+    .Base_Relative.offset = offsetof(Compilation, trampoline_map),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
