@@ -4864,15 +4864,21 @@ mass_handle_field_access_lazy_proc(
   // Auto dereference pointers to structs
   if (struct_descriptor != unwrapped_descriptor) {
     assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
-    Storage base_storage;
+
+    Storage pointee_storage = storage_none;
     bool is_temporary;
-    if (struct_->storage.tag == Storage_Tag_Register) {
-      base_storage = struct_->storage;
+    if (struct_->storage.tag == Storage_Tag_Static) {
+      const void *pointed_memory = *storage_static_as_c_type(&struct_->storage, void *);
+      pointee_storage = storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
+      is_temporary = false;
+    } else if (struct_->storage.tag == Storage_Tag_Register) {
+      Register reg = struct_->storage.Register.index;
+      pointee_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
       is_temporary = false;
     } else {
-      base_storage = storage_register_for_descriptor(
-        register_acquire_temp(builder), struct_->descriptor
-      );
+      Register reg = register_acquire_temp(builder);
+      Storage base_storage = storage_register_for_descriptor(reg, struct_descriptor);
+      pointee_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
       move_value(
         context->allocator,
         builder,
@@ -4883,8 +4889,7 @@ mass_handle_field_access_lazy_proc(
       is_temporary = true;
     }
 
-    Storage pointee_storage =
-      storage_indirect(unwrapped_descriptor->bit_size, base_storage.Register.index);
+    // TODO @Speed the logic in this function does not actually need a Value, just Storage
     struct_ = value_make(context, unwrapped_descriptor, pointee_storage, struct_->source_range);
     struct_->is_temporary = is_temporary;
   }
@@ -4967,25 +4972,32 @@ mass_handle_array_access_lazy_proc(
 }
 
 static Value *
-mass_make_lazy_struct_field_access(
+mass_struct_field_access(
   Execution_Context *context,
   Value *struct_,
   Memory_Layout_Item *field
 ) {
-  Mass_Field_Access_Lazy_Payload *lazy_payload =
-    allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
-  *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
+  Mass_Field_Access_Lazy_Payload stack_lazy_payload = {
     .struct_ = struct_,
     .field = field,
   };
 
-  return mass_make_lazy_value(
-    context,
-    struct_->source_range,
-    lazy_payload,
-    field->descriptor,
-    mass_handle_field_access_lazy_proc
-  );
+  if (value_is_non_lazy_static(struct_)) {
+    Expected_Result expected_result = expected_result_static(field->descriptor);
+    return mass_handle_field_access_lazy_proc(context, 0, &expected_result, &stack_lazy_payload);
+  } else {
+    Mass_Field_Access_Lazy_Payload *lazy_payload =
+      allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
+    *lazy_payload = stack_lazy_payload;
+
+    return mass_make_lazy_value(
+      context,
+      struct_->source_range,
+      lazy_payload,
+      field->descriptor,
+      mass_handle_field_access_lazy_proc
+    );
+  }
 }
 
 static Value *
@@ -5028,7 +5040,7 @@ mass_handle_dot_operator(
       }
       Memory_Layout_Item *field =
         dyn_array_get(unwrapped_descriptor->Struct.memory_layout.items, index);
-      return mass_make_lazy_struct_field_access(context, lhs, field);
+      return mass_struct_field_access(context, lhs, field);
     }
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
@@ -5070,7 +5082,7 @@ mass_handle_dot_operator(
         });
         return 0;
       }
-      return mass_make_lazy_struct_field_access(context, lhs, field);
+      return mass_struct_field_access(context, lhs, field);
     }
   } else if (
     lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
