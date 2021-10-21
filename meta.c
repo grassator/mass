@@ -108,7 +108,7 @@ typedef struct {
   };
 } Meta_Type;
 
-char *
+static char *
 strtolower(
   const char *str
 ) {
@@ -117,6 +117,21 @@ strtolower(
   for(size_t i = 0; result[i]; i++){
     result[i] = (char)tolower(result[i]);
   }
+  return result;
+}
+
+static char *
+strjoin(
+  const char *a,
+  const char *b
+) {
+  size_t a_length = strlen(a);
+  size_t b_length = strlen(b);
+  size_t length = a_length + b_length + 1;
+  char *result = malloc(length);
+  memcpy(result, a, a_length);
+  memcpy(result + a_length, b, b_length);
+  result[length - 1] = 0;
   return result;
 }
 
@@ -2012,61 +2027,24 @@ main(void) {
     })
   ));
 
-  export_compiler_custom_name("i64_logical_shift_left", push_type(
-    type_function(Compile_Time, "mass_i64_logical_shift_left", "i64", (Argument_Type[]){
-      { "i64", "input" },
-      { "i64", "shift" },
-    })
-  ));
+  const char *i64_ops[] = {
+    "logical_shift_left", "logical_shift_right",
+    "bitwise_and", "bitwise_or",
+    "add", "subtract",
+    "equal", "not_equal",
+  };
 
-  export_compiler_custom_name("i64_logical_shift_right", push_type(
-    type_function(Compile_Time, "mass_i64_logical_shift_right", "i64", (Argument_Type[]){
-      { "i64", "input" },
-      { "i64", "shift" },
-    })
-  ));
-
-  export_compiler_custom_name("i64_bitwise_or", push_type(
-    type_function(Compile_Time, "mass_i64_bitwise_or", "i64", (Argument_Type[]){
-      { "i64", "a" },
-      { "i64", "b" },
-    })
-  ));
-
-  export_compiler_custom_name("i64_bitwise_and", push_type(
-    type_function(Compile_Time, "mass_i64_bitwise_and", "i64", (Argument_Type[]){
-      { "i64", "a" },
-      { "i64", "b" },
-    })
-  ));
-
-  export_compiler_custom_name("i64_add", push_type(
-    type_function(Compile_Time, "mass_i64_add", "i64", (Argument_Type[]){
-      { "i64", "a" },
-      { "i64", "b" },
-    })
-  ));
-
-  export_compiler_custom_name("i64_subtract", push_type(
-    type_function(Compile_Time, "mass_i64_subtract", "i64", (Argument_Type[]){
-      { "i64", "a" },
-      { "i64", "b" },
-    })
-  ));
-
-  export_compiler_custom_name("i64_equal", push_type(
-    type_function(Compile_Time, "mass_i64_equal", "i64", (Argument_Type[]){
-      { "i64", "a" },
-      { "i64", "b" },
-    })
-  ));
-
-  export_compiler_custom_name("i64_not_equal", push_type(
-    type_function(Compile_Time, "mass_i64_not_equal", "i64", (Argument_Type[]){
-      { "i64", "a" },
-      { "i64", "b" },
-    })
-  ));
+  for (u64 i = 0; i < countof(i64_ops); ++i) {
+    const char *base = i64_ops[i];
+    const char *exported_name = strjoin("i64_", base);
+    const char *internal_name = strjoin("mass_i64_", base);
+    export_compiler_custom_name(exported_name, push_type(
+      type_function(Compile_Time, internal_name, "i64", (Argument_Type[]){
+        { "i64", "a" },
+        { "i64", "b" },
+      })
+    ));
+  }
 
   #define DEFINE_ARITHMETIC(_NAME_)\
     export_compiler_custom_name(#_NAME_, push_type(type_intrinsic("mass_" #_NAME_)))

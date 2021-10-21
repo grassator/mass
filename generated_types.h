@@ -734,15 +734,15 @@ static Descriptor * descriptor_pointer_to
   (const Allocator * allocator, const Descriptor * descriptor);
 
 static i64 mass_i64_logical_shift_left
-  (i64 input, i64 shift);
+  (i64 a, i64 b);
 
 static i64 mass_i64_logical_shift_right
-  (i64 input, i64 shift);
-
-static i64 mass_i64_bitwise_or
   (i64 a, i64 b);
 
 static i64 mass_i64_bitwise_and
+  (i64 a, i64 b);
+
+static i64 mass_i64_bitwise_or
   (i64 a, i64 b);
 
 static i64 mass_i64_add
@@ -2631,8 +2631,8 @@ static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_mass_i64_logical_shift_left;
 static Descriptor descriptor_mass_i64_logical_shift_right;
-static Descriptor descriptor_mass_i64_bitwise_or;
 static Descriptor descriptor_mass_i64_bitwise_and;
+static Descriptor descriptor_mass_i64_bitwise_or;
 static Descriptor descriptor_mass_i64_add;
 static Descriptor descriptor_mass_i64_subtract;
 static Descriptor descriptor_mass_i64_equal;
