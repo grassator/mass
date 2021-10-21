@@ -3875,9 +3875,9 @@ mass_trampoline_call(
 ) {
   const Mass_Trampoline *trampoline = mass_ensure_trampoline(context, original, args_view);
 
-  // TODO @Speed technically only return value need to be permanently allocated
+  Temp_Mark temp_mark = context_temp_mark(context);
   u8 *args_struct_memory = allocator_allocate_bytes(
-    context->allocator,
+    context->temp_allocator,
     descriptor_byte_size(trampoline->args_descriptor),
     descriptor_byte_alignment(trampoline->args_descriptor)
   );
@@ -3900,10 +3900,19 @@ mass_trampoline_call(
   assert(slice_equal(return_field->name, slice_literal("returns")));
   assert(return_field->tag == Memory_Layout_Item_Tag_Base_Relative);
   trampoline->proc(args_struct_memory);
-  void *return_memory = args_struct_memory + return_field->Base_Relative.offset;
+  const void *temp_return_memory = args_struct_memory + return_field->Base_Relative.offset;
+  u64 return_byte_size = descriptor_byte_size(return_field->descriptor);
+  void *return_memory = allocator_allocate_bytes(
+    context->allocator,
+    return_byte_size,
+    descriptor_byte_alignment(return_field->descriptor)
+  );
+  memcpy(return_memory, temp_return_memory, return_byte_size);
+
   Storage return_storage = storage_static_internal(return_memory, return_field->descriptor->bit_size);
 
   Value *result = value_make(context, return_field->descriptor, return_storage, args_view.source_range);
+  context_temp_reset_to_mark(context, temp_mark);
 
   return result;
 }
