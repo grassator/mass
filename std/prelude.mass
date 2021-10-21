@@ -49,7 +49,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 
 import :: fn(path : String) => (MASS.Scope) MASS.import
 cast :: @fn(type : Type, value) MASS.cast
-startup :: @fn(callback : fn() -> ()) -> () MASS.startup
+startup :: fn(callback : fn() -> ()) => () MASS.startup
 eval :: @fn(curly : MASS.Group_Curly) MASS.eval
 eval :: @fn(paren : MASS.Group_Paren) MASS.eval
 fragment :: fn(curly : MASS.Group_Curly) => (MASS.Code_Fragment) MASS.fragment
@@ -113,7 +113,7 @@ compile_time_allocate :: macro(type : Type) {
   )
 }
 
-quote :: @fn(x) MASS.quote
+quote :: fn(x) => (MASS.Quoted) MASS.quote
 unquote :: @fn(x) MASS.unquote
 
 type_of :: fn(x) => (Type) MASS.type_of
