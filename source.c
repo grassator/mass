@@ -3704,6 +3704,7 @@ mass_intrinsic_call(
     Lazy_Value *lazy = (Lazy_Value *)storage_static_as_c_type(&result->storage, Lazy_Value);
     lazy->epoch = context->epoch;
   }
+
   return result;
 }
 
@@ -3807,8 +3808,12 @@ token_handle_function_call(
     const Value *saved_call_target = context->current_compile_time_function_call_target;
     context->current_compile_time_function_call_target = temp_overload;
     Value *result;
+    const Descriptor *expected_descriptor = info->returns.declaration.descriptor;
     if (info->flags & Function_Info_Flags_Intrinsic) {
       result = mass_intrinsic_call(context, overload, args_view);
+      // @Hack Have to reset the expected descriptor here because
+      //       it is always Value * for the intrinsic.
+      expected_descriptor = 0;
     } else {
       if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
         result = mass_intrinsic_call(context, maybe_literal->body, args_view);
@@ -3822,6 +3827,17 @@ token_handle_function_call(
           .source_range = source_range,
         };
         result = compile_time_eval(context, fake_eval_view);
+      }
+    }
+    if (result && expected_descriptor && expected_descriptor != &descriptor_void) {
+      const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(result);
+      if (!same_type(expected_descriptor, actual_descriptor)) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = source_range,
+          .Type_Mismatch = { .actual = actual_descriptor, .expected = expected_descriptor },
+        });
+        return 0;
       }
     }
     context->current_compile_time_function_call_target = saved_call_target;
