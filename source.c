@@ -3594,8 +3594,8 @@ ensure_parameter_descriptors(
     assert(info->returns.maybe_type_expression.length);
     info->returns.declaration.descriptor =
       token_match_type(&temp_context, info->returns.maybe_type_expression);
-    assert(info->returns.declaration.descriptor);
     MASS_ON_ERROR(*temp_context.result) goto err;
+    assert(info->returns.declaration.descriptor);
   }
 
   err:
