@@ -4409,13 +4409,10 @@ mass_handle_comparison_operation(
 
   Compare_Type compare_type = (Compare_Type)(u64)raw_payload;
 
-  const Descriptor *descriptor =
-    large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
-
   Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
-    Expected_Result expected_result = expected_result_static(descriptor);
+    Expected_Result expected_result = expected_result_static(&descriptor_s8);
     return mass_handle_comparison_operation_lazy_proc(context, 0, &expected_result, &stack_lazy_payload);
   } else {
     Mass_Comparison_Operator_Lazy_Payload *payload =
