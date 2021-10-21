@@ -2040,6 +2040,34 @@ main(void) {
     })
   ));
 
+  export_compiler_custom_name("i64_add", push_type(
+    type_function(Compile_Time, "mass_i64_add", "i64", (Argument_Type[]){
+      { "i64", "a" },
+      { "i64", "b" },
+    })
+  ));
+
+  export_compiler_custom_name("i64_subtract", push_type(
+    type_function(Compile_Time, "mass_i64_subtract", "i64", (Argument_Type[]){
+      { "i64", "a" },
+      { "i64", "b" },
+    })
+  ));
+
+  export_compiler_custom_name("i64_equal", push_type(
+    type_function(Compile_Time, "mass_i64_equal", "i64", (Argument_Type[]){
+      { "i64", "a" },
+      { "i64", "b" },
+    })
+  ));
+
+  export_compiler_custom_name("i64_not_equal", push_type(
+    type_function(Compile_Time, "mass_i64_not_equal", "i64", (Argument_Type[]){
+      { "i64", "a" },
+      { "i64", "b" },
+    })
+  ));
+
   #define DEFINE_ARITHMETIC(_NAME_)\
     export_compiler_custom_name(#_NAME_, push_type(type_intrinsic("mass_" #_NAME_)))
 

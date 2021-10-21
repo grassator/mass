@@ -146,7 +146,6 @@ template_unsigned_integer_overloads :: macro(template, impl) {
 }
 
 template_integer_overloads :: macro(template, impl) {
-  f :: template(impl, i64)
   f :: template_signed_integer_overloads(template, impl)
   f :: template_unsigned_integer_overloads(template, impl)
   f
@@ -154,10 +153,6 @@ template_integer_overloads :: macro(template, impl) {
 
 arithmetic_template :: macro(impl, type : Type) {
   fn(x : type, y : type) => (bool) impl
-}
-// TODO support arithmetic on i64 and remove this overload
-arithmetic_template :: macro(impl, type :: i64) {
-  fn(x : i64, y : i64) => (s64) impl
 }
 
 add :: template_integer_overloads(arithmetic_template, MASS.add)
@@ -177,6 +172,11 @@ greater_equal :: template_integer_overloads(comparison_template, MASS.greater_eq
 equal :: template_integer_overloads(comparison_template, MASS.equal)
 not_equal :: template_integer_overloads(comparison_template, MASS.not_equal)
 
+
+add :: MASS.i64_add
+subtract :: MASS.i64_subtract
+equal :: MASS.i64_equal
+not_equal :: MASS.i64_not_equal
 logical_shift_left :: MASS.i64_logical_shift_left
 logical_shift_right :: MASS.i64_logical_shift_right
 bitwise_or :: MASS.i64_bitwise_or

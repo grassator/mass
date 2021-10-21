@@ -745,6 +745,18 @@ static i64 mass_i64_bitwise_or
 static i64 mass_i64_bitwise_and
   (i64 a, i64 b);
 
+static i64 mass_i64_add
+  (i64 a, i64 b);
+
+static i64 mass_i64_subtract
+  (i64 a, i64 b);
+
+static i64 mass_i64_equal
+  (i64 a, i64 b);
+
+static i64 mass_i64_not_equal
+  (i64 a, i64 b);
+
 static Value * mass_add
   (Execution_Context * context, Value_View args);
 
@@ -2621,6 +2633,10 @@ static Descriptor descriptor_mass_i64_logical_shift_left;
 static Descriptor descriptor_mass_i64_logical_shift_right;
 static Descriptor descriptor_mass_i64_bitwise_or;
 static Descriptor descriptor_mass_i64_bitwise_and;
+static Descriptor descriptor_mass_i64_add;
+static Descriptor descriptor_mass_i64_subtract;
+static Descriptor descriptor_mass_i64_equal;
+static Descriptor descriptor_mass_i64_not_equal;
 static Descriptor descriptor_mass_add;
 static Descriptor descriptor_mass_subtract;
 static Descriptor descriptor_mass_multiply;

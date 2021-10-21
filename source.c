@@ -2837,45 +2837,17 @@ typedef struct {
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
-static i64
-mass_i64_logical_shift_left(
-  i64 input,
-  i64 shift
-) {
-  i64 result = input;
-  result.bits = input.bits << shift.bits;
-  return result;
-}
+static i64 mass_i64_add(i64 a, i64 b) { return (i64){a.bits + b.bits}; }
+static i64 mass_i64_subtract(i64 a, i64 b) { return (i64){a.bits - b.bits}; }
 
-static i64
-mass_i64_logical_shift_right(
-  i64 input,
-  i64 shift
-) {
-  i64 result = input;
-  result.bits = input.bits >> shift.bits;
-  return result;
-}
+static i64 mass_i64_equal(i64 a, i64 b) { return (i64){a.bits == b.bits}; }
+static i64 mass_i64_not_equal(i64 a, i64 b) { return (i64){a.bits != b.bits}; }
 
-static i64
-mass_i64_bitwise_and(
-  i64 a,
-  i64 b
-) {
-  i64 result = a;
-  result.bits = a.bits & b.bits;
-  return result;
-}
+static i64 mass_i64_logical_shift_left(i64 num, i64 shift) { return (i64){num.bits << shift.bits};}
+static i64 mass_i64_logical_shift_right(i64 num, i64 shift) { return (i64){num.bits >> shift.bits};}
 
-static i64
-mass_i64_bitwise_or(
-  i64 a,
-  i64 b
-) {
-  i64 result = a;
-  result.bits = a.bits | b.bits;
-  return result;
-}
+static i64 mass_i64_bitwise_and(i64 a, i64 b) { return (i64){a.bits & b.bits}; }
+static i64 mass_i64_bitwise_or(i64 a, i64 b) { return (i64){a.bits | b.bits}; }
 
 typedef struct {
   const Descriptor *target;
