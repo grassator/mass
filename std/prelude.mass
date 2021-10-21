@@ -105,14 +105,6 @@ operator intrinsic 25 (~> x) fragment
 operator intrinsic 30 (' x) quote
 operator intrinsic 30 (x ') unquote
 
-compile_time_allocate :: macro(type : Type) {
-  MASS.allocator_allocate_bytes(
-    MASS.allocator,
-    type.bit_size.as_u64 / 8,
-    type.bit_alignment.as_u64 / 8
-  )
-}
-
 quote :: fn(x) => (MASS.Quoted) MASS.quote
 unquote :: @fn(x) MASS.unquote
 
@@ -182,12 +174,16 @@ logical_shift_right :: MASS.i64_logical_shift_right
 bitwise_or :: MASS.i64_bitwise_or
 bitwise_and :: MASS.i64_bitwise_and
 
+compile_time_allocate :: macro(type : Type) {
+  MASS.allocator_allocate_bytes(
+    MASS.allocator,
+    type.bit_size.as_u64 / 8,
+    type.bit_alignment.as_u64 / 8
+  )
+}
+
 Array :: fn(item : Type, length : u64) => (Type) {
-  byte_size :: MASS.Descriptor.bit_size.as_u64 / 8
-  byte_alignment :: MASS.Descriptor.bit_alignment.as_u64 / 8
-  t : Type = MASS.allocator_allocate_bytes(MASS.allocator, byte_size, byte_alignment)
-  // FIXME the following should work, but breaks on Linux
-  //t : Type = compile_time_allocate(MASS.Descriptor)
+  t : Type = compile_time_allocate(MASS.Descriptor)
 
   t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
   t.bit_size = [item.bit_size.as_u64 * length]

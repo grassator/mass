@@ -4121,7 +4121,6 @@ mass_handle_arithmetic_operation_lazy_proc(
     }
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
-      Allocator *allocator = context->allocator;
       u64 bit_size = descriptor->bit_size.as_u64;
 
       if (payload->operator == Mass_Arithmetic_Operator_Divide) {
@@ -4135,21 +4134,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       register_bitset_set(&disallowed_temp_registers, Register_D);
       register_bitset_set(&disallowed_temp_registers, Register_A);
 
-      // Save RDX as it will be used for the result overflow
-      // but we should not save or restore it if it is the result
-      // @CopyPaste :SaveRDX
-      Maybe_Saved_Register maybe_saved_rdx = {0};
-      if (
-        expected_result->tag != Expected_Result_Tag_Exact ||
-        !storage_is_register_index(
-          &value_from_exact_expected_result(expected_result)->storage,
-          Register_D
-        )
-      ) {
-        maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
-          allocator, builder, &result_range, Register_D, disallowed_temp_registers
-        );
-      }
+      Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
 
       Value *temp_dividend = value_temporary_acquire_register_for_descriptor(
         context, builder, Register_A, descriptor, result_range
@@ -4157,11 +4142,30 @@ mass_handle_arithmetic_operation_lazy_proc(
       Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
       temp_dividend = value_force(context, builder, &expected_dividend, payload->lhs);
 
+      Register temp_divisor_register = register_find_available(builder, disallowed_temp_registers);
       Value *temp_divisor = value_temporary_acquire_register_for_descriptor(
-        context, builder, register_find_available(builder, 0), descriptor, payload->rhs->source_range
+        context, builder, temp_divisor_register, descriptor, payload->rhs->source_range
       );
       Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
       temp_divisor = value_force(context, builder, &expected_divisor, payload->rhs);
+
+      // Save RDX as it will be used for the remainder
+      // but we should not save or restore it if it is the result
+      // @CopyPaste :SaveRDX
+      Storage maybe_saved_rdx = storage_none;
+      if (register_bitset_get(builder->register_occupied_bitset, Register_D)) {
+        if (
+          expected_result->tag != Expected_Result_Tag_Exact ||
+          !storage_is_register_index(
+            &value_from_exact_expected_result(expected_result)->storage, Register_D
+          )
+        ) {
+          Register temp_register = register_find_available(builder, disallowed_temp_registers);
+          register_acquire(builder, temp_register);
+          maybe_saved_rdx = storage_register_for_descriptor(temp_register, &descriptor_s64);
+          move_value(context->allocator, builder, &result_range, &maybe_saved_rdx, &reg_d);
+        }
+      }
 
       push_instruction(&builder->code_block, (Instruction) {
         .tag = Instruction_Tag_Location,
@@ -4193,7 +4197,6 @@ mass_handle_arithmetic_operation_lazy_proc(
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
-          Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
           push_eagerly_encoded_assembly_no_source_range(
             &builder->code_block, result_range, &(Instruction_Assembly){xor, {reg_d, reg_d}}
           );
@@ -4219,7 +4222,11 @@ mass_handle_arithmetic_operation_lazy_proc(
       }
 
       value_release_if_temporary(builder, temp_divisor);
-      register_release_maybe_restore(builder, &maybe_saved_rdx);
+      if (maybe_saved_rdx.tag != Storage_Tag_None) {
+        assert(maybe_saved_rdx.tag == Storage_Tag_Register);
+        move_value(context->allocator, builder, &result_range, &reg_d, &maybe_saved_rdx);
+        register_release(builder, maybe_saved_rdx.Register.index);
+      }
 
       return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_dividend);
     }
