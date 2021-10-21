@@ -57,6 +57,11 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Scope")),
+    type_scope_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Declaration")),
     type_declaration_value
   );
@@ -69,6 +74,11 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Tuple")),
     type_tuple_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Code_Fragment")),
+    type_code_fragment_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,

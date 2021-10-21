@@ -1525,14 +1525,14 @@ main(void) {
     { "u64", "common_ancestor_id" },
   }));
 
-  push_type(type_struct("Scope", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Scope", (Struct_Item[]){
     { "const Allocator *", "allocator" },
     { "u64", "id" },
     { "const Scope *", "parent" },
     { "const Scope_Using *", "maybe_using" },
     { "Scope_Map *", "map" },
     { "const Token_Statement_Matcher *", "statement_matcher" },
-  }));
+  })));
 
   push_type(type_struct("Overload_Set", (Struct_Item[]){
     { "Array_Value_Ptr", "items" },
@@ -1719,10 +1719,10 @@ main(void) {
     { "Array_Value_Ptr", "items"},
   })));
 
-  push_type(type_struct("Code_Fragment", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Code_Fragment", (Struct_Item[]){
     { "Scope *", "scope"},
     { "Value_View", "children"},
-  }));
+  })));
 
   push_type(type_struct("Typed_Symbol", (Struct_Item[]){
     { "const Symbol *", "symbol"},

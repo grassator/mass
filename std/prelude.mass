@@ -47,12 +47,12 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_done
 }
 
-import :: @fn(path : String) MASS.import
+import :: fn(path : String) => (MASS.Scope) MASS.import
 cast :: @fn(type : Type, value) MASS.cast
 startup :: @fn(callback : fn() -> ()) -> () MASS.startup
 eval :: @fn(curly : MASS.Group_Curly) MASS.eval
 eval :: @fn(paren : MASS.Group_Paren) MASS.eval
-fragment :: @fn(curly : MASS.Group_Curly) MASS.fragment
+fragment :: fn(curly : MASS.Group_Curly) => (MASS.Code_Fragment) MASS.fragment
 
 inline_machine_code_bytes :: MASS.inline_machine_code_bytes
 
@@ -71,9 +71,9 @@ static_assert :: macro(condition : bool, message : String) {
   @{if condition { compile_time_error("Static Assert Failed", message) }}
 }
 
-apply :: @fn(symbol :: 'module, curly : MASS.Group_Curly) MASS.inline_module
-apply :: @fn(symbol :: 'exports, curly : MASS.Group_Curly) MASS.exports
-apply :: @fn(symbol :: 'c_struct, curly : MASS.Group_Square) MASS.c_struct
+apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) => (MASS.Scope) MASS.inline_module
+apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) => () MASS.exports
+apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) => (Type) MASS.c_struct
 apply :: macro(type, tuple : MASS.Group_Square) { cast(type', tuple') }
 
 operator 7 (x == y) equal
@@ -152,7 +152,7 @@ template_integer_overloads :: macro(template, impl) {
 }
 
 arithmetic_template :: macro(impl, type : Type) {
-  fn(x : type, y : type) => (bool) impl
+  fn(x : type, y : type) => (type) impl
 }
 
 add :: template_integer_overloads(arithmetic_template, MASS.add)
@@ -201,14 +201,14 @@ multiply :: Array
 external :: fn(
   library_name : String,
   symbol_name : String
-) -> (MASS.External_Symbol) {
+) => (MASS.External_Symbol) {
   [library_name, symbol_name]
 }
 
-syscall :: fn(number : s64) -> (MASS.Syscall) { [number] }
+syscall :: fn(number : s64) => (MASS.Syscall) { [number] }
 
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {
-  macro(x : type) -> (type) { 0 - x }
+  macro(x : type) { 0 - x }
 }, ())
 negate :: macro(literal : i64) -> (s64) {
   -cast(s64, literal)
