@@ -3410,9 +3410,15 @@ call_function_overload(
   }
 
   u64 target_volatile_registers_bitset = call_setup->calling_convention->register_volatile_bitset;
-  u64 expected_result_bitset = maybe_expected_storage
-    ? register_bitset_from_storage(maybe_expected_storage)
-    : 0;
+  u64 expected_result_bitset = 0;
+  if (maybe_expected_storage) {
+    if (
+      maybe_expected_storage->tag == Storage_Tag_Register ||
+      maybe_expected_storage->tag == Storage_Tag_Unpacked
+    ) {
+      expected_result_bitset = register_bitset_from_storage(maybe_expected_storage);
+    }
+  }
 
   u64 saved_registers_from_arguments_bitset = (
     // Need to save registers that are volatile in the callee and are actually used in the caller,
@@ -3499,6 +3505,16 @@ call_function_overload(
   u64 return_value_bitset = register_bitset_from_storage(&fn_return_value->storage);
   register_acquire_bitset(builder, return_value_bitset);
 
+  assert(!(return_value_bitset & saved_registers_from_arguments_bitset));
+  DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
+    push_eagerly_encoded_assembly(
+      &builder->code_block, *source_range,
+      &(Instruction_Assembly){mov, {saved->reg, saved->stack}}
+    );
+  }
+
+  register_acquire_bitset(builder, saved_registers_from_arguments_bitset);
+
   Value *expected_value =
     expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
 
@@ -3508,15 +3524,6 @@ call_function_overload(
   if (expected_result->tag == Expected_Result_Tag_Exact) {
     builder->register_occupied_bitset &= ~return_value_bitset;
   }
-
-  DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){mov, {saved->reg, saved->stack}}
-    );
-  }
-
-  register_acquire_bitset(builder, saved_registers_from_arguments_bitset);
 
   context_temp_reset_to_mark(context, temp_mark);
 
@@ -3716,6 +3723,193 @@ value_is_intrinsic(
   return !!(info && info->flags & Function_Info_Flags_Intrinsic);
 }
 
+typedef void(*Mass_Trampoline_Proc)(void *);
+
+static Value *
+mass_trampoline_call(
+  Execution_Context *context,
+  Value *original,
+  Value_View args_view
+) {
+  const Function_Info *original_info = maybe_function_info_from_value(original, args_view);
+  assert(original_info);
+
+  C_Struct_Aligner struct_aligner = {0};
+  Array_Memory_Layout_Item fields = dyn_array_make(
+    Array_Memory_Layout_Item,
+    .allocator = context->allocator,
+    .capacity = args_view.length,
+  );
+  for (u64 i = 0; i < args_view.length; ++i) {
+    Value *item = value_view_get(args_view, i);
+    const Descriptor *field_descriptor = item->descriptor;
+    assert(item->descriptor != &descriptor_lazy_value);
+    u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
+
+    dyn_array_push(fields, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Base_Relative,
+      .name = {0},
+      .descriptor = field_descriptor,
+      .source_range = item->source_range,
+      .Base_Relative.offset = field_byte_offset,
+    });
+  }
+
+  const Descriptor *return_descriptor = original_info->returns.declaration.descriptor;
+  u64 return_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, return_descriptor);
+  {
+    dyn_array_push(fields, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Base_Relative,
+      .name = slice_literal("returns"),
+      .descriptor = return_descriptor,
+      .source_range = original_info->returns.declaration.source_range,
+      .Base_Relative.offset = return_byte_offset,
+    });
+  }
+
+  c_struct_aligner_end(&struct_aligner);
+
+  Descriptor *args_struct_descriptor = allocator_allocate(context->allocator, Descriptor);
+  *args_struct_descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Struct,
+    .bit_size = {struct_aligner.bit_size},
+    .bit_alignment = {struct_aligner.bit_alignment},
+    .Struct = {
+      .is_tuple = true,
+      .memory_layout = {
+        .items = fields,
+      }
+    },
+  };
+
+  Scope *trampoline_scope = scope_make(context->allocator, original_info->scope);
+  Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(trampoline_info, trampoline_scope);
+  trampoline_info->flags = Function_Info_Flags_Compile_Time;
+  trampoline_info->returns = (Function_Return) {
+    .declaration = {
+      .descriptor = &descriptor_void,
+      .source_range = COMPILER_SOURCE_RANGE,
+    },
+  };
+  trampoline_info->parameters = dyn_array_make(
+    Array_Function_Parameter,
+    .allocator = context->allocator,
+    .capacity = 1
+  );
+  dyn_array_push(trampoline_info->parameters, (Function_Parameter) {
+    .tag = Function_Parameter_Tag_Generic,
+    .declaration = {
+      .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
+      .descriptor = descriptor_pointer_to(context->allocator, args_struct_descriptor),
+      .source_range = COMPILER_SOURCE_RANGE,
+    },
+  });
+
+  const Symbol *original_symbol = mass_ensure_symbol(context->compilation, slice_literal("original"));
+  scope_define_value(trampoline_scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, original_symbol, original);
+  Fixed_Buffer *buffer =
+    fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
+  fixed_buffer_append_slice(buffer, slice_literal("{args.returns = original("));
+  assert(args_view.length <= 10);
+  for (u64 i = 0; i < args_view.length; ++i) {
+    if (i != 0) {
+      fixed_buffer_append_slice(buffer, slice_literal(", "));
+    }
+    fixed_buffer_append_slice(buffer, slice_literal("args."));
+    fixed_buffer_append_u8(buffer, u64_to_u8(i) + '0');
+  }
+  fixed_buffer_append_slice(buffer, slice_literal(");}"));
+
+  Source_Range body_range = {
+    .file = allocator_make(context->allocator, Source_File, .text = fixed_buffer_as_slice(buffer)),
+    .offsets = {.from = 0, .to = u64_to_u32(buffer->occupied), },
+  };
+  Value_View *body = allocator_allocate(context->allocator, Value_View);
+  *body = (Value_View){0};
+  MASS_ON_ERROR(tokenize(context->compilation, body_range, body)) {
+    panic("This body should always be tokenizable since we constructed it to be");
+  }
+  Value *body_value =
+    value_make(context, &descriptor_value_view, storage_static(body), COMPILER_SOURCE_RANGE);
+
+  Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
+  *trampoline_literal = (Function_Literal) {
+    .info = trampoline_info,
+    .body = body_value,
+  };
+  Value *literal_value = value_make(
+    context, &descriptor_function_literal, storage_static(trampoline_literal), COMPILER_SOURCE_RANGE
+  );
+
+  // Need a custom context to make sure the function literal is compiled for JIT execution
+  Execution_Context trampoline_context = *context;
+  trampoline_context.flags &= ~Execution_Context_Flags_Global;
+  trampoline_context.program = context->compilation->jit.program;
+  Value *instance = ensure_function_instance(&trampoline_context, literal_value, args_view);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  Mass_Result jit_result = program_jit(context->compilation, &context->compilation->jit);
+  MASS_ON_ERROR(jit_result) {
+    context_error(context, jit_result.Error.error);
+    return 0;
+  }
+
+  Mass_Trampoline_Proc trampoline_proc =
+    (Mass_Trampoline_Proc)value_as_function(trampoline_context.program, instance);
+
+  // ---- Actual call
+
+  u8 *args_struct_memory = allocator_allocate_bytes(
+    context->allocator,
+    descriptor_byte_size(args_struct_descriptor),
+    descriptor_byte_alignment(args_struct_descriptor)
+  );
+
+  for (u64 i = 0; i < args_view.length; ++i) {
+    Value *item = value_view_get(args_view, i);
+    assert(value_is_non_lazy_static(item));
+    Memory_Layout_Item *field = dyn_array_get(fields, i);
+    assert(field->tag == Memory_Layout_Item_Tag_Base_Relative);
+    u64 offset = field->Base_Relative.offset;
+    void *arg_memory = args_struct_memory + offset;
+    const void *source_memory = storage_static_as_c_type_internal(
+      &item->storage, item->descriptor->bit_size
+    );
+    memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
+  }
+  trampoline_proc(args_struct_memory);
+  void *return_memory = args_struct_memory + return_byte_offset;
+  Storage return_storage = storage_static_internal(return_memory, return_descriptor->bit_size);
+
+  Value *result = value_make(
+    context, return_descriptor, return_storage, original_info->returns.declaration.source_range
+  );
+
+  return result;
+}
+
+static bool
+mass_can_trampoline_call(
+  const Function_Info *info,
+  Value_View args_view
+) {
+  for (u64 i = 0; i < args_view.length; ++i) {
+    Value *arg = value_view_get(args_view, i);
+
+    if (!value_is_non_lazy_static(arg)) return false;
+
+    // The check here is required because casts may generate extra instructions.
+    // This can be removed if the casts are not a thing for fn calls or if
+    // there will be a way to compile-time cast without generating instructions
+    // maybe also with trampolines or something similar.
+    const Function_Parameter *param = dyn_array_get(info->parameters, i);
+    const Descriptor *expected_descriptor = param->declaration.descriptor;
+    if (!same_type(expected_descriptor, arg->descriptor)) return false;
+  }
+  return true;
+}
+
 static Value *
 token_handle_function_call(
   Execution_Context *context,
@@ -3818,15 +4012,19 @@ token_handle_function_call(
       if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
         result = mass_intrinsic_call(context, maybe_literal->body, args_view);
       } else {
-        Value *fake_args_token = value_make(
-          context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
-        );
-        Value_View fake_eval_view = {
-          .values = (Value *[]){temp_overload, fake_args_token},
-          .length = 2,
-          .source_range = source_range,
-        };
-        result = compile_time_eval(context, fake_eval_view);
+        if (mass_can_trampoline_call(info, args_view)) {
+          result = mass_trampoline_call(context, temp_overload, args_view);
+        } else {
+          Value *fake_args_token = value_make(
+            context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
+          );
+          Value_View fake_eval_view = {
+            .values = (Value *[]){temp_overload, fake_args_token},
+            .length = 2,
+            .source_range = source_range,
+          };
+          result = compile_time_eval(context, fake_eval_view);
+        }
       }
     }
     if (result && expected_descriptor && expected_descriptor != &descriptor_void) {
