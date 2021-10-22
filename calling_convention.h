@@ -857,19 +857,18 @@ calling_convention_x86_64_windows_call_setup_proc(
     } else {
       if (descriptor_byte_size(function->returns.declaration.descriptor) > 8) {
         result.flags |= Function_Call_Setup_Flags_Indirect_Return;
-        const Descriptor *reference =
-          descriptor_reference_to(allocator, function->returns.declaration.descriptor);
+        const Descriptor *return_descriptor = function->returns.declaration.descriptor;
 
         result.caller_return_value = value_init(
           allocator_allocate(allocator, Value),
-          reference,
-          storage_register_for_descriptor(Register_A, reference),
+          return_descriptor,
+          storage_indirect(return_descriptor->bit_size, Register_A),
           function->returns.declaration.source_range
         );
         result.callee_return_value = value_init(
           allocator_allocate(allocator, Value),
-          reference,
-          storage_register_for_descriptor(Register_C, reference),
+          return_descriptor,
+          storage_indirect(return_descriptor->bit_size, Register_C),
           function->returns.declaration.source_range
         );
       } else {
