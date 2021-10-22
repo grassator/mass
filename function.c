@@ -588,9 +588,24 @@ maybe_constant_fold_internal(
   return expected_result_ensure_value_or_temp(context, builder, expected_result, imm_value);
 }
 
+static inline Storage
+storage_adjusted_for_lea(
+  Storage source
+) {
+  assert(source.tag == Storage_Tag_Memory);
+  // `LEA` is a weird instruction in that the size of the operands affects
+  // what the instruction *does*, instead of describing the operands.
+  // For the purposes of this compiler we always want it to generate 64-bit
+  // effective address and then store that full address in the target register.
+  // This is why here we are forcing the source memory operand to be 8 bytes.
+  Storage adjusted_source = source;
+  adjusted_source.bit_size.as_u64 = 64;
+  return adjusted_source;
+}
+
 static void
 load_address(
-  Execution_Context *context,
+  Execution_Context *context, // TODO remove this parameter
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -600,27 +615,16 @@ load_address(
     result_value->descriptor->tag == Descriptor_Tag_Pointer_To ||
     result_value->descriptor->tag == Descriptor_Tag_Reference_To
   );
-  assert(source.tag == Storage_Tag_Memory);
 
   bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
   Storage register_storage = can_reuse_result_as_temp
     ? result_value->storage
     : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
 
-
-  // `LEA` is a weird instruction in that the size of the operands affects
-  // what the instruction *does*, instead of describing the operands.
-  // For the purposes of this compiler we always want it to generate 64-bit
-  // effective address and then store that full address in the target register.
-  // This is why here we are forcing the source memory operand to be 8 bytes
-  // and check that the target register is also 8 bytes in size.
-  Storage adjusted_source = source;
-  adjusted_source.bit_size.as_u64 = 64;
   assert(register_storage.bit_size.as_u64 == 64);
-
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range,
-    &(Instruction_Assembly){lea, {register_storage, adjusted_source}}
+    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(source)}}
   );
 
   if (!can_reuse_result_as_temp) {
@@ -628,6 +632,31 @@ load_address(
     move_value(builder, source_range, &result_value->storage, &register_storage);
     register_release(builder, register_storage.Register.index);
   }
+}
+
+static void
+load_address_to_indirect(
+  Execution_Context *context, // TODO remove this parameter
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  Storage target,
+  Storage source
+) {
+  assert(target.tag == Storage_Tag_Memory);
+  assert(target.Memory.location.tag == Memory_Location_Tag_Indirect);
+  assert(target.Memory.location.Indirect.offset == 0);
+  assert(source.tag == Storage_Tag_Memory);
+
+  Storage register_storage = {
+    .tag = Storage_Tag_Register,
+    .Register.index = target.Memory.location.Indirect.base_register,
+    .bit_size = {64},
+  };
+
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range,
+    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(source)}}
+  );
 }
 
 static void

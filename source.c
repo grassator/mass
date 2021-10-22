@@ -3282,7 +3282,7 @@ call_function_overload(
     const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
-        source_arg = &void_value; // :UninitializedArgs
+        source_arg = reserve_stack(context, builder, target_arg->descriptor, *source_range);
       } else {
         Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
         Value_View default_expression = declared_argument->maybe_default_expression;
@@ -3445,11 +3445,11 @@ call_function_overload(
     if (storage_is_stack(&param->storage)) continue;
 
     Value *source_arg = *dyn_array_get(temp_arguments, i);
-    // TODO @Hack :UninitializedArgs
-    //      this is required to skip over trying to assign uninitialized (return) arguments
-    if (source_arg == &void_value) continue;
-
-    MASS_ON_ERROR(assign(context, builder, param, source_arg, source_range)) return 0;
+    if (storage_is_indirect(&param->storage)) {
+      load_address_to_indirect(context, builder, source_range, param->storage, source_arg->storage);
+    } else {
+      MASS_ON_ERROR(assign(context, builder, param, source_arg, source_range)) return 0;
+    }
   }
 
   builder->max_call_parameters_stack_size = u32_max(
