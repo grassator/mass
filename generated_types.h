@@ -534,21 +534,6 @@ typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
-typedef enum Function_Call_Setup_Flags {
-  Function_Call_Setup_Flags_None = 0,
-  Function_Call_Setup_Flags_Indirect_Return = 1,
-} Function_Call_Setup_Flags;
-
-const char *function_call_setup_flags_name(Function_Call_Setup_Flags value) {
-  if (value == 0) return "Function_Call_Setup_Flags_None";
-  if (value == 1) return "Function_Call_Setup_Flags_Indirect_Return";
-  assert(!"Unexpected value for enum Function_Call_Setup_Flags");
-  return 0;
-};
-
-typedef dyn_array_type(Function_Call_Setup_Flags *) Array_Function_Call_Setup_Flags_Ptr;
-typedef dyn_array_type(const Function_Call_Setup_Flags *) Array_Const_Function_Call_Setup_Flags_Ptr;
-
 typedef struct Function_Call_Jump Function_Call_Jump;
 typedef dyn_array_type(Function_Call_Jump *) Array_Function_Call_Jump_Ptr;
 typedef dyn_array_type(const Function_Call_Jump *) Array_Const_Function_Call_Jump_Ptr;
@@ -1697,8 +1682,8 @@ function_call_jump_as_syscall(Function_Call_Jump *function_call_jump) {
 }
 typedef dyn_array_type(Function_Call_Jump) Array_Function_Call_Jump;
 typedef struct Function_Call_Setup {
-  Function_Call_Setup_Flags flags;
   u32 parameters_stack_size;
+  u32 _parameters_stack_size_padding;
   Function_Call_Jump jump;
   const Calling_Convention * calling_convention;
   Memory_Layout arguments_layout;
@@ -2510,12 +2495,6 @@ static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
 static Descriptor descriptor_function_literal_pointer;
 static Descriptor descriptor_function_literal_pointer_pointer;
-static Descriptor descriptor_function_call_setup_flags;
-static Descriptor descriptor_array_function_call_setup_flags;
-static Descriptor descriptor_array_function_call_setup_flags_ptr;
-static Descriptor descriptor_array_const_function_call_setup_flags_ptr;
-static Descriptor descriptor_function_call_setup_flags_pointer;
-static Descriptor descriptor_function_call_setup_flags_pointer_pointer;
 static Descriptor descriptor_function_call_jump;
 static Descriptor descriptor_array_function_call_jump;
 static Descriptor descriptor_array_function_call_jump_ptr;
@@ -4902,11 +4881,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
-MASS_DEFINE_OPAQUE_C_TYPE(function_call_setup_flags, Function_Call_Setup_Flags)
-static C_Enum_Item function_call_setup_flags_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Indirect_Return"), .value = 1 },
-};
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_jump_ptr, Array_Function_Call_Jump_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_jump, Array_Function_Call_Jump)
@@ -4945,15 +4919,15 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_function_call_setup_flags,
-    .name = slice_literal_fields("flags"),
-    .Base_Relative.offset = offsetof(Function_Call_Setup, flags),
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("parameters_stack_size"),
+    .Base_Relative.offset = offsetof(Function_Call_Setup, parameters_stack_size),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("parameters_stack_size"),
-    .Base_Relative.offset = offsetof(Function_Call_Setup, parameters_stack_size),
+    .name = slice_literal_fields("_parameters_stack_size_padding"),
+    .Base_Relative.offset = offsetof(Function_Call_Setup, _parameters_stack_size_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

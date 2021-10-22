@@ -634,6 +634,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Call},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
+  bool is_indirect_return = false;
   if (function->returns.declaration.descriptor == &descriptor_void) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
@@ -657,7 +658,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     System_V_Classification classification =
       x86_64_system_v_classify(function->returns.declaration.descriptor);
     if (classification.class == SYSTEM_V_MEMORY) {
-      result.flags |= Function_Call_Setup_Flags_Indirect_Return;
+      is_indirect_return = true;
       Bits bit_size = function->returns.declaration.descriptor->bit_size;
       result.caller_return = storage_indirect(bit_size, Register_A);
       result.callee_return = storage_indirect(bit_size, Register_DI);
@@ -688,7 +689,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .general = {
       .items = general_registers,
       .count = countof(general_registers),
-      .index = (result.flags & Function_Call_Setup_Flags_Indirect_Return) ? 1 : 0,
+      .index = is_indirect_return ? 1 : 0,
     },
     .vector = {
       .items = vector_registers,
@@ -720,7 +721,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   }
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
-  if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
+  if (is_indirect_return) {
     const Descriptor *descriptor = function->returns.declaration.descriptor;
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
@@ -805,8 +806,6 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
 
   assert(stack_offset == 0);
 
-  assert(!(result.flags & Function_Call_Setup_Flags_Indirect_Return));
-
   return result;
 }
 
@@ -819,6 +818,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Call},
     .calling_convention = &calling_convention_x86_64_windows,
   };
+  bool is_indirect_return = false;
   if (function->returns.declaration.descriptor == &descriptor_void) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
@@ -830,7 +830,7 @@ calling_convention_x86_64_windows_call_setup_proc(
       result.caller_return = common_storage;
     } else {
       if (descriptor_byte_size(function->returns.declaration.descriptor) > 8) {
-        result.flags |= Function_Call_Setup_Flags_Indirect_Return;
+        is_indirect_return = true;
         const Descriptor *return_descriptor = function->returns.declaration.descriptor;
 
         result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
@@ -856,7 +856,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     ),
   };
 
-  u64 index = (result.flags & Function_Call_Setup_Flags_Indirect_Return) ? 1 : 0;
+  u64 index = is_indirect_return ? 1 : 0;
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
@@ -888,7 +888,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     index += 1;
   }
 
-  if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
+  if (is_indirect_return) {
     const Descriptor *return_descriptor = function->returns.declaration.descriptor;
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
