@@ -1443,7 +1443,6 @@ value_ensure_type(
   Value *value,
   Source_Range source_range
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
   if (value->descriptor == &descriptor_tuple) {
     const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
@@ -1703,8 +1702,6 @@ token_apply_macro_syntax(
   Macro *macro,
   Source_Range source_range
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   assert(macro->scope);
 
   // All captured token sequences need to have access to the same base scope
@@ -3921,8 +3918,6 @@ token_handle_function_call(
   Value_View args_view,
   Source_Range source_range
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   if (target_expression->descriptor == &descriptor_macro_capture) {
     Macro_Capture *capture = storage_static_as_c_type(&target_expression->storage, Macro_Capture);
     Execution_Context capture_context = *context;
@@ -4075,8 +4070,6 @@ token_handle_parsed_function_call(
   Value *args_token,
   Source_Range source_range
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   Value *call_return_value = 0;
   Temp_Mark temp_mark = context_temp_mark(context);
 
@@ -4864,7 +4857,7 @@ mass_handle_typed_symbol_operator(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = source_range,
-      .detailed_message ="operator : expects a symbol on the left hand side"
+      .detailed_message = "operator : expects a symbol on the left hand side"
     });
     return 0;
   }
@@ -5429,8 +5422,6 @@ token_parse_if_expression(
   u32 *matched_length,
   const Symbol *end_symbol
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u32 peek_index = 0;
   Value *keyword = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols._if
@@ -5522,8 +5513,6 @@ token_parse_intrinsic_literal(
   const Function_Info *info,
   u32 *match_length
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u32 peek_index = 0;
   Value *at = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.operator_at
@@ -5634,8 +5623,6 @@ function_info_from_parameters_and_return_type(
   Value_View args_view,
   Value *return_types
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u64 function_epoch = get_new_epoch();
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
@@ -5718,8 +5705,6 @@ token_parse_function_literal(
   u32 *matched_length,
   const Symbol *end_symbol
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u32 peek_index = 0;
   bool is_macro = false;
   Value *at = value_view_maybe_match_cached_symbol(
@@ -5900,8 +5885,6 @@ token_parse_expression(
   u32 *out_match_length,
   const Symbol *end_symbol
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   if(view.length == 0) return &void_value;
   if(view.length == 1) {
     *out_match_length = 1;
@@ -6072,8 +6055,6 @@ token_parse_block_view(
   Execution_Context *context,
   Value_View children_view
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   if (!children_view.length) return &void_value;
 
   Value *block_result = &void_value;
@@ -6227,8 +6208,6 @@ token_parse_statement_using(
   Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u32 peek_index = 0;
   Value *keyword = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.using
@@ -6298,8 +6277,6 @@ token_parse_statement_label(
   Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u32 peek_index = 0;
   Value *keyword = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.label
@@ -6600,8 +6577,6 @@ token_parse_definition_and_assignment_statements(
   Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   Value_View lhs;
   Value_View rhs;
   Value *operator;
