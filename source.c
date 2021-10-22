@@ -3282,7 +3282,7 @@ call_function_overload(
     const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
-        source_arg = &void_value;
+        source_arg = &void_value; // :UninitializedArgs
       } else {
         Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
         Value_View default_expression = declared_argument->maybe_default_expression;
@@ -3327,8 +3327,9 @@ call_function_overload(
     u64 source_registers_bitset = 0;
     if (
       source_arg->descriptor != &descriptor_lazy_value &&
+      source_arg->descriptor != &descriptor_void &&
       source_arg->storage.tag != Storage_Tag_Static &&
-      target_arg->descriptor->tag != Descriptor_Tag_Reference_To
+      target_arg->storage.tag != Descriptor_Tag_Reference_To
     ) {
       source_registers_bitset = register_bitset_from_storage(&source_arg->storage);
       if (!(all_used_arguments_register_bitset & source_registers_bitset)) {
@@ -3444,6 +3445,10 @@ call_function_overload(
     if (storage_is_stack(&param->storage)) continue;
 
     Value *source_arg = *dyn_array_get(temp_arguments, i);
+    // TODO @Hack :UninitializedArgs
+    //      this is required to skip over trying to assign uninitialized (return) arguments
+    if (source_arg == &void_value) continue;
+
     MASS_ON_ERROR(assign(context, builder, param, source_arg, source_range)) return 0;
   }
 
@@ -3853,6 +3858,7 @@ mass_trampoline_call(
   Value_View args_view
 ) {
   const Mass_Trampoline *trampoline = mass_ensure_trampoline(context, original, args_view);
+  MASS_ON_ERROR(*context->result) return 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
   u8 *args_struct_memory = allocator_allocate_bytes(

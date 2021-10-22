@@ -738,14 +738,14 @@ calling_convention_x86_64_system_v_call_setup_proc(
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
-    const Descriptor *reference = descriptor_reference_to(allocator, function->returns.declaration.descriptor);
+    const Descriptor *descriptor = function->returns.declaration.descriptor;
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
-      .descriptor = reference,
+      .descriptor = descriptor,
       .source_range = function->returns.declaration.source_range,
-      .Absolute = { .storage = storage_register_for_descriptor(Register_DI, reference), },
+      .Absolute = { .storage = storage_indirect(descriptor->bit_size, Register_DI), },
     });
   }
 
@@ -929,15 +929,14 @@ calling_convention_x86_64_windows_call_setup_proc(
   }
 
   if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
-    const Descriptor *return_descriptor =
-      descriptor_reference_to(allocator, function->returns.declaration.descriptor);
+    const Descriptor *return_descriptor = function->returns.declaration.descriptor;
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = return_descriptor,
       .source_range = function->returns.declaration.source_range,
-      .Absolute = { .storage = storage_register_for_descriptor(Register_C, return_descriptor), },
+      .Absolute = { .storage = storage_indirect(return_descriptor->bit_size, Register_C), },
     });
   }
 
