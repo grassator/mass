@@ -1522,12 +1522,10 @@ main(void) {
   push_type(type_struct("Scope_Using", (Struct_Item[]){
     { "const Scope_Using *", "next" },
     { "const Scope *", "scope" },
-    { "u64", "common_ancestor_id" },
   }));
 
   export_compiler(push_type(type_struct("Scope", (Struct_Item[]){
     { "const Allocator *", "allocator" },
-    { "u64", "id" },
     { "const Scope *", "parent" },
     { "const Scope_Using *", "maybe_using" },
     { "Scope_Map *", "map" },

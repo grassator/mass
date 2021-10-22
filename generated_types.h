@@ -1459,13 +1459,11 @@ hash_map_template(Operator_Map, const Symbol *, Operator *, hash_pointer, const_
 typedef struct Scope_Using {
   const Scope_Using * next;
   const Scope * scope;
-  u64 common_ancestor_id;
 } Scope_Using;
 typedef dyn_array_type(Scope_Using) Array_Scope_Using;
 
 typedef struct Scope {
   const Allocator * allocator;
-  u64 id;
   const Scope * parent;
   const Scope_Using * maybe_using;
   Scope_Map * map;
@@ -4325,12 +4323,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_using, Scope_Using,
     .name = slice_literal_fields("scope"),
     .Base_Relative.offset = offsetof(Scope_Using, scope),
   },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("common_ancestor_id"),
-    .Base_Relative.offset = offsetof(Scope_Using, common_ancestor_id),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(scope_using);
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope_ptr, Array_Scope_Ptr)
@@ -4341,12 +4333,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
     .descriptor = &descriptor_allocator_pointer,
     .name = slice_literal_fields("allocator"),
     .Base_Relative.offset = offsetof(Scope, allocator),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("id"),
-    .Base_Relative.offset = offsetof(Scope, id),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

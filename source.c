@@ -150,12 +150,8 @@ scope_make(
   const Allocator *allocator,
   const Scope *parent
 ) {
-  static Atomic_u64 next_id = {0};
-  u64 id = atomic_u64_increment(&next_id);
-
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
-    .id = id,
     .allocator = allocator,
     .parent = parent,
     .map = 0,
@@ -163,15 +159,18 @@ scope_make(
   return scope;
 }
 
-static inline const Scope *
-scope_maybe_find_common_ancestor(
-  const Scope *a,
-  const Scope *b
+static inline u32
+scope_statement_matcher_shallow(
+  Execution_Context *context,
+  Value_View view,
+  Lazy_Value *out_lazy_value,
+  const Scope *scope
 ) {
-  while (a && b) {
-    if (a->id > b->id) a = a->parent;
-    else if (b->id > a->id) b = b->parent;
-    else return a;
+  const Token_Statement_Matcher *matcher = scope->statement_matcher;
+  for (; matcher; matcher = matcher->previous) {
+    u32 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
+    MASS_ON_ERROR(*context->result) return 0;
+    if (match_length) return match_length;
   }
   return 0;
 }
@@ -181,25 +180,18 @@ token_statement_matcher_in_scopes(
   Execution_Context *context,
   Value_View view,
   Lazy_Value *out_lazy_value,
-  const Scope *scope,
-  u64 common_ancestor_id
+  const Scope *scope
 ) {
-  for (; scope && scope->id != common_ancestor_id; scope = scope->parent) {
+  for (; scope; scope = scope->parent) {
     const Scope_Using *using = scope->maybe_using;
     for (; using; using = using->next) {
-      u32 match_length = token_statement_matcher_in_scopes(
-        context, view, out_lazy_value, using->scope, using->common_ancestor_id
-      );
+      u32 match_length = scope_statement_matcher_shallow(context, view, out_lazy_value, scope);
       if (match_length) return match_length;
     }
     // Do a reverse iteration because we want statements that are defined later
     // to have higher precedence when parsing
-    const Token_Statement_Matcher *matcher = scope->statement_matcher;
-    for (; matcher; matcher = matcher->previous) {
-      u32 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
-      MASS_ON_ERROR(*context->result) return 0;
-      if (match_length) return match_length;
-    }
+    u32 match_length = scope_statement_matcher_shallow(context, view, out_lazy_value, scope);
+    if (match_length) return match_length;
   }
   return 0;
 }
@@ -209,16 +201,9 @@ use_scope(
   Execution_Context *context,
   Scope *scope_to_use
 ) {
-  // TODO `using` should not lookup in parent scopes I guess and instead we probably should
-  //      only allow it modules and add exports
-  // This code injects a proxy scope that just uses the same data as the other
-  const Scope *common_ancestor = scope_maybe_find_common_ancestor(context->scope, scope_to_use);
-  assert(common_ancestor);
-
   Scope_Using *using_entry = allocator_allocate(context->allocator, Scope_Using);
   *using_entry = (Scope_Using) {
     .scope = scope_to_use,
-    .common_ancestor_id = common_ancestor->id,
     .next = context->scope->maybe_using,
   };
   context->scope->maybe_using = using_entry;
@@ -253,29 +238,20 @@ scope_lookup_shallow(
 }
 
 static inline Scope_Entry *
-scope_lookup_till_id(
+scope_lookup(
   const Scope *scope,
-  const Symbol *symbol,
-  u64 till_id
+  const Symbol *symbol
 ) {
-  for (; scope && scope->id != till_id; scope = scope->parent) {
+  for (; scope; scope = scope->parent) {
     const Scope_Using *using = scope->maybe_using;
     for (; using; using = using->next) {
-      Scope_Entry *entry = scope_lookup_till_id(using->scope, symbol, using->common_ancestor_id);
+      Scope_Entry *entry = scope_lookup_shallow(using->scope, symbol);
       if (entry) return entry;
     }
     Scope_Entry *entry = scope_lookup_shallow(scope, symbol);
     if (entry) return entry;
   }
   return 0;
-}
-
-static inline Scope_Entry *
-scope_lookup(
-  const Scope *scope,
-  const Symbol *symbol
-) {
-  return scope_lookup_till_id(scope, symbol, 0);
 }
 
 static Value *
@@ -6138,7 +6114,7 @@ token_parse_block_view(
       .context = *context,
       .descriptor = &descriptor_void,
     };
-    match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, context->scope, 0);
+    match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, context->scope);
     MASS_ON_ERROR(*context->result) goto defer;
 
     if (match_length) {
