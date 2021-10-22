@@ -1796,7 +1796,9 @@ token_parse_macro_statement(
 
   Value_View rest = value_view_rest(&value_view, match_length);
   if (rest.length) {
-    if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
+    const Symbol *semicolon = context->compilation->common_symbols.operator_semicolon;
+    Value *first_remaining = value_view_get(rest, 0);
+    if (value_is_symbol(first_remaining) && value_as_symbol(first_remaining) == semicolon) {
       match_length += 1;
     } else {
       match_length = 0;
@@ -6085,7 +6087,9 @@ token_parse_block_view(
     MASS_ON_ERROR(*context->result) goto defer;
     Value_View rest = value_view_rest(&children_view, start_index);
     // Skipping over empty statements
-    if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
+    const Symbol *semicolon = context->compilation->common_symbols.operator_semicolon;
+    Value *first_remaining = value_view_get(rest, 0);
+    if (value_is_symbol(first_remaining) && value_as_symbol(first_remaining) == semicolon) {
       match_length = 1;
       continue;
     }
