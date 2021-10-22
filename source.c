@@ -3691,14 +3691,6 @@ mass_intrinsic_call(
     (Value *(*)(Execution_Context *, Value_View))jitted_code;
   Value *result = jitted_intrinsic(&eval_context, args_view);
 
-  // The value that comes out of an intrinsic is consider to originate in the same
-  // epoch as the function, which is true since we evaluate right at this point.
-  if (result && result->descriptor == &descriptor_lazy_value) {
-    // TODO get rid of this cast somehow
-    Lazy_Value *lazy = (Lazy_Value *)storage_static_as_c_type(&result->storage, Lazy_Value);
-    lazy->context.epoch = context->epoch;
-  }
-
   return result;
 }
 
