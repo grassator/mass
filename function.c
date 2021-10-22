@@ -811,7 +811,10 @@ ensure_function_instance(
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
 
-  Value *return_value = instance_descriptor->Function_Instance.call_setup.callee_return_value;
+  const Descriptor *return_descriptor = fn_info->returns.declaration.descriptor;
+  Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
+  Value *return_value =
+    value_make(context, return_descriptor, return_storage, fn_info->returns.declaration.source_range);
 
   Function_Builder *builder = &(Function_Builder){
     .function = fn_info,
@@ -869,11 +872,9 @@ ensure_function_instance(
     .Label.pointer = builder->code_block.end_label,
   });
 
-  const Storage *callee_return_storage = &call_setup.callee_return_value->storage;
-  const Storage *caller_return_storage = &call_setup.caller_return_value->storage;
-  if (!storage_equal(callee_return_storage, caller_return_storage)) {
-    Register caller_register = function_return_value_register_from_storage(caller_return_storage);
-    Register callee_register = function_return_value_register_from_storage(callee_return_storage);
+  if (!storage_equal(&call_setup.callee_return, &call_setup.caller_return)) {
+    Register caller_register = function_return_value_register_from_storage(&call_setup.caller_return);
+    Register callee_register = function_return_value_register_from_storage(&call_setup.callee_return);
     Storage callee_register_storage =
       storage_register_for_descriptor(callee_register, &descriptor_void_pointer);
     Storage caller_register_storage =

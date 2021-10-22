@@ -3211,8 +3211,13 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  Value *fn_return_value = instance_descriptor->call_setup.caller_return_value;
-  if (fn_info->returns.declaration.descriptor != &descriptor_void) {
+  const Descriptor *return_descriptor = fn_info->returns.declaration.descriptor;
+  Value *fn_return_value;
+  if (return_descriptor == &descriptor_void) {
+    fn_return_value = &void_value;
+  } else {
+    Storage return_storage = instance_descriptor->call_setup.caller_return;
+    fn_return_value = value_make(context, return_descriptor, return_storage, *source_range);
     fn_return_value->is_temporary = true;
   }
 

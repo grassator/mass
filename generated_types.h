@@ -1702,8 +1702,8 @@ typedef struct Function_Call_Setup {
   Function_Call_Jump jump;
   const Calling_Convention * calling_convention;
   Memory_Layout arguments_layout;
-  Value * caller_return_value;
-  Value * callee_return_value;
+  Storage caller_return;
+  Storage callee_return;
 } Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
@@ -4975,15 +4975,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_value_pointer,
-    .name = slice_literal_fields("caller_return_value"),
-    .Base_Relative.offset = offsetof(Function_Call_Setup, caller_return_value),
+    .descriptor = &descriptor_storage,
+    .name = slice_literal_fields("caller_return"),
+    .Base_Relative.offset = offsetof(Function_Call_Setup, caller_return),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_value_pointer,
-    .name = slice_literal_fields("callee_return_value"),
-    .Base_Relative.offset = offsetof(Function_Call_Setup, callee_return_value),
+    .descriptor = &descriptor_storage,
+    .name = slice_literal_fields("callee_return"),
+    .Base_Relative.offset = offsetof(Function_Call_Setup, callee_return),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_call_setup);

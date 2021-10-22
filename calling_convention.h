@@ -635,8 +635,8 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   if (function->returns.declaration.descriptor == &descriptor_void) {
-    result.callee_return_value = &void_value;
-    result.caller_return_value = &void_value;
+    result.callee_return = storage_none;
+    result.caller_return = storage_none;
   } else {
     static const Register general_registers[] = { Register_A, Register_D };
     static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
@@ -659,18 +659,8 @@ calling_convention_x86_64_system_v_call_setup_proc(
     if (classification.class == SYSTEM_V_MEMORY) {
       result.flags |= Function_Call_Setup_Flags_Indirect_Return;
       Bits bit_size = function->returns.declaration.descriptor->bit_size;
-      result.caller_return_value = value_init(
-        allocator_allocate(allocator, Value),
-        function->returns.declaration.descriptor,
-        storage_indirect(bit_size, Register_A),
-        function->returns.declaration.source_range
-      );
-      result.callee_return_value = value_init(
-        allocator_allocate(allocator, Value),
-        function->returns.declaration.descriptor,
-        storage_indirect(bit_size, Register_DI),
-        function->returns.declaration.source_range
-      );
+      result.caller_return = storage_indirect(bit_size, Register_A);
+      result.callee_return = storage_indirect(bit_size, Register_DI);
     } else {
       u64 stack_offset = 0;
       Slice return_name = function->returns.declaration.symbol
@@ -681,14 +671,8 @@ calling_convention_x86_64_system_v_call_setup_proc(
       );
       assert(item.tag == Memory_Layout_Item_Tag_Absolute);
 
-      Value *common_return_value = value_init(
-        allocator_allocate(allocator, Value),
-        item.descriptor,
-        item.Absolute.storage,
-        function->returns.declaration.source_range
-      );
-      result.callee_return_value = common_return_value;
-      result.caller_return_value = common_return_value;
+      result.callee_return = item.Absolute.storage;
+      result.caller_return = item.Absolute.storage;
     }
   }
 
@@ -761,20 +745,15 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   if (function->returns.declaration.descriptor == &descriptor_void) {
-    result.callee_return_value = &void_value;
-    result.caller_return_value = &void_value;
+    result.callee_return = storage_none;
+    result.caller_return = storage_none;
   } else {
     // FIXME provide user error? or should it be handled earlier?
     assert(function->returns.declaration.descriptor == &descriptor_s32);
 
-    Value *common_return_value = value_init(
-      allocator_allocate(allocator, Value),
-      &descriptor_s32,
-      storage_register_for_descriptor(Register_A, &descriptor_s32),
-      function->returns.declaration.source_range
-    );
-    result.callee_return_value = common_return_value;
-    result.caller_return_value = common_return_value;
+    Storage common_storage = storage_register_for_descriptor(Register_A, &descriptor_s32);
+    result.callee_return = common_storage;
+    result.caller_return = common_storage;
   }
 
   // TODO consider if actual syscall number should be handled here?
@@ -841,44 +820,26 @@ calling_convention_x86_64_windows_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_windows,
   };
   if (function->returns.declaration.descriptor == &descriptor_void) {
-    result.callee_return_value = &void_value;
-    result.caller_return_value = &void_value;
+    result.callee_return = storage_none;
+    result.caller_return = storage_none;
   } else {
     if (descriptor_is_float(function->returns.declaration.descriptor)) {
-      Value *common_return_value = value_init(
-        allocator_allocate(allocator, Value),
-        function->returns.declaration.descriptor,
-        storage_register_for_descriptor(Register_Xmm0, function->returns.declaration.descriptor),
-        function->returns.declaration.source_range
-      );
-      result.callee_return_value = common_return_value;
-      result.caller_return_value = common_return_value;
+      Storage common_storage =
+        storage_register_for_descriptor(Register_Xmm0, function->returns.declaration.descriptor);
+      result.callee_return = common_storage;
+      result.caller_return = common_storage;
     } else {
       if (descriptor_byte_size(function->returns.declaration.descriptor) > 8) {
         result.flags |= Function_Call_Setup_Flags_Indirect_Return;
         const Descriptor *return_descriptor = function->returns.declaration.descriptor;
 
-        result.caller_return_value = value_init(
-          allocator_allocate(allocator, Value),
-          return_descriptor,
-          storage_indirect(return_descriptor->bit_size, Register_A),
-          function->returns.declaration.source_range
-        );
-        result.callee_return_value = value_init(
-          allocator_allocate(allocator, Value),
-          return_descriptor,
-          storage_indirect(return_descriptor->bit_size, Register_C),
-          function->returns.declaration.source_range
-        );
+        result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
+        result.callee_return = storage_indirect(return_descriptor->bit_size, Register_C);
       } else {
-        Value *common_return_value = value_init(
-          allocator_allocate(allocator, Value),
-          function->returns.declaration.descriptor,
-          storage_register_for_descriptor(Register_A, function->returns.declaration.descriptor),
-          function->returns.declaration.source_range
-        );
-        result.callee_return_value = common_return_value;
-        result.caller_return_value = common_return_value;
+        Storage common_storage =
+          storage_register_for_descriptor(Register_A, function->returns.declaration.descriptor);
+        result.callee_return = common_storage;
+        result.caller_return = common_storage;
       }
     }
   }

@@ -1708,8 +1708,8 @@ main(void) {
     { "Function_Call_Jump", "jump"},
     { "const Calling_Convention *", "calling_convention" },
     { "Memory_Layout", "arguments_layout" },
-    { "Value *", "caller_return_value" },
-    { "Value *", "callee_return_value" },
+    { "Storage", "caller_return" },
+    { "Storage", "callee_return" },
   }));
 
   export_compiler(push_type(type_struct("Tuple", (Struct_Item[]){
