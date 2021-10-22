@@ -5813,19 +5813,18 @@ token_parse_function_literal(
     fn_info->flags |= Function_Info_Flags_Compile_Time;
   }
   bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
+  // TODO support this on non-Linux systems
   if (is_syscall) {
     ensure_parameter_descriptors(context, fn_info);
-    // TODO support this on non-Linux systems
-    Descriptor *fn_descriptor = descriptor_function_instance(
-      context->allocator, name, fn_info, &calling_convention_x86_64_system_v_syscall
-    );
+    Function_Call_Setup call_setup =
+      calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
-    if (is_syscall) {
-      s64 syscall_number = storage_static_as_c_type(&body_value->storage, Syscall)->number;
-      assert(fn_descriptor->tag == Descriptor_Tag_Function_Instance);
-      assert(fn_descriptor->Function_Instance.call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
-      fn_descriptor->Function_Instance.call_setup.jump.Syscall.number = syscall_number;
-    }
+    s64 syscall_number = storage_static_as_c_type(&body_value->storage, Syscall)->number;
+    assert(call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
+    call_setup.jump.Syscall.number = syscall_number;
+
+    Descriptor *fn_descriptor =
+      descriptor_function_instance(context->allocator, name, fn_info, call_setup);
 
     return value_init(
       allocator_allocate(context->allocator, Value),
@@ -5867,14 +5866,12 @@ token_parse_function_literal(
 
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
-    Descriptor *fn_descriptor = descriptor_function_instance(
-      context->allocator, name, fn_info, calling_convention
-    );
-
-    return value_init(
-      allocator_allocate(context->allocator, Value),
-      &descriptor_descriptor_pointer, storage_static_inline(&fn_descriptor), view.source_range
-    );
+    Function_Call_Setup call_setup =
+      calling_convention->call_setup_proc(context->allocator, fn_info);
+    Descriptor *fn_descriptor =
+      descriptor_function_instance(context->allocator, name, fn_info, call_setup);
+    Storage fn_storage = storage_static_inline(&fn_descriptor);
+    return value_make(context, &descriptor_descriptor_pointer, fn_storage, view.source_range);
   }
 }
 

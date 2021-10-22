@@ -1366,7 +1366,7 @@ descriptor_function_instance(
   const Allocator *allocator,
   Slice name,
   const Function_Info *info,
-  const Calling_Convention *calling_convention
+  Function_Call_Setup call_setup
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
@@ -1374,10 +1374,7 @@ descriptor_function_instance(
     .name = name,
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Function_Instance = {
-      .info = info,
-      .call_setup = calling_convention->call_setup_proc(allocator, info),
-    },
+    .Function_Instance = { .info = info, .call_setup = call_setup, },
   };
   return result;
 }

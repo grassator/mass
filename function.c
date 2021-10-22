@@ -755,9 +755,9 @@ ensure_function_instance(
 
   MASS_ON_ERROR(*context->result) return 0;
 
-  const Descriptor *instance_descriptor = descriptor_function_instance(
-    context->allocator, fn_name, fn_info, calling_convention
-  );
+  Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
+  const Descriptor *instance_descriptor =
+    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
@@ -795,9 +795,8 @@ ensure_function_instance(
     },
   };
 
-  const Function_Call_Setup *call_setup = &instance_descriptor->Function_Instance.call_setup;
   {
-    const Memory_Layout *arguments_layout = &call_setup->arguments_layout;
+    const Memory_Layout *arguments_layout = &call_setup.arguments_layout;
     Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Received_Argument);
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
@@ -841,8 +840,8 @@ ensure_function_instance(
     .Label.pointer = builder->code_block.end_label,
   });
 
-  const Storage *callee_return_storage = &call_setup->callee_return_value->storage;
-  const Storage *caller_return_storage = &call_setup->caller_return_value->storage;
+  const Storage *callee_return_storage = &call_setup.callee_return_value->storage;
+  const Storage *caller_return_storage = &call_setup.caller_return_value->storage;
   if (!storage_equal(callee_return_storage, caller_return_storage)) {
     Register caller_register = function_return_value_register_from_storage(caller_return_storage);
     Register callee_register = function_return_value_register_from_storage(callee_return_storage);
@@ -930,9 +929,9 @@ program_init_startup_code(
   const Calling_Convention *calling_convention =
     context->compilation->runtime_program->default_calling_convention;
   Slice fn_name = slice_literal("__startup");
-  Descriptor *descriptor = descriptor_function_instance(
-    context->allocator, fn_name, fn_info, calling_convention
-  );
+  Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
+  Descriptor *descriptor =
+    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup);
   Label *fn_label = make_label(context->allocator, program, &program->memory.code, fn_name);
   Label *end_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("__startup end"));

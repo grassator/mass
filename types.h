@@ -120,8 +120,9 @@ do {\
 #define MASS_DEFINE_FUNCTION(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
 do {\
   MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
+  Function_Call_Setup call_setup = calling_convention->call_setup_proc(allocator, function);\
   const Descriptor *instance_descriptor = descriptor_function_instance(\
-    allocator, slice_literal(_NAME_), function, calling_convention\
+    allocator, slice_literal(_NAME_), function, call_setup\
   );\
   Value *instance_value = value_init(\
     allocator_allocate(allocator, Value),\
