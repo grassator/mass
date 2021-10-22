@@ -386,7 +386,6 @@ x86_64_system_v_classify_field_recursively(
 
 static System_V_Classification
 x86_64_system_v_classify(
-  const Allocator *allocator,
   const Descriptor *descriptor
 ) {
   u64 byte_size = descriptor_byte_size(descriptor);
@@ -443,7 +442,7 @@ x86_64_system_v_classify(
   // parameter list by a pointer that has class INTEGER)
   bool is_c_plus_plus_non_trivial = false; // TODO allow to specify / detect this
   if (is_c_plus_plus_non_trivial) {
-    descriptor = descriptor_reference_to(allocator, descriptor);
+    panic("TODO propagate somehow to the caller that this in an implicit reference");
     return (System_V_Classification){ .class = SYSTEM_V_INTEGER, .descriptor = descriptor };
   }
 
@@ -656,7 +655,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     };
 
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator, function->returns.declaration.descriptor);
+      x86_64_system_v_classify(function->returns.declaration.descriptor);
     if (classification.class == SYSTEM_V_MEMORY) {
       result.flags |= Function_Call_Setup_Flags_Indirect_Return;
       Bits bit_size = function->returns.declaration.descriptor->bit_size;
@@ -726,7 +725,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator, param->declaration.descriptor);
+      x86_64_system_v_classify(param->declaration.descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
@@ -805,7 +804,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     assert(param->tag != Function_Parameter_Tag_Exact_Static);
 
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator, param->declaration.descriptor);
+      x86_64_system_v_classify(param->declaration.descriptor);
     // TODO figure out how item 6. Only values of class INTEGER or class MEMORY are passed to the kernel.
     //      can be understood together with the item 4. System-calls are limited to six arguments,
     //      no argument is passed directly on the stack. While in user space MEMORY class arguments
