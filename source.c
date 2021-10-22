@@ -1266,7 +1266,7 @@ tokenizer_make_group_children_view(
 
 static inline bool
 tokenizer_group_end_paren(
-  const Allocator *allocator,
+  Compilation *compilation,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
   u64 offset
@@ -1276,9 +1276,10 @@ tokenizer_group_end_paren(
   Value *parent_value = *dyn_array_get(*stack, parent->index);
   if (parent_value->descriptor != &descriptor_group_paren) return false;
 
-  Value_View children =
-    tokenizer_make_group_children_view(allocator, stack, parent, parent_value, offset);
-  Group_Paren *group = allocator_allocate(allocator, Group_Paren);
+  Value_View children = tokenizer_make_group_children_view(
+    compilation->allocator, stack, parent, parent_value, offset
+  );
+  Group_Paren *group = allocator_allocate(compilation->allocator, Group_Paren);
   *group = (Group_Paren){.children = children};
   parent_value->storage = storage_static(group);
 
@@ -1287,7 +1288,7 @@ tokenizer_group_end_paren(
 
 static inline bool
 tokenizer_group_end_square(
-  const Allocator *allocator,
+  Compilation *compilation,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
   u64 offset
@@ -1297,9 +1298,10 @@ tokenizer_group_end_square(
   Value *parent_value = *dyn_array_get(*stack, parent->index);
   if (parent_value->descriptor != &descriptor_group_square) return false;
 
-  Value_View children =
-    tokenizer_make_group_children_view(allocator, stack, parent, parent_value, offset);
-  Group_Square *group = allocator_allocate(allocator, Group_Square);
+  Value_View children = tokenizer_make_group_children_view(
+    compilation->allocator, stack, parent, parent_value, offset
+  );
+  Group_Square *group = allocator_allocate(compilation->allocator, Group_Square);
   *group = (Group_Square){.children = children};
   parent_value->storage = storage_static(group);
 
@@ -1308,7 +1310,7 @@ tokenizer_group_end_square(
 
 static inline bool
 tokenizer_group_end_curly(
-  const Allocator *allocator,
+  Compilation *compilation,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
   u64 offset
@@ -1325,20 +1327,19 @@ tokenizer_group_end_curly(
   // { 42 ; }
   while (parent->index + 1 < dyn_array_length(*stack)) {
     Value *last = *dyn_array_last(*stack);
+    if (last->descriptor != &descriptor_symbol) break;
     // :FakeSemicolon
     // We detect fake semicolons with range_length == 0
     // so it needs to be created like that in the tokenizer
-    bool is_last_token_a_fake_semicolon = (
-      range_length(last->source_range.offsets) == 0 &&
-      value_match_symbol(last, slice_literal(";"))
-    );
-    if (!is_last_token_a_fake_semicolon) break;
+    if (range_length(last->source_range.offsets) != 0) break;
+    if (value_as_symbol(last) != compilation->common_symbols.operator_semicolon) break;
     dyn_array_pop(*stack);
   }
 
-  Value_View children =
-    tokenizer_make_group_children_view(allocator, stack, parent, parent_value, offset);
-  Group_Square *group = allocator_allocate(allocator, Group_Square);
+  Value_View children = tokenizer_make_group_children_view(
+    compilation->allocator, stack, parent, parent_value, offset
+  );
+  Group_Square *group = allocator_allocate(compilation->allocator, Group_Square);
   *group = (Group_Square){.children = children};
   parent_value->storage = storage_static(group);
 

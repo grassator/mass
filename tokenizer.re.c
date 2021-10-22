@@ -73,7 +73,7 @@ tokenize(
     )
 
   #define TOKENIZER_GROUP_END(_VARIANT_)\
-    if (!tokenizer_group_end_##_VARIANT_(allocator, &stack, &parent_stack, offset))\
+    if (!tokenizer_group_end_##_VARIANT_(compilation, &stack, &parent_stack, offset))\
       TOKENIZER_HANDLE_ERROR((Slice){0})
 
   for (;;) {
