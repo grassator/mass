@@ -4,9 +4,9 @@ name: Build & Test
 on: push
 
 jobs:
-  windows:
+  windows-msvc:
     # Name the Job
-    name: Windows Build & Test
+    name: Windows MSVC Build & Test
     # Set the type of machine to run on
     runs-on: windows-latest
 
@@ -20,6 +20,23 @@ jobs:
         run: dir
       - name: Test
         run: .\test.bat
+
+  windows-clang:
+    # Name the Job
+    name: Windows Clang Build & Test
+    # Set the type of machine to run on
+    runs-on: windows-latest
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Configure MSVC Dev Cmd
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: List working directory
+        run: dir
+      - name: Test
+        run: .\test.bat clang-cl
 
   linux-gcc:
     # Name the Job

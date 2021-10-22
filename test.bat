@@ -1,7 +1,10 @@
 @echo off
 
+set "CC=%1"
+if "%CC%"=="" set "CC=cl"
+
 cls
-call build.bat
+call build.bat %CC%
 if %errorlevel% neq 0 (exit /b 1)
 
 for %%f in (build\*_spec.exe) do (
