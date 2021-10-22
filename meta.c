@@ -1600,7 +1600,6 @@ main(void) {
     { "const Descriptor *", "descriptor" },
     { "Lazy_Value_Proc", "proc" },
     { "void *", "payload" },
-    { "u64", "epoch" },
   }));
 
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){

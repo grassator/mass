@@ -1568,7 +1568,6 @@ typedef struct Lazy_Value {
   const Descriptor * descriptor;
   Lazy_Value_Proc proc;
   void * payload;
-  u64 epoch;
 } Lazy_Value;
 typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 
@@ -4603,12 +4602,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
     .descriptor = &descriptor_void_pointer,
     .name = slice_literal_fields("payload"),
     .Base_Relative.offset = offsetof(Lazy_Value, payload),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("epoch"),
-    .Base_Relative.offset = offsetof(Lazy_Value, epoch),
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_value);

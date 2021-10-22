@@ -2169,7 +2169,7 @@ value_force(
 
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    if (lazy->epoch != VALUE_STATIC_EPOCH && lazy->epoch != context->epoch) {
+    if (lazy->context.epoch != VALUE_STATIC_EPOCH && lazy->context.epoch != context->epoch) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = value->source_range,
@@ -2266,7 +2266,6 @@ mass_make_lazy_value_with_epoch(
     .descriptor = descriptor,
     .proc = proc,
     .payload = payload,
-    .epoch = epoch,
   };
   return value_init(
     &combined->value,
@@ -3697,7 +3696,7 @@ mass_intrinsic_call(
   if (result && result->descriptor == &descriptor_lazy_value) {
     // TODO get rid of this cast somehow
     Lazy_Value *lazy = (Lazy_Value *)storage_static_as_c_type(&result->storage, Lazy_Value);
-    lazy->epoch = context->epoch;
+    lazy->context.epoch = context->epoch;
   }
 
   return result;
