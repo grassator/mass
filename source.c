@@ -4996,9 +4996,8 @@ mass_fragment(
   Value_View args_view
 ) {
   assert(args_view.length == 1);
-  // TODO consider using empty space operator instead
   Value *source_value = value_view_get(args_view, 0);
-  const Group_Curly *group = value_as_group_curly(source_value); // TODO user error
+  const Group_Curly *group = value_as_group_curly(source_value);
   Code_Fragment *fragment = allocator_allocate(context->allocator, Code_Fragment);
   *fragment = (Code_Fragment) {
     .scope = context->scope,
