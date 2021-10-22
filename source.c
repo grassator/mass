@@ -5052,9 +5052,8 @@ mass_handle_field_access_lazy_proc(
   Execution_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
-  void *raw_payload
+  Mass_Field_Access_Lazy_Payload *payload
 ) {
-  Mass_Field_Access_Lazy_Payload *payload = raw_payload;
   Memory_Layout_Item *field = payload->field;
 
   Expected_Result expected_struct =
@@ -5064,44 +5063,40 @@ mass_handle_field_access_lazy_proc(
 
   const Descriptor *struct_descriptor = struct_->descriptor;
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(struct_descriptor);
+  const Memory_Layout *layout = &unwrapped_descriptor->Struct.memory_layout;
+  assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
+
+  Storage struct_storage;
+  bool is_temporary;
 
   // Auto dereference pointers to structs
-  if (struct_descriptor != unwrapped_descriptor) {
-    assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
-
-    Storage pointee_storage = storage_none;
-    bool is_temporary;
+  if (struct_descriptor == unwrapped_descriptor) {
+    struct_storage = struct_->storage;
+    is_temporary = struct_->is_temporary;
+  } else {
     if (struct_->storage.tag == Storage_Tag_Static) {
       const void *pointed_memory = *storage_static_as_c_type(&struct_->storage, void *);
-      pointee_storage = storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
+      struct_storage = storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
       is_temporary = false;
     } else if (struct_->storage.tag == Storage_Tag_Register) {
       Register reg = struct_->storage.Register.index;
-      pointee_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
+      struct_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
       is_temporary = false;
     } else {
       Register reg = register_acquire_temp(builder);
       Storage base_storage = storage_register_for_descriptor(reg, struct_descriptor);
-      pointee_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
+      struct_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
       move_value(builder, &struct_->source_range, &base_storage, &struct_->storage);
       is_temporary = true;
     }
-
-    // TODO @Speed the logic in this function does not actually need a Value, just Storage
-    struct_ = value_make(context, unwrapped_descriptor, pointee_storage, struct_->source_range);
-    struct_->is_temporary = is_temporary;
   }
 
-  assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
-  Storage field_storage = memory_layout_item_storage(
-    &struct_->storage, &unwrapped_descriptor->Struct.memory_layout, field
-  );
-  Value *field_value =
-    value_make(context, field->descriptor, field_storage, struct_->source_range);
+  Storage field_storage = memory_layout_item_storage(&struct_storage, layout, field);
+  Value *field_value = value_make(context, field->descriptor, field_storage, struct_->source_range);
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
-  field_value->is_temporary = struct_->is_temporary;
+  field_value->is_temporary = is_temporary;
 
   return expected_result_ensure_value_or_temp(context, builder, expected_result, field_value);
 }
