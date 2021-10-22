@@ -1,5 +1,8 @@
 @echo off
 
+set "CC=%1"
+if "%CC%"=="" set "CC=cl"
+
 if not defined DevEnvDir (
     call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
 )
@@ -14,16 +17,23 @@ set FLAGS=/Od /std:c11 /nologo /WX /F 16777216 /FC /Zo /Zi^
   /wd4255 /wd4505 /wd4201 /wd4668 /wd4820 /wd5045 /wd4100 /wd4214 /wd5105^
   /D UNICODE /D _UNICODE
 
-cl %FLAGS% ..\meta.c
+if "%CC%"=="clang-cl" (
+  set FLAGS=-gcodeview /Od /Zo /Zi -D UNICODE -D _UNICODE^
+    -Wno-incompatible-function-pointer-types ^
+    -Wno-initializer-overrides ^
+    -Wno-deprecated-declarations
+)
+
+%CC% %FLAGS% ..\meta.c
 if %errorlevel% neq 0 (goto Fail)
 
 .\meta
 if %errorlevel% neq 0 (goto Fail)
 
-cl %FLAGS% ..\source_spec.c
+%CC% %FLAGS% ..\source_spec.c
 if %errorlevel% neq 0 (goto Fail)
 
-cl %FLAGS% ..\mass.c
+%CC% %FLAGS% ..\mass.c
 if %errorlevel% neq 0 (goto Fail)
 
 :Success
