@@ -1243,92 +1243,104 @@ tokenizer_group_start(
   dyn_array_push(*stack, value);
 }
 
-static inline bool
-tokenizer_group_end(
+static inline Value_View
+tokenizer_make_group_children_view(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
-  char actual_paren,
+  Tokenizer_Parent *parent,
+  Value *parent_value,
   u64 offset
 ) {
-  Value *parent_value = 0;
-  Tokenizer_Parent *parent = 0;
-  if (dyn_array_length(*parent_stack)) {
-    parent = dyn_array_last(*parent_stack);
-    parent_value = *dyn_array_get(*stack, parent->index);
-  }
-  if (
-    !parent_value ||
-    !(
-      value_is_group_paren(parent_value) ||
-      value_is_group_curly(parent_value) ||
-      value_is_group_square(parent_value)
-     )
-  ) {
-    panic("Tokenizer: unexpected parent stack entry");
-  }
-
-  Slice expected_paren = {0};
-  if (parent->descriptor == &descriptor_group_paren) {
-    expected_paren = slice_literal(")");
-  } else if (parent->descriptor == &descriptor_group_square) {
-    expected_paren = slice_literal("]");
-  } else if (parent->descriptor == &descriptor_group_curly) {
-    expected_paren = slice_literal("}");
-
-    // Newlines at the end of the block do not count as semicolons otherwise this:
-    // { 42
-    // }
-    // is being interpreted as:
-    // { 42 ; }
-    while (parent->index + 1 < dyn_array_length(*stack)) {
-      Value *last = *dyn_array_last(*stack);
-      // :FakeSemicolon
-      // We detect fake semicolons with range_length == 0
-      // so it needs to be created like that in the tokenizer
-      bool is_last_token_a_fake_semicolon = (
-        range_length(last->source_range.offsets) == 0 &&
-        value_match_symbol(last, slice_literal(";"))
-      );
-      if (!is_last_token_a_fake_semicolon) break;
-      dyn_array_pop(*stack);
-    }
-  } else {
-    panic("UNREACHABLE");
-  }
-  if (actual_paren != expected_paren.bytes[0]) {
-    return false;
-  }
-
   parent_value->source_range.offsets.to = u64_to_u32(offset);
   Source_Range children_range = parent_value->source_range;
   children_range.offsets.to -= 1;
   children_range.offsets.from += 1;
   Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
   u64 child_count = dyn_array_length(*stack) - parent->index - 1;
+  stack->data->length = parent->index + 1; // pop the children
 
-  Value_View children = temp_token_array_into_value_view(
+  return temp_token_array_into_value_view(
     allocator, children_values, u64_to_u32(child_count), children_range
   );
-  assert(parent_value->storage.tag == Storage_Tag_None);
-  if (parent->descriptor == &descriptor_group_paren) {
-    Group_Paren *group = allocator_allocate(allocator, Group_Paren);
-    *group = (Group_Paren){.children = children};
-    parent_value->storage = storage_static(group);
-  } else if (parent->descriptor == &descriptor_group_square) {
-    Group_Curly *group = allocator_allocate(allocator, Group_Curly);
-    *group = (Group_Curly){.children = children};
-    parent_value->storage = storage_static(group);
-  } else if (parent->descriptor == &descriptor_group_curly) {
-    Group_Square *group = allocator_allocate(allocator, Group_Square);
-    *group = (Group_Square){.children = children};
-    parent_value->storage = storage_static(group);
-  } else {
-    panic("UNREACHABLE");
+}
+
+static inline bool
+tokenizer_group_end_paren(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  u64 offset
+) {
+  if (!dyn_array_length(*parent_stack)) return false;
+  Tokenizer_Parent *parent = dyn_array_pop(*parent_stack);
+  Value *parent_value = *dyn_array_get(*stack, parent->index);
+  if (parent_value->descriptor != &descriptor_group_paren) return false;
+
+  Value_View children =
+    tokenizer_make_group_children_view(allocator, stack, parent, parent_value, offset);
+  Group_Paren *group = allocator_allocate(allocator, Group_Paren);
+  *group = (Group_Paren){.children = children};
+  parent_value->storage = storage_static(group);
+
+  return true;
+}
+
+static inline bool
+tokenizer_group_end_square(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  u64 offset
+) {
+  if (!dyn_array_length(*parent_stack)) return false;
+  Tokenizer_Parent *parent = dyn_array_pop(*parent_stack);
+  Value *parent_value = *dyn_array_get(*stack, parent->index);
+  if (parent_value->descriptor != &descriptor_group_square) return false;
+
+  Value_View children =
+    tokenizer_make_group_children_view(allocator, stack, parent, parent_value, offset);
+  Group_Square *group = allocator_allocate(allocator, Group_Square);
+  *group = (Group_Square){.children = children};
+  parent_value->storage = storage_static(group);
+
+  return true;
+}
+
+static inline bool
+tokenizer_group_end_curly(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  u64 offset
+) {
+  if (!dyn_array_length(*parent_stack)) return false;
+  Tokenizer_Parent *parent = dyn_array_pop(*parent_stack);
+  Value *parent_value = *dyn_array_get(*stack, parent->index);
+  if (parent_value->descriptor != &descriptor_group_curly) return false;
+
+  // Newlines at the end of the block do not count as semicolons otherwise this:
+  // { 42
+  // }
+  // is being interpreted as:
+  // { 42 ; }
+  while (parent->index + 1 < dyn_array_length(*stack)) {
+    Value *last = *dyn_array_last(*stack);
+    // :FakeSemicolon
+    // We detect fake semicolons with range_length == 0
+    // so it needs to be created like that in the tokenizer
+    bool is_last_token_a_fake_semicolon = (
+      range_length(last->source_range.offsets) == 0 &&
+      value_match_symbol(last, slice_literal(";"))
+    );
+    if (!is_last_token_a_fake_semicolon) break;
+    dyn_array_pop(*stack);
   }
 
-  stack->data->length = parent->index + 1; // pop the children
-  dyn_array_pop(*parent_stack);
+  Value_View children =
+    tokenizer_make_group_children_view(allocator, stack, parent, parent_value, offset);
+  Group_Square *group = allocator_allocate(allocator, Group_Square);
+  *group = (Group_Square){.children = children};
+  parent_value->storage = storage_static(group);
 
   return true;
 }

@@ -67,11 +67,13 @@ tokenize(
       )\
     )
 
-  #define TOKENIZER_GROUP_START(_TAG_)\
-    tokenizer_group_start(allocator, &stack, &parent_stack, (_TAG_), TOKENIZER_CURRENT_RANGE())
+  #define TOKENIZER_GROUP_START(_VARIANT_)\
+    tokenizer_group_start(\
+      allocator, &stack, &parent_stack, &descriptor_group_##_VARIANT_, TOKENIZER_CURRENT_RANGE()\
+    )
 
-  #define TOKENIZER_GROUP_END(_PAREN_)\
-    if (!tokenizer_group_end(allocator, &stack, &parent_stack, (_PAREN_), offset))\
+  #define TOKENIZER_GROUP_END(_VARIANT_)\
+    if (!tokenizer_group_end_##_VARIANT_(allocator, &stack, &parent_stack, offset))\
       TOKENIZER_HANDLE_ERROR((Slice){0})
 
   for (;;) {
@@ -111,12 +113,12 @@ tokenize(
         continue;
       }
 
-      "(" { TOKENIZER_GROUP_START(&descriptor_group_paren); continue; }
-      "[" { TOKENIZER_GROUP_START(&descriptor_group_square); continue; }
-      "{" { TOKENIZER_GROUP_START(&descriptor_group_curly); continue; }
-      ")" { TOKENIZER_GROUP_END(')'); continue; }
-      "]" { TOKENIZER_GROUP_END(']'); continue; }
-      "}" { TOKENIZER_GROUP_END('}'); continue; }
+      "(" { TOKENIZER_GROUP_START(paren); continue; }
+      "[" { TOKENIZER_GROUP_START(square); continue; }
+      "{" { TOKENIZER_GROUP_START(curly); continue; }
+      ")" { TOKENIZER_GROUP_END(paren); continue; }
+      "]" { TOKENIZER_GROUP_END(square); continue; }
+      "}" { TOKENIZER_GROUP_END(curly); continue; }
 
       operator = [+*%/=!@^&$\\:;,?|.~<>-]+|['];
       operator { TOKENIZER_PUSH_SYMBOL(); continue; }
