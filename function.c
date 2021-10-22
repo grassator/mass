@@ -8,7 +8,7 @@ reserve_stack_storage(
   Function_Builder *builder,
   Bits bit_size
 ) {
-  s32 byte_size = u64_to_s32(bit_size.as_u64 * 8);
+  s32 byte_size = u64_to_s32(bit_size.as_u64 / 8);
   builder->stack_reserve = s32_align(builder->stack_reserve, byte_size);
   builder->stack_reserve += byte_size;
   // The value is negative here because the stack grows down
