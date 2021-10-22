@@ -66,7 +66,6 @@ make_trampoline(
 
 static void
 move_value(
-  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   const Storage *target,

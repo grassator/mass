@@ -421,7 +421,7 @@ value_indirect_from_reference(
         context, builder, reg, referenced_descriptor, source->source_range
       );
       Storage reg_storage = storage_register_for_descriptor(reg, source->descriptor);
-      move_value(context->allocator, builder, &source->source_range, &reg_storage, &source->storage);
+      move_value(builder, &source->source_range, &reg_storage, &source->storage);
       return temp;
     }
     default:
@@ -710,7 +710,7 @@ assign_integers(
       );
     }
   }
-  move_value(context->allocator, builder, &target->source_range, &target->storage, &adjusted_source);
+  move_value(builder, &target->source_range, &target->storage, &adjusted_source);
 
   if (is_temp) {
     assert(adjusted_source.tag == Storage_Tag_Register);
@@ -837,7 +837,7 @@ assign(
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(context, source, &descriptor_u64, source_range);
         source->descriptor = target->descriptor;
-        move_value(context->allocator, builder, source_range, &target->storage, &source->storage);
+        move_value(builder, source_range, &target->storage, &source->storage);
         return *context->result;
       } else {
         context_error(context, (Mass_Error) {
@@ -900,7 +900,7 @@ assign(
 
   MASS_TRY(*context->result);
   if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
-    move_value(context->allocator, builder, source_range, &target->storage, &source->storage);
+    move_value(builder, source_range, &target->storage, &source->storage);
     return *context->result;
   }
 
@@ -4151,7 +4151,7 @@ storage_load_index_address(
   );
 
   // Move the index into the register
-  move_value(context->allocator, builder, source_range, &new_base->storage, &index_value->storage);
+  move_value(builder, source_range, &new_base->storage, &index_value->storage);
 
   // Multiplication by 1 byte is useless so checking it here
   if (item_descriptor->bit_size.as_u64 != 8) {
@@ -4163,10 +4163,7 @@ storage_load_index_address(
       context, builder, register_find_available(builder, 0), &descriptor_s64, *source_range
     );
 
-    move_value(
-      context->allocator, builder, source_range,
-      &reg_byte_size_value->storage, &byte_size_value->storage
-    );
+    move_value(builder, source_range, &reg_byte_size_value->storage, &byte_size_value->storage);
 
     push_eagerly_encoded_assembly(
       &builder->code_block, *source_range,
@@ -4186,7 +4183,7 @@ storage_load_index_address(
     );
 
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      move_value(context->allocator, builder, source_range, &temp_value->storage, &target->storage);
+      move_value(builder, source_range, &temp_value->storage, &target->storage);
     } else {
       assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
       load_address(context, builder, source_range, temp_value, target->storage);
@@ -4370,7 +4367,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           Register temp_register = register_find_available(builder, disallowed_temp_registers);
           register_acquire(builder, temp_register);
           maybe_saved_rdx = storage_register_for_descriptor(temp_register, &descriptor_s64);
-          move_value(context->allocator, builder, &result_range, &maybe_saved_rdx, &reg_d);
+          move_value(builder, &result_range, &maybe_saved_rdx, &reg_d);
         }
       }
 
@@ -4424,14 +4421,14 @@ mass_handle_arithmetic_operation_lazy_proc(
           });
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
-          move_value(context->allocator, builder, &result_range, &temp_dividend->storage, &reg_d);
+          move_value(builder, &result_range, &temp_dividend->storage, &reg_d);
         }
       }
 
       value_release_if_temporary(builder, temp_divisor);
       if (maybe_saved_rdx.tag != Storage_Tag_None) {
         assert(maybe_saved_rdx.tag == Storage_Tag_Register);
-        move_value(context->allocator, builder, &result_range, &reg_d, &maybe_saved_rdx);
+        move_value(builder, &result_range, &reg_d, &maybe_saved_rdx);
         register_release(builder, maybe_saved_rdx.Register.index);
       }
 
@@ -5086,13 +5083,7 @@ mass_handle_field_access_lazy_proc(
       Register reg = register_acquire_temp(builder);
       Storage base_storage = storage_register_for_descriptor(reg, struct_descriptor);
       pointee_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
-      move_value(
-        context->allocator,
-        builder,
-        &struct_->source_range,
-        &base_storage,
-        &struct_->storage
-      );
+      move_value(builder, &struct_->source_range, &base_storage, &struct_->storage);
       is_temporary = true;
     }
 

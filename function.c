@@ -119,7 +119,6 @@ register_release_maybe_restore(
 
 static void
 move_value(
-  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   const Storage *target,
@@ -271,7 +270,7 @@ move_value(
 
     Storage right_size_temp = temp_full_register;
     right_size_temp.bit_size = source->bit_size;
-    move_value(allocator, builder, source_range, target, &right_size_temp);
+    move_value(builder, source_range, target, &right_size_temp);
     register_release(builder, temp_full_register.Register.index);
     return;
   }
@@ -314,7 +313,7 @@ move_value(
       );
       Storage right_size_temp = temp_full_register;
       right_size_temp.bit_size = source->bit_size;
-      move_value(allocator, builder, source_range, &right_size_temp, source);
+      move_value(builder, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
         push_eagerly_encoded_assembly_no_source_range(
           &builder->code_block, *source_range,
@@ -403,8 +402,8 @@ move_value(
       .Register.index = register_acquire_temp(builder),
     };
     // TODO avoid and extra source range push for recursion
-    move_value(allocator, builder, source_range, &temp, source);
-    move_value(allocator, builder, source_range, target, &temp);
+    move_value(builder, source_range, &temp, source);
+    move_value(builder, source_range, target, &temp);
     register_release(builder, temp.Register.index);
     return;
   }
@@ -535,7 +534,7 @@ make_if(
         bool is_packed = value->storage.Register.offset_in_bits != 0;
         if (is_packed) {
           test_storage = storage_register_for_descriptor(register_acquire_temp(builder), value->descriptor);
-          move_value(context->allocator, builder, source_range, &test_storage, &value->storage);
+          move_value(builder, source_range, &test_storage, &value->storage);
         }
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
@@ -626,7 +625,7 @@ load_address(
 
   if (!can_reuse_result_as_temp) {
     assert(register_storage.tag == Storage_Tag_Register);
-    move_value(context->allocator, builder, source_range, &result_value->storage, &register_storage);
+    move_value(builder, source_range, &result_value->storage, &register_storage);
     register_release(builder, register_storage.Register.index);
   }
 }
