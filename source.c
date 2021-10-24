@@ -3251,7 +3251,7 @@ call_function_overload(
     .capacity = 32,
   );
 
-  bool has_default_arguments = dyn_array_length(arguments) != dyn_array_length(target_params);
+  bool has_default_arguments = dyn_array_length(arguments) != dyn_array_length(fn_info->parameters);
   Scope *default_arguments_scope = has_default_arguments
     ? scope_make(context->allocator, fn_info->scope)
     : 0;
