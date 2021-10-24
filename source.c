@@ -3500,7 +3500,6 @@ call_function_overload(
   register_release_bitset(builder, argument_register_bitset | temp_register_argument_bitset);
 
   u64 return_value_bitset = register_bitset_from_storage(&fn_return_value->storage);
-  register_acquire_bitset(builder, return_value_bitset);
 
   assert(!(return_value_bitset & saved_registers_from_arguments_bitset));
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
@@ -3511,16 +3510,10 @@ call_function_overload(
   }
 
   register_acquire_bitset(builder, saved_registers_from_arguments_bitset);
+  register_acquire_bitset(builder, (return_value_bitset & ~expected_result_bitset));
 
   Value *expected_value =
     expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
-
-  // This is awkward that we need to manually clear return bitset because
-  // it *might* be set depending on whether the expected result is a temp.
-  // The whole thing feels a bit fishy but not sure what is the fix.
-  if (expected_result->tag == Expected_Result_Tag_Exact) {
-    builder->register_occupied_bitset &= ~return_value_bitset;
-  }
 
   context_temp_reset_to_mark(context, temp_mark);
 
