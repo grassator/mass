@@ -3221,17 +3221,6 @@ call_function_overload(
     fn_return_value->is_temporary = true;
   }
 
-  const Storage *maybe_expected_storage = 0;
-  switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: {
-      maybe_expected_storage = &value_from_exact_expected_result(expected_result)->storage;
-      break;
-    }
-    case Expected_Result_Tag_Flexible: {
-      break;
-    }
-  }
-
   const Function_Call_Setup *call_setup = &instance_descriptor->call_setup;
 
   Temp_Mark temp_mark = context_temp_mark(context);
@@ -3404,13 +3393,15 @@ call_function_overload(
 
   u64 target_volatile_registers_bitset = call_setup->calling_convention->register_volatile_bitset;
   u64 expected_result_bitset = 0;
-  if (maybe_expected_storage) {
-    if (
-      maybe_expected_storage->tag == Storage_Tag_Register ||
-      maybe_expected_storage->tag == Storage_Tag_Unpacked
-    ) {
-      expected_result_bitset = register_bitset_from_storage(maybe_expected_storage);
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      const Storage *expected = &value_from_exact_expected_result(expected_result)->storage;
+      if (expected->tag == Storage_Tag_Register || expected->tag == Storage_Tag_Unpacked) {
+        expected_result_bitset = register_bitset_from_storage(expected);
+      }
+      break;
     }
+    case Expected_Result_Tag_Flexible: break;
   }
 
   u64 saved_registers_from_arguments_bitset = (
@@ -3420,7 +3411,7 @@ call_function_overload(
     // but only if we are not using them for optimized arguments assignment.
     (~(copied_straight_to_param_bitset | temp_register_argument_bitset))
   );
-  // We must not save the register(s) that we will overwrite with the result
+  // We must not save the register(s) that will be used for the result
   // otherwise we will overwrite it with the restored value
   u64 saved_registers_bitset = saved_registers_from_arguments_bitset & ~expected_result_bitset;
   if (saved_registers_bitset) {
