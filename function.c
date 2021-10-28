@@ -27,25 +27,21 @@ static const u64 registers_that_can_be_temp = (
 static Register
 register_find_available(
   Function_Builder *builder,
-  u64 register_disallowed_bit_mask
+  u64 disallowed_bit_mask
 ) {
-  // FIXME this should be all registers except for RSP
-  static const Register temp_registers[] = {
-    Register_C, Register_B, Register_D, Register_BP, Register_SI, Register_DI,
-    Register_R8, Register_R9, Register_R10, Register_R11,
-    Register_R12, Register_R13, Register_R14, Register_R15
-  };
-  for (u32 i = 0; i < countof(temp_registers); ++i) {
-    Register reg_index = temp_registers[i];
-    if (register_bitset_get(register_disallowed_bit_mask, reg_index)) continue;
-    if (register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
-    return reg_index;
-  }
-  // FIXME
-  panic("Could not acquire a temp register");
-  return -1;
-}
+  // Start with the registers that we can theoretically use for temp values
+  u64 available_bit_set = registers_that_can_be_temp;
+  // Narrow it down by the ones that are not in use
+  available_bit_set &= ~builder->register_occupied_bitset;
+  // Apply any additional constraints from the user
+  available_bit_set &= ~disallowed_bit_mask;
 
+  u32 available_index = u64_count_trailing_zeros(available_bit_set);
+  if (available_index == 64) {
+    panic("TODO: Could not find an empty temp register");
+  }
+  return available_index;
+}
 
 typedef struct {
   const Source_Range *source_range;
