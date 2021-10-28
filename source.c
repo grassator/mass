@@ -5386,36 +5386,38 @@ mass_handle_if_expression_lazy_proc(
     condition = temp_condition;
   }
 
-  Label *else_label = make_if(context, builder, &condition->source_range, condition);
+  Program *program = context->program;
+  Label *else_label =
+    make_label(context->allocator, program, &program->memory.code, slice_literal("else"));
 
-  Value *result_value = value_force(context, builder, expected_result, then);
-  MASS_ON_ERROR(*context->result) return 0;
+  Conditional_Jump_Type jump_type =
+    make_if(builder, else_label, &condition->source_range, condition);
 
-  if (result_value->storage.tag == Storage_Tag_Static) {
-    Storage stack_storage = reserve_stack_storage(builder, result_value->descriptor->bit_size);
-    Value *stack_result =
-      value_make(context, result_value->descriptor, stack_storage, result_value->source_range);
-    MASS_ON_ERROR(assign(context, builder, stack_result, result_value, dummy_range)) return 0;
-    result_value = stack_result;
+  Label *after_label =
+    make_label(context->allocator, program, &program->memory.code, slice_literal("endif"));
+
+  Value *result_value = 0;
+  if (jump_type != Conditional_Jump_Type_Always_False) {
+    result_value = value_force(context, builder, expected_result, then);
+    MASS_ON_ERROR(*context->result) return 0;
+
+    push_eagerly_encoded_assembly(
+      &builder->code_block, *dummy_range,
+      &(Instruction_Assembly){jmp, {code_label32(after_label)}}
+    );
   }
-
-  Label *after_label = make_label(
-    context->allocator, context->program, &context->program->memory.code, slice_literal("if end")
-  );
-
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *dummy_range,
-    &(Instruction_Assembly){jmp, {code_label32(after_label)}}
-  );
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
     .Label.pointer = else_label,
   });
 
-  Expected_Result expected_else = expected_result_from_value(result_value);
-  result_value = value_force(context, builder, &expected_else, else_);
-  MASS_ON_ERROR(*context->result) return 0;
+  if (jump_type != Conditional_Jump_Type_Always_True) {
+    Expected_Result expected_else =
+      result_value ? expected_result_from_value(result_value) : *expected_result;
+    result_value = value_force(context, builder, &expected_else, else_);
+    MASS_ON_ERROR(*context->result) return 0;
+  }
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
