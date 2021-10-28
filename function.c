@@ -43,65 +43,6 @@ register_find_available(
   return available_index;
 }
 
-typedef struct {
-  const Source_Range *source_range;
-  Register index;
-  Register saved_index;
-  bool saved;
-} Maybe_Saved_Register;
-
-static Maybe_Saved_Register
-register_acquire_maybe_save_if_already_acquired(
-  Allocator *allocator,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Register reg_index,
-  u64 register_disallowed_bit_mask
-) {
-  Maybe_Saved_Register result = {
-    .saved = false,
-    .source_range = source_range,
-    .index = reg_index,
-  };
-  if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) {
-    register_acquire(builder, reg_index);
-    return result;
-  }
-
-  result.saved_index = register_find_available(builder, register_disallowed_bit_mask);
-  register_acquire(builder, result.saved_index);
-  result.saved = true;
-
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range,
-    &(Instruction_Assembly){mov, {
-      storage_register_for_descriptor(result.saved_index, &descriptor_s64),
-      storage_register_for_descriptor(reg_index, &descriptor_s64),
-    }}
-  );
-
-  return result;
-}
-
-static inline void
-register_release_maybe_restore(
-  Function_Builder *builder,
-  const Maybe_Saved_Register *maybe_saved_register
-) {
-  if (maybe_saved_register->saved) {
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *maybe_saved_register->source_range,
-      &(Instruction_Assembly){mov, {
-        storage_register_for_descriptor(maybe_saved_register->index, &descriptor_s64),
-        storage_register_for_descriptor(maybe_saved_register->saved_index, &descriptor_s64),
-      }}
-    );
-    register_release(builder, maybe_saved_register->saved_index);
-  } else {
-    register_release(builder, maybe_saved_register->index);
-  }
-}
-
 static void
 move_value(
   Function_Builder *builder,
