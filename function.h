@@ -11,14 +11,6 @@ ensure_function_instance(
   Value_View args
 );
 
-static inline Value *
-reserve_stack(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Descriptor *descriptor,
-  Source_Range source_range
-);
-
 static void
 program_init_startup_code(
   Execution_Context *context

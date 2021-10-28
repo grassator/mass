@@ -26,9 +26,9 @@ value_from_expected_result(
     case Expected_Result_Tag_Flexible: {
       const Descriptor *return_descriptor = expected_result_descriptor(expected_result);
       // FIXME :ExpectedStack
-      return return_descriptor == &descriptor_void
-        ? &void_value
-        : reserve_stack(context, builder, return_descriptor, source_range);
+      if (return_descriptor == &descriptor_void) return &void_value;
+      Storage storage = reserve_stack_storage(builder, return_descriptor->bit_size);
+      return value_make(context, return_descriptor, storage, source_range);
     } break;
   }
   panic("UNREACHABLE");
@@ -2141,7 +2141,8 @@ expected_result_ensure_value_or_temp(
       }
       if (flexible->storage & Expected_Result_Storage_Memory) {
         assert(value->storage.tag != Storage_Tag_Register); // checked above
-        Value *temp_result = reserve_stack(context, builder, expected_descriptor, value->source_range);
+        Storage storage = reserve_stack_storage(builder, expected_descriptor->bit_size);
+        Value *temp_result = value_make(context, expected_descriptor, storage, value->source_range);
         MASS_ON_ERROR(assign(context, builder, temp_result, value, &value->source_range)) return 0;
         return temp_result;
       }
@@ -3276,7 +3277,8 @@ call_function_overload(
     const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
-        source_arg = reserve_stack(context, builder, target_arg->descriptor, *source_range);
+        Storage source_storage = reserve_stack_storage(builder, target_arg->descriptor->bit_size);
+        source_arg = value_make(context, target_arg->descriptor, source_storage, *source_range);
       } else {
         Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
         Value_View default_expression = declared_argument->maybe_default_expression;
@@ -3378,7 +3380,8 @@ call_function_overload(
         // The code below is useful to check how many spills to stack happen
         //static int stack_counter = 0;
         //printf(" > stack %i\n", stack_counter++);
-        arg_value = reserve_stack(context, builder, stack_descriptor, *source_range);
+        Storage stack_storage = reserve_stack_storage(builder, stack_descriptor->bit_size);
+        arg_value = value_make(context, stack_descriptor, stack_storage, *source_range);
         arg_value->is_temporary = true;
       }
     };
@@ -4888,7 +4891,8 @@ mass_handle_variable_definition_lazy_proc(
   if (payload->descriptor == &descriptor_void) {
     return value_make(context, payload->descriptor, storage_none, payload->source_range);
   } else {
-    return reserve_stack(context, builder, payload->descriptor, payload->source_range);
+    Storage stack_storage = reserve_stack_storage(builder, payload->descriptor->bit_size);
+    return value_make(context, payload->descriptor, stack_storage, payload->source_range);
   }
 }
 
@@ -5384,8 +5388,9 @@ mass_handle_if_expression_lazy_proc(
   MASS_ON_ERROR(*context->result) return 0;
 
   if (result_value->storage.tag == Storage_Tag_Static) {
+    Storage stack_storage = reserve_stack_storage(builder, result_value->descriptor->bit_size);
     Value *stack_result =
-      reserve_stack(context, builder, result_value->descriptor, result_value->source_range);
+      value_make(context, result_value->descriptor, stack_storage, result_value->source_range);
     MASS_ON_ERROR(assign(context, builder, stack_result, result_value, dummy_range)) return 0;
     result_value = stack_result;
   }
