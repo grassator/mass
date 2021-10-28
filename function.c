@@ -424,72 +424,80 @@ make_if(
   Value *value
 ) {
   Program *program = context->program;
-  bool is_always_true = false;
-  Label *label = make_label(context->allocator, program, &program->memory.code, slice_literal("if"));
+  Label *to_label = make_label(context->allocator, program, &program->memory.code, slice_literal("if"));
+
   if(value->storage.tag == Storage_Tag_Static) {
     s64 imm = storage_static_value_up_to_s64(&value->storage);
-    if (imm == 0) return label;
-    is_always_true = true;
-  }
-
-  if (!is_always_true) {
-    if (value->storage.tag == Storage_Tag_Eflags) {
-      const X64_Mnemonic *mnemonic = 0;
-      switch(value->storage.Eflags.compare_type) {
-        case Compare_Type_Equal: mnemonic = jne; break;
-        case Compare_Type_Not_Equal: mnemonic = je; break;
-
-        case Compare_Type_Unsigned_Below: mnemonic = jae; break;
-        case Compare_Type_Unsigned_Below_Equal: mnemonic = ja; break;
-        case Compare_Type_Unsigned_Above: mnemonic = jbe; break;
-        case Compare_Type_Unsigned_Above_Equal: mnemonic = jb; break;
-
-        case Compare_Type_Signed_Less: mnemonic = jge; break;
-        case Compare_Type_Signed_Less_Equal: mnemonic = jg; break;
-        case Compare_Type_Signed_Greater: mnemonic = jle; break;
-        case Compare_Type_Signed_Greater_Equal: mnemonic = jl; break;
-        default: assert(!"Unsupported comparison"); break;
-      }
+    bool condition_always_false = (imm == 0);
+    if (condition_always_false) {
+      // Jump unconditionally
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){mnemonic, {code_label32(label)}}
+        &(Instruction_Assembly){jmp, {code_label32(to_label)}}
       );
     } else {
-      if (value->storage.tag == Storage_Tag_Register) {
-        Storage test_storage = value->storage;
-        bool is_packed = value->storage.Register.offset_in_bits != 0;
-        if (is_packed) {
-          test_storage = storage_register_for_descriptor(register_acquire_temp(builder), value->descriptor);
-          move_value(builder, source_range, &test_storage, &value->storage);
-        }
-        push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range,
-          &(Instruction_Assembly){x64_test, {test_storage, test_storage}}
-        );
-        if (is_packed) register_release(builder, test_storage.Register.index);
-      } else {
-        u64 bit_size = value->descriptor->bit_size.as_u64;
-        if (bit_size == 32 || bit_size == 64) {
-          push_eagerly_encoded_assembly(
-            &builder->code_block, *source_range,
-            &(Instruction_Assembly){cmp, {value->storage, imm32(0)}}
-          );
-        } else if (bit_size == 8) {
-          push_eagerly_encoded_assembly(
-            &builder->code_block, *source_range,
-            &(Instruction_Assembly){cmp, {value->storage, imm8(0)}}
-          );
-        } else {
-          assert(!"Unsupported value inside `if`");
-        }
+      // Nothing to do - CPU will just continue to the first instruction in the `if` body
+    }
+    return to_label;
+  }
+
+  if (value->storage.tag == Storage_Tag_Eflags) {
+    const X64_Mnemonic *mnemonic = 0;
+    switch(value->storage.Eflags.compare_type) {
+      case Compare_Type_Equal: mnemonic = jne; break;
+      case Compare_Type_Not_Equal: mnemonic = je; break;
+
+      case Compare_Type_Unsigned_Below: mnemonic = jae; break;
+      case Compare_Type_Unsigned_Below_Equal: mnemonic = ja; break;
+      case Compare_Type_Unsigned_Above: mnemonic = jbe; break;
+      case Compare_Type_Unsigned_Above_Equal: mnemonic = jb; break;
+
+      case Compare_Type_Signed_Less: mnemonic = jge; break;
+      case Compare_Type_Signed_Less_Equal: mnemonic = jg; break;
+      case Compare_Type_Signed_Greater: mnemonic = jle; break;
+      case Compare_Type_Signed_Greater_Equal: mnemonic = jl; break;
+      default: assert(!"Unsupported comparison"); break;
+    }
+    push_eagerly_encoded_assembly(
+      &builder->code_block, *source_range,
+      &(Instruction_Assembly){mnemonic, {code_label32(to_label)}}
+    );
+  } else {
+    if (value->storage.tag == Storage_Tag_Register) {
+      Storage test_storage = value->storage;
+      bool is_packed = value->storage.Register.offset_in_bits != 0;
+      if (is_packed) {
+        test_storage = storage_register_for_descriptor(register_acquire_temp(builder), value->descriptor);
+        move_value(builder, source_range, &test_storage, &value->storage);
       }
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){jz, {code_label32(label)}}
+        &(Instruction_Assembly){x64_test, {test_storage, test_storage}}
       );
+      if (is_packed) register_release(builder, test_storage.Register.index);
+    } else {
+      u64 bit_size = value->descriptor->bit_size.as_u64;
+      if (bit_size == 32 || bit_size == 64) {
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range,
+          &(Instruction_Assembly){cmp, {value->storage, imm32(0)}}
+        );
+      } else if (bit_size == 8) {
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range,
+          &(Instruction_Assembly){cmp, {value->storage, imm8(0)}}
+        );
+      } else {
+        assert(!"Unsupported value inside `if`");
+      }
     }
+    push_eagerly_encoded_assembly(
+      &builder->code_block, *source_range,
+      &(Instruction_Assembly){jz, {code_label32(to_label)}}
+    );
   }
-  return label;
+
+  return to_label;
 }
 
 static Value *

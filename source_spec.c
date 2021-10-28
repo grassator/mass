@@ -467,6 +467,26 @@ spec("source") {
       check(is_zero(-2) == false);
       check(is_zero(0) == true);
     }
+    it("should correctly handle always-false condition") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "is_positive", &test_context,
+        "is_positive :: fn() -> (s64) {"
+          "if 0 then 21 else 42"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+    it("should correctly handle always-false condition") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "is_positive", &test_context,
+        "is_positive :: fn() -> (s64) {"
+          "if 1 then 42 else 21"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
     it("should report an error on missing `then` inside of an if expression") {
       test_program_inline_source_base(
         "main", &test_context,
