@@ -254,6 +254,89 @@ atomic_u64_load(
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// Bit Operations
+//////////////////////////////////////////////////////////////////////////////
+
+static inline u32
+u64_count_leading_zeros(
+  u64 data
+) {
+  if (!data) return 64;
+  #if defined(_MSC_VER) && !defined(__clang__)
+  u32 index;
+  _BitScanReverse64(&index, data);
+  return 63 - index;
+  #else
+  return (u32)__builtin_clzll((unsigned long long)data);
+  #endif
+}
+
+static inline u32
+u64_count_trailing_zeros(
+  u64 data
+) {
+  if (!data) return 64;
+  #if defined(_MSC_VER) && !defined(__clang__)
+  u32 index;
+  _BitScanForward64(&index, data);
+  return index;
+  #else
+  return (u32)__builtin_ctzll((unsigned long long)data);
+  #endif
+}
+
+static inline u32
+u32_count_leading_zeros(
+  u32 data
+) {
+  if (!data) return 32;
+  #if defined(_MSC_VER) && !defined(__clang__)
+  u32 index;
+  _BitScanReverse(&index, data);
+  return 31 - index;
+  #else
+  return (u32)__builtin_clz((unsigned long long)data);
+  #endif
+}
+
+static inline u32
+u32_count_trailing_zeros(
+  u32 data
+) {
+  if (!data) return 32;
+  #if defined(_MSC_VER) && !defined(__clang__)
+  u32 index;
+  _BitScanForward(&index, data);
+  return index;
+  #else
+  return (u32)__builtin_ctz((unsigned int)data);
+  #endif
+}
+
+static inline u32
+u32_count_set_bits(
+  u32 data
+) {
+  #if defined(_MSC_VER) && !defined(__clang__)
+  return (u32)__popcnt(data);
+  #else
+  return (u32)__builtin_popcount((unsigned int)data);
+  #endif
+}
+
+static inline u32
+u64_count_set_bits(
+  u64 data
+) {
+  #if defined(_MSC_VER) && !defined(__clang__)
+  return (u32)__popcnt64(data);
+  #else
+  return (u32)__builtin_popcountll((unsigned long long)data);
+  #endif
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
 // Integer Casts
 //////////////////////////////////////////////////////////////////////////////
 
