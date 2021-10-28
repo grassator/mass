@@ -118,11 +118,7 @@ static inline u64
 register_bitset_occupied_count(
   u64 bitset
 ) {
-  #ifdef _MSC_VER
-  return __popcnt64(bitset);
-  #else
-  return __builtin_popcount(bitset);
-  #endif
+  return u64_count_set_bits(bitset);
 }
 
 static inline void
