@@ -1096,44 +1096,6 @@ storage_eflags(
   };
 }
 
-static inline Value *
-value_from_signed_immediate(
-  Execution_Context *context,
-  s64 value,
-  Source_Range source_range
-) {
-  if (s64_fits_into_s8(value)) {
-    return value_make(context, &descriptor_s8, imm8((s8)value), source_range);
-  }
-  if (s64_fits_into_s16(value)) {
-    return value_make(context, &descriptor_s16, imm16((s16)value), source_range);
-  }
-  if (s64_fits_into_s32(value)) {
-    return value_make(context, &descriptor_s32, imm32((s32)value), source_range);
-  }
-  return value_make(context, &descriptor_s64, imm64(value), source_range);
-}
-
-static inline Value *
-value_from_unsigned_immediate_internal(
-  Execution_Context *context,
-  u64 value,
-  Source_Range source_range
-) {
-  if (u64_fits_into_u8(value)) {
-    return value_make(context, &descriptor_u8, imm8((u8)value), source_range);
-  }
-  if (u64_fits_into_u16(value)) {
-    return value_make(context, &descriptor_u16, imm16((u16)value), source_range);
-  }
-  if (u64_fits_into_u32(value)) {
-    return value_make(context, &descriptor_u32, imm32((u32)value), source_range);
-  }
-  return value_make(context, &descriptor_u64, imm64(value), source_range);
-}
-#define value_from_unsigned_immediate(...)\
-  value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
 static inline Storage
 storage_register(
   Register reg,
