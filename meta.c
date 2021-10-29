@@ -1416,6 +1416,7 @@ main(void) {
   }));
 
   push_type(type_struct("Function_Builder", (Struct_Item[]){
+    { "u64", "epoch" },
     { "s32", "stack_reserve" },
     { "u32", "max_call_parameters_stack_size" },
     { "Value *", "return_value" },

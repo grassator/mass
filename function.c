@@ -731,6 +731,7 @@ ensure_function_instance(
     value_make(context, return_descriptor, return_storage, fn_info->returns.declaration.source_range);
 
   Function_Builder *builder = &(Function_Builder){
+    .epoch = body_context.epoch,
     .function = fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .return_value = return_value,
@@ -885,6 +886,7 @@ program_init_startup_code(
   Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
+    .epoch = get_new_epoch(),
     .function = fn_info,
     .code_block = {
       .allocator = context->allocator,

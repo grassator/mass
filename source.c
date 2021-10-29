@@ -2174,7 +2174,8 @@ value_force(
 
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    if (lazy->context.epoch != VALUE_STATIC_EPOCH && lazy->context.epoch != context->epoch) {
+
+    if (lazy->context.epoch != VALUE_STATIC_EPOCH && lazy->context.epoch != builder->epoch) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = value->source_range,
@@ -2738,6 +2739,7 @@ compile_time_eval(
     context->allocator, jit->program, section, slice_literal("compile_time_eval")
   );
   Function_Builder eval_builder = {
+    .epoch = eval_context.epoch,
     .function = &fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .code_block = {

@@ -1345,6 +1345,7 @@ typedef struct Code_Block {
 typedef dyn_array_type(Code_Block) Array_Code_Block;
 
 typedef struct Function_Builder {
+  u64 epoch;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   Value * return_value;
@@ -3923,6 +3924,12 @@ MASS_DEFINE_TYPE_VALUE(code_block);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("epoch"),
+    .Base_Relative.offset = offsetof(Function_Builder, epoch),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_s32,
