@@ -84,6 +84,10 @@ int main(s32 argc, char **argv) {
     }
   }
 
+  if (!raw_file_path) {
+    return mass_cli_print_usage();
+  }
+
   // Normalize slashes
   for (char *ch = raw_file_path; *ch; ++ch) {
     if (*ch == '\\') *ch = '/';
