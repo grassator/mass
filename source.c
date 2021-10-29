@@ -5390,7 +5390,7 @@ mass_handle_if_expression_lazy_proc(
   Label *else_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("else"));
 
-  make_if(builder, else_label, &condition->source_range, condition);
+  encode_inverted_conditional_jump(builder, else_label, &condition->source_range, condition);
 
   Label *after_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("endif"));

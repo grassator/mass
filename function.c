@@ -417,7 +417,7 @@ fn_encode(
 }
 
 static void
-make_if(
+encode_inverted_conditional_jump(
   Function_Builder *builder,
   Label *to_label,
   const Source_Range *source_range,
