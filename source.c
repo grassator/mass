@@ -5442,20 +5442,18 @@ token_parse_if_expression(
 
   Source_Range dummy_range = keyword->source_range;
 
-  Mass_If_Expression_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_If_Expression_Lazy_Payload);
-  *payload = (Mass_If_Expression_Lazy_Payload){0};
-
+  Value *value_condition;
   {
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
     u32 condition_length;
-    payload->condition = token_parse_expression(
+    value_condition = token_parse_expression(
       context, condition_view, &condition_length, context->compilation->common_symbols.then
     );
     peek_index += condition_length;
     MASS_ON_ERROR(*context->result) return 0;
   }
 
+  Value *value_then;
   {
     static const Token_Pattern else_pattern = {
       .tag = Token_Pattern_Tag_Symbol,
@@ -5463,17 +5461,18 @@ token_parse_if_expression(
     };
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
     u32 then_length;
-    payload->then = token_parse_expression(
+    value_then = token_parse_expression(
       context, then_view, &then_length,  context->compilation->common_symbols._else
     );
     peek_index += then_length;
     MASS_ON_ERROR(*context->result) return 0;
   }
 
+  Value *value_else;
   {
     Value_View else_view = value_view_slice(&view, peek_index, view.length);
     u32 else_length;
-    payload->else_ = token_parse_expression(context, else_view, &else_length, end_symbol);
+    value_else = token_parse_expression(context, else_view, &else_length, end_symbol);
     peek_index += else_length;
   }
 
@@ -5481,8 +5480,16 @@ token_parse_if_expression(
 
   // TODO probably want to unify then and else branch before returning
   const Descriptor *result_descriptor = context_is_compile_time_eval(context)
-    ? value_or_lazy_value_descriptor(payload->then)
-    : deduce_runtime_descriptor_for_value(context, payload->then);
+    ? value_or_lazy_value_descriptor(value_then)
+    : deduce_runtime_descriptor_for_value(context, value_else);
+
+  Mass_If_Expression_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_If_Expression_Lazy_Payload);
+  *payload = (Mass_If_Expression_Lazy_Payload){
+    .condition = value_condition,
+    .then = value_then,
+    .else_ = value_else,
+  };
 
   return mass_make_lazy_value(
     context, dummy_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
