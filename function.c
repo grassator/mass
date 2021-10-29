@@ -482,7 +482,7 @@ encode_inverted_conditional_jump(
 
 static Value *
 maybe_constant_fold_internal(
-  Execution_Context *context,
+  Compilation *compilation,
   Function_Builder *builder,
   s64 constant_result,
   const Expected_Result *expected_result,
@@ -498,8 +498,11 @@ maybe_constant_fold_internal(
     case 64: imm_storage = imm64(s64_to_s64(constant_result)); break;
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
-  Value *imm_value = value_make(context, descriptor, imm_storage, *source_range);
-  return expected_result_ensure_value_or_temp(context->compilation, builder, expected_result, imm_value);
+  Value *imm_value = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    descriptor, imm_storage, *source_range
+  );
+  return expected_result_ensure_value_or_temp(compilation, builder, expected_result, imm_value);
 }
 
 static inline Storage
@@ -655,7 +658,8 @@ function_return_value_register_from_storage(
 
 static Value *
 ensure_function_instance(
-  Execution_Context *context,
+  Compilation *compilation,
+  Program *program,
   Value *fn_value,
   Value_View args
 ) {
@@ -668,13 +672,12 @@ ensure_function_instance(
   assert(!(literal->flags & Function_Literal_Flags_Macro));
   const Function_Info *fn_info = function_literal_info_for_args(literal, args);
 
-  Program *program = context->program;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
   if (!dyn_array_is_initialized(literal->instances)) {
     literal->instances = dyn_array_make(
       Array_Value_Ptr,
-      .allocator = context->allocator,
+      .allocator = compilation->allocator,
       .capacity = 4
     );
   }
@@ -694,39 +697,47 @@ ensure_function_instance(
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
 
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*compilation->result) return 0;
 
-  Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
+  Function_Call_Setup call_setup = calling_convention->call_setup_proc(compilation->allocator, fn_info);
   const Descriptor *instance_descriptor =
-    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup);
+    descriptor_function_instance(compilation->allocator, fn_name, fn_info, call_setup);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
-    Storage storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
-    Value *cached_instance = value_make(context, instance_descriptor, storage, fn_value->source_range);
+    Storage storage = import_symbol(compilation->allocator, program, symbol->library_name, symbol->symbol_name);
+    Value *cached_instance = value_init(
+      allocator_allocate(compilation->allocator, Value),
+      instance_descriptor, storage, fn_value->source_range
+    );
     dyn_array_push(literal->instances, cached_instance);
     return cached_instance;
   }
 
-  Label *call_label = make_label(context->allocator, program, &program->memory.code, fn_name);
+  Label *call_label = make_label(compilation->allocator, program, &program->memory.code, fn_name);
   // It is important to cache the label here for recursive calls
-  Value *cached_instance =
-    value_make(context, instance_descriptor, code_label32(call_label), fn_value->source_range);
+  Value *cached_instance = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    instance_descriptor, code_label32(call_label), fn_value->source_range
+  );
   dyn_array_push(literal->instances, cached_instance);
 
-  Execution_Context body_context = *context;
-  Scope *body_scope = scope_make(context->allocator, fn_info->scope);
+  Execution_Context body_context = execution_context_from_compilation(compilation);
+  Scope *body_scope = scope_make(compilation->allocator, fn_info->scope);
   body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
+  body_context.program = program;
   body_context.epoch = get_new_epoch();
 
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
-  Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
+  Slice end_label_name = slice_join(compilation->allocator, end_label_pieces, countof(end_label_pieces));
 
   const Descriptor *return_descriptor = fn_info->returns.declaration.descriptor;
   Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
-  Value *return_value =
-    value_make(context, return_descriptor, return_storage, fn_info->returns.declaration.source_range);
+  Value *return_value = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    return_descriptor, return_storage, fn_info->returns.declaration.source_range
+  );
 
   Function_Builder *builder = &(Function_Builder){
     .program = program,
@@ -735,9 +746,9 @@ ensure_function_instance(
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .return_value = return_value,
     .code_block = {
-      .allocator = context->allocator,
+      .allocator = compilation->allocator,
       .start_label = call_label,
-      .end_label = make_label(context->allocator, program, &program->memory.code, end_label_name),
+      .end_label = make_label(compilation->allocator, program, &program->memory.code, end_label_name),
     },
   };
 
@@ -749,7 +760,7 @@ ensure_function_instance(
       Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
       if (item->name.length) {
         // TODO figure out how to avoid this lookup
-        const Symbol *item_symbol = mass_ensure_symbol(context->compilation, item->name);
+        const Symbol *item_symbol = mass_ensure_symbol(compilation, item->name);
         scope_define_value(body_scope, body_context.epoch, item->source_range, item_symbol, arg_value);
       }
       mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
@@ -777,9 +788,9 @@ ensure_function_instance(
   } else {
     panic("Unexpected function body type");
   }
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*compilation->result) return 0;
 
-  value_force_exact(context->compilation, builder, return_value, parse_result);
+  value_force_exact(compilation, builder, return_value, parse_result);
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
@@ -868,6 +879,7 @@ program_init_startup_code(
   Execution_Context *context
 ) {
   Program *program = context->program;
+  Compilation *compilation = context->compilation;
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, context->scope);
   const Calling_Convention *calling_convention =
@@ -913,13 +925,14 @@ program_init_startup_code(
 
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
-    Value *instance = ensure_function_instance(context, fn, (Value_View){0});
+    Value *instance = ensure_function_instance(compilation, program, fn, (Value_View){0});
     push_eagerly_encoded_assembly(
       &builder.code_block, source_range,
       &(Instruction_Assembly){call, {instance->storage}}
     );
   }
-  Value *entry_instance = ensure_function_instance(context, program->entry_point, (Value_View){0});
+  Value *entry_instance =
+    ensure_function_instance(compilation, program, program->entry_point, (Value_View){0});
   push_eagerly_encoded_assembly(
     &builder.code_block, source_range,
     &(Instruction_Assembly){jmp, {entry_instance->storage}}

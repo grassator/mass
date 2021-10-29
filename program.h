@@ -63,7 +63,8 @@ program_find_import(
 
 static Storage
 import_symbol(
-  Execution_Context *context,
+  const Allocator *allocator,
+  Program *program,
   const Slice library_name,
   const Slice symbol_name
 );

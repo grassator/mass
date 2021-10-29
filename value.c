@@ -1097,40 +1097,49 @@ storage_eflags(
 }
 
 // TODO consider adding explicit boolean descriptor type
-#define value_from_compare(_allocator_, _compare_type_, _SOURCE_RANGE_) value_make(\
-  (_allocator_), &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
+#define value_from_compare(_ALLOCATOR_, _compare_type_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_s64, imm64((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s64(_ALLOCATOR_, _integer_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_s64, imm64((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_s32, imm32((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s32(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_s32, imm32((_INTEGER_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_s16, imm16((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s16(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_s16, imm16((_INTEGER_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_s8, imm8((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s8(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_s8, imm8((_INTEGER_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_u64, imm64((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_u64(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_u64, imm64((_INTEGER_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_u32, imm32((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_u32(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_u32, imm32((_INTEGER_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_u16, imm16((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_u16(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_u16, imm16((_INTEGER_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
-  (_CONTEXT_), &descriptor_u8, imm8((_integer_), (_SOURCE_RANGE_)\
+#define value_from_u8(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
+  allocator_allocate((_ALLOCATOR_), Value),\
+  &descriptor_u8, imm8((_INTEGER_), (_SOURCE_RANGE_)\
 )
 
 static inline Value *
@@ -1201,13 +1210,16 @@ storage_register_for_descriptor(
 
 static inline Value *
 value_register_for_descriptor(
-  Execution_Context *context,
+  const Allocator *allocator,
   Register reg,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
   Storage storage = storage_register_for_descriptor(reg, descriptor);
-  return value_make(context, descriptor, storage, source_range);
+  return value_init(
+    allocator_allocate(allocator, Value),
+    descriptor, storage, source_range
+  );
 }
 
 static inline Value *

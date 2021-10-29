@@ -443,9 +443,6 @@ typedef struct Expected_Result Expected_Result;
 typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
 typedef dyn_array_type(const Expected_Result *) Array_Const_Expected_Result_Ptr;
 
-typedef Value * (*Lazy_Value_Proc)
-  (Execution_Context * context, Function_Builder * builder, const Expected_Result * expected_result, void * payload);
-
 typedef struct Lazy_Value Lazy_Value;
 typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
 typedef dyn_array_type(const Lazy_Value *) Array_Const_Lazy_Value_Ptr;
@@ -616,6 +613,9 @@ typedef dyn_array_type(const Common_Symbols *) Array_Const_Common_Symbols_Ptr;
 typedef struct Compilation Compilation;
 typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
+
+typedef Value * (*Lazy_Value_Proc)
+  (Compilation * compilation, Function_Builder * builder, const Expected_Result * expected_result, void * payload);
 
 typedef enum Instruction_Extension_Type {
   Instruction_Extension_Type_None = 0,
@@ -1373,7 +1373,6 @@ typedef dyn_array_type(Function_Layout) Array_Function_Layout;
 typedef struct Execution_Context {
   Allocator * allocator;
   Allocator * temp_allocator;
-  const Value * current_compile_time_function_call_target;
   Execution_Context_Flags flags;
   s32 _flags_padding;
   Compilation * compilation;
@@ -2080,6 +2079,7 @@ typedef struct Compilation {
   Symbol_Map * prefix_operator_symbol_map;
   Symbol_Map * infix_or_suffix_operator_symbol_map;
   Common_Symbols common_symbols;
+  const Value * current_compile_time_function_call_target;
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
 
@@ -2431,7 +2431,6 @@ static Descriptor descriptor_array_expected_result_ptr;
 static Descriptor descriptor_array_const_expected_result_ptr;
 static Descriptor descriptor_expected_result_pointer;
 static Descriptor descriptor_expected_result_pointer_pointer;
-static Descriptor descriptor_lazy_value_proc;
 static Descriptor descriptor_lazy_value;
 static Descriptor descriptor_array_lazy_value;
 static Descriptor descriptor_array_lazy_value_ptr;
@@ -2587,6 +2586,7 @@ static Descriptor descriptor_array_compilation;
 static Descriptor descriptor_array_compilation_ptr;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_compilation_pointer_pointer;
+static Descriptor descriptor_lazy_value_proc;
 static Descriptor descriptor_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type_ptr;
@@ -4076,12 +4076,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
     .descriptor = &descriptor_allocator_pointer,
     .name = slice_literal_fields("temp_allocator"),
     .Base_Relative.offset = offsetof(Execution_Context, temp_allocator),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_value_pointer,
-    .name = slice_literal_fields("current_compile_time_function_call_target"),
-    .Base_Relative.offset = offsetof(Execution_Context, current_compile_time_function_call_target),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5935,6 +5929,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_common_symbols,
     .name = slice_literal_fields("common_symbols"),
     .Base_Relative.offset = offsetof(Compilation, common_symbols),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("current_compile_time_function_call_target"),
+    .Base_Relative.offset = offsetof(Compilation, current_compile_time_function_call_target),
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);

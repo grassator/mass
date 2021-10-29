@@ -1463,7 +1463,6 @@ main(void) {
   export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
     { "Allocator *", "temp_allocator" },
-    { "const Value *", "current_compile_time_function_call_target" },
     { "Execution_Context_Flags", "flags" },
     { "s32", "_flags_padding" },
     { "Compilation *", "compilation" },
@@ -1588,13 +1587,6 @@ main(void) {
       { "Expected_Result_Storage", "storage" },
       { "u32", "_storage_padding" },
     }),
-  }));
-
-  push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
-    { "Execution_Context *", "context" },
-    { "Function_Builder *", "builder" },
-    { "const Expected_Result *", "expected_result" },
-    { "void *", "payload" },
   }));
 
   push_type(type_struct("Lazy_Value", (Struct_Item[]){
@@ -1963,6 +1955,14 @@ main(void) {
     { "Symbol_Map *", "prefix_operator_symbol_map" },
     { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Common_Symbols", "common_symbols" },
+    { "const Value *", "current_compile_time_function_call_target" },
+  }));
+
+  push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
+    { "Compilation *", "compilation" },
+    { "Function_Builder *", "builder" },
+    { "const Expected_Result *", "expected_result" },
+    { "void *", "payload" },
   }));
 
   push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){

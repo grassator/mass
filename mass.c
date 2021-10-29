@@ -125,7 +125,7 @@ int main(s32 argc, char **argv) {
     return -1;
   }
   context.program->entry_point = main;
-  ensure_function_instance(&context, main, (Value_View){0});
+  ensure_function_instance(&compilation, context.program, main, (Value_View){0});
   if(context.result->tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&compilation, &context.result->Error.error);
   }

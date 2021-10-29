@@ -114,7 +114,7 @@ test_program_source_base(
       value = *dyn_array_get(set->items, 0);
     }
     if (value->descriptor == &descriptor_function_literal) {
-      ensure_function_instance(context, value, (Value_View){0});
+      ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
     }
   }
   return value;
@@ -205,7 +205,7 @@ spec("source") {
 
   describe("Scope") {
     it("should be able to set and lookup values") {
-      Value *test = value_from_s64(&test_context, 42, (Source_Range){0});
+      Value *test = value_from_s64(test_context.allocator, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       scope_define_value(root_scope, 0, (Source_Range){0}, symbol, test);
@@ -214,17 +214,17 @@ spec("source") {
     }
 
     it("should be able to lookup things from parent scopes") {
-      Value *global = value_from_s64(&test_context, 42, (Source_Range){0});
+      Value *global = value_from_s64(test_context.allocator, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *global_symbol = mass_ensure_symbol(&test_compilation, slice_literal("global"));
       scope_define_value(root_scope, 0, (Source_Range){0}, global_symbol, global);
 
       const Symbol *test_symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
-      Value *level_1_test = value_from_s64(&test_context, 1, (Source_Range){0});
+      Value *level_1_test = value_from_s64(test_context.allocator, 1, (Source_Range){0});
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define_value(scope_level_1, 0, (Source_Range){0}, test_symbol, level_1_test);
 
-      Value *level_2_test = value_from_s64(&test_context, 1, (Source_Range){0});
+      Value *level_2_test = value_from_s64(test_context.allocator, 1, (Source_Range){0});
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define_value(scope_level_2, 0, (Source_Range){0}, test_symbol,  level_2_test);
 
@@ -2234,7 +2234,7 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/folding"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
+      ensure_function_instance(&test_compilation, test_program, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/folding.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2245,7 +2245,7 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/print"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
+      ensure_function_instance(&test_compilation, test_program, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/print.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2267,7 +2267,7 @@ spec("source") {
         "main", &test_context, "fixtures/relocations"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
+      ensure_function_instance(&test_compilation, test_program, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }

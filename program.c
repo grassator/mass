@@ -166,23 +166,23 @@ program_find_import(
 
 static Storage
 import_symbol(
-  Execution_Context *context,
+  const Allocator *allocator,
+  Program *program,
   const Slice library_name,
   const Slice symbol_name
 ) {
-  Program *program = context->program;
   Import_Library *library = program_find_import_library(program, library_name);
   if (!library) {
     library = dyn_array_push(program->import_libraries, (Import_Library) {
       .name = library_name,
-      .symbols = dyn_array_make(Array_Import_Symbol, .allocator = context->allocator),
+      .symbols = dyn_array_make(Array_Import_Symbol, .allocator = allocator),
     });
   }
 
   Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
-    Label *label = make_label(context->allocator, program, &program->memory.ro_data, symbol_name);
+    Label *label = make_label(allocator, program, &program->memory.ro_data, symbol_name);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .label32 = label,
