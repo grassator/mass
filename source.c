@@ -6113,21 +6113,29 @@ mass_handle_block_lazy_proc(
     result_value = value_force(compilation, builder, expected_result, lazy_statement);
     MASS_ON_ERROR(*compilation->result) return 0;
     // We do not do cross-statement register allocation so can check that there
-    // are no stray registers retained across statement boundaries
-    if(builder && registers_before != builder->register_occupied_bitset) {
-      for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-        bool before = register_bitset_get(registers_before, reg_index);
-        bool after = register_bitset_get(builder->register_occupied_bitset, reg_index);
-        if (before != after) {
-          if (after) {
-            printf("Unreleased %s\n", register_name(reg_index));
-          } else {
-            printf("Falsly released %s\n", register_name(reg_index));
-          }
+    // are no stray registers retained across statement boundaries except when a block
+    // returns a flexible result from a function call in the last statement.
+    if (!builder) continue;
+    u64 registers_after = builder->register_occupied_bitset;
+    if (is_last_statement && expected_result->tag == Expected_Result_Tag_Flexible) {
+      if (result_value->storage.tag == Storage_Tag_Register) {
+        Register result_register = result_value->storage.Register.index;
+        register_bitset_unset(&registers_after, result_register);
+      }
+    }
+    if(registers_before == registers_after) continue;
+    for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+      bool before = register_bitset_get(registers_before, reg_index);
+      bool after = register_bitset_get(registers_after, reg_index);
+      if (before != after) {
+        if (after) {
+          printf("Unreleased %s\n", register_name(reg_index));
+        } else {
+          printf("Falsely released %s\n", register_name(reg_index));
         }
       }
-      panic("Found unreleased registers");
     }
+    panic("Found unreleased registers");
   }
   return result_value;
 }
