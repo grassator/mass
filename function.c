@@ -416,35 +416,13 @@ fn_encode(
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 }
 
-typedef enum {
-  Conditional_Jump_Type_Runtime,
-  Conditional_Jump_Type_Always_False,
-  Conditional_Jump_Type_Always_True,
-} Conditional_Jump_Type;
-
-static Conditional_Jump_Type
+static void
 make_if(
   Function_Builder *builder,
   Label *to_label,
   const Source_Range *source_range,
   Value *value
 ) {
-  if(value->storage.tag == Storage_Tag_Static) {
-    s64 imm = storage_static_value_up_to_s64(&value->storage);
-    bool condition_always_false = (imm == 0);
-    if (condition_always_false) {
-      // Jump unconditionally
-      push_eagerly_encoded_assembly(
-        &builder->code_block, *source_range,
-        &(Instruction_Assembly){jmp, {code_label32(to_label)}}
-      );
-      return Conditional_Jump_Type_Always_False;
-    } else {
-      // Nothing to do - CPU will just continue to the first instruction in the `if` body
-      return Conditional_Jump_Type_Always_True;
-    }
-  }
-
   if (value->storage.tag == Storage_Tag_Eflags) {
     const X64_Mnemonic *mnemonic = 0;
     switch(value->storage.Eflags.compare_type) {
@@ -500,8 +478,6 @@ make_if(
       &(Instruction_Assembly){jz, {code_label32(to_label)}}
     );
   }
-
-  return Conditional_Jump_Type_Runtime;
 }
 
 static Value *

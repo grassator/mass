@@ -5390,34 +5390,27 @@ mass_handle_if_expression_lazy_proc(
   Label *else_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("else"));
 
-  Conditional_Jump_Type jump_type =
-    make_if(builder, else_label, &condition->source_range, condition);
+  make_if(builder, else_label, &condition->source_range, condition);
 
   Label *after_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("endif"));
 
-  Value *result_value = 0;
-  if (jump_type != Conditional_Jump_Type_Always_False) {
-    result_value = value_force(context, builder, expected_result, then);
-    MASS_ON_ERROR(*context->result) return 0;
+  Value *result_value = value_force(context, builder, expected_result, then);
+  MASS_ON_ERROR(*context->result) return 0;
 
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *dummy_range,
-      &(Instruction_Assembly){jmp, {code_label32(after_label)}}
-    );
-  }
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *dummy_range,
+    &(Instruction_Assembly){jmp, {code_label32(after_label)}}
+  );
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
     .Label.pointer = else_label,
   });
 
-  if (jump_type != Conditional_Jump_Type_Always_True) {
-    Expected_Result expected_else =
-      result_value ? expected_result_from_value(result_value) : *expected_result;
-    result_value = value_force(context, builder, &expected_else, else_);
-    MASS_ON_ERROR(*context->result) return 0;
-  }
+  Expected_Result expected_else = expected_result_from_value(result_value);
+  result_value = value_force(context, builder, &expected_else, else_);
+  MASS_ON_ERROR(*context->result) return 0;
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
@@ -5477,6 +5470,21 @@ token_parse_if_expression(
   }
 
   *matched_length = peek_index;
+
+  if (value_is_non_lazy_static(value_condition)) {
+    const Descriptor *descriptor = value_condition->descriptor;
+    if (!descriptor_is_integer(descriptor) && descriptor != &descriptor_i64) {
+      // TODO :GenericIntegerType
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = value_condition->source_range,
+        .Type_Mismatch = { .expected = &descriptor_s64, .actual = value_condition->descriptor },
+      });
+      return 0;
+    }
+    s64 imm = storage_static_value_up_to_s64(&value_condition->storage);
+    return imm ? value_then : value_else;
+  }
 
   // TODO probably want to unify then and else branch before returning
   const Descriptor *result_descriptor = context_is_compile_time_eval(context)
