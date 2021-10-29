@@ -183,12 +183,20 @@ mass_success() {
 }
 
 static inline void
+compilation_error(
+  Compilation *compilation,
+  Mass_Error error
+) {
+  assert(compilation->result->tag != Mass_Result_Tag_Error);
+  *compilation->result = mass_error(error);
+}
+
+static inline void
 context_error(
   Execution_Context *context,
   Mass_Error error
 ) {
-  assert(context->result->tag != Mass_Result_Tag_Error);
-  *context->result = mass_error(error);
+  compilation_error(context->compilation, error);
 }
 
 static void
