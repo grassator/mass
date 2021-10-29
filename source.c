@@ -6917,9 +6917,9 @@ program_parse(
   Execution_Context *context
 ) {
   assert(context->module);
-  Value_View tokens;
 
   Performance_Counter perf = system_performance_counter_start();
+  Value_View tokens;
   MASS_TRY(tokenize(context->compilation, context->module->source_range, &tokens));
   if (0) {
     u64 usec = system_performance_counter_end(&perf);

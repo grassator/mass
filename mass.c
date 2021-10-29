@@ -11,6 +11,7 @@
 typedef enum {
   Mass_Cli_Mode_Compile,
   Mass_Cli_Mode_Run,
+  Mass_Cli_Mode_Script,
 } Mass_Cli_Mode;
 
 s32
@@ -58,6 +59,8 @@ int main(s32 argc, char **argv) {
     char *arg = argv[i];
     if (strcmp(arg, "--run") == 0) {
       mode = Mass_Cli_Mode_Run;
+    } else if (strcmp(arg, "--script") == 0) {
+      mode = Mass_Cli_Mode_Script;
     } else if (strcmp(arg, "--output") == 0) {
       if (++i >= argc) {
         return mass_cli_print_usage();
@@ -100,7 +103,8 @@ int main(s32 argc, char **argv) {
       calling_convention = &calling_convention_x86_64_windows;
       break;
     }
-    case Mass_Cli_Mode_Run: {
+    case Mass_Cli_Mode_Run:
+    case Mass_Cli_Mode_Script: {
       calling_convention = host_calling_convention();
       break;
     }
@@ -116,6 +120,26 @@ int main(s32 argc, char **argv) {
     return mass_cli_print_error(&compilation, &result.Error.error);
   }
   Module *root_module = program_module_from_file(&context, file_path, context.scope);
+  if(result.tag != Mass_Result_Tag_Success) {
+    return mass_cli_print_error(&compilation, &result.Error.error);
+  }
+
+  if (mode == Mass_Cli_Mode_Script) {
+    Value_View tokens;
+    MASS_TRY(tokenize(&compilation, root_module->source_range, &tokens));
+    Group_Curly curly = {.children = tokens};
+    Value group_value;
+    value_init(&group_value, &descriptor_group_curly, storage_static(&curly), root_module->source_range);
+    Value *group_value_pointer = &group_value;
+    Value_View group_view = value_view_single(&group_value_pointer);
+    compile_time_eval(&context, group_view);
+    if(context.result->tag != Mass_Result_Tag_Success) {
+      return mass_cli_print_error(&compilation, &context.result->Error.error);
+    }
+    return 0;
+  }
+
+
   program_import_module(&context, root_module);
   if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&compilation, &result.Error.error);
@@ -154,6 +178,9 @@ int main(s32 argc, char **argv) {
       fixed_buffer_destroy(path_buffer);
       break;
     }
+    case Mass_Cli_Mode_Script: {
+      panic("Script mode expected to be handled at an earlier stage");
+    } break;
     case Mass_Cli_Mode_Run: {
       Jit jit;
       jit_init(&jit, context.program);
