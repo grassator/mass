@@ -37,11 +37,7 @@ mass_cli_print_error(
   Compilation *compilation,
   Mass_Error *error
 ) {
-  Fixed_Buffer *error_buffer = mass_error_to_string(compilation, error);
-  slice_print(fixed_buffer_as_slice(error_buffer));
-  fixed_buffer_destroy(error_buffer);
-  printf("\n  at ");
-  source_range_print_start_position(compilation, &error->source_range);
+  mass_print_error(compilation, error);
   return -1;
 }
 
@@ -119,27 +115,16 @@ int main(s32 argc, char **argv) {
   if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&compilation, &result.Error.error);
   }
-  Module *root_module = program_module_from_file(&context, file_path, context.scope);
-  if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&compilation, &result.Error.error);
-  }
 
   if (mode == Mass_Cli_Mode_Script) {
-    Value_View tokens;
-    MASS_TRY(tokenize(&compilation, root_module->source_range, &tokens));
-    Group_Curly curly = {.children = tokens};
-    Value group_value;
-    value_init(&group_value, &descriptor_group_curly, storage_static(&curly), root_module->source_range);
-    Value *group_value_pointer = &group_value;
-    Value_View group_view = value_view_single(&group_value_pointer);
-    compile_time_eval(&context, group_view);
+    mass_run_script(&context, file_path);
     if(context.result->tag != Mass_Result_Tag_Success) {
       return mass_cli_print_error(&compilation, &context.result->Error.error);
     }
     return 0;
   }
 
-
+  Module *root_module = program_module_from_file(&context, file_path, context.scope);
   program_import_module(&context, root_module);
   if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&compilation, &result.Error.error);

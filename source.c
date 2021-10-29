@@ -6931,6 +6931,7 @@ program_parse(
   return *context->result;
 }
 
+
 static Fixed_Buffer *
 program_absolute_path(
   Slice raw_path
@@ -7056,4 +7057,33 @@ program_load_file_module_into_root_scope(
 ) {
   Module *module = program_module_from_file(context, file_path, context->compilation->root_scope);
   return program_import_module(context, module);
+}
+
+static void
+mass_print_error(
+  Compilation *compilation,
+  Mass_Error *error
+) {
+  Fixed_Buffer *error_buffer = mass_error_to_string(compilation, error);
+  slice_print(fixed_buffer_as_slice(error_buffer));
+  fixed_buffer_destroy(error_buffer);
+  printf("\n  at ");
+  source_range_print_start_position(compilation, &error->source_range);
+}
+
+static void
+mass_run_script(
+  Execution_Context *context,
+  Slice file_path
+) {
+  Module *root_module = program_module_from_file(context, file_path, context->scope);
+  MASS_ON_ERROR(*context->result) return;
+  Value_View tokens;
+  MASS_ON_ERROR(tokenize(context->compilation, root_module->source_range, &tokens)) return;
+  Group_Curly curly = {.children = tokens};
+  Value group_value;
+  value_init(&group_value, &descriptor_group_curly, storage_static(&curly), root_module->source_range);
+  Value *group_value_pointer = &group_value;
+  Value_View group_view = value_view_single(&group_value_pointer);
+  compile_time_eval(context, group_view);
 }
