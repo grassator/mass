@@ -17,7 +17,7 @@
 
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
-  Execution_Context *context,
+  Compilation *compilation,
   Function_Builder *builder,
   Value *target,
   Value *source,
@@ -31,7 +31,7 @@ expected_result_descriptor(
 
 static PRELUDE_NO_DISCARD Value *
 expected_result_ensure_value_or_temp(
-  Execution_Context *context,
+  Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *value
@@ -115,7 +115,7 @@ token_handle_function_call(
 
 static PRELUDE_NO_DISCARD Value *
 value_force(
-  Execution_Context *context,
+  Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *value
@@ -123,7 +123,7 @@ value_force(
 
 static void
 value_force_exact(
-  Execution_Context *context,
+  Compilation *compilation,
   Function_Builder *builder,
   Value *target,
   Value *source

@@ -1345,6 +1345,7 @@ typedef struct Code_Block {
 typedef dyn_array_type(Code_Block) Array_Code_Block;
 
 typedef struct Function_Builder {
+  Program * program;
   u64 epoch;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
@@ -1551,6 +1552,7 @@ expected_result_as_flexible(Expected_Result *expected_result) {
 typedef dyn_array_type(Expected_Result) Array_Expected_Result;
 typedef struct Lazy_Value {
   Execution_Context context;
+  u64 epoch;
   const Descriptor * descriptor;
   Lazy_Value_Proc proc;
   void * payload;
@@ -3926,6 +3928,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_program_pointer,
+    .name = slice_literal_fields("program"),
+    .Base_Relative.offset = offsetof(Function_Builder, program),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_u64,
     .name = slice_literal_fields("epoch"),
     .Base_Relative.offset = offsetof(Function_Builder, epoch),
@@ -4570,6 +4578,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
     .descriptor = &descriptor_execution_context,
     .name = slice_literal_fields("context"),
     .Base_Relative.offset = offsetof(Lazy_Value, context),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("epoch"),
+    .Base_Relative.offset = offsetof(Lazy_Value, epoch),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -499,7 +499,7 @@ maybe_constant_fold_internal(
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
   Value *imm_value = value_make(context, descriptor, imm_storage, *source_range);
-  return expected_result_ensure_value_or_temp(context, builder, expected_result, imm_value);
+  return expected_result_ensure_value_or_temp(context->compilation, builder, expected_result, imm_value);
 }
 
 static inline Storage
@@ -519,7 +519,6 @@ storage_adjusted_for_lea(
 
 static void
 load_address(
-  Execution_Context *context, // TODO remove this parameter
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -550,7 +549,6 @@ load_address(
 
 static void
 load_address_to_indirect(
-  Execution_Context *context, // TODO remove this parameter
   Function_Builder *builder,
   const Source_Range *source_range,
   Storage target,
@@ -731,6 +729,7 @@ ensure_function_instance(
     value_make(context, return_descriptor, return_storage, fn_info->returns.declaration.source_range);
 
   Function_Builder *builder = &(Function_Builder){
+    .program = program,
     .epoch = body_context.epoch,
     .function = fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
@@ -780,7 +779,7 @@ ensure_function_instance(
   }
   MASS_ON_ERROR(*context->result) return 0;
 
-  value_force_exact(&body_context, builder, return_value, parse_result);
+  value_force_exact(context->compilation, builder, return_value, parse_result);
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
@@ -886,6 +885,7 @@ program_init_startup_code(
   Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
+    .program = program,
     .epoch = get_new_epoch(),
     .function = fn_info,
     .code_block = {

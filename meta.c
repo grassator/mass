@@ -1416,6 +1416,7 @@ main(void) {
   }));
 
   push_type(type_struct("Function_Builder", (Struct_Item[]){
+    { "Program *", "program" },
     { "u64", "epoch" },
     { "s32", "stack_reserve" },
     { "u32", "max_call_parameters_stack_size" },
@@ -1598,6 +1599,7 @@ main(void) {
 
   push_type(type_struct("Lazy_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
+    { "u64", "epoch" },
     { "const Descriptor *", "descriptor" },
     { "Lazy_Value_Proc", "proc" },
     { "void *", "payload" },

@@ -1212,7 +1212,7 @@ value_register_for_descriptor(
 
 static inline Value *
 value_temporary_acquire_indirect_for_descriptor(
-  Execution_Context *context,
+  const Allocator *allocator,
   Function_Builder *builder,
   Register reg,
   const Descriptor *descriptor,
@@ -1220,14 +1220,15 @@ value_temporary_acquire_indirect_for_descriptor(
 ) {
   register_acquire(builder, reg);
   Storage storage = storage_indirect(descriptor->bit_size, reg);
-  Value *value = value_make(context, descriptor, storage, source_range);
+  Value *value = allocator_allocate(allocator, Value);
+  value_init(value, descriptor, storage, source_range);
   value->is_temporary = true;
   return value;
 }
 
 static inline Value *
 value_temporary_acquire_register_for_descriptor(
-  Execution_Context *context,
+  const Allocator *allocator,
   Function_Builder *builder,
   Register reg,
   const Descriptor *descriptor,
@@ -1235,7 +1236,8 @@ value_temporary_acquire_register_for_descriptor(
 ) {
   register_acquire(builder, reg);
   Storage storage = storage_register_for_descriptor(reg, descriptor);
-  Value *value = value_make(context, descriptor, storage, source_range);
+  Value *value = allocator_allocate(allocator, Value);
+  value_init(value, descriptor, storage, source_range);
   value->is_temporary = true;
   return value;
 }
