@@ -161,7 +161,7 @@ mass_error_to_string(
       APPEND_LITERAL("Invalid identifier");
     } break;
     case Mass_Error_Tag_Dynamic_Library_Load: {
-      APPEND_LITERAL("Unable to load a dynamic library");
+      APPEND_LITERAL("Unable to load a dynamic library ");
       APPEND_SLICE(error->Dynamic_Library_Load.library_name);
     } break;
     case Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found: {

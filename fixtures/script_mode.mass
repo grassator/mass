@@ -10,5 +10,5 @@ WriteFile :: fn(
 
 stdout_handle := GetStdHandle(cast(s32, -11))
 
-string :: "Hello, World!"
+string :: "Hello, World!\n"
 () = WriteFile(stdout_handle, string.bytes, cast(s32, string.length), 0, 0)

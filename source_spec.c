@@ -2217,6 +2217,18 @@ spec("source") {
     }
   }
 
+  describe("Script mode") {
+    #if defined(_WIN32) // TODO support on Linux
+    it("should support script-mode execution") {
+      Mass_Result result =
+        program_load_file_module_into_root_scope(&test_context, slice_literal("std/prelude"));
+      check(spec_check_mass_result(&result));
+      mass_run_script(&test_context, slice_literal("fixtures/script_mode"));
+      check(spec_check_mass_result(test_context.result));
+    }
+    #endif
+  }
+
   describe("PE32 Executables") {
     it("should parse and write out an executable that exits with status code 42") {
       Program *test_program = test_context.program;
