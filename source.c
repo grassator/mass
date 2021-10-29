@@ -4187,14 +4187,14 @@ storage_load_index_address(
   // Multiplication by 1 byte is useless so checking it here
   if (item_descriptor->bit_size.as_u64 != 8) {
     u32 item_byte_size = u64_to_u32(descriptor_byte_size(item_descriptor));
-    Value *byte_size_value = value_from_s32(compilation->allocator, item_byte_size, *source_range);
 
     // Multiply index by the item byte size
     Value *reg_byte_size_value = value_temporary_acquire_register_for_descriptor(
       allocator, builder, register_find_available(builder, 0), &descriptor_s64, *source_range
     );
 
-    move_value(builder, source_range, &reg_byte_size_value->storage, &byte_size_value->storage);
+    Storage item_byte_size_storage = imm32(item_byte_size);
+    move_value(builder, source_range, &reg_byte_size_value->storage, &item_byte_size_storage);
 
     push_eagerly_encoded_assembly(
       &builder->code_block, *source_range,
@@ -4664,8 +4664,11 @@ mass_handle_comparison_operation_lazy_proc(
     &(Instruction_Assembly){cmp, {temp_a->storage, temp_b->storage}}
   );
 
-  Value *comparison_value =
-    value_from_compare(compilation->allocator, compare_type, *source_range);
+  Value *comparison_value = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    // TODO figure out a better descriptor for comparison results
+    &descriptor_s8, storage_eflags(compare_type), *source_range
+  );
 
   value_release_if_temporary(builder, temp_a);
   value_release_if_temporary(builder, temp_b);

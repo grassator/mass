@@ -1096,52 +1096,6 @@ storage_eflags(
   };
 }
 
-// TODO consider adding explicit boolean descriptor type
-#define value_from_compare(_ALLOCATOR_, _compare_type_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
-)
-
-#define value_from_s64(_ALLOCATOR_, _integer_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_s64, imm64((_integer_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_s32(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_s32, imm32((_INTEGER_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_s16(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_s16, imm16((_INTEGER_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_s8(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_s8, imm8((_INTEGER_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_u64(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_u64, imm64((_INTEGER_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_u32(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_u32, imm32((_INTEGER_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_u16(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_u16, imm16((_INTEGER_)), (_SOURCE_RANGE_)\
-)
-
-#define value_from_u8(_ALLOCATOR_, _INTEGER_, _SOURCE_RANGE_) value_init(\
-  allocator_allocate((_ALLOCATOR_), Value),\
-  &descriptor_u8, imm8((_INTEGER_), (_SOURCE_RANGE_)\
-)
-
 static inline Value *
 value_from_signed_immediate(
   Execution_Context *context,

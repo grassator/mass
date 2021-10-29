@@ -205,7 +205,10 @@ spec("source") {
 
   describe("Scope") {
     it("should be able to set and lookup values") {
-      Value *test = value_from_s64(test_context.allocator, 42, (Source_Range){0});
+      Value *test = value_init(
+        allocator_allocate(test_context.allocator, Value),
+        &descriptor_s64, imm64(42), COMPILER_SOURCE_RANGE
+      );
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       scope_define_value(root_scope, 0, (Source_Range){0}, symbol, test);
@@ -214,17 +217,26 @@ spec("source") {
     }
 
     it("should be able to lookup things from parent scopes") {
-      Value *global = value_from_s64(test_context.allocator, 42, (Source_Range){0});
+      Value *global = value_init(
+        allocator_allocate(test_context.allocator, Value),
+        &descriptor_s64, imm64(42), COMPILER_SOURCE_RANGE
+      );
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *global_symbol = mass_ensure_symbol(&test_compilation, slice_literal("global"));
       scope_define_value(root_scope, 0, (Source_Range){0}, global_symbol, global);
 
       const Symbol *test_symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
-      Value *level_1_test = value_from_s64(test_context.allocator, 1, (Source_Range){0});
+      Value *level_1_test = value_init(
+        allocator_allocate(test_context.allocator, Value),
+        &descriptor_s64, imm64(1), COMPILER_SOURCE_RANGE
+      );
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define_value(scope_level_1, 0, (Source_Range){0}, test_symbol, level_1_test);
 
-      Value *level_2_test = value_from_s64(test_context.allocator, 1, (Source_Range){0});
+      Value *level_2_test = value_init(
+        allocator_allocate(test_context.allocator, Value),
+        &descriptor_s64, imm64(2), COMPILER_SOURCE_RANGE
+      );
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define_value(scope_level_2, 0, (Source_Range){0}, test_symbol,  level_2_test);
 
