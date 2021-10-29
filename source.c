@@ -5368,23 +5368,12 @@ mass_handle_if_expression_lazy_proc(
   const Expected_Result *expected_result,
   Mass_If_Expression_Lazy_Payload *payload
 ) {
-  Value *condition = payload->condition;
-  Value *then = payload->then;
-  Value *else_ = payload->else_;
-
   const Source_Range *dummy_range = &payload->condition->source_range;
 
-  if (value_is_static_i64(condition)) {
-    condition = token_value_force_immediate_integer(
-      context, condition, &descriptor_s64, dummy_range
-    );
-  } else if (condition->descriptor == &descriptor_lazy_value) {
-    // TODO support any If-able descriptors instead of accepting literally anything
-    Expected_Result expected_condition = expected_result_any(0);
-    Value *temp_condition = value_force(context, builder, &expected_condition, condition);
-    MASS_ON_ERROR(*context->result) return 0;
-    condition = temp_condition;
-  }
+  // TODO support any If-able descriptors instead of accepting literally anything
+  Expected_Result expected_condition = expected_result_any(0);
+  Value *condition = value_force(context, builder, &expected_condition, payload->condition);
+  MASS_ON_ERROR(*context->result) return 0;
 
   Program *program = context->program;
   Label *else_label =
@@ -5395,7 +5384,7 @@ mass_handle_if_expression_lazy_proc(
   Label *after_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("endif"));
 
-  Value *result_value = value_force(context, builder, expected_result, then);
+  Value *result_value = value_force(context, builder, expected_result, payload->then);
   MASS_ON_ERROR(*context->result) return 0;
 
   push_eagerly_encoded_assembly(
@@ -5409,7 +5398,7 @@ mass_handle_if_expression_lazy_proc(
   });
 
   Expected_Result expected_else = expected_result_from_value(result_value);
-  result_value = value_force(context, builder, &expected_else, else_);
+  result_value = value_force(context, builder, &expected_else, payload->else_);
   MASS_ON_ERROR(*context->result) return 0;
 
   push_instruction(&builder->code_block, (Instruction) {
