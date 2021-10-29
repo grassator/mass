@@ -2178,7 +2178,6 @@ value_force(
       return 0;
     }
     Value *result = lazy->proc(&lazy->context, builder, expected_result, lazy->payload);
-    allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
     MASS_ON_ERROR(*context->result) return 0;
     // TODO is there a better way to cache the result?
     *value = *result;
