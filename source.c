@@ -5368,8 +5368,6 @@ mass_handle_if_expression_lazy_proc(
   const Expected_Result *expected_result,
   Mass_If_Expression_Lazy_Payload *payload
 ) {
-  const Source_Range *dummy_range = &payload->condition->source_range;
-
   // TODO support any If-able descriptors instead of accepting literally anything
   Expected_Result expected_condition = expected_result_any(0);
   Value *condition = value_force(context, builder, &expected_condition, payload->condition);
@@ -5387,8 +5385,10 @@ mass_handle_if_expression_lazy_proc(
   Value *result_value = value_force(context, builder, expected_result, payload->then);
   MASS_ON_ERROR(*context->result) return 0;
 
+  Source_Range after_then_body_source_range = payload->then->source_range;
+  after_then_body_source_range.offsets.from = after_then_body_source_range.offsets.to;
   push_eagerly_encoded_assembly(
-    &builder->code_block, *dummy_range,
+    &builder->code_block, after_then_body_source_range,
     &(Instruction_Assembly){jmp, {code_label32(after_label)}}
   );
 
