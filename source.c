@@ -7084,14 +7084,31 @@ mass_run_script(
   Execution_Context *context,
   Slice file_path
 ) {
+  Compilation *compilation = context->compilation;
   Module *root_module = program_module_from_file(context, file_path, context->scope);
   MASS_ON_ERROR(*context->result) return;
-  Value_View tokens;
-  MASS_ON_ERROR(tokenize(context->compilation, root_module->source_range, &tokens)) return;
-  Group_Curly curly = {.children = tokens};
-  Value group_value;
-  value_init(&group_value, &descriptor_group_curly, storage_static(&curly), root_module->source_range);
-  Value *group_value_pointer = &group_value;
-  Value_View group_view = value_view_single(&group_value_pointer);
-  compile_time_eval(context, group_view);
+
+  Source_Range source_range = root_module->source_range;
+  Value_View *tokens = allocator_allocate(context->allocator, Value_View);
+  MASS_ON_ERROR(tokenize(compilation, root_module->source_range, tokens)) return;
+
+  Value *tokens_value = allocator_allocate(context->allocator, Value);
+  value_init(tokens_value, &descriptor_value_view, storage_static(tokens), source_range);
+
+  Function_Literal *literal = mass_make_fake_function_literal(
+    context, tokens_value, &descriptor_void, &source_range
+  );
+  Value *literal_value =
+    value_make(context, &descriptor_function_literal, storage_static(literal), source_range);
+
+  context->program->entry_point = literal_value;
+  ensure_function_instance(compilation, context->program, literal_value, (Value_View){0});
+  MASS_ON_ERROR(*context->result) return;
+
+  Jit jit;
+  jit_init(&jit, context->program);
+  *context->result = program_jit(compilation, &jit);
+  MASS_ON_ERROR(*context->result) return;
+  fn_type_opaque script = value_as_function(jit.program, jit.program->entry_point);
+  script();
 }
