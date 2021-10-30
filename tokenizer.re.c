@@ -11,7 +11,7 @@ tokenize(
   Source_Range source_range,
   Value_View *out_tokens
 ) {
-  Slice input = source_from_source_range(compilation, &source_range);
+  Slice input = source_range.file->text;
 
   const Allocator *allocator = compilation->allocator;
 
@@ -23,9 +23,10 @@ tokenize(
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
 
-  u64 offset = 0;
-  u64 marker = 0;
-  u64 token_start_offset = 0;
+  u64 offset = source_range.offsets.from;
+  u64 token_start_offset = offset;
+  u64 marker = offset;
+  u64 end_offset = source_range.offsets.to;
 
   #define TOKENIZER_CURRENT_SLICE()\
     slice_sub(input, token_start_offset, offset)
@@ -85,8 +86,8 @@ tokenize(
       re2c:flags:input = custom;
       re2c:api:style = free-form;
       re2c:define:YYCTYPE    = char;
-      re2c:define:YYLESSTHAN = "offset >= input.length";
-      re2c:define:YYPEEK     = "offset < input.length ? input.bytes[offset] : 0";
+      re2c:define:YYLESSTHAN = "offset >= end_offset";
+      re2c:define:YYPEEK     = "offset < end_offset ? input.bytes[offset] : 0";
       re2c:define:YYSKIP     = "++offset;";
       re2c:define:YYBACKUP   = "marker = offset;";
       re2c:define:YYRESTORE  = "offset = marker;";
@@ -165,12 +166,8 @@ tokenize(
 
   done:
   if (result.tag == Mass_Result_Tag_Success) {
-    Source_Range children_range = {
-      .file = source_range.file,
-      .offsets = {.from = 0, .to = u64_to_u32(input.length)},
-    };
     *out_tokens = temp_token_array_into_value_view(
-      allocator, dyn_array_raw(stack), u64_to_u32(dyn_array_length(stack)), children_range
+      allocator, dyn_array_raw(stack), u64_to_u32(dyn_array_length(stack)), source_range
     );
   }
   fixed_buffer_destroy(string_buffer);
