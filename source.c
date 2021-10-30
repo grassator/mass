@@ -7089,6 +7089,29 @@ mass_print_error(
 }
 
 static void
+mass_maybe_trim_shebang(
+  Source_Range *source_range
+) {
+  Range_u32 *offsets = &source_range->offsets;
+  for (offsets->from; offsets->from < offsets->to; offsets->from += 1) {
+    char ch = source_range->file->text.bytes[offsets->from];
+    if (isspace(ch)) continue;
+    if (ch == '#') {
+      // Skip till the end of line
+      for (; offsets->from < offsets->to; offsets->from += 1) {
+        char ch = source_range->file->text.bytes[offsets->from];
+        if (ch == '\n') {
+          offsets->from += 1;
+          goto next;
+        }
+      }
+    }
+    next:
+    break;
+  }
+}
+
+static void
 mass_run_script(
   Execution_Context *context,
   Slice file_path
@@ -7097,9 +7120,13 @@ mass_run_script(
   Module *root_module = program_module_from_file(context, file_path, context->scope);
   MASS_ON_ERROR(*context->result) return;
 
+  // Trim leading whitespace and possible a shebang
   Source_Range source_range = root_module->source_range;
+  mass_maybe_trim_shebang(&source_range);
+
   Value_View *tokens = allocator_allocate(context->allocator, Value_View);
-  MASS_ON_ERROR(tokenize(compilation, root_module->source_range, tokens)) return;
+  *context->result = tokenize(compilation, source_range, tokens);
+  MASS_ON_ERROR(*context->result) return;
 
   Value *tokens_value = allocator_allocate(context->allocator, Value);
   value_init(tokens_value, &descriptor_value_view, storage_static(tokens), source_range);

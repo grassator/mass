@@ -130,7 +130,10 @@ mass_error_to_string(
       }
     } break;
     case Mass_Error_Tag_Unexpected_Token: {
-      APPEND_LITERAL("Unexpected token");
+      APPEND_LITERAL("Unexpected token '");
+      APPEND_LITERAL("'");
+      Slice source = source_from_source_range(compilation, &error->source_range);
+      APPEND_SLICE(source);
       if (error->Unexpected_Token.expected.length) {
         APPEND_LITERAL(", expected '");
         APPEND_SLICE(error->Unexpected_Token.expected);
