@@ -2552,6 +2552,22 @@ mass_import(
   return 0;
 }
 
+static void
+mass_push_token_matcher(
+  Execution_Context *context,
+  Token_Statement_Matcher_Proc proc,
+  void *payload
+) {
+  Token_Statement_Matcher *matcher =
+    allocator_allocate(context->allocator, Token_Statement_Matcher);
+  *matcher = (Token_Statement_Matcher){
+    .previous = context->scope->statement_matcher,
+    .proc = proc,
+    .payload = payload,
+  };
+  context->scope->statement_matcher = matcher;
+}
+
 static u32
 token_parse_syntax_definition(
   Execution_Context *context,
@@ -2665,14 +2681,7 @@ token_parse_syntax_definition(
     .replacement = replacement,
     .scope = context->scope
   };
-  Token_Statement_Matcher *matcher =
-    allocator_allocate(context->allocator, Token_Statement_Matcher);
-  *matcher = (Token_Statement_Matcher){
-    .previous = context->scope->statement_matcher,
-    .proc = token_parse_macro_statement,
-    .payload = macro,
-  };
-  context->scope->statement_matcher = matcher;
+  mass_push_token_matcher(context, token_parse_macro_statement, macro);
   return peek_index;
 
   err:
