@@ -2,7 +2,7 @@ main :: fn() {
   io :: import("std/io")
   process :: import("std/process")
 
-  message :: "Hello, World!"
+  message :: "Hello, World!\n"
   io.print(message)
 
   process.exit(0)

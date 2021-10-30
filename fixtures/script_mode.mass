@@ -1,14 +1,3 @@
+io :: import("std/io")
 
-GetStdHandle :: fn(handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
-WriteFile :: fn(
-  status : s64,
-  buffer : &u8,
-  size : s32,
-  bytes_written : s64,
-  overlapped : s64
-) -> (s64) external("kernel32.dll", "WriteFile")
-
-stdout_handle := GetStdHandle(cast(s32, -11))
-
-string :: "Hello, World!\n"
-WriteFile(stdout_handle, string.bytes, cast(s32, string.length), 0, 0)
+io.print("Hello, World!\n")
