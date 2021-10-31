@@ -115,11 +115,7 @@ Pointer_To :: macro(type : Type) -> (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
 }
 address_of :: Pointer_To
-
-// It is technically not necessary to specify the return type here,
-// but it is nice as an extra stress to the compiler.
-// FIXME Using `address_of` instead of `Pointer_To` results in an infinite loop
-address_of :: fn(x) => (Pointer_To(type_of(x))) MASS.address_of
+address_of :: fn(x) => (address_of(type_of(x))) MASS.address_of
 
 template_signed_integer_overloads :: macro(template, impl) {
   f :: template(impl, s64)
