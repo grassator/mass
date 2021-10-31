@@ -4879,6 +4879,19 @@ mass_compile_time_error(
 }
 
 static Value *
+mass_call(
+  Execution_Context *context,
+  Value_View args_view
+) {
+  assert(args_view.length == 2);
+  Value *lhs_value = value_view_get(args_view, 0);
+  Value *rhs_value = value_view_get(args_view, 1);
+  return token_handle_parsed_function_call(
+    context, lhs_value, rhs_value, args_view.source_range
+  );
+}
+
+static Value *
 mass_handle_apply_operator(
   Execution_Context *context,
   Value_View operands_view,
@@ -4887,11 +4900,8 @@ mass_handle_apply_operator(
   Value *lhs_value = value_view_get(operands_view, 0);
   Value *rhs_value = value_view_get(operands_view, 1);
   Source_Range source_range = operands_view.source_range;
-
   if (value_is_group_paren(rhs_value)) {
-    return token_handle_parsed_function_call(
-      context, lhs_value, rhs_value, operands_view.source_range
-    );
+    return mass_call(context, operands_view);
   }
 
   if (rhs_value->descriptor == &descriptor_value_view) {

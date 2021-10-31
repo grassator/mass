@@ -676,6 +676,9 @@ typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 static Mass_Result tokenize
   (Compilation * compilation, Source_Range source_range, Value_View * out_tokens);
 
+static Value * mass_call
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_import
   (Execution_Context * context, Value_View args);
 
@@ -2615,6 +2618,7 @@ static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
+static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_eval;
