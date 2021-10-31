@@ -4835,7 +4835,7 @@ mass_size_of(
 }
 
 static Value *
-mass_address_of(
+mass_pointer_to(
   Execution_Context *context,
   Value_View args
 ) {

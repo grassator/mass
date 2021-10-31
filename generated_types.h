@@ -679,7 +679,7 @@ static Mass_Result tokenize
 static Value * mass_import
   (Execution_Context * context, Value_View args);
 
-static Value * mass_address_of
+static Value * mass_pointer_to
   (Execution_Context * context, Value_View args);
 
 static Value * mass_eval
@@ -2616,7 +2616,7 @@ static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_import;
-static Descriptor descriptor_mass_address_of;
+static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_eval;
 static Descriptor descriptor_mass_fragment;
 static Descriptor descriptor_mass_inline_module;

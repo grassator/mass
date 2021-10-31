@@ -97,7 +97,7 @@ operator 15 (x | y) bitwise_or
 operator 15 (x & y) bitwise_and
 
 operator 16 (- x) negate
-operator 16 (& x) address_of
+operator 16 (& x) pointer_to
 
 operator intrinsic 20 (@ x) eval
 operator intrinsic 25 (~> x) fragment
@@ -111,11 +111,10 @@ unquote :: @fn(x) MASS.unquote
 type_of :: fn(x) => (Type) MASS.type_of
 size_of :: fn(x) => (i64) MASS.size_of
 
-Pointer_To :: macro(type : Type) -> (Type) {
+pointer_to :: macro(type : Type) -> (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
 }
-address_of :: Pointer_To
-address_of :: fn(x) => (address_of(type_of(x))) MASS.address_of
+pointer_to :: fn(x) => (pointer_to(type_of(x))) MASS.pointer_to
 
 template_signed_integer_overloads :: macro(template, impl) {
   f :: template(impl, s64)
