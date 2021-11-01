@@ -918,7 +918,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "intrinsic_id :: @fn(x) @intrinsic { x }\n"
+          "intrinsic_id :: @fn(x) intrinsic { x }\n"
           "checker :: fn() -> (s64) { intrinsic_id(42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -930,7 +930,7 @@ spec("source") {
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
-            "@intrinsic { arguments.values.1 }\n"
+            "intrinsic { arguments.values.1 }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -942,7 +942,7 @@ spec("source") {
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
-            "@intrinsic { b }\n"
+            "intrinsic { b }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -952,7 +952,7 @@ spec("source") {
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,
-        "my_intrinsic :: fn() -> () @intrinsic { 0 }\n"
+        "my_intrinsic :: fn() -> () intrinsic { 0 }\n"
         "checker :: fn() -> () { my_intrinsic() }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);

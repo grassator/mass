@@ -5618,10 +5618,6 @@ token_parse_intrinsic_literal(
   u32 *match_length
 ) {
   u32 peek_index = 0;
-  Value *at = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.operator_at
-  );
-  if (!at) return 0;
   Value *keyword = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.intrinsic
   );
