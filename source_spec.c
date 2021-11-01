@@ -918,7 +918,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "intrinsic_id :: @fn(x) intrinsic { x }\n"
+          "intrinsic_id :: fn(x : i64) => (i64) intrinsic { arguments.values.0 }\n"
           "checker :: fn() -> (s64) { intrinsic_id(42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -931,18 +931,6 @@ spec("source") {
           "checker", &test_context,
           "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
             "intrinsic { arguments.values.1 }\n"
-          "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
-        );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to be able to access arguments by names in user-defined intrinsics") {
-      s64 (*checker)() =
-        (s64 (*)())test_program_inline_source_function(
-          "checker", &test_context,
-          "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
-            "intrinsic { b }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
       check(spec_check_mass_result(test_context.result));

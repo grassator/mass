@@ -5614,7 +5614,6 @@ static Value *
 token_parse_intrinsic_literal(
   Execution_Context *context,
   Value_View view,
-  const Function_Info *info,
   u32 *match_length
 ) {
   u32 peek_index = 0;
@@ -5630,64 +5629,8 @@ token_parse_intrinsic_literal(
   }
   *match_length = peek_index;
 
-  const u64 tokens_per_argument = 8;
-  Array_Value_Ptr wrapped_body_children = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->allocator,
-    .capacity = tokens_per_argument * dyn_array_length(info->parameters),
-  );
-
-  // TODO would be nice to somehow make it non syntax-dependent
-  // This adds local definitions for each of the arguments
-  Value *arguments_symbol = token_make_symbol_value(
-    context->compilation, slice_literal("arguments"), view.source_range
-  );
-  Value *values_symbol = token_make_symbol_value(
-    context->compilation, slice_literal("values"), view.source_range
-  );
-  Value *colon_equal_symbol = token_make_symbol_value(
-    context->compilation, slice_literal(":="), view.source_range
-  );
-  Value *dot_symbol = token_make_symbol_value(
-    context->compilation, slice_literal("."), view.source_range
-  );
-  Value *semicolon_symbol = token_make_symbol_value(
-    context->compilation, slice_literal(";"), view.source_range
-  );
-  for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
-    Function_Parameter *param = dyn_array_get(info->parameters, param_index);
-    Value *param_name_symbol = value_make(
-      context, &descriptor_symbol, storage_static(param->declaration.symbol), view.source_range
-    );
-
-    dyn_array_push(wrapped_body_children, param_name_symbol);
-    dyn_array_push(wrapped_body_children, colon_equal_symbol);
-    dyn_array_push(wrapped_body_children, arguments_symbol);
-    dyn_array_push(wrapped_body_children, dot_symbol);
-    dyn_array_push(wrapped_body_children, values_symbol);
-    dyn_array_push(wrapped_body_children, dot_symbol);
-    i64 *literal = allocator_allocate(context->allocator, i64);
-    *literal = (i64){.bits = param_index};
-    Value *literal_value = value_make(
-      context, &descriptor_i64, storage_static(literal), view.source_range
-    );
-    dyn_array_push(wrapped_body_children, literal_value);
-    dyn_array_push(wrapped_body_children, semicolon_symbol);
-  }
-  assert(dyn_array_length(wrapped_body_children) % tokens_per_argument == 0);
-
-
-  dyn_array_push(wrapped_body_children, body);
-
-  Group_Curly *wrapped_body_group = allocator_allocate(context->allocator, Group_Curly);
-  wrapped_body_group->children = value_view_from_value_array(wrapped_body_children, &body->source_range);
-
-  Value *wrapped_body_value = value_make(
-    context, &descriptor_group_curly, storage_static(wrapped_body_group), body->source_range
-  );
-
   Function_Literal *literal = mass_make_fake_function_literal(
-    context, wrapped_body_value, &descriptor_value_pointer, &keyword->source_range
+    context, body, &descriptor_value_pointer, &keyword->source_range
   );
 
   // @Volatile :IntrinsicFunctionSignature
@@ -5699,6 +5642,7 @@ token_parse_intrinsic_literal(
   );
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
     .declaration = {
+      // TODO make a common symbol for this
       .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
       .descriptor = &descriptor_execution_context_pointer,
       .source_range = keyword->source_range,
@@ -5706,6 +5650,7 @@ token_parse_intrinsic_literal(
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
     .declaration = {
+      // TODO make a common symbol for this
       .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
       .descriptor = &descriptor_value_view,
       .source_range = keyword->source_range,
@@ -5872,7 +5817,7 @@ token_parse_function_literal(
   if (!body_value) {
     u32 intrinsic_match_length = 0;
     Value_View rest = value_view_rest(&view, peek_index);
-    body_value = token_parse_intrinsic_literal(context, rest, fn_info, &intrinsic_match_length);
+    body_value = token_parse_intrinsic_literal(context, rest, &intrinsic_match_length);
     if (body_value) {
       peek_index += intrinsic_match_length;
     }
