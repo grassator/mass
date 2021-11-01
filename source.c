@@ -6736,9 +6736,7 @@ scope_define_builtins(
   Scope *scope,
   const Calling_Convention *calling_convention
 ) {
-  Execution_Context *context = &(Execution_Context){0};
-  *context = execution_context_from_compilation(compilation);
-  const Allocator *allocator = context->allocator;
+  const Allocator *allocator = compilation->allocator;
 
   global_scope_define_exports(compilation, scope);
   scope_define_value(
