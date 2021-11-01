@@ -5611,26 +5611,22 @@ mass_make_fake_function_literal(
 }
 
 static Value *
-token_parse_intrinsic_literal(
+mass_intrinsic(
   Execution_Context *context,
-  Value_View view,
-  u32 *match_length
+  Value_View args_view
 ) {
-  u32 peek_index = 0;
-  Value *keyword = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.intrinsic
-  );
-  if (!keyword) return 0;
+  assert(args_view.length == 2);
+  assert(value_match_symbol(value_view_get(args_view, 0), slice_literal("intrinsic")));
 
-  Value *body = value_view_next(view, &peek_index);
+  Value *body = value_view_get(args_view, 1);
   if (!value_is_group_curly(body)) {
-    context_parse_error(context, view, peek_index);
+    context_parse_error(context, args_view, 1);
     return 0;
   }
-  *match_length = peek_index;
+  const Source_Range *source_range = &args_view.source_range;
 
   Function_Literal *literal = mass_make_fake_function_literal(
-    context, body, &descriptor_value_pointer, &keyword->source_range
+    context, body, &descriptor_value_pointer, source_range
   );
 
   // @Volatile :IntrinsicFunctionSignature
@@ -5645,7 +5641,7 @@ token_parse_intrinsic_literal(
       // TODO make a common symbol for this
       .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
       .descriptor = &descriptor_execution_context_pointer,
-      .source_range = keyword->source_range,
+      .source_range = *source_range,
     },
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
@@ -5653,13 +5649,13 @@ token_parse_intrinsic_literal(
       // TODO make a common symbol for this
       .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
       .descriptor = &descriptor_value_view,
-      .source_range = keyword->source_range,
+      .source_range = *source_range,
     },
   });
   literal->info->flags |= Function_Info_Flags_Compile_Time;
   literal->info->flags |= Function_Info_Flags_Intrinsic;
 
-  return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
+  return value_make(context, &descriptor_function_literal, storage_static(literal), *source_range);
 }
 
 static Function_Info *
@@ -5814,14 +5810,6 @@ token_parse_function_literal(
   MASS_ON_ERROR(*context->result) return 0;
 
   Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_group_curly);
-  if (!body_value) {
-    u32 intrinsic_match_length = 0;
-    Value_View rest = value_view_rest(&view, peek_index);
-    body_value = token_parse_intrinsic_literal(context, rest, &intrinsic_match_length);
-    if (body_value) {
-      peek_index += intrinsic_match_length;
-    }
-  }
   if (!body_value) {
     Token_Pattern end_pattern = {
       .tag = Token_Pattern_Tag_Cached_Symbol,
