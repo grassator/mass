@@ -1825,6 +1825,17 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should mark a field of a constant struct as a constant as well") {
+      test_program_inline_source_function(
+        "test", &test_context,
+        "Point :: c_struct [x : s32, y : s32]\n"
+        "test :: fn(p : Point) -> () { p.x = 21 };"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Assignment_To_Constant);
+    }
+
     it("should be able to parse tuples and access their elements") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,

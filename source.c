@@ -5152,7 +5152,8 @@ mass_handle_field_access_lazy_proc(
   bool is_temporary;
 
   // Auto dereference pointers to structs
-  if (struct_descriptor == unwrapped_descriptor) {
+  bool is_pointer = struct_descriptor != unwrapped_descriptor;
+  if (!is_pointer) {
     struct_storage = struct_->storage;
     is_temporary = struct_->is_temporary;
   } else {
@@ -5182,6 +5183,10 @@ mass_handle_field_access_lazy_proc(
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
   field_value->is_temporary = is_temporary;
+
+  if (!is_pointer && (struct_->flags & Value_Flags_Constant)) {
+    field_value->flags |= Value_Flags_Constant;
+  }
 
   return expected_result_ensure_value_or_temp(
     compilation, builder, expected_result, field_value
@@ -5252,6 +5257,10 @@ mass_handle_array_access_lazy_proc(
       item_descriptor, element_storage, array->source_range
     );
     array_element_value->is_temporary = true;
+  }
+
+  if (array->flags & Value_Flags_Constant) {
+    array_element_value->flags |= Value_Flags_Constant;
   }
 
   return expected_result_ensure_value_or_temp(
