@@ -1641,7 +1641,7 @@ typedef struct Function_Parameter {
   char _tag_padding[4];
   Declaration declaration;
   Value_View maybe_type_expression;
-  Value_View maybe_default_expression;
+  Value * maybe_default_value;
   union {
     Function_Parameter_Exact_Static Exact_Static;
   };
@@ -4797,9 +4797,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_value_view,
-    .name = slice_literal_fields("maybe_default_expression"),
-    .Base_Relative.offset = offsetof(Function_Parameter, maybe_default_expression),
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("maybe_default_value"),
+    .Base_Relative.offset = offsetof(Function_Parameter, maybe_default_value),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

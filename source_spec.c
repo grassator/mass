@@ -734,17 +734,6 @@ spec("source") {
       check(actual == 42);
     }
 
-    it("should support default arguments that refer to previous arguments") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "test_default :: fn(x : s64, y : s64 = x) -> (s64) { x + y }\n"
-        "test :: fn() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual == 42);
-    }
-
     it("should support default arguments with inference") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
@@ -759,7 +748,7 @@ spec("source") {
     it("should disallow default arguments coming after non-default ones") {
       test_program_inline_source_function(
         "test", &test_context,
-        "test :: fn(x : s64, y : s64 = x, z : s32) -> () {}\n"
+        "test :: fn(x : s64, y : s64 = 20, z : s32) -> () {}\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;

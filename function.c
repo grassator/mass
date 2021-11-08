@@ -840,7 +840,7 @@ calculate_arguments_match_score(
     Value *source_arg = 0;
     const Descriptor *source_descriptor;
     if (arg_index >= args_view.length) {
-      if (!param->maybe_default_expression.length) return -1;
+      if (!param->maybe_default_value) return -1;
       source_descriptor = target_descriptor;
     } else {
       source_arg = value_view_get(args_view, arg_index);

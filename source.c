@@ -1977,9 +1977,6 @@ token_match_argument(
       goto err;
     }
     name_token = value_view_get(definition, 0);
-    Value *parsed_default_expression =
-      token_parse_expression(context, default_expression, &(u32){0}, 0);
-    descriptor = deduce_runtime_descriptor_for_value(context, parsed_default_expression);
   } else {
     Value_View name_tokens;
     Value *operator;
@@ -2007,9 +2004,17 @@ token_match_argument(
     }
   }
 
+  Value *maybe_default_value = 0;
+  if (default_expression.length) {
+    maybe_default_value = compile_time_eval(context, default_expression);
+    if (is_inferred_type) {
+      descriptor = deduce_runtime_descriptor_for_value(context, maybe_default_value);
+    }
+  }
+
   arg = (Function_Parameter) {
     .tag = generic ? Function_Parameter_Tag_Generic : Function_Parameter_Tag_Runtime,
-    .maybe_default_expression = default_expression,
+    .maybe_default_value = maybe_default_value,
     .maybe_type_expression = maybe_type_expression,
     .declaration = {
       .symbol = value_as_symbol(name_token),
@@ -3171,12 +3176,7 @@ mass_handle_macro_call(
     if (arg->declaration.symbol) {
       Value *arg_value;
       if (i >= args_view.length) {
-        // We should catch the missing default expression in the matcher
-        Value_View default_expression = arg->maybe_default_expression;
-        assert(default_expression.length);
-        Execution_Context arg_context = *context;
-        arg_context.scope = body_scope;
-        arg_value = token_parse_expression(&arg_context, default_expression, &(u32){0}, 0);
+        arg_value = arg->maybe_default_value;
       } else {
         arg_value = value_view_get(args_view, i);
       }
@@ -3325,14 +3325,7 @@ call_function_overload(
         );
       } else {
         Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
-        Value_View default_expression = declared_argument->maybe_default_expression;
-        assert(default_expression.length);
-        Execution_Context arg_context = execution_context_from_compilation(compilation);
-        arg_context.flags &= ~Execution_Context_Flags_Global;
-        arg_context.scope = default_arguments_scope;
-        arg_context.epoch = builder->epoch;
-        source_arg = token_parse_expression(&arg_context, default_expression, &(u32){0}, 0);
-        MASS_ON_ERROR(*arg_context.result) return 0;
+        source_arg = declared_argument->maybe_default_value;
       }
     } else {
       Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
@@ -3627,7 +3620,7 @@ match_overload_argument_count(
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     if (arg_index < actual_count) continue;
-    if (!param->maybe_default_expression.length) return false;
+    if (!param->maybe_default_value) return false;
   }
   return true;
 }
@@ -5709,7 +5702,7 @@ function_info_from_parameters_and_return_type(
       MASS_ON_ERROR(*context->result) goto defer;
       dyn_array_push(temp_params, param);
       if (previous_argument_has_default_value) {
-        if (!param.maybe_default_expression.length ) {
+        if (!param.maybe_default_value) {
           context_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
             .source_range = return_types->source_range,
@@ -5717,7 +5710,7 @@ function_info_from_parameters_and_return_type(
           goto defer;
         }
       } else {
-        previous_argument_has_default_value = !!param.maybe_default_expression.length;
+        previous_argument_has_default_value = !!param.maybe_default_value;
       }
     }
     dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);

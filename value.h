@@ -12,7 +12,7 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
 static inline Function_Parameter
 function_parameter_with_default(
   const Symbol *symbol,
-  Value_View default_expression,
+  Value *default_value,
   const Descriptor *descriptor
 ) {
    return (Function_Parameter){
@@ -22,7 +22,7 @@ function_parameter_with_default(
       .descriptor = descriptor,
       .source_range = COMPILER_SOURCE_RANGE,
     },
-    .maybe_default_expression = default_expression,
+    .maybe_default_value = default_value,
   };
 }
 
@@ -31,7 +31,7 @@ function_parameter(
   const Symbol *symbol,
   const Descriptor *descriptor
 ) {
-  return function_parameter_with_default(symbol, (Value_View){0}, descriptor);
+  return function_parameter_with_default(symbol, 0, descriptor);
 }
 
 typedef struct {

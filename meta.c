@@ -1632,7 +1632,7 @@ main(void) {
   }), (Struct_Item[]){
     { "Declaration", "declaration" },
     { "Value_View", "maybe_type_expression" },
-    { "Value_View", "maybe_default_expression" },
+    { "Value *", "maybe_default_value" },
   }));
 
   push_type(type_enum("Function_Info_Flags", (Enum_Type_Item[]){
