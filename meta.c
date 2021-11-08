@@ -47,7 +47,6 @@ typedef struct {
 typedef struct {
   const char *type;
   const char *name;
-  const char *maybe_default_expression;
 } Argument_Type;
 
 typedef enum {
@@ -423,15 +422,6 @@ print_scope_define_function(
   assert(type->tag == Meta_Type_Tag_Function);
   Function_Type *function = &type->function;
 
-  #define DEFAULT_EXPR_FORMAT "%s_%s__default_expression"
-  for (uint64_t i = 0; i < function->argument_count; ++i) {
-    Argument_Type *arg = &function->arguments[i];
-    if (!arg->maybe_default_expression) continue;
-    // TODO escape default expression
-    fprintf(file, "  MASS_FN_ARG_DEFAULT_EXPRESSION("DEFAULT_EXPR_FORMAT", \"%s\")\n",
-      function->name, arg->name, arg->maybe_default_expression);
-  }
-
   if (function->kind == Function_Kind_Typedef) {
     fprintf(file, "  MASS_DEFINE_FUNCTION_TYPE(\n");
   } else {
@@ -489,14 +479,8 @@ print_scope_define_function(
   for (uint64_t i = 0; i < function->argument_count; ++i) {
     Argument_Type *arg = &function->arguments[i];
     if (i != 0) fprintf(file, ",\n");
-    if (arg->maybe_default_expression) {
-      fprintf(file, "    function_parameter_with_default(\n");
-      fprintf(file, "      slice_literal(\"%s\"), "DEFAULT_EXPR_FORMAT",\n",
-        arg->name, function->name, arg->name);
-    } else {
-      fprintf(file, "    function_parameter(\n");
-      fprintf(file, "      mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", arg->name);
-    }
+    fprintf(file, "    function_parameter(\n");
+    fprintf(file, "      mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", arg->name);
     fprintf(file, "&");
     print_mass_struct_descriptor_type(file, arg->type);
     fprintf(file, "\n    )");
