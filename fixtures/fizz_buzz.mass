@@ -3,17 +3,17 @@ fizz_buzz :: fn() {
 
   for i : s8 = 1; i <= 100; i = i + 1 {
     print_number := true
-    if (i % 3 == 0) {
+    if i % 3 == 0 {
       print_number = false
       io.print("fizz")
-    }
-    if (i % 5 == 0) {
+    } else {}
+    if i % 5 == 0 {
       print_number = false
       io.print("buzz")
-    }
+    } else {}
     if (print_number) {
       io.print(i)
-    }
+    } else {}
     io.print(" ")
   }
 }
