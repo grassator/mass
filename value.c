@@ -122,6 +122,9 @@ mass_error_to_string(
       APPEND_LITERAL(": ");
       APPEND_SLICE(error->detailed_message);
     } break;
+    case Mass_Error_Tag_Assignment_To_Constant: {
+      APPEND_LITERAL("Trying to assign to a constant value");
+    } break;
     case Mass_Error_Tag_Parse: {
       APPEND_LITERAL("Unable to parse the expression");
       if (error->detailed_message.length) {

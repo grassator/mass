@@ -1561,10 +1561,16 @@ main(void) {
     { "Source_Range", "source_range" },
   })));
 
+  push_type(type_enum("Value_Flags", (Enum_Type_Item[]){
+    { "None",  0 },
+    { "Constant", 1 << 0 },
+  }));
+
   export_compiler(push_type(type_struct("Value", (Struct_Item[]){
+    { "u32", "is_temporary" },
+    { "Value_Flags", "flags" },
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
-    { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
   })));
 
@@ -1745,6 +1751,7 @@ main(void) {
   export_compiler_custom_name("Error", push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),
     struct_empty("Parse"),
+    struct_empty("Assignment_To_Constant"),
     struct_fields("User_Defined", (Struct_Item[]){
       { "Slice", "name" },
     }),

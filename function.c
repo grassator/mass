@@ -758,6 +758,7 @@ ensure_function_instance(
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
       Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
+      arg_value->flags |= Value_Flags_Constant;
       if (item->name.length) {
         // TODO figure out how to avoid this lookup
         const Symbol *item_symbol = mass_ensure_symbol(compilation, item->name);

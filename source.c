@@ -356,9 +356,9 @@ assign_from_static(
     Value *static_pointer = hash_map_get(compilation->static_pointer_map, source_memory);
     assert(static_pointer);
     if (static_pointer->storage.tag == Storage_Tag_None) {
-      // TODO should depend on constness of the static value I guess?
-      //      Do not forget to make memory readable for ro_dar
-      Section *section = &builder->program->memory.rw_data;
+      Section *section = (static_pointer->flags & Value_Flags_Constant)
+       ? &builder->program->memory.ro_data
+       : &builder->program->memory.rw_data;
       u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
       u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
 
@@ -782,6 +782,14 @@ assign(
   const Source_Range *source_range
 ) {
   MASS_TRY(*compilation->result);
+
+  if (target->flags & Value_Flags_Constant) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Assignment_To_Constant,
+      .source_range = *source_range,
+    });
+    return *compilation->result;
+  }
 
   if (target->storage.tag == Storage_Tag_Eflags) {
     panic("Internal Error: Trying to move into Eflags");

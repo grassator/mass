@@ -21,7 +21,9 @@ print :: macro(string : String) -> () {
   WriteFile(cached_stdout_handle, string.bytes, cast(s32, string.length), 0, 0)
 }
 
-print :: fn(integer : s64) {
+print :: fn(x : s64) {
+  // TODO replace with shadowing an arg with a local when supported
+  integer := x
   count := {
     count := 0
     for temp := integer ; temp ; temp = temp / 10 {

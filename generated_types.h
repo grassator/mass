@@ -410,6 +410,21 @@ typedef struct Declaration Declaration;
 typedef dyn_array_type(Declaration *) Array_Declaration_Ptr;
 typedef dyn_array_type(const Declaration *) Array_Const_Declaration_Ptr;
 
+typedef enum Value_Flags {
+  Value_Flags_None = 0,
+  Value_Flags_Constant = 1,
+} Value_Flags;
+
+const char *value_flags_name(Value_Flags value) {
+  if (value == 0) return "Value_Flags_None";
+  if (value == 1) return "Value_Flags_Constant";
+  assert(!"Unexpected value for enum Value_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Value_Flags *) Array_Value_Flags_Ptr;
+typedef dyn_array_type(const Value_Flags *) Array_Const_Value_Flags_Ptr;
+
 typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
@@ -1516,9 +1531,10 @@ typedef struct Declaration {
 typedef dyn_array_type(Declaration) Array_Declaration;
 
 typedef struct Value {
+  u32 is_temporary;
+  Value_Flags flags;
   const Descriptor * descriptor;
   Storage storage;
-  u64 is_temporary;
   Source_Range source_range;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
@@ -1787,26 +1803,27 @@ typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unimplemented = 0,
   Mass_Error_Tag_Parse = 1,
-  Mass_Error_Tag_User_Defined = 2,
-  Mass_Error_Tag_Circular_Dependency = 3,
-  Mass_Error_Tag_Non_Trailing_Default_Argument = 4,
-  Mass_Error_Tag_Expected_Static = 5,
-  Mass_Error_Tag_Integer_Range = 6,
-  Mass_Error_Tag_File_Open = 7,
-  Mass_Error_Tag_File_Too_Large = 8,
-  Mass_Error_Tag_Dynamic_Library_Load = 9,
-  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 10,
-  Mass_Error_Tag_Unexpected_Token = 11,
-  Mass_Error_Tag_Operator_Fixity_Conflict = 12,
-  Mass_Error_Tag_Undefined_Variable = 13,
-  Mass_Error_Tag_Redifinition = 14,
-  Mass_Error_Tag_Unknown_Field = 15,
-  Mass_Error_Tag_Invalid_Identifier = 16,
-  Mass_Error_Tag_Type_Mismatch = 17,
-  Mass_Error_Tag_Epoch_Mismatch = 18,
-  Mass_Error_Tag_No_Matching_Overload = 19,
-  Mass_Error_Tag_Undecidable_Overload = 20,
-  Mass_Error_Tag_Non_Function_Overload = 21,
+  Mass_Error_Tag_Assignment_To_Constant = 2,
+  Mass_Error_Tag_User_Defined = 3,
+  Mass_Error_Tag_Circular_Dependency = 4,
+  Mass_Error_Tag_Non_Trailing_Default_Argument = 5,
+  Mass_Error_Tag_Expected_Static = 6,
+  Mass_Error_Tag_Integer_Range = 7,
+  Mass_Error_Tag_File_Open = 8,
+  Mass_Error_Tag_File_Too_Large = 9,
+  Mass_Error_Tag_Dynamic_Library_Load = 10,
+  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 11,
+  Mass_Error_Tag_Unexpected_Token = 12,
+  Mass_Error_Tag_Operator_Fixity_Conflict = 13,
+  Mass_Error_Tag_Undefined_Variable = 14,
+  Mass_Error_Tag_Redifinition = 15,
+  Mass_Error_Tag_Unknown_Field = 16,
+  Mass_Error_Tag_Invalid_Identifier = 17,
+  Mass_Error_Tag_Type_Mismatch = 18,
+  Mass_Error_Tag_Epoch_Mismatch = 19,
+  Mass_Error_Tag_No_Matching_Overload = 20,
+  Mass_Error_Tag_Undecidable_Overload = 21,
+  Mass_Error_Tag_Non_Function_Overload = 22,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
@@ -2420,6 +2437,12 @@ static Descriptor descriptor_array_declaration;
 static Descriptor descriptor_array_declaration_ptr;
 static Descriptor descriptor_declaration_pointer;
 static Descriptor descriptor_declaration_pointer_pointer;
+static Descriptor descriptor_value_flags;
+static Descriptor descriptor_array_value_flags;
+static Descriptor descriptor_array_value_flags_ptr;
+static Descriptor descriptor_array_const_value_flags_ptr;
+static Descriptor descriptor_value_flags_pointer;
+static Descriptor descriptor_value_flags_pointer_pointer;
 static Descriptor descriptor_value;
 static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
@@ -4473,9 +4496,26 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(declaration, Declaration,
   },
 );
 MASS_DEFINE_TYPE_VALUE(declaration);
+MASS_DEFINE_OPAQUE_C_TYPE(value_flags, Value_Flags)
+static C_Enum_Item value_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Constant"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("is_temporary"),
+    .Base_Relative.offset = offsetof(Value, is_temporary),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_value_flags,
+    .name = slice_literal_fields("flags"),
+    .Base_Relative.offset = offsetof(Value, flags),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_descriptor_pointer,
@@ -4487,12 +4527,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
     .descriptor = &descriptor_storage,
     .name = slice_literal_fields("storage"),
     .Base_Relative.offset = offsetof(Value, storage),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("is_temporary"),
-    .Base_Relative.offset = offsetof(Value, is_temporary),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5169,26 +5203,27 @@ MASS_DEFINE_OPAQUE_C_TYPE(mass_error_tag, Mass_Error_Tag)
 static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Unimplemented"), .value = 0 },
 { .name = slice_literal_fields("Parse"), .value = 1 },
-{ .name = slice_literal_fields("User_Defined"), .value = 2 },
-{ .name = slice_literal_fields("Circular_Dependency"), .value = 3 },
-{ .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 4 },
-{ .name = slice_literal_fields("Expected_Static"), .value = 5 },
-{ .name = slice_literal_fields("Integer_Range"), .value = 6 },
-{ .name = slice_literal_fields("File_Open"), .value = 7 },
-{ .name = slice_literal_fields("File_Too_Large"), .value = 8 },
-{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 9 },
-{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 10 },
-{ .name = slice_literal_fields("Unexpected_Token"), .value = 11 },
-{ .name = slice_literal_fields("Operator_Fixity_Conflict"), .value = 12 },
-{ .name = slice_literal_fields("Undefined_Variable"), .value = 13 },
-{ .name = slice_literal_fields("Redifinition"), .value = 14 },
-{ .name = slice_literal_fields("Unknown_Field"), .value = 15 },
-{ .name = slice_literal_fields("Invalid_Identifier"), .value = 16 },
-{ .name = slice_literal_fields("Type_Mismatch"), .value = 17 },
-{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 18 },
-{ .name = slice_literal_fields("No_Matching_Overload"), .value = 19 },
-{ .name = slice_literal_fields("Undecidable_Overload"), .value = 20 },
-{ .name = slice_literal_fields("Non_Function_Overload"), .value = 21 },
+{ .name = slice_literal_fields("Assignment_To_Constant"), .value = 2 },
+{ .name = slice_literal_fields("User_Defined"), .value = 3 },
+{ .name = slice_literal_fields("Circular_Dependency"), .value = 4 },
+{ .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 5 },
+{ .name = slice_literal_fields("Expected_Static"), .value = 6 },
+{ .name = slice_literal_fields("Integer_Range"), .value = 7 },
+{ .name = slice_literal_fields("File_Open"), .value = 8 },
+{ .name = slice_literal_fields("File_Too_Large"), .value = 9 },
+{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 10 },
+{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 11 },
+{ .name = slice_literal_fields("Unexpected_Token"), .value = 12 },
+{ .name = slice_literal_fields("Operator_Fixity_Conflict"), .value = 13 },
+{ .name = slice_literal_fields("Undefined_Variable"), .value = 14 },
+{ .name = slice_literal_fields("Redifinition"), .value = 15 },
+{ .name = slice_literal_fields("Unknown_Field"), .value = 16 },
+{ .name = slice_literal_fields("Invalid_Identifier"), .value = 17 },
+{ .name = slice_literal_fields("Type_Mismatch"), .value = 18 },
+{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 19 },
+{ .name = slice_literal_fields("No_Matching_Overload"), .value = 20 },
+{ .name = slice_literal_fields("Undecidable_Overload"), .value = 21 },
+{ .name = slice_literal_fields("Non_Function_Overload"), .value = 22 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {

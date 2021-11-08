@@ -2001,6 +2001,9 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Parse">
     Parse
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Assignment_To_Constant">
+    Assignment_To_Constant
+  </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_User_Defined">
     User_Defined { User_Defined }
   </DisplayString>

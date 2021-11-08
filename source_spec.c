@@ -617,17 +617,17 @@ spec("source") {
     it("should correctly work with nested 5 argument calls") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,
-        "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
-        "bar :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> () { x5 = 42; }"
+        "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5) + x5 }\n"
+        "bar :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x4 }"
       );
       check(spec_check_mass_result(test_context.result));
-      check(checker(1, 2, 3, 4, 5) == 5);
+      check(checker(1, 2, 3, 4, 5) == 9);
     }
 
     it("should correctly save volatile registers when calling other functions") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "outer", &test_context,
-        "inner :: fn(x : s64) -> () { x = 21 };"
+        "inner :: fn(x : s64) -> () { };"
         "outer :: fn(x : s64) -> (s64) { inner(1); x }"
       );
       check(spec_check_mass_result(test_context.result));
@@ -1020,6 +1020,16 @@ spec("source") {
   }
 
   describe("Assignment") {
+    it("should not allow assignment to the arguments") {
+      test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn(x : s64) -> () { x = 21 };"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Assignment_To_Constant);
+    }
+
     it("should report type mismatch when assigning") {
       test_program_inline_source_base(
         "test", &test_context,
@@ -1587,7 +1597,8 @@ spec("source") {
     it("should be able to use a while loop") {
       s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "sum_up_to", &test_context,
-        "sum_up_to :: fn(x : s32) -> (s32) {"
+        "sum_up_to :: fn(to : s32) -> (s32) {"
+          "x := to;"
           "sum : s32;"
           "sum = 0;"
           "while (x >= 0) {"
@@ -1607,7 +1618,8 @@ spec("source") {
     it("should be able to use `break` statement inside of the while loop") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(x : s32) -> (s32) {"
+        "checker :: fn(to : s32) -> (s32) {"
+          "x := to;"
           "sum : s32;"
           "sum = 0;"
           "while (x >= 0) {"
@@ -1626,7 +1638,8 @@ spec("source") {
     it("should be able to use `continue` statement inside of the while loop") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(x : s32) -> (s32) {"
+        "checker :: fn(to : s32) -> (s32) {"
+          "x := to;"
           "sum : s32;"
           "sum = 0;"
           "while (x >= 0) {"
@@ -1687,7 +1700,8 @@ spec("source") {
     it("should be able to parse and run a program with labels and goto") {
       s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "sum_up_to", &test_context,
-        "sum_up_to :: fn(x : s32) -> (s32) {"
+        "sum_up_to :: fn(to : s32) -> (s32) {"
+          "x := to;"
           "sum : s32;"
           "sum = 0;"
           "label loop;"
