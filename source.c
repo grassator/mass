@@ -5571,8 +5571,6 @@ token_parse_if_expression(
   );
   if (!keyword) return 0;
 
-  Source_Range dummy_range = keyword->source_range;
-
   Value *value_condition;
   {
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
@@ -5586,14 +5584,10 @@ token_parse_if_expression(
 
   Value *value_then;
   {
-    static const Token_Pattern else_pattern = {
-      .tag = Token_Pattern_Tag_Symbol,
-      .Symbol.name = slice_literal_fields("else"),
-    };
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
     u32 then_length;
     value_then = token_parse_expression(
-      context, then_view, &then_length,  context->compilation->common_symbols._else
+      context, then_view, &then_length, context->compilation->common_symbols._else
     );
     peek_index += then_length;
     MASS_ON_ERROR(*context->result) return 0;
@@ -5605,6 +5599,7 @@ token_parse_if_expression(
     u32 else_length;
     value_else = token_parse_expression(context, else_view, &else_length, end_symbol);
     peek_index += else_length;
+    MASS_ON_ERROR(*context->result) return 0;
   }
 
   *matched_length = peek_index;
@@ -5638,7 +5633,7 @@ token_parse_if_expression(
   };
 
   return mass_make_lazy_value(
-    context, dummy_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
+    context, keyword->source_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
   );
 }
 
