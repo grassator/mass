@@ -6891,7 +6891,7 @@ program_parse(
   }
 
   Value *block_result = token_parse_block_view(context, tokens);
-  value_force_exact(context->compilation, 0, &void_value, block_result);
+  compile_time_eval(context, value_view_single(&block_result));
   return *context->result;
 }
 

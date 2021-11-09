@@ -1,20 +1,7 @@
-// TODO ..@condition should be parsed as an expression instead of a wildcard
-syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
-  () = if condition() then then_branch() else else_branch()
-}
-
-// TODO think of a better solution
-// It is a bit unfortunate that we have to define this wrapper,
-// otherwise we match the block version of this which will fail
-// parsing (@condition() then) as an expression
-//syntax statement("if" ..@condition "then" {}@then_branch "else" {}@else_branch) (
-  //if condition() then then_branch() else else_branch()
-//)
-
 syntax statement("while" ..@condition {}@body) {
   label _loop_start
   label placeholder _loop_done
-  if condition() {
+  if condition() then {
     body(module {
       break :: ~> { goto _loop_done }
       continue :: ~> { goto _loop_start }
@@ -30,7 +17,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_start
   label placeholder _loop_done
   label placeholder _loop_post
-  if condition() {
+  if condition() then {
     body(module {
       break :: ~> { goto _loop_done }
       continue :: ~> { goto _loop_post }
@@ -63,7 +50,7 @@ false :: 0
 compile_time_error :: fn(name : String, description : String) => () MASS.compile_time_error
 
 static_assert :: macro(condition : bool, message : String) {
-  @{if condition { compile_time_error("Static Assert Failed", message) } else {}}
+  @{if condition then { compile_time_error("Static Assert Failed", message) } else {}}
 }
 
 apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) => (MASS.Scope) MASS.inline_module

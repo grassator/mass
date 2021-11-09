@@ -530,8 +530,7 @@ spec("source") {
       s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
         "is_positive", &test_context,
         "is_positive :: fn(x : s32) -> (s8) {\n"
-          // FIXME figure out how to deal with a newline before `else`
-          "if (x < 10) { return 0 } else { return 1 }\n"
+          "if x < 10 then { return 0 } else { return 1 }\n"
           "0"
         "}"
       );
@@ -549,14 +548,6 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Undefined_Variable);
       spec_check_slice(error->Undefined_Variable.name, slice_literal(";"));
-    }
-
-    it("should report an error for an `if` statement with an incorrect condition") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: fn() -> () { if (1 < 0) { 0 } 42; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
     }
   }
 
@@ -769,7 +760,7 @@ spec("source") {
     it("should be able to have an explicit return") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(x : s32) -> (s32) { if x > 0 { return x } else {}; 0 }"
+        "checker :: fn(x : s32) -> (s32) { if x > 0 then { return x } else {}; 0 }"
       );
       check(spec_check_mass_result(test_context.result));
       s32 actual = checker(42);
@@ -1429,7 +1420,7 @@ spec("source") {
       test_program_inline_source_base(
         "DUMMY", &test_context,
         "do_stuff :: fn() -> () {}\n"
-        "if 1 { do_stuff() } else {}\n"
+        "if 1 then { do_stuff() } else {}\n"
         "DUMMY :: 42"
       );
       check(test_context.result->tag == Mass_Result_Tag_Success);
@@ -1509,7 +1500,7 @@ spec("source") {
     it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "id :: macro(x : s64) -> (s64) { if (x > 0) { return 20 } else {}; x }\n"
+        "id :: macro(x : s64) -> (s64) { if x > 0 then { return 20 } else {}; x }\n"
         "checker :: fn() -> (s64) { id(42) + 1 }"
       );
       check(spec_check_mass_result(test_context.result));
@@ -1694,7 +1685,7 @@ spec("source") {
           "sum : s32;"
           "sum = 0;"
           "label loop;"
-          "if (x < 0) { return sum } else {};"
+          "if x < 0 then { return sum } else {};"
           "sum = sum + x;"
           "x = x - 1;"
           "goto loop;"

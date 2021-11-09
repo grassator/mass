@@ -3,15 +3,15 @@ fizz_buzz :: fn() {
 
   for i : s8 = 1; i <= 100; i = i + 1 {
     print_number := true
-    if i % 3 == 0 {
+    if i % 3 == 0 then {
       print_number = false
       io.print("fizz")
     } else {}
-    if i % 5 == 0 {
+    if i % 5 == 0 then {
       print_number = false
       io.print("buzz")
     } else {}
-    if (print_number) {
+    if print_number then {
       io.print(i)
     } else {}
     io.print(" ")
