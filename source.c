@@ -5103,12 +5103,13 @@ mass_goto_lazy_proc(
 }
 
 static Value *
-mass_goto(
+mass_handle_goto_operator(
   Execution_Context *context,
-  Value_View operands
+  Value_View operands,
+  const void *payload
 ) {
   assert(operands.length == 1);
-  Value *target = value_view_get(operands, 0);
+  Value *target = token_parse_single(context, value_view_get(operands, 0));
 
   return mass_make_lazy_value(
     context, operands.source_range, target,
@@ -6849,6 +6850,13 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_return_operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("goto"), allocator_make(allocator, Operator,
+    .precedence = 0,
+    .fixity = Operator_Fixity_Prefix,
+    .associativity = Operator_Associativity_Right,
+    .argument_count = 1,
+    .handler = mass_handle_goto_operator,
   )));
 
   {

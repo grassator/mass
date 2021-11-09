@@ -40,8 +40,6 @@ inline_machine_code_bytes :: MASS.inline_machine_code_bytes
 
 debugger :: ~> { inline_machine_code_bytes(0xCC) }
 
-syntax statement("goto" ..@target) { MASS.goto(target()) }
-
 Symbol :: MASS.Symbol
 bool :: s8
 true :: 1
@@ -58,7 +56,6 @@ apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) => () MASS.exports
 apply :: fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) => () MASS.intrinsic
 apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) => (Type) MASS.c_struct
 apply :: macro(type, tuple : MASS.Group_Square) { cast(type', tuple') }
-apply :: macro(symbol :: 'goto, curly : MASS.Symbol) { inline_machine_code_bytes(0xE9, target) }
 
 operator 7 (x == y) equal
 operator 7 (x != y) not_equal
