@@ -14,10 +14,8 @@ Tests can be executed by running `test.bat`.
 
 ### Mac / Linux
 
-> While the compiler itself can be built and run on non-Windows systems,
-there is currently **no support for generating Linux or Mac binaries**, nor
-support JIT-compilations on these platforms. Cross-compiled to Windows
-executables that the compiler outputs can be run using Wine.
+There is currently **no support for generating Linux or Mac binaries**,
+however it is possible to run the code in JIT mode.
 
 You can build the code by running `./build.sh` and tests are run with
 `./test.sh`. Both gcc and clang compilers are supported and you can
