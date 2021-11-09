@@ -2117,6 +2117,19 @@ expected_result_ensure_value_or_temp(
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
       const Descriptor *expected_descriptor =
         flexible->descriptor ? flexible->descriptor : value->descriptor;
+      // FIXME :ExpectedResultCheck
+      //       descriptor should be verified here but it causes a lot of errors atm
+      //if (
+        //expected_descriptor != &descriptor_void &&
+        //!same_value_type_or_can_implicitly_move_cast(expected_descriptor, value)
+      //) {
+        //compilation_error(compilation, (Mass_Error) {
+          //.tag = Mass_Error_Tag_Type_Mismatch,
+          //.source_range = value->source_range,
+          //.Type_Mismatch = { .expected = expected_descriptor, .actual = value->descriptor },
+        //});
+        //return 0;
+      //}
       if (value->storage.tag == Storage_Tag_None) {
         return value;
       }
@@ -2124,12 +2137,6 @@ expected_result_ensure_value_or_temp(
         value->storage.tag == Storage_Tag_Static &&
         (flexible->storage & Expected_Result_Storage_Static)
       ) {
-        value = maybe_coerce_i64_to_integer(
-          compilation, value, expected_descriptor, &value->source_range
-        );
-        if (!same_type_or_can_implicitly_move_cast(expected_descriptor, value->descriptor)) {
-          panic("Unexpected type mismatch");
-        }
         return value;
       }
       if (
@@ -5063,6 +5070,49 @@ mass_handle_assignment_operator(
   return mass_make_lazy_value(
     context, operands.source_range, payload,
     &descriptor_void, mass_handle_assignment_lazy_proc
+  );
+}
+
+static Value *
+mass_goto_lazy_proc(
+  Compilation *compilation,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Value *payload_target
+) {
+  Expected_Result expected_target = expected_result_any(&descriptor_label_pointer);
+  Value *target = value_force(compilation, builder, &expected_target, payload_target);
+  MASS_ON_ERROR(*compilation->result) return 0;
+  // TODO :ExpectedResultCheck
+  if (target->descriptor != &descriptor_label_pointer) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = target->source_range,
+      .Type_Mismatch = { .expected = &descriptor_label_pointer, .actual = target->descriptor },
+    });
+    return 0;
+  }
+
+  Label *label = *storage_static_as_c_type(&target->storage, Label *);
+  push_eagerly_encoded_assembly(
+    &builder->code_block, payload_target->source_range,
+    &(Instruction_Assembly){jmp, {code_label32(label)}}
+  );
+
+  return expected_result_validate(expected_result, &void_value);
+}
+
+static Value *
+mass_goto(
+  Execution_Context *context,
+  Value_View operands
+) {
+  assert(operands.length == 1);
+  Value *target = value_view_get(operands, 0);
+
+  return mass_make_lazy_value(
+    context, operands.source_range, target,
+    &descriptor_void, mass_goto_lazy_proc
   );
 }
 

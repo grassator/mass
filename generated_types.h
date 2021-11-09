@@ -697,6 +697,9 @@ static Value * mass_intrinsic
 static Value * mass_call
   (Execution_Context * context, Value_View args);
 
+static Value * mass_goto
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_import
   (Execution_Context * context, Value_View args);
 
@@ -2646,6 +2649,7 @@ static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
+static Descriptor descriptor_mass_goto;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_eval;
