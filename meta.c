@@ -1669,7 +1669,6 @@ main(void) {
     { "u32", "_flags_padding"},
     { "Execution_Context", "context" },
     { "Function_Info *", "info" },
-    { "Scope *", "scope" },
     { "Value *", "body" },
     { "Array_Value_Ptr", "instances"},
     { "Array_Function_Specialization", "specializations"},

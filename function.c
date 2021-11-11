@@ -723,7 +723,7 @@ ensure_function_instance(
   dyn_array_push(literal->instances, cached_instance);
 
   Execution_Context body_context = execution_context_from_compilation(compilation);
-  Scope *body_scope = scope_make(compilation->allocator, literal->scope);
+  Scope *body_scope = scope_make(compilation->allocator, literal->context.scope);
   body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
   body_context.program = program;

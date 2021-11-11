@@ -1677,7 +1677,6 @@ typedef struct Function_Literal {
   u32 _flags_padding;
   Execution_Context context;
   Function_Info * info;
-  Scope * scope;
   Value * body;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
@@ -4911,12 +4910,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .descriptor = &descriptor_function_info_pointer,
     .name = slice_literal_fields("info"),
     .Base_Relative.offset = offsetof(Function_Literal, info),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .Base_Relative.offset = offsetof(Function_Literal, scope),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

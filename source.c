@@ -3203,7 +3203,7 @@ mass_handle_macro_call(
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
-  Scope *body_scope = scope_make(context->allocator, literal->scope);
+  Scope *body_scope = scope_make(context->allocator, literal->context.scope);
 
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
@@ -3833,7 +3833,9 @@ mass_ensure_trampoline(
     },
   };
 
-  Scope *trampoline_scope = scope_make(context->allocator, context->compilation->root_scope);
+  Execution_Context *trampoline_context = allocator_allocate(context->allocator, Execution_Context);
+  trampoline_context->scope = scope_make(context->allocator, context->compilation->root_scope);
+
   Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
   trampoline_info->flags = Function_Info_Flags_Compile_Time;
   trampoline_info->returns = (Function_Return) {
@@ -3857,7 +3859,9 @@ mass_ensure_trampoline(
   });
 
   const Symbol *original_symbol = mass_ensure_symbol(context->compilation, slice_literal("original"));
-  scope_define_value(trampoline_scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, original_symbol, original);
+  scope_define_value(
+    trampoline_context->scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, original_symbol, original
+  );
   Fixed_Buffer *buffer =
     fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
   fixed_buffer_append_slice(buffer, slice_literal("{args.returns = original("));
@@ -3887,6 +3891,7 @@ mass_ensure_trampoline(
   *trampoline_literal = (Function_Literal) {
     .info = trampoline_info,
     .body = body_value,
+    .context = *trampoline_context,
   };
   Value *literal_value = value_make(
     context, &descriptor_function_literal, storage_static(trampoline_literal), COMPILER_SOURCE_RANGE
