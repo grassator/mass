@@ -834,6 +834,9 @@ typedef dyn_array_type(const Allocator *) Array_Const_Allocator_Ptr;
 typedef dyn_array_type(Virtual_Memory_Buffer *) Array_Virtual_Memory_Buffer_Ptr;
 typedef dyn_array_type(const Virtual_Memory_Buffer *) Array_Const_Virtual_Memory_Buffer_Ptr;
 
+typedef dyn_array_type(_Bool *) Array__Bool_Ptr;
+typedef dyn_array_type(const _Bool *) Array_Const__Bool_Ptr;
+
 typedef dyn_array_type(u8 *) Array_u8_Ptr;
 typedef dyn_array_type(const u8 *) Array_Const_u8_Ptr;
 
@@ -2162,6 +2165,8 @@ typedef dyn_array_type(Allocator) Array_Allocator;
 
 typedef dyn_array_type(Virtual_Memory_Buffer) Array_Virtual_Memory_Buffer;
 
+typedef dyn_array_type(_Bool) Array__Bool;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -2738,6 +2743,12 @@ static Descriptor descriptor_array_virtual_memory_buffer_ptr;
 static Descriptor descriptor_array_const_virtual_memory_buffer_ptr;
 static Descriptor descriptor_virtual_memory_buffer_pointer;
 static Descriptor descriptor_virtual_memory_buffer_pointer_pointer;
+static Descriptor descriptor__bool;
+static Descriptor descriptor_array__bool;
+static Descriptor descriptor_array__bool_ptr;
+static Descriptor descriptor_array_const__bool_ptr;
+static Descriptor descriptor__bool_pointer;
+static Descriptor descriptor__bool_pointer_pointer;
 static Descriptor descriptor_u8;
 static Descriptor descriptor_array_u8;
 static Descriptor descriptor_array_u8_ptr;
@@ -6134,6 +6145,8 @@ MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator, .Opaque.numeric_interpretation =
 MASS_DEFINE_OPAQUE_C_TYPE(array_allocator, Array_Allocator)
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_None)
 MASS_DEFINE_OPAQUE_C_TYPE(array_virtual_memory_buffer, Array_Virtual_Memory_Buffer)
+MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_None)
+MASS_DEFINE_OPAQUE_C_TYPE(array__bool, Array__Bool)
 MASS_DEFINE_OPAQUE_C_TYPE(u8, u8, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
 MASS_DEFINE_OPAQUE_C_TYPE(array_u8, Array_u8)
 MASS_DEFINE_OPAQUE_C_TYPE(u16, u16, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)

@@ -468,13 +468,13 @@ spec("source") {
       check(checker(-2) == 0);
     }
     it("should work with a value instead of comparison as a condition") {
-      s64(*is_zero)(s32) = (s64(*)(s32))test_program_inline_source_function(
+      bool(*is_zero)(s32) = (bool(*)(s32))test_program_inline_source_function(
         "is_zero", &test_context,
-        "is_zero :: fn(x : s32) -> (s64) {"
-          "if x then false else true"
+        "is_zero :: fn(x : s32) -> (bool) {"
+          "if x != 0 then false else true"
         "}"
       );
-      check(is_zero);
+      check(spec_check_mass_result(test_context.result));
       check(is_zero(42) == false);
       check(is_zero(-2) == false);
       check(is_zero(0) == true);
@@ -483,17 +483,17 @@ spec("source") {
       s64(*checker)() = (s64(*)())test_program_inline_source_function(
         "is_positive", &test_context,
         "is_positive :: fn() -> (s64) {"
-          "if 0 then 21 else 42"
+          "if false then 21 else 42"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-    it("should correctly handle always-false condition") {
+    it("should correctly handle always-true condition") {
       s64(*checker)() = (s64(*)())test_program_inline_source_function(
         "is_positive", &test_context,
         "is_positive :: fn() -> (s64) {"
-          "if 1 then 42 else 21"
+          "if true then 42 else 21"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
@@ -1488,7 +1488,7 @@ spec("source") {
       test_program_inline_source_base(
         "DUMMY", &test_context,
         "do_stuff :: fn() -> () {}\n"
-        "if 1 then { do_stuff() } else {}\n"
+        "if true then { do_stuff() } else {}\n"
         "DUMMY :: 42"
       );
       check(test_context.result->tag == Mass_Result_Tag_Success);
@@ -1497,8 +1497,7 @@ spec("source") {
     it("should be able to use if / else to choose an implementation at compile time") {
       Value *value = test_program_inline_source_base(
         "TEST", &test_context,
-        "CONDITION :: 1\n"
-        "TEST :: if CONDITION then 42 else 1000\n"
+        "TEST :: if true then 42 else 1000\n"
       );
 
       check(value);
@@ -1511,8 +1510,7 @@ spec("source") {
     it("should be able combine if / else, inline modules and `using` for conditional definitions") {
       Value *value = test_program_inline_source_base(
         "TEST", &test_context,
-        "CONDITION :: 1\n"
-        "using if CONDITION then module { TEST :: 42 } else module { TEST :: 1000 }\n"
+        "using if true then module { TEST :: 42 } else module { TEST :: 1000 }\n"
       );
 
       check(value);
@@ -2216,9 +2214,9 @@ spec("source") {
     }
 
     it("should use correct EFLAGS values when dealing with unsigned integers") {
-      u8(*checker)(void) = (u8(*)(void))test_program_inline_source_function(
+      bool(*checker)(void) = (bool(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "test :: fn() -> (s8) { x : u8 = 200; x < 0 }"
+        "test :: fn() -> (bool) { x : u8 = 200; x < 0 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == false);

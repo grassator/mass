@@ -41,9 +41,8 @@ inline_machine_code_bytes :: MASS.inline_machine_code_bytes
 debugger :: ~> { inline_machine_code_bytes(0xCC) }
 
 Symbol :: MASS.Symbol
-bool :: s8
-true :: 1
-false :: 0
+true :: cast(bool, 1)
+false :: cast(bool, 0)
 
 compile_time_error :: fn(name : String, description : String) => () MASS.compile_time_error
 

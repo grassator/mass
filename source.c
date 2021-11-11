@@ -2932,7 +2932,7 @@ mass_handle_cast_lazy_proc(
   Bits original_bit_size = source_descriptor->bit_size;
 
   Value *result_value = value;
-  if (value_is_static_i64(expression)) {
+  if (value_is_static_i64(expression) && descriptor_is_integer(target_descriptor)) {
     result_value = token_value_force_immediate_integer(
       compilation, value, target_descriptor, source_range
     );
@@ -2994,21 +2994,6 @@ mass_cast_helper(
   };
 
   if (
-    descriptor_is_integer(target_descriptor) ||
-    target_descriptor->tag == Descriptor_Tag_Pointer_To
-  ) {
-    if (value_is_non_lazy_static(expression)) {
-      Expected_Result expected_result = expected_result_static(target_descriptor);
-      return mass_handle_cast_lazy_proc(context->compilation, 0, &expected_result, &lazy_payload);
-    } else {
-      Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
-      *heap_payload = lazy_payload;
-
-      return mass_make_lazy_value(
-        context, source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
-      );
-    }
-  } else if (
     expression->descriptor == &descriptor_tuple &&
     expression->storage.tag == Storage_Tag_Static
   ) {
@@ -3020,15 +3005,17 @@ mass_cast_helper(
     );
   }
 
-  context_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_Type_Mismatch,
-    .source_range = source_range,
-    .Type_Mismatch = {
-      .expected = target_descriptor,
-      .actual = value_or_lazy_value_descriptor(expression),
-    },
-  });
-  return 0;
+  if (value_is_non_lazy_static(expression)) {
+    Expected_Result expected_result = expected_result_static(target_descriptor);
+    return mass_handle_cast_lazy_proc(context->compilation, 0, &expected_result, &lazy_payload);
+  }
+
+  Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+  *heap_payload = lazy_payload;
+
+  return mass_make_lazy_value(
+    context, source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+  );
 }
 
 static Value *
@@ -4714,8 +4701,7 @@ mass_handle_comparison_operation_lazy_proc(
 
   Value *comparison_value = value_init(
     allocator_allocate(compilation->allocator, Value),
-    // TODO figure out a better descriptor for comparison results
-    &descriptor_s8, storage_eflags(compare_type), *source_range
+    &descriptor__bool, storage_eflags(compare_type), *source_range
   );
 
   value_release_if_temporary(builder, temp_a);
@@ -4741,7 +4727,7 @@ mass_handle_comparison_operation(
   Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
-    Expected_Result expected_result = expected_result_static(&descriptor_s8);
+    Expected_Result expected_result = expected_result_static(&descriptor__bool);
     return mass_handle_comparison_operation_lazy_proc(
       context->compilation, 0, &expected_result, &stack_lazy_payload
     );
@@ -4750,7 +4736,7 @@ mass_handle_comparison_operation(
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
     *payload = stack_lazy_payload;
     return mass_make_lazy_value(
-      context, arguments.source_range, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
+      context, arguments.source_range, payload, &descriptor__bool, mass_handle_comparison_operation_lazy_proc
     );
   }
 }
@@ -5678,17 +5664,16 @@ token_parse_if_expression(
 
   if (value_is_non_lazy_static(value_condition)) {
     const Descriptor *descriptor = value_condition->descriptor;
-    if (!descriptor_is_integer(descriptor) && descriptor != &descriptor_i64) {
-      // TODO :GenericIntegerType
+    if (descriptor != &descriptor__bool) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = value_condition->source_range,
-        .Type_Mismatch = { .expected = &descriptor_s64, .actual = value_condition->descriptor },
+        .Type_Mismatch = { .expected = &descriptor__bool, .actual = value_condition->descriptor },
       });
       return 0;
     }
-    s64 imm = storage_static_value_up_to_s64(&value_condition->storage);
-    return imm ? value_then : value_else;
+    bool condition = *storage_static_as_c_type(&value_condition->storage, bool);
+    return condition ? value_then : value_else;
   }
 
   // TODO probably want to unify then and else branch before returning

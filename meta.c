@@ -2120,6 +2120,12 @@ main(void) {
     Meta_Type_Flags_No_C_Type
   );
 
+  set_flags(
+    export_global_custom_name("bool",
+      push_type(type_c_opaque("_Bool", Opaque_Numeric_Interpretation_None))),
+    Meta_Type_Flags_No_C_Type
+  );
+
   #define PROCESS_INTEGER_TYPES(F)\
     F(u8) F(u16) F(u32) F(u64)\
     F(s8) F(s16) F(s32) F(s64)
