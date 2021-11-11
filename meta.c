@@ -1399,7 +1399,7 @@ main(void) {
     { "Instruction_Bucket *", "last_bucket" },
   }));
 
-  push_type(type_struct("Function_Builder", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Function_Builder", (Struct_Item[]){
     { "Program *", "program" },
     { "u64", "epoch" },
     { "s32", "stack_reserve" },
@@ -1411,7 +1411,7 @@ main(void) {
     { "u64", "register_occupied_bitset" },
     { "Slice", "source" },
     { "const Function_Info *", "function" },
-  }));
+  })));
 
   push_type(type_enum("Function_Parameter_Mode", (Enum_Type_Item[]){
     { "Call", 0 },
@@ -1568,7 +1568,7 @@ main(void) {
     { "Unpacked", 1 << 5 },
   }));
 
-  push_type(type_union("Expected_Result", (Struct_Type[]){
+  export_compiler(push_type(type_union("Expected_Result", (Struct_Type[]){
     struct_fields("Exact", (Struct_Item[]){
       { "Value *", "value" },
     }),
@@ -1577,15 +1577,15 @@ main(void) {
       { "Expected_Result_Storage", "storage" },
       { "u32", "_storage_padding" },
     }),
-  }));
+  })));
 
-  push_type(type_struct("Lazy_Value", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Lazy_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
     { "u64", "epoch" },
     { "const Descriptor *", "descriptor" },
     { "Lazy_Value_Proc", "proc" },
     { "void *", "payload" },
-  }));
+  })));
 
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
@@ -1929,7 +1929,7 @@ main(void) {
     { "const Symbol *", "operator_space" },
   }));
 
-  push_type(type_struct("Compilation", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Compilation", (Struct_Item[]){
     { "Virtual_Memory_Buffer", "temp_buffer" },
     { "Allocator *", "temp_allocator" },
     { "Virtual_Memory_Buffer", "allocation_buffer" },
@@ -1947,7 +1947,7 @@ main(void) {
     { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Common_Symbols", "common_symbols" },
     { "const Value *", "current_compile_time_function_call_target" },
-  }));
+  })));
 
   push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
     { "Compilation *", "compilation" },

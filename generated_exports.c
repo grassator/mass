@@ -92,6 +92,11 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Function_Builder")),
+    type_function_builder_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Execution_Context")),
     type_execution_context_value
   );
@@ -109,6 +114,31 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Value")),
     type_value_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Expected_Result")),
+    type_expected_result_value
+  );
+  scope_define_enum(
+    compilation, scope, COMPILER_SOURCE_RANGE,
+    slice_literal("Expected_Result_Tag"), type_expected_result_tag_value,
+    expected_result_tag_items, countof(expected_result_tag_items)
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Expected_Result_Exact")),
+    type_expected_result_exact_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Expected_Result_Flexible")),
+    type_expected_result_flexible_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Lazy_Value")),
+    type_lazy_value_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
@@ -259,6 +289,11 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Result_Error")),
     type_mass_result_error_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Compilation")),
+    type_compilation_value
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
