@@ -917,6 +917,22 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to allocate and return a void value through an intrinsic") {
+      void (*checker)() = test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn() => () intrinsic {\n"
+            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+            "value.source_range = arguments.source_range\n"
+            "value.descriptor = type_of(())\n"
+            "value.storage.tag = MASS.Storage_Tag.None\n"
+            "value"
+          "}\n"
+          "checker :: fn() -> () { my_intrinsic() }\n"
+        );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,

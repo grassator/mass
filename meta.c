@@ -1325,7 +1325,7 @@ main(void) {
     }),
   }));
 
-  push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
+  export_compiler(push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
     struct_empty("None"),
     struct_fields("Eflags", (Struct_Item[]){
       { "Compare_Type", "compare_type" },
@@ -1350,7 +1350,7 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Bits", "bit_size" },
-  }));
+  })));
 
   push_type(type_struct("Relocation", (Struct_Item[]){
     { "Storage", "patch_at" },

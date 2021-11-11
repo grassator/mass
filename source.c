@@ -5451,7 +5451,7 @@ mass_handle_dot_operator(
         .tag = Mass_Error_Tag_Parse,
         .source_range = rhs_range,
         .detailed_message =
-          "Right hand side of the . operator for an array must be an (expr) or a literal number"
+          slice_literal("Right hand side of the . operator for an array must be an (expr) or a literal number")
       });
       return 0;
     }

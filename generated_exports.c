@@ -52,6 +52,46 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage")),
+    type_storage_value
+  );
+  scope_define_enum(
+    compilation, scope, COMPILER_SOURCE_RANGE,
+    slice_literal("Storage_Tag"), type_storage_tag_value,
+    storage_tag_items, countof(storage_tag_items)
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Eflags")),
+    type_storage_eflags_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Register")),
+    type_storage_register_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Xmm")),
+    type_storage_xmm_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Static")),
+    type_storage_static_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Memory")),
+    type_storage_memory_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Unpacked")),
+    type_storage_unpacked_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Execution_Context")),
     type_execution_context_value
   );
