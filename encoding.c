@@ -307,7 +307,7 @@ eager_encode_instruction_assembly(
       u8 empty_patch_bytes[4] = {0};
       instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
     } else if (storage->tag == Storage_Tag_Static) {
-      const u8 *bytes = storage_static_as_c_type_internal(storage, storage->bit_size);
+      const u8 *bytes = get_static_storage_with_bit_size(storage, storage->bit_size);
       instruction_bytes_append_bytes(&result.bytes, bytes, storage->bit_size.as_u64 / 8);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");

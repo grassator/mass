@@ -246,7 +246,7 @@ mass_error_to_string(
 }
 
 static inline const void *
-storage_static_as_c_type_internal(
+get_static_storage_with_bit_size(
   const Storage *storage,
   Bits bit_size
 ) {
@@ -275,7 +275,7 @@ storage_static_as_c_type_internal(
 }
 
 #define storage_static_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)storage_static_as_c_type_internal(_OPERAND_, (Bits){sizeof(_TYPE_) * CHAR_BIT}))
+  ((_TYPE_ *)get_static_storage_with_bit_size(_OPERAND_, (Bits){sizeof(_TYPE_) * CHAR_BIT}))
 
 #define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
   static inline bool\
@@ -729,7 +729,7 @@ storage_with_offset_and_bit_size(
       break;
     }
     case Storage_Tag_Static: {
-      const s8 *pointer = storage_static_as_c_type_internal(base, base->bit_size);
+      const s8 *pointer = get_static_storage_with_bit_size(base, base->bit_size);
       result = storage_static_internal(pointer + diff, bit_size);
       break;
     }

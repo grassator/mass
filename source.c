@@ -395,7 +395,7 @@ assign_from_static(
       target->storage.Memory.location.Instruction_Pointer_Relative.label
     );
     const void *source_memory =
-      storage_static_as_c_type_internal(&source->storage, source->storage.bit_size);
+      get_static_storage_with_bit_size(&source->storage, source->storage.bit_size);
     memcpy(section_memory, source_memory, source->storage.bit_size.as_u64 / 8);
     return true;
   }
@@ -2942,8 +2942,7 @@ mass_handle_cast_lazy_proc(
       target_descriptor, value->storage, *source_range
     );
     if (result_value->storage.tag == Storage_Tag_Static) {
-      // TODO this is quite awkward and unsafe. There is probably a better way
-      void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_bit_size);
+      const void *memory = get_static_storage_with_bit_size(&value->storage, original_bit_size);
       result_value->storage = storage_static_internal(memory, cast_to_bit_size);
     } else {
       result_value->storage.bit_size = cast_to_bit_size;
@@ -3941,7 +3940,7 @@ mass_trampoline_call(
     assert(field->tag == Memory_Layout_Item_Tag_Base_Relative);
     u64 offset = field->Base_Relative.offset;
     void *arg_memory = args_struct_memory + offset;
-    const void *source_memory = storage_static_as_c_type_internal(
+    const void *source_memory = get_static_storage_with_bit_size(
       &item->storage, item->descriptor->bit_size
     );
     memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
@@ -4211,7 +4210,7 @@ storage_load_index_address(
     s8 *target_bytes = 0;
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       target_bytes =
-        *(s8**)storage_static_as_c_type_internal(&target->storage, target->storage.bit_size);
+        *(s8**)get_static_storage_with_bit_size(&target->storage, target->storage.bit_size);
     } else {
       panic("TODO support more static dereferences");
     }
