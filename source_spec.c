@@ -1106,6 +1106,7 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
     it("should be able to define, assign and lookup an s64 variable on the stack") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
@@ -1942,6 +1943,19 @@ spec("source") {
         "test :: fn() -> (s32) {"
           "cast(Point, [42, 0]).x"
         "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should allow casting unrelated types with the same bit size") {
+      s8(*checker)(void) = (s8(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "Wrapped :: c_struct [x : s32]\n"
+        "test :: fn() -> (s32) {\n"
+          "x : Wrapped = [42]\n"
+          "cast(s32, x)\n"
+        "};"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);

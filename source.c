@@ -2907,15 +2907,15 @@ mass_handle_cast_lazy_proc(
   const Source_Range *source_range = &expression->source_range;
 
   if (target_descriptor->tag == Descriptor_Tag_Pointer_To) {
-     if (source_descriptor->tag != Descriptor_Tag_Pointer_To) {
-        compilation_error(compilation, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = *source_range,
-          .Type_Mismatch = {
-            .expected = descriptor_pointer_to(compilation->allocator, source_descriptor),
-            .actual = source_descriptor,
-          },
-        });
+    if (source_descriptor->tag != Descriptor_Tag_Pointer_To) {
+       compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+        .Type_Mismatch = {
+          .expected = descriptor_pointer_to(compilation->allocator, source_descriptor),
+          .actual = source_descriptor,
+        },
+      });
       return 0;
     }
 
@@ -2936,20 +2936,27 @@ mass_handle_cast_lazy_proc(
     result_value = token_value_force_immediate_integer(
       compilation, value, target_descriptor, source_range
     );
-  } else if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
-    result_value = value_init(
-      allocator_allocate(compilation->allocator, Value),
-      target_descriptor, value->storage, *source_range
-    );
-    if (result_value->storage.tag == Storage_Tag_Static) {
-      const void *memory = get_static_storage_with_bit_size(&value->storage, original_bit_size);
-      result_value->storage = storage_static_internal(memory, cast_to_bit_size);
+  } else {
+    if (cast_to_bit_size.as_u64 > original_bit_size.as_u64) {
+      panic("TODO user error or trying to cast to a larger type");
+      return 0;
     } else {
-      result_value->storage.bit_size = cast_to_bit_size;
+      result_value = value_init(
+        allocator_allocate(compilation->allocator, Value),
+        target_descriptor, value->storage, *source_range
+      );
+      if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
+        if (result_value->storage.tag == Storage_Tag_Static) {
+          const void *memory = get_static_storage_with_bit_size(&value->storage, original_bit_size);
+          result_value->storage = storage_static_internal(memory, cast_to_bit_size);
+        } else {
+          result_value->storage.bit_size = cast_to_bit_size;
+        }
+      }
+      // TODO This is awkward and there might be a better way.
+      //      It is also might be necessary to somehow mark the original value as invalid maybe?
+      result_value->is_temporary = value->is_temporary;
     }
-    // TODO This is awkward and there might be a better way.
-    //      It is also might be necessary to somehow mark the original value as invalid maybe?
-    result_value->is_temporary = value->is_temporary;
   }
 
   return expected_result_ensure_value_or_temp(
