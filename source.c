@@ -5426,11 +5426,7 @@ mass_handle_dot_operator(
     lhs_forced_descriptor == &descriptor_scope
   ) {
     if (value_is_i64(rhs)) {
-      Value *index_value = token_value_force_immediate_integer(
-        context->compilation, rhs, &descriptor_u64, &rhs_range
-      );
-      MASS_ON_ERROR(*context->result) return 0;
-      u64 index = *storage_static_as_c_type(&index_value->storage, u64);
+      u64 index = value_as_i64(rhs)->bits;
       if (unwrapped_descriptor->tag != Descriptor_Tag_Struct) goto err;
       if (index >= dyn_array_length(unwrapped_descriptor->Struct.memory_layout.items)) {
         context_error(context, (Mass_Error) {
