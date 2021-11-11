@@ -1398,7 +1398,9 @@ function_literal_info_for_args(
       .info = 0,
     });
 
-  ensure_parameter_descriptors(&mutable_literal->context, specialized_info);
+  ensure_parameter_descriptors(
+    &mutable_literal->context, specialized_info, mutable_literal->context.scope
+  );
 
   // :SpecializationInfiniteLoop
   added_specialization->info = specialized_info;

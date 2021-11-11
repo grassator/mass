@@ -3594,12 +3594,13 @@ struct Overload_Match_State {
 static void
 ensure_parameter_descriptors(
   const Execution_Context *context,
-  Function_Info *info
+  Function_Info *info,
+  Scope *arguments_scope
 ) {
   Execution_Context temp_context = *context;
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
 
-  temp_context.scope = scope_make(temp_context.temp_allocator, temp_context.scope);
+  temp_context.scope = scope_make(temp_context.temp_allocator, arguments_scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     if (!param->declaration.descriptor) {
@@ -5949,7 +5950,7 @@ token_parse_function_literal(
   bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
   // TODO support this on non-Linux systems
   if (is_syscall) {
-    ensure_parameter_descriptors(context, fn_info);
+    ensure_parameter_descriptors(context, fn_info, context->scope);
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
@@ -5983,7 +5984,7 @@ token_parse_function_literal(
     }
     if (is_macro) flags |= Function_Literal_Flags_Macro;
     if (!(flags & Function_Literal_Flags_Generic)) {
-      ensure_parameter_descriptors(context, fn_info);
+      ensure_parameter_descriptors(context, fn_info, context->scope);
       MASS_ON_ERROR(*context->result) return 0;
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
@@ -5995,7 +5996,7 @@ token_parse_function_literal(
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    ensure_parameter_descriptors(context, fn_info);
+    ensure_parameter_descriptors(context, fn_info, context->scope);
     MASS_ON_ERROR(*context->result) return 0;
 
     const Calling_Convention *calling_convention =

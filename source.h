@@ -43,7 +43,8 @@ get_new_epoch();
 static void
 ensure_parameter_descriptors(
   const Execution_Context *context,
-  Function_Info *info
+  Function_Info *info,
+  Scope *arguments_scope
 );
 
 static inline const Symbol *
