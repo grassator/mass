@@ -2776,7 +2776,7 @@ compile_time_eval(
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
-  function_info_init(&fn_info, eval_context.scope);
+  function_info_init(&fn_info);
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Section *section = &jit->program->memory.code;
@@ -3203,7 +3203,7 @@ mass_handle_macro_call(
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
-  Scope *body_scope = scope_make(context->allocator, literal->info->scope);
+  Scope *body_scope = scope_make(context->allocator, literal->scope);
 
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
@@ -3833,9 +3833,8 @@ mass_ensure_trampoline(
     },
   };
 
-  Scope *trampoline_scope = scope_make(context->allocator, original_info->scope);
+  Scope *trampoline_scope = scope_make(context->allocator, context->compilation->root_scope);
   Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(trampoline_info, trampoline_scope);
   trampoline_info->flags = Function_Info_Flags_Compile_Time;
   trampoline_info->returns = (Function_Return) {
     .declaration = {
@@ -5711,7 +5710,7 @@ mass_make_fake_function_literal(
   function_context.scope = function_scope;
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, function_scope);
+  function_info_init(fn_info);
   fn_info->returns = (Function_Return) {
     .declaration = {
       .descriptor = returns,
@@ -5790,7 +5789,7 @@ function_info_from_parameters_and_return_type(
   arg_context.epoch = function_epoch;
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, function_scope);
+  function_info_init(fn_info);
 
   Temp_Mark temp_mark = context_temp_mark(context);
 

@@ -723,7 +723,7 @@ ensure_function_instance(
   dyn_array_push(literal->instances, cached_instance);
 
   Execution_Context body_context = execution_context_from_compilation(compilation);
-  Scope *body_scope = scope_make(compilation->allocator, fn_info->scope);
+  Scope *body_scope = scope_make(compilation->allocator, literal->scope);
   body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
   body_context.program = program;
@@ -882,7 +882,7 @@ program_init_startup_code(
   Program *program = context->program;
   Compilation *compilation = context->compilation;
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, context->scope);
+  function_info_init(fn_info);
   const Calling_Convention *calling_convention =
     context->compilation->runtime_program->default_calling_convention;
   Slice fn_name = slice_literal("__startup");

@@ -1661,7 +1661,6 @@ typedef dyn_array_type(Function_Return) Array_Function_Return;
 typedef struct Function_Info {
   Function_Info_Flags flags;
   u32 _flags_padding;
-  Scope * scope;
   Array_Function_Parameter parameters;
   Function_Return returns;
 } Function_Info;
@@ -1678,6 +1677,7 @@ typedef struct Function_Literal {
   u32 _flags_padding;
   Execution_Context context;
   Function_Info * info;
+  Scope * scope;
   Value * body;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
@@ -4850,12 +4850,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .Base_Relative.offset = offsetof(Function_Info, scope),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_array_function_parameter,
     .name = slice_literal_fields("parameters"),
     .Base_Relative.offset = offsetof(Function_Info, parameters),
@@ -4917,6 +4911,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .descriptor = &descriptor_function_info_pointer,
     .name = slice_literal_fields("info"),
     .Base_Relative.offset = offsetof(Function_Literal, info),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_scope_pointer,
+    .name = slice_literal_fields("scope"),
+    .Base_Relative.offset = offsetof(Function_Literal, scope),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -1649,7 +1649,6 @@ main(void) {
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Function_Info_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Scope *", "scope" },
     { "Array_Function_Parameter", "parameters" },
     { "Function_Return", "returns" },
   }));
@@ -1670,6 +1669,7 @@ main(void) {
     { "u32", "_flags_padding"},
     { "Execution_Context", "context" },
     { "Function_Info *", "info" },
+    { "Scope *", "scope" },
     { "Value *", "body" },
     { "Array_Value_Ptr", "instances"},
     { "Array_Function_Specialization", "specializations"},

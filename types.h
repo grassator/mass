@@ -103,7 +103,6 @@
     .flags = (_FLAGS_),\
     .returns.declaration.descriptor = (_RETURN_DESCRIPTOR_),\
     .parameters = parameters,\
-    .scope = scope,\
   };
 
 #define MASS_DEFINE_FUNCTION_TYPE(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\

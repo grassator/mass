@@ -1287,12 +1287,10 @@ value_global_c_string_from_slice(
 
 static inline void
 function_info_init(
-  Function_Info *info,
-  Scope *scope
+  Function_Info *info
 ) {
   *info = (Function_Info) {
     .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .scope = scope,
     .returns.declaration = {.descriptor = &descriptor_void},
   };
 }
