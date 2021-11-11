@@ -162,6 +162,11 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Opaque")),
+    type_descriptor_opaque_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("Descriptor_Function_Instance")),
     type_descriptor_function_instance_value
   );

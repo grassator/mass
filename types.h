@@ -23,12 +23,13 @@
     .Pointer_To.descriptor = &descriptor_##_NAME_,\
   }
 
-#define MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_)\
+#define MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
     .name = slice_literal_fields(#_NAME_),\
     .bit_size = {_BIT_SIZE_},\
     .bit_alignment = (_BIT_ALIGNMENT_),\
+    __VA_ARGS__\
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
@@ -68,12 +69,12 @@
   static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);\
   static Value *type_##_NAME_##_pointer_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_##_pointer);
 
-#define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_)\
-  MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_);\
+#define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
+  MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, __VA_ARGS__);\
   MASS_DEFINE_TYPE_VALUE(_NAME_);
 
-#define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_)\
-  MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT)
+#define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_, ...)\
+  MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT, __VA_ARGS__)
 
 #define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\
   Value_View _VAR_NAME_;\

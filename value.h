@@ -324,14 +324,28 @@ static inline bool
 descriptor_is_integer(
   const Descriptor *descriptor
 ) {
-  return descriptor_is_signed_integer(descriptor) || descriptor_is_unsigned_integer(descriptor);
+  if (!descriptor) return false;
+  if (descriptor->tag != Descriptor_Tag_Opaque) {
+    return false;
+  }
+  if (descriptor->Opaque.numeric_interpretation != Opaque_Numeric_Interpretation_Twos_Complement) {
+    return false;
+  }
+  return true;
 }
 
 static inline bool
 descriptor_is_float(
   const Descriptor *descriptor
 ) {
-  return descriptor == &descriptor_f32 || descriptor == &descriptor_f64;
+  if (!descriptor) return false;
+  if (descriptor->tag != Descriptor_Tag_Opaque) {
+    return false;
+  }
+  if (descriptor->Opaque.numeric_interpretation != Opaque_Numeric_Interpretation_Ieee_Float) {
+    return false;
+  }
+  return true;
 }
 
 static inline const Descriptor *

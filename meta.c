@@ -9,6 +9,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include "prelude.h"
 
+typedef enum Opaque_Numeric_Interpretation {
+  Opaque_Numeric_Interpretation_None = 0,
+  Opaque_Numeric_Interpretation_Twos_Complement = 1,
+  Opaque_Numeric_Interpretation_Ieee_Float = 2,
+} Opaque_Numeric_Interpretation;
+
 typedef struct {
   const char *name;
   int32_t value;
@@ -69,6 +75,10 @@ typedef struct {
   bool negative;
 } Meta_i64;
 
+typedef struct {
+  Opaque_Numeric_Interpretation numeric_interpretation;
+} Meta_C_Opaque;
+
 typedef enum {
   Meta_Type_Tag_C_Opaque,
   Meta_Type_Tag_Struct,
@@ -104,6 +114,7 @@ typedef struct {
     Function_Type function;
     Hash_Map_Type hash_map;
     Meta_i64 i64;
+    Meta_C_Opaque c_opaque;
   };
 } Meta_Type;
 
@@ -815,7 +826,20 @@ print_mass_descriptor_and_type(
     }
     case Meta_Type_Tag_C_Opaque: {
       char *lowercase_name = strtolower(type->name);
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->name);
+      const char *numeric_interpretation_string = 0;
+      switch(type->c_opaque.numeric_interpretation) {
+        case Opaque_Numeric_Interpretation_None: {
+          numeric_interpretation_string = "Opaque_Numeric_Interpretation_None";
+        } break;
+        case Opaque_Numeric_Interpretation_Twos_Complement: {
+          numeric_interpretation_string = "Opaque_Numeric_Interpretation_Twos_Complement";
+        } break;
+        case Opaque_Numeric_Interpretation_Ieee_Float: {
+          numeric_interpretation_string = "Opaque_Numeric_Interpretation_Ieee_Float";
+        } break;
+      }
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s, .Opaque.numeric_interpretation = %s)\n",
+        lowercase_name, type->name, numeric_interpretation_string);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
       break;
     }
@@ -932,10 +956,11 @@ print_mass_descriptor_and_type(
     .item_count = countof(__VA_ARGS__),\
   }
 
-#define type_c_opaque(_NAME_STRING_, ...)\
+#define type_c_opaque(_NAME_STRING_, _NUMERIC_INTERPRETATION_)\
   (Meta_Type){\
     .tag = Meta_Type_Tag_C_Opaque,\
     .name = (_NAME_STRING_),\
+    .c_opaque.numeric_interpretation = (_NUMERIC_INTERPRETATION_),\
   }
 
 #define type_enum(_NAME_STRING_, ...)\
@@ -1705,8 +1730,17 @@ main(void) {
     { "const Descriptor *", "descriptor"},
   }));
 
+  push_type(type_enum("Opaque_Numeric_Interpretation", (Enum_Type_Item[]){
+    { "None", Opaque_Numeric_Interpretation_None },
+    { "Twos_Complement", Opaque_Numeric_Interpretation_Twos_Complement },
+    { "Ieee_Float", Opaque_Numeric_Interpretation_Ieee_Float },
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
-    struct_empty("Opaque"),
+    struct_fields("Opaque", (Struct_Item[]){
+      { "Opaque_Numeric_Interpretation", "numeric_interpretation" },
+      { "u32", "_numeric_interpretation_padding" },
+    }),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "const Function_Info *", "info" },
       { "Function_Call_Setup", "call_setup"},
@@ -2066,20 +2100,45 @@ main(void) {
   DEFINE_ARITHMETIC(not_equal);
 
   // Standard C types
-  set_flags(push_type(type_c_opaque("char")), Meta_Type_Flags_No_C_Type);
-  set_flags(push_type(type_c_opaque("int")), Meta_Type_Flags_No_C_Type);
+  set_flags(push_type(
+    type_c_opaque("char", Opaque_Numeric_Interpretation_Twos_Complement)),
+    Meta_Type_Flags_No_C_Type
+  );
+  set_flags(push_type(
+    type_c_opaque("int", Opaque_Numeric_Interpretation_Twos_Complement)),
+    Meta_Type_Flags_No_C_Type
+  );
 
   // Prelude Types
-  set_flags(export_compiler_custom_name("Allocator", push_type(type_c_opaque("Allocator"))), Meta_Type_Flags_No_C_Type);
-  set_flags(push_type(type_c_opaque("Virtual_Memory_Buffer")), Meta_Type_Flags_No_C_Type);
-  #define PROCESS_PRELUDE_TYPES(F)\
+  set_flags(
+    export_compiler_custom_name("Allocator",
+      push_type(type_c_opaque("Allocator", Opaque_Numeric_Interpretation_None))),
+    Meta_Type_Flags_No_C_Type
+  );
+  set_flags(
+    push_type(type_c_opaque("Virtual_Memory_Buffer", Opaque_Numeric_Interpretation_None)),
+    Meta_Type_Flags_No_C_Type
+  );
+
+  #define PROCESS_INTEGER_TYPES(F)\
     F(u8) F(u16) F(u32) F(u64)\
-    F(s8) F(s16) F(s32) F(s64)\
+    F(s8) F(s16) F(s32) F(s64)
+
+  #define PROCESS_FLOAT_TYPES(F)\
     F(f32) F(f64)
 
-  #define DEFINE_PRIMITIVE(T)\
-    export_global(set_flags(push_type(type_c_opaque(#T)),\
+  #define PROCESS_NUMERIC_TYPES(F)\
+    PROCESS_INTEGER_TYPES(F)\
+    PROCESS_FLOAT_TYPES(F)
+
+  #define DEFINE_INTEGER_TYPE(T)\
+    export_global(set_flags(push_type(type_c_opaque(#T, Opaque_Numeric_Interpretation_Twos_Complement)),\
       Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
+  #define DEFINE_FLOAT_TYPE(T)\
+    export_global(set_flags(push_type(type_c_opaque(#T, Opaque_Numeric_Interpretation_Ieee_Float)),\
+      Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
+  PROCESS_INTEGER_TYPES(DEFINE_INTEGER_TYPE)
+  PROCESS_FLOAT_TYPES(DEFINE_FLOAT_TYPE)
 
   #define DEFINE_RANGES(T)\
     set_flags(push_type(type_struct("Range_" #T, (Struct_Item[]){\
@@ -2087,8 +2146,7 @@ main(void) {
       { #T, "to" },\
     })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array);
 
-  PROCESS_PRELUDE_TYPES(DEFINE_PRIMITIVE)
-  PROCESS_PRELUDE_TYPES(DEFINE_RANGES)
+  PROCESS_NUMERIC_TYPES(DEFINE_RANGES)
 
   export_global_custom_name("String", set_flags(push_type(type_struct("Slice", (Struct_Item[]){
     { "u8 *", "bytes" },
