@@ -1411,10 +1411,15 @@ tokenizer_push_string_literal(
   char *bytes = allocator_allocate_bytes(compilation->allocator, length, 1);
   memcpy(bytes, (*string_buffer)->memory, length);
   {
-    Descriptor *bytes_descriptor =
-      descriptor_array_of(compilation->allocator, &descriptor_u8, u64_to_u32(length));
+    Descriptor *bits_descriptor = allocator_allocate(compilation->allocator, Descriptor);
+    *bits_descriptor = (Descriptor) {
+      .tag = Descriptor_Tag_Opaque,
+      .bit_size = {length * CHAR_BIT},
+      .bit_alignment = { CHAR_BIT },
+      .Opaque = { .numeric_interpretation = Opaque_Numeric_Interpretation_None },
+    };
     Value *pointer_value = hash_map_set(compilation->static_pointer_map, bytes, (Value){0});
-    value_init(pointer_value, bytes_descriptor, storage_none, source_range);
+    value_init(pointer_value, bits_descriptor, storage_none, source_range);
   }
 
   allocator_allocate_bulk(compilation->allocator, combined, {
