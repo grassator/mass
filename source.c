@@ -403,14 +403,21 @@ assign_from_static(
 }
 
 static PRELUDE_NO_DISCARD Value *
-value_indirect_from_reference(
+value_indirect_from_reference_or_pointer(
   Compilation *compilation,
   Function_Builder *builder,
   Value *source
 ) {
   const Allocator *allocator = compilation->allocator;
-  assert(source->descriptor->tag == Descriptor_Tag_Reference_To);
-  const Descriptor *referenced_descriptor = source->descriptor->Reference_To.descriptor;
+  const Descriptor *referenced_descriptor;
+  if (source->descriptor->tag == Descriptor_Tag_Reference_To) {
+    referenced_descriptor = source->descriptor->Reference_To.descriptor;
+  } else if (source->descriptor->tag == Descriptor_Tag_Pointer_To) {
+    referenced_descriptor = source->descriptor->Pointer_To.descriptor;
+  } else {
+    panic("Unexpected descriptor tag for an indirect value");
+    return 0;
+  }
   switch(source->storage.tag) {
     case Storage_Tag_Register: {
       Register reg = source->storage.Register.index;
@@ -807,7 +814,7 @@ assign(
     source->descriptor->tag == Descriptor_Tag_Reference_To &&
     target->descriptor->tag != Descriptor_Tag_Reference_To
   ) {
-    Value *referenced_value = value_indirect_from_reference(compilation, builder, source);
+    Value *referenced_value = value_indirect_from_reference_or_pointer(compilation, builder, source);
     MASS_TRY(assign(compilation, builder, target, referenced_value, source_range));
     value_release_if_temporary(builder, referenced_value);
     return *compilation->result;
@@ -822,7 +829,7 @@ assign(
       ) ||
       source->descriptor == &descriptor_tuple
     ) {
-      Value *referenced_target = value_indirect_from_reference(compilation, builder, target);
+      Value *referenced_target = value_indirect_from_reference_or_pointer(compilation, builder, target);
       MASS_TRY(assign(compilation, builder, referenced_target, source, source_range));
       value_release_if_temporary(builder, referenced_target);
       return *compilation->result;
@@ -838,8 +845,8 @@ assign(
   ) {
     if (!same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) goto err;
     if (!storage_equal(&target->storage, &source->storage)) {
-      Value *referenced_source = value_indirect_from_reference(compilation, builder, source);
-      Value *referenced_target = value_indirect_from_reference(compilation, builder, target);
+      Value *referenced_source = value_indirect_from_reference_or_pointer(compilation, builder, source);
+      Value *referenced_target = value_indirect_from_reference_or_pointer(compilation, builder, target);
       MASS_TRY(assign(compilation, builder, referenced_target, referenced_source, source_range));
       value_release_if_temporary(builder, referenced_source);
       value_release_if_temporary(builder, referenced_target);
@@ -5342,6 +5349,47 @@ mass_struct_field_access(
     );
   }
 }
+static Value *
+mass_handle_dereference_operator_lazy_proc(
+  Compilation *compilation,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Value* pointer
+) {
+  // TODO value_indirect_from_reference_or_pointer should probably take an expected_result
+  Value *value = value_indirect_from_reference_or_pointer(compilation, builder, pointer);
+  return expected_result_ensure_value_or_temp(compilation, builder, expected_result, value);
+}
+
+static Value *
+mass_handle_dereference_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  const void *payload
+) {
+  Value *pointer = token_parse_single(context, value_view_get(args_view, 0));
+  MASS_ON_ERROR(*context->result) return 0;
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
+  if (descriptor->tag != Descriptor_Tag_Pointer_To) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = args_view.source_range,
+      .Type_Mismatch = {
+        .expected = descriptor_pointer_to(context->allocator, descriptor),
+        .actual = descriptor,
+      },
+    });
+    return 0;
+  }
+  // FIXME support this for static values
+  return mass_make_lazy_value(
+    context,
+    args_view.source_range,
+    pointer,
+    descriptor->Pointer_To.descriptor,
+    mass_handle_dereference_operator_lazy_proc
+  );
+}
 
 static Value *
 mass_handle_dot_operator(
@@ -6817,6 +6865,13 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(".*"), allocator_make(allocator, Operator,
+    .precedence = 20,
+    .fixity = Operator_Fixity_Postfix,
+    .associativity = Operator_Associativity_Left,
+    .argument_count = 1,
+    .handler = mass_handle_dereference_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(" "), allocator_make(allocator, Operator,
     .precedence = 20,
