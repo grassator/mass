@@ -1261,22 +1261,6 @@ descriptor_array_of(
   return result;
 }
 
-static inline Value *
-value_global_c_string_from_slice(
-  Execution_Context *context,
-  Slice slice,
-  Source_Range source_range
-) {
-  u32 length = u64_to_u32(slice.length + 1);
-  Descriptor *descriptor = descriptor_array_of(context->allocator, &descriptor_u8, length);
-
-  Value *string_value = value_global(context, descriptor, source_range);
-  s8 *memory = rip_value_pointer(string_value);
-  memcpy(memory, slice.bytes, slice.length);
-  memory[length - 1] = 0;
-  return string_value;
-}
-
 static inline void
 function_info_init(
   Function_Info *info
