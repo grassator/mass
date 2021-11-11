@@ -933,6 +933,44 @@ spec("source") {
       checker();
     }
 
+    // FIXME this breaks because meta.c does not correctly define descriptor_lazy_value_proc
+    xit("should be able to allocate and return a lazy void value through an intrinsic") {
+      void (*checker)() = test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn() => () intrinsic {\n"
+            "lazy_value_proc :: fn("
+              "compilation : &MASS.Compilation,"
+              "builder : &MASS.Function_Builder,"
+              "expected_result : &MASS.Expected_Result,"
+              "payload : &type_of(())"
+            ") -> (&MASS.Value) {\n"
+              "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+              "value.source_range = arguments.source_range\n"
+              "value.descriptor = type_of(())\n"
+              "value.storage.tag = MASS.Storage_Tag.None\n"
+              "value"
+            "}\n"
+
+            "lazy_value : &MASS.Lazy_Value = compile_time_allocate(MASS.Lazy_Value)\n"
+            "lazy_value.context = context.*\n"
+            "lazy_value.descriptor = type_of(())\n"
+            "lazy_value.proc = lazy_value_proc\n"
+            "lazy_value.payload = 0\n"
+
+            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+            "value.source_range = arguments.source_range\n"
+            "value.descriptor = MASS.Lazy_Value\n"
+            "value.storage.tag = MASS.Storage_Tag.Static\n"
+            "value.storage.bit_size = value.descriptor.bit_size\n"
+            "value.storage.Static.memory.tag = Static_Memory_Tag_Heap\n"
+            "value.storage.Static.memory.Heap.pointer = lazy_value\n"
+            "value"
+          "}\n"
+          "checker :: fn() -> () { my_intrinsic() }\n"
+        );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,
