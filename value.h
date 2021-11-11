@@ -233,12 +233,6 @@ storage_is_stack(
 );
 
 static inline Storage
-storage_register_for_descriptor(
-  Register reg,
-  const Descriptor *descriptor
-);
-
-static inline Storage
 memory_layout_item_storage_at_index(
   const Storage *base,
   const Memory_Layout *layout,

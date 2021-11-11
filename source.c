@@ -433,7 +433,7 @@ value_indirect_from_reference_or_pointer(
       Value *temp = value_temporary_acquire_indirect_for_descriptor(
         allocator, builder, reg, referenced_descriptor, source->source_range
       );
-      Storage reg_storage = storage_register_for_descriptor(reg, source->descriptor);
+      Storage reg_storage = storage_register(reg, source->descriptor->bit_size);
       move_value(builder, &source->source_range, &reg_storage, &source->storage);
       return temp;
     }
@@ -707,7 +707,7 @@ assign_integers(
     } else {
       is_temp = true;
       Register reg = register_acquire_temp(builder);
-      adjusted_source = storage_register_for_descriptor(reg, target->descriptor);
+      adjusted_source = storage_register(reg, target->descriptor->bit_size);
     }
 
     if (descriptor_is_signed_integer(source->descriptor)) {
@@ -2830,7 +2830,7 @@ compile_time_eval(
   Register out_register = register_acquire_temp(&eval_builder);
   Value out_value_register = {
     .descriptor = &descriptor_s64,
-    .storage = storage_register_for_descriptor(out_register, &descriptor_void_pointer),
+    .storage = storage_register(out_register, (Bits){64}),
   };
   Value result_address = {
     .descriptor = &descriptor_s64,
@@ -3495,7 +3495,7 @@ call_function_overload(
       if (!register_bitset_get(saved_registers_bitset, reg_index)) continue;
 
       Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
-        .reg = storage_register_for_descriptor(reg_index, &descriptor_void_pointer),
+        .reg = storage_register(reg_index, (Bits){64}),
         .stack = reserve_stack_storage(builder, descriptor_void_pointer.bit_size),
       });
 
@@ -3532,7 +3532,7 @@ call_function_overload(
     case Function_Call_Jump_Tag_Call: {
       if (instance->storage.tag == Storage_Tag_Static) {
         Register temp_reg = register_acquire_temp(builder);
-        Storage reg = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
+        Storage reg = storage_register(temp_reg, (Bits){64});
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
           &(Instruction_Assembly){mov, {reg, instance->storage}}
@@ -3551,7 +3551,7 @@ call_function_overload(
     } break;
     case Function_Call_Jump_Tag_Syscall: {
       assert(instance->storage.tag == Storage_Tag_None);
-      Storage syscal_number_storage = storage_register_for_descriptor(Register_A, &descriptor_s64);
+      Storage syscal_number_storage = storage_register(Register_A, (Bits){64});
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
         &(Instruction_Assembly){mov, {syscal_number_storage, imm64(call_setup->jump.Syscall.number)}}
@@ -4354,7 +4354,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
       Storage maybe_saved_rdx = storage_none;
-      Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
+      Storage reg_d = storage_register(Register_D, (Bits){64});
       if (
         expected_result->tag != Expected_Result_Tag_Exact ||
         !storage_is_register_index(
@@ -4364,7 +4364,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       ) {
         Register temp_register = register_find_available(builder, disallowed_temp_registers);
         register_acquire(builder, temp_register);
-        maybe_saved_rdx = storage_register_for_descriptor(temp_register, &descriptor_s64);
+        maybe_saved_rdx = storage_register(temp_register, (Bits){64});
         move_value(builder, &result_range, &maybe_saved_rdx, &reg_d);
       }
 
@@ -4438,7 +4438,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
       Storage maybe_saved_rdx = storage_none;
-      Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
+      Storage reg_d = storage_register(Register_D, (Bits){64});
       if (register_bitset_get(builder->register_occupied_bitset, Register_D)) {
         if (
           expected_result->tag != Expected_Result_Tag_Exact ||
@@ -4448,7 +4448,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         ) {
           Register temp_register = register_find_available(builder, disallowed_temp_registers);
           register_acquire(builder, temp_register);
-          maybe_saved_rdx = storage_register_for_descriptor(temp_register, &descriptor_s64);
+          maybe_saved_rdx = storage_register(temp_register, (Bits){64});
           move_value(builder, &result_range, &maybe_saved_rdx, &reg_d);
         }
       }
@@ -4477,7 +4477,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         );
       } else {
         if (bit_size == 8) {
-          Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
+          Storage reg_ax = storage_register(Register_A, (Bits){16});
           push_eagerly_encoded_assembly_no_source_range(
             &builder->code_block, result_range, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend->storage}}
           );
@@ -4502,7 +4502,7 @@ mass_handle_arithmetic_operation_lazy_proc(
             .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
           });
         } else {
-          Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
+          Storage reg_d = storage_register(Register_D, descriptor->bit_size);
           move_value(builder, &result_range, &temp_dividend->storage, &reg_d);
         }
       }
@@ -5235,7 +5235,7 @@ mass_handle_field_access_lazy_proc(
       is_temporary = false;
     } else {
       Register reg = register_acquire_temp(builder);
-      Storage base_storage = storage_register_for_descriptor(reg, struct_descriptor);
+      Storage base_storage = storage_register(reg, struct_descriptor->bit_size);
       struct_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
       move_value(builder, &struct_->source_range, &base_storage, &struct_->storage);
       is_temporary = true;

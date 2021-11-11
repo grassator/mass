@@ -345,7 +345,7 @@ make_trampoline(
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
-  Storage rax = storage_register_for_descriptor(Register_A, &descriptor_u64);
+  Storage rax = storage_register(Register_A, (Bits){64});
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {mov, {rax, imm64(address)}});
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {jmp, {rax}});
   return result;
@@ -379,13 +379,13 @@ fn_encode(
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         out_layout->volatile_register_push_offsets[push_index++] =
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
-        Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
+        Storage to_save = storage_register(reg_index, (Bits){64});
         encode_and_write_assembly(buffer, &(Instruction_Assembly) {push, {to_save}});
       }
     }
   }
 
-  Storage rsp = storage_register_for_descriptor(Register_SP, &descriptor_u64);
+  Storage rsp = storage_register(Register_SP, (Bits){64});
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {sub, {rsp, stack_size_operand}});
   out_layout->stack_allocation_offset_in_prolog =
     u64_to_u8(code_base_rva + buffer->occupied -out_layout->begin_rva);
@@ -406,7 +406,7 @@ fn_encode(
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (register_bitset_get(builder->register_used_bitset, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
-        Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
+        Storage to_save = storage_register(reg_index, (Bits){64});
         encode_and_write_assembly(buffer, &(Instruction_Assembly) {pop, {to_save}});
       }
     }
@@ -449,7 +449,7 @@ encode_inverted_conditional_jump(
       Storage test_storage = value->storage;
       bool is_packed = value->storage.Register.offset_in_bits != 0;
       if (is_packed) {
-        test_storage = storage_register_for_descriptor(register_acquire_temp(builder), value->descriptor);
+        test_storage = storage_register(register_acquire_temp(builder), value->descriptor->bit_size);
         move_value(builder, source_range, &test_storage, &value->storage);
       }
       push_eagerly_encoded_assembly(
@@ -535,7 +535,7 @@ load_address(
   bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
   Storage register_storage = can_reuse_result_as_temp
     ? result_value->storage
-    : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
+    : storage_register(register_acquire_temp(builder), result_value->descriptor->bit_size);
 
   assert(register_storage.bit_size.as_u64 == 64);
   push_eagerly_encoded_assembly(
@@ -801,10 +801,8 @@ ensure_function_instance(
   if (!storage_equal(&call_setup.callee_return, &call_setup.caller_return)) {
     Register caller_register = function_return_value_register_from_storage(&call_setup.caller_return);
     Register callee_register = function_return_value_register_from_storage(&call_setup.callee_return);
-    Storage callee_register_storage =
-      storage_register_for_descriptor(callee_register, &descriptor_void_pointer);
-    Storage caller_register_storage =
-      storage_register_for_descriptor(caller_register, &descriptor_void_pointer);
+    Storage callee_register_storage = storage_register(callee_register, (Bits){64});
+    Storage caller_register_storage = storage_register(caller_register, (Bits){64});
     push_eagerly_encoded_assembly(
       &builder->code_block, return_value->source_range,
       &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
@@ -909,8 +907,7 @@ program_init_startup_code(
   };
 
   // Resolve relocations
-  Descriptor *void_pointer = descriptor_pointer_to(context->allocator, &descriptor_void);
-  Storage register_a = storage_register_for_descriptor(Register_A, void_pointer);
+  Storage register_a = storage_register(Register_A, (Bits){64});
   u64 relocation_count = dyn_array_length(program->relocations);
   for (u64 i = 0; i < relocation_count; ++i) {
     Relocation *relocation = dyn_array_get(program->relocations, i);

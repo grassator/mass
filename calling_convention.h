@@ -749,10 +749,10 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
-    // FIXME provide user error? or should it be handled earlier?
-    assert(function->returns.declaration.descriptor == &descriptor_s32);
+    // TODO provide user error? or should it be handled earlier?
+    assert(function->returns.declaration.descriptor->bit_size.as_u64 == 32);
 
-    Storage common_storage = storage_register_for_descriptor(Register_A, &descriptor_s32);
+    Storage common_storage = storage_register(Register_A, (Bits){32});
     result.callee_return = common_storage;
     result.caller_return = common_storage;
   }
@@ -823,21 +823,20 @@ calling_convention_x86_64_windows_call_setup_proc(
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
+    Bits bit_size = function->returns.declaration.descriptor->bit_size;
     if (descriptor_is_float(function->returns.declaration.descriptor)) {
-      Storage common_storage =
-        storage_register_for_descriptor(Register_Xmm0, function->returns.declaration.descriptor);
+      Storage common_storage = storage_register(Register_Xmm0, bit_size);
       result.callee_return = common_storage;
       result.caller_return = common_storage;
     } else {
-      if (descriptor_byte_size(function->returns.declaration.descriptor) > 8) {
+      if (bit_size.as_u64 > 64) {
         is_indirect_return = true;
         const Descriptor *return_descriptor = function->returns.declaration.descriptor;
 
         result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
         result.callee_return = storage_indirect(return_descriptor->bit_size, Register_C);
       } else {
-        Storage common_storage =
-          storage_register_for_descriptor(Register_A, function->returns.declaration.descriptor);
+        Storage common_storage = storage_register(Register_A, bit_size);
         result.callee_return = common_storage;
         result.caller_return = common_storage;
       }
@@ -867,8 +866,7 @@ calling_convention_x86_64_windows_call_setup_proc(
       .source_range = param->declaration.source_range,
     };
 
-    u64 byte_size = descriptor_byte_size(item.descriptor);
-    bool is_large_argument = byte_size > 8;
+    bool is_large_argument = item.descriptor->bit_size.as_u64 > 64;
     Storage arg_storage;
     if (is_large_argument) {
       item.descriptor = descriptor_reference_to(allocator, item.descriptor);
@@ -877,7 +875,7 @@ calling_convention_x86_64_windows_call_setup_proc(
       Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[index]
         : general_registers[index];
-      arg_storage = storage_register_for_descriptor(reg, item.descriptor);
+      arg_storage = storage_register(reg, item.descriptor->bit_size);
       item.tag = Memory_Layout_Item_Tag_Absolute;
       item.Absolute.storage = arg_storage;
     } else {

@@ -1122,14 +1122,6 @@ storage_register(
   return result;
 }
 
-static inline Storage
-storage_register_for_descriptor(
-  Register reg,
-  const Descriptor *descriptor
-) {
-  return storage_register(reg, descriptor->bit_size);
-}
-
 static inline Value *
 value_register_for_descriptor(
   const Allocator *allocator,
@@ -1137,7 +1129,7 @@ value_register_for_descriptor(
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  Storage storage = storage_register_for_descriptor(reg, descriptor);
+  Storage storage = storage_register(reg, descriptor->bit_size);
   return value_init(
     allocator_allocate(allocator, Value),
     descriptor, storage, source_range
@@ -1169,7 +1161,7 @@ value_temporary_acquire_register_for_descriptor(
   Source_Range source_range
 ) {
   register_acquire(builder, reg);
-  Storage storage = storage_register_for_descriptor(reg, descriptor);
+  Storage storage = storage_register(reg, descriptor->bit_size);
   Value *value = allocator_allocate(allocator, Value);
   value_init(value, descriptor, storage, source_range);
   value->is_temporary = true;
