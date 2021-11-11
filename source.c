@@ -856,11 +856,8 @@ assign(
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const i64 *literal = storage_static_as_c_type(&source->storage, i64);
       if (literal->bits == 0) {
-        source = token_value_force_immediate_integer(
-          compilation, source, &descriptor_u64, source_range
-        );
-        source->descriptor = target->descriptor;
-        move_value(builder, source_range, &target->storage, &source->storage);
+        Storage zero = imm64(0);
+        move_value(builder, source_range, &target->storage, &zero);
         return *compilation->result;
       } else {
         compilation_error(compilation, (Mass_Error) {
