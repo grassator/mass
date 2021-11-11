@@ -2442,13 +2442,15 @@ token_parse_operator_definition(
   const Symbol *alias = value_as_symbol(alias_token);
 
   Value *precedence_value = token_parse_single(context, precedence_token);
-  precedence_value = token_value_force_immediate_integer(
-    context->compilation, precedence_value, &descriptor_u64, &precedence_token->source_range
-  );
-  MASS_ON_ERROR(*context->result) goto err;
-
-  assert(precedence_value->storage.tag == Storage_Tag_Static);
-  u32 precendence = u64_to_u32(storage_static_value_up_to_u64(&precedence_value->storage));
+  if (!value_is_i64(precedence_value)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = precedence_token->source_range,
+      .detailed_message ="Expected a precedence literal number",
+    });
+    goto err;
+  }
+  u32 precendence = u64_to_u32(value_as_i64(precedence_value)->bits);
 
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
