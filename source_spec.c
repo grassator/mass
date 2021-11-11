@@ -1055,6 +1055,19 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Unimplemented);
     }
+
+    it("should allow casting one pointer type to another") {
+      s8(*checker)(void) = (s8(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (s8) {\n"
+          "x := 42\n"
+          "pointer := cast(&s8, &x)\n"
+          "pointer.*"
+        "};"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
     it("should be able to define, assign and lookup an s64 variable on the stack") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
