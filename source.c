@@ -4816,9 +4816,11 @@ mass_handle_address_of_lazy_proc(
   const Expected_Result *expected_result,
   Value *pointee
 ) {
-  // FIXME :ExpectedExact
-  Value *result_value = value_from_exact_expected_result(expected_result);
-  load_address(builder, &result_value->source_range, result_value, pointee->storage);
+  Source_Range source_range = pointee->source_range;
+  Value *result_value = value_from_expected_result(
+    compilation->allocator, builder, expected_result, source_range
+  );
+  load_address(builder, &source_range, result_value, pointee->storage);
   return result_value;
 }
 
