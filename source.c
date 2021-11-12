@@ -5038,6 +5038,17 @@ mass_handle_assignment_lazy_proc(
 
   value_force_exact(compilation, builder, target, payload->expression);
   value_release_if_temporary(builder, target);
+  MASS_ON_ERROR(*compilation->result) return 0;
+
+  const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
+  if (expected_descriptor != &descriptor_void) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = target->source_range,
+      .Type_Mismatch = { .expected = expected_descriptor, .actual = &descriptor_void },
+    });
+    return 0;
+  }
 
   return expected_result_validate(expected_result, &void_value);
 }
