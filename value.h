@@ -121,9 +121,8 @@ value_view_get(
   Value_View view,
   u64 index
 ) {
-  Value *result = value_view_peek(view, index);
-  assert(result);
-  return result;
+  assert(index < view.length);
+  return view.values[index];
 }
 
 static inline Value *
