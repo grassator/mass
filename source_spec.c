@@ -1053,6 +1053,30 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should support referring to the previous argument's type") {
+      u64 (*checker)() =
+        (u64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_add :: fn(x : y, y : u64) -> (x) { x + y }\n"
+          "checker :: fn() -> (u64) {\n"
+            "my_add(31, 11)\n"
+          "}"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should report an error when argument types refer to each other") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "my_add :: fn(x : y, y : x) -> (x) { x + y }\n"
+        "checker :: fn() -> (u64) {\n"
+          "my_add(31, 11)\n"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+    }
   }
 
   describe("Assignment") {

@@ -3603,28 +3603,38 @@ ensure_parameter_descriptors(
   temp_context.scope = scope_make(temp_context.temp_allocator, arguments_scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
-    if (!param->declaration.descriptor) {
-      assert(param->maybe_type_expression.length);
-      param->declaration.descriptor =
-        token_match_type(&temp_context, param->maybe_type_expression);
-      MASS_ON_ERROR(*temp_context.result) goto err;
-    }
-    assert(param->declaration.descriptor);
     Source_Range source_range = param->declaration.source_range;
-    Value *param_value = value_init(
-      allocator_allocate(temp_context.temp_allocator, Value),
-      &descriptor_descriptor_pointer,
-      storage_static(&param->declaration.descriptor),
-      source_range
-    );
-    scope_define_value(
-      temp_context.scope,
-      VALUE_STATIC_EPOCH,
-      source_range,
-      param->declaration.symbol,
-      param_value
+    Value_View lazy_expr;
+    if (param->declaration.descriptor) {
+      Value **param_value_pointer = allocator_allocate(temp_context.temp_allocator, Value *);
+      *param_value_pointer = value_init(
+        allocator_allocate(temp_context.temp_allocator, Value),
+        &descriptor_descriptor_pointer,
+        storage_static(&param->declaration.descriptor),
+        source_range
+      );
+      lazy_expr = value_view_single(param_value_pointer);
+    } else {
+      lazy_expr = param->maybe_type_expression;
+    }
+
+    scope_define_lazy_compile_time_expression(
+      &temp_context, temp_context.scope, param->declaration.symbol, lazy_expr
     );
   }
+
+  DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
+    if (param->declaration.descriptor) continue;
+    const Symbol *symbol = param->declaration.symbol;
+    Source_Range source_range = param->declaration.source_range;
+    Value *type_value =
+      scope_lookup_force(&temp_context, temp_context.scope, symbol, &source_range);
+    MASS_ON_ERROR(*temp_context.result) goto err;
+    param->declaration.descriptor = value_ensure_type(&temp_context, type_value, source_range);
+    MASS_ON_ERROR(*temp_context.result) goto err;
+    assert(param->declaration.descriptor);
+  }
+
   if (!info->returns.declaration.descriptor) {
     assert(info->returns.maybe_type_expression.length);
     info->returns.declaration.descriptor =
