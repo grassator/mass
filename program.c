@@ -201,6 +201,8 @@ program_jit_imports(
 ) {
   Program *program = jit->program;
   u64 import_count = dyn_array_length(program->import_libraries);
+  Source_Range source_range;
+  INIT_LITERAL_SOURCE_RANGE(&source_range, "__import");
   for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
@@ -212,7 +214,7 @@ program_jit_imports(
       handle = callbacks->load_library(library_name);
       if (!handle) return mass_error((Mass_Error) {
         .tag = Mass_Error_Tag_Dynamic_Library_Load,
-        .source_range = COMPILER_SOURCE_RANGE, // TODO provide a better range here
+        .source_range = source_range,
         .Dynamic_Library_Load = {
           .library_name = lib->name,
           //.symbol_name = lib->name,
@@ -228,7 +230,7 @@ program_jit_imports(
         fn_type_opaque address = (fn_type_opaque)callbacks->load_symbol(handle, symbol_name);
         if (!address) return mass_error((Mass_Error) {
           .tag = Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found,
-          .source_range = COMPILER_SOURCE_RANGE, // TODO provide a better range here
+          .source_range = source_range,
           .Dynamic_Library_Symbol_Not_Found = {
             .library_name = lib->name,
             .symbol_name = lib->name,

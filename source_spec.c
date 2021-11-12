@@ -103,9 +103,11 @@ test_program_source_base(
   program_import_module(context, test_module);
   MASS_ON_ERROR(*context->result) return 0;
   Slice id_slice = slice_from_c_string(id);
+  Source_Range symbol_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&symbol_source_range, "__test_symbol__");
   const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice);
   Value *value = scope_lookup_force(
-    context, test_module->own_scope, symbol, &COMPILER_SOURCE_RANGE
+    context, test_module->own_scope, symbol, &symbol_source_range
   );
   if (value) {
     if (value->descriptor == &descriptor_overload_set) {
@@ -207,7 +209,7 @@ spec("source") {
     it("should be able to set and lookup values") {
       Value *test = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(42), COMPILER_SOURCE_RANGE
+        &descriptor_s64, imm64(42), (Source_Range){0}
       );
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
@@ -219,7 +221,7 @@ spec("source") {
     it("should be able to lookup things from parent scopes") {
       Value *global = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(42), COMPILER_SOURCE_RANGE
+        &descriptor_s64, imm64(42), (Source_Range){0}
       );
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *global_symbol = mass_ensure_symbol(&test_compilation, slice_literal("global"));
@@ -228,14 +230,14 @@ spec("source") {
       const Symbol *test_symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       Value *level_1_test = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(1), COMPILER_SOURCE_RANGE
+        &descriptor_s64, imm64(1), (Source_Range){0}
       );
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define_value(scope_level_1, 0, (Source_Range){0}, test_symbol, level_1_test);
 
       Value *level_2_test = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(2), COMPILER_SOURCE_RANGE
+        &descriptor_s64, imm64(2), (Source_Range){0}
       );
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define_value(scope_level_2, 0, (Source_Range){0}, test_symbol,  level_2_test);

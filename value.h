@@ -4,11 +4,6 @@
 #include <inttypes.h>
 #include "types.h"
 
-static const Source_Range COMPILER_SOURCE_RANGE = {
-  .file = 0,
-  .offsets = {0},
-};
-
 static inline Function_Parameter
 function_parameter_with_default(
   const Symbol *symbol,
@@ -20,7 +15,7 @@ function_parameter_with_default(
     .declaration = {
       .symbol = symbol,
       .descriptor = descriptor,
-      .source_range = COMPILER_SOURCE_RANGE,
+      .source_range = {0}, // FIXME provide this
     },
     .maybe_default_value = default_value,
   };

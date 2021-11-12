@@ -921,7 +921,7 @@ typedef struct Source_File {
 typedef dyn_array_type(Source_File) Array_Source_File;
 
 typedef struct Source_Range {
-  Source_File * file;
+  const Source_File * file;
   Range_u32 offsets;
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;

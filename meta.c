@@ -381,8 +381,10 @@ print_scope_define(
   const char *export_name
 ) {
   char *lowercase_name = strtolower(name);
+  fprintf(file, "  Source_Range %s__source_range;\n", export_name);
+  fprintf(file, "  INIT_LITERAL_SOURCE_RANGE(&%s__source_range, \"%s\");\n", export_name, export_name);
   fprintf(file, "  scope_define_value(\n");
-  fprintf(file, "    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,\n");
+  fprintf(file, "    scope, VALUE_STATIC_EPOCH, %s__source_range,\n", export_name);
   fprintf(file, "    mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", export_name);
   fprintf(file, "    type_%s_value\n", lowercase_name);
   fprintf(file, "  );\n");
@@ -395,8 +397,10 @@ print_scope_enum(
   const char *export_name
 ) {
   char *lowercase_name = strtolower(name);
+  fprintf(file, "  Source_Range %s__source_range;\n", export_name);
+  fprintf(file, "  INIT_LITERAL_SOURCE_RANGE(&%s__source_range, \"%s\");\n", export_name, export_name);
   fprintf(file, "  scope_define_enum(\n");
-  fprintf(file, "    compilation, scope, COMPILER_SOURCE_RANGE,\n");
+  fprintf(file, "    compilation, scope, %s__source_range,\n", export_name);
   fprintf(file, "    slice_literal(\"%s\"), type_%s_value,\n", export_name, lowercase_name);
   fprintf(file, "    %s_items, countof(%s_items)\n", lowercase_name, lowercase_name);
   fprintf(file, "  );\n");
@@ -1125,7 +1129,7 @@ main(void) {
   }));
 
   push_type(type_struct("Source_Range", (Struct_Item[]){
-    { "Source_File *", "file" },
+    { "const Source_File *", "file" },
     { "Range_u32", "offsets" },
   }));
 

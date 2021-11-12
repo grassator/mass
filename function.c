@@ -892,7 +892,8 @@ program_init_startup_code(
     make_label(context->allocator, program, &program->memory.code, slice_literal("__startup end"));
   Storage storage = code_label32(fn_label);
 
-  Source_Range source_range = COMPILER_SOURCE_RANGE;
+  Source_Range source_range;
+  INIT_LITERAL_SOURCE_RANGE(&source_range, "__startup");
   Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){

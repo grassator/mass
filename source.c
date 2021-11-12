@@ -3836,10 +3836,12 @@ mass_ensure_trampoline(
 
   Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
   trampoline_info->flags = Function_Info_Flags_Compile_Time;
+  Source_Range returns_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&returns_source_range, "returns");
   trampoline_info->returns = (Function_Return) {
     .declaration = {
       .descriptor = &descriptor_void,
-      .source_range = COMPILER_SOURCE_RANGE,
+      .source_range = returns_source_range,
     },
   };
   trampoline_info->parameters = dyn_array_make(
@@ -3847,18 +3849,22 @@ mass_ensure_trampoline(
     .allocator = context->allocator,
     .capacity = 1
   );
+  Source_Range args_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&args_source_range, "args");
   dyn_array_push(trampoline_info->parameters, (Function_Parameter) {
     .tag = Function_Parameter_Tag_Generic,
     .declaration = {
       .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
       .descriptor = descriptor_pointer_to(context->allocator, args_struct_descriptor),
-      .source_range = COMPILER_SOURCE_RANGE,
+      .source_range = args_source_range,
     },
   });
 
+  Source_Range original_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&original_source_range, "original");
   const Symbol *original_symbol = mass_ensure_symbol(context->compilation, slice_literal("original"));
   scope_define_value(
-    trampoline_context->scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, original_symbol, original
+    trampoline_context->scope, VALUE_STATIC_EPOCH, original_source_range, original_symbol, original
   );
   Fixed_Buffer *buffer =
     fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
@@ -3882,8 +3888,7 @@ mass_ensure_trampoline(
   MASS_ON_ERROR(tokenize(context->compilation, body_range, body)) {
     panic("This body should always be tokenizable since we constructed it to be");
   }
-  Value *body_value =
-    value_make(context, &descriptor_value_view, storage_static(body), COMPILER_SOURCE_RANGE);
+  Value *body_value = value_make(context, &descriptor_value_view, storage_static(body), body_range);
 
   Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
   *trampoline_literal = (Function_Literal) {
@@ -3892,7 +3897,7 @@ mass_ensure_trampoline(
     .context = *trampoline_context,
   };
   Value *literal_value = value_make(
-    context, &descriptor_function_literal, storage_static(trampoline_literal), COMPILER_SOURCE_RANGE
+    context, &descriptor_function_literal, storage_static(trampoline_literal), body_range
   );
 
   Compilation *compilation = context->compilation;
@@ -6823,23 +6828,25 @@ module_compiler_init(
   const Allocator *allocator = compilation->allocator;
   Scope *scope = scope_make(allocator, compilation->root_scope);
   *out_module = (Module) {
-    .source_range = COMPILER_SOURCE_RANGE,
+    .source_range = {0},
     .own_scope = scope,
     .exports = {
       .tag = Module_Exports_Tag_All,
       .scope = scope,
     },
   };
+  INIT_LITERAL_SOURCE_RANGE(&out_module->source_range, "MASS");
 
   compiler_scope_define_exports(compilation, scope);
   Value *allocator_value = value_init(
     allocator_allocate(allocator, Value),
     &descriptor_allocator_pointer,
     storage_static_inline(&allocator),
-    COMPILER_SOURCE_RANGE
+    (Source_Range){0}
   );
+  INIT_LITERAL_SOURCE_RANGE(&allocator_value->source_range, "allocator");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    scope, VALUE_STATIC_EPOCH, allocator_value->source_range,
     mass_ensure_symbol(compilation, slice_literal("allocator")), allocator_value
   );
 }
@@ -6853,8 +6860,10 @@ scope_define_builtins(
   const Allocator *allocator = compilation->allocator;
 
   global_scope_define_exports(compilation, scope);
+  Source_Range type_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&type_source_range, "Type");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    scope, VALUE_STATIC_EPOCH, type_source_range,
     mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
   );
 
@@ -6862,56 +6871,71 @@ scope_define_builtins(
     allocator_allocate(allocator, Value),
     &descriptor_scope,
     storage_static(compilation->compiler_module.exports.scope),
-    COMPILER_SOURCE_RANGE
+    (Source_Range){0}
   );
+  INIT_LITERAL_SOURCE_RANGE(&compiler_module_value->source_range, "MASS");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    scope, VALUE_STATIC_EPOCH, compiler_module_value->source_range,
     mass_ensure_symbol(compilation, slice_literal("MASS")), compiler_module_value
   );
 
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
+  Source_Range dot_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&dot_source_range, ".");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, dot_source_range, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(".*"), allocator_make(allocator, Operator,
+  Source_Range dot_star_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&dot_star_source_range, ".*");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, dot_star_source_range, slice_literal(".*"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 1,
     .handler = mass_handle_dereference_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(" "), allocator_make(allocator, Operator,
+  Source_Range empty_space_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&empty_space_source_range, " ");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, empty_space_source_range, slice_literal(" "), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_apply_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal(":"), allocator_make(allocator, Operator,
+  Source_Range colon_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&colon_source_range, ":");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, colon_source_range, slice_literal(":"), allocator_make(allocator, Operator,
     .precedence = 2,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_typed_symbol_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("="), allocator_make(allocator, Operator,
+  Source_Range equal_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&equal_source_range, "=");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, equal_source_range, slice_literal("="), allocator_make(allocator, Operator,
     .precedence = 1,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_assignment_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("return"), allocator_make(allocator, Operator,
+  Source_Range return_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&return_source_range, "return");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, return_source_range, slice_literal("return"), allocator_make(allocator, Operator,
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_return_operator,
   )));
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, COMPILER_SOURCE_RANGE, slice_literal("goto"), allocator_make(allocator, Operator,
+  Source_Range goto_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&goto_source_range, "goto");
+  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, goto_source_range, slice_literal("goto"), allocator_make(allocator, Operator,
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
@@ -7079,21 +7103,23 @@ program_module_from_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
+  Source_File *file = allocator_allocate(context->allocator, Source_File);
+  *file = (Source_File) {
+    .path = file_path,
+  };
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path);
   if (!buffer) {
+    Source_Range error_source_range = { .file = file, .offsets = {0} };
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Open,
-      .source_range = COMPILER_SOURCE_RANGE,
+      .source_range = error_source_range,
       .detailed_message = slice_literal("Unable to open the file"),
       .File_Open = {.path = file_path},
     });
     return 0;
   }
-  Source_File *file = allocator_allocate(context->allocator, Source_File);
-  *file = (Source_File) {
-    .path = file_path,
-    .text = fixed_buffer_as_slice(buffer),
-  };
+  file->text = fixed_buffer_as_slice(buffer);
+
   if (buffer->occupied > UINT32_MAX) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Too_Large,

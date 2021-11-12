@@ -3,6 +3,20 @@
 #include <stddef.h>
 #include <limits.h>
 
+#define _INIT_LITERAL_SOURCE_RANGE_STRINGIFY(X) #X
+#define _INIT_LITERAL_SOURCE_RANGE_PROXY(X) _INIT_LITERAL_SOURCE_RANGE_STRINGIFY(X)
+#define INIT_LITERAL_SOURCE_RANGE(_TO_INIT_, _C_STRING_)\
+  do {\
+    static const Source_File FAKE_SOURCE_FILE = {\
+      .path = slice_literal_fields(__FILE__ ":" _INIT_LITERAL_SOURCE_RANGE_PROXY(__LINE__)),\
+      .text = slice_literal_fields(_C_STRING_),\
+    };\
+    *(_TO_INIT_) = (Source_Range){\
+      .file = &FAKE_SOURCE_FILE,\
+      .offsets = {.from = 0, .to = (u32)FAKE_SOURCE_FILE.text.length}\
+    };\
+  } while(0)
+
 #define MASS_DESCRIPTOR_STATIC_ARRAY(_C_TYPE_, _LENGTH_, ...)\
   {\
     .tag = Descriptor_Tag_Fixed_Size_Array,\
@@ -79,16 +93,9 @@
 #define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\
   Value_View _VAR_NAME_;\
   {\
-    Source_File *fake_file = allocator_allocate(allocator, Source_File);\
-    *fake_file = (Source_File){\
-      .path = COMPILER_SOURCE_FILE.path,\
-      .text = slice_literal(_EXPR_),\
-    };\
-    Source_Range fake_range = {\
-      .source_file = fake_file,\
-      .offsets = {.from = 0, .to = fake_file->text.length},\
-    };\
-    MASS_ON_ERROR(tokenize(compilation, fake_range, &_VAR_NAME_)) panic("unreached");\
+    Source_Range source_range;\
+    INIT_LITERAL_SOURCE_RANGE(&source_range, _EXPR_);\
+    MASS_ON_ERROR(tokenize(compilation, source_range, &_VAR_NAME_)) panic("unreached");\
   }
 
 #define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _RETURN_DESCRIPTOR_, ...)\
@@ -108,17 +115,21 @@
 
 #define MASS_DEFINE_FUNCTION_TYPE(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
 do {\
+  Source_Range source_range;\
+  INIT_LITERAL_SOURCE_RANGE(&source_range, _NAME_);\
   MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Value *info_value = value_init(\
     allocator_allocate(allocator, Value),\
     &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
   );\
   const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_));\
-  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, fn_symbol, info_value);\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, fn_symbol, info_value);\
 } while(0)
 
 #define MASS_DEFINE_FUNCTION(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
 do {\
+  Source_Range source_range;\
+  INIT_LITERAL_SOURCE_RANGE(&source_range, _NAME_);\
   MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(allocator, function);\
   const Descriptor *instance_descriptor = descriptor_function_instance(\
@@ -126,10 +137,10 @@ do {\
   );\
   Value *instance_value = value_init(\
     allocator_allocate(allocator, Value),\
-    instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
+    instance_descriptor, imm64((u64)_FN_), source_range\
   );\
   const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_));\
-  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, fn_symbol, instance_value);\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, fn_symbol, instance_value);\
 } while(0)
 
 typedef struct {
