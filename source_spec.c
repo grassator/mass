@@ -1005,8 +1005,7 @@ spec("source") {
       check(checker() == 42);
     }
 
-    // FIXME some weird
-    xit("should be able to allocate and return a lazy void value through an intrinsic") {
+    it("should be able to allocate and return a lazy void value through an intrinsic") {
       void (*checker)() = test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn() => () intrinsic {\n"
@@ -1017,24 +1016,25 @@ spec("source") {
               "payload : &type_of(())"
             ") -> (&MASS.Value) {\n"
               "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
-              "value.source_range = arguments.source_range\n"
+              "value.source_range = cast(&MASS.Value, payload).source_range\n"
               "value.descriptor = type_of(())\n"
               "value.storage.tag = MASS.Storage_Tag.None\n"
+              "value.storage.bit_size = value.descriptor.bit_size\n"
               "value"
             "}\n"
+            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
 
             "lazy_value : &MASS.Lazy_Value = compile_time_allocate(MASS.Lazy_Value)\n"
             "lazy_value.context = context.*\n"
             "lazy_value.descriptor = type_of(())\n"
             "lazy_value.proc = lazy_value_proc\n"
-            "lazy_value.payload = 0\n"
+            "lazy_value.payload = value\n"
 
-            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
             "value.source_range = arguments.source_range\n"
             "value.descriptor = MASS.Lazy_Value\n"
             "value.storage.tag = MASS.Storage_Tag.Static\n"
             "value.storage.bit_size = value.descriptor.bit_size\n"
-            "value.storage.Static.memory.tag = Static_Memory_Tag_Heap\n"
+            "value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap\n"
             "value.storage.Static.memory.Heap.pointer = lazy_value\n"
             "value"
           "}\n"
