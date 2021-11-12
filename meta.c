@@ -933,6 +933,29 @@ print_mass_descriptor_and_type(
     }
     case Meta_Type_Tag_Function: {
       // Exported functions are handled separately
+      Function_Type *function = &type->function;
+      char *lowercase_name = strtolower(type->name);
+      if (function->kind == Function_Kind_Typedef) {
+        fprintf(file, "MASS_DEFINE_FUNCTION_DESCRIPTOR(\n  %s,\n", lowercase_name);
+        {
+          fprintf(file, "  &");
+          print_mass_struct_descriptor_type(file, function->returns);
+        }
+        for (uint64_t i = 0; i < function->argument_count; ++i) {
+          Argument_Type *arg = &function->arguments[i];
+          fprintf(file, ",\n  {\n");
+          fprintf(file, "    .tag = Function_Parameter_Tag_Runtime,\n");
+          fprintf(file, "    .declaration = {\n");
+          {
+            fprintf(file, "      .descriptor = &");
+            print_mass_struct_descriptor_type(file, arg->type);
+            fprintf(file, ",\n");
+          }
+          fprintf(file, "    },\n");
+          fprintf(file, "  }");
+        }
+        fprintf(file, "\n)\n");
+      }
       break;
     }
     case Meta_Type_Tag_Hash_Map: {

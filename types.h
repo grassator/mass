@@ -67,6 +67,24 @@
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
 
+#define MASS_DEFINE_FUNCTION_DESCRIPTOR(_NAME_, _RETURN_DESCRIPTOR_, ...)\
+  dyn_array_struct(Function_Parameter) descriptor_##_NAME_##__parameters = {\
+    .length = countof((const Function_Parameter[]){__VA_ARGS__}),\
+    .items = {__VA_ARGS__},\
+  };\
+  static Function_Info descriptor_##_NAME_##__info = {\
+    .flags = Function_Info_Flags_None,\
+    .returns.declaration.descriptor = (_RETURN_DESCRIPTOR_),\
+    .parameters = {(Dyn_Array_Internal *)&descriptor_##_NAME_##__parameters,}\
+  };\
+  static Descriptor descriptor_##_NAME_ = {\
+    .tag = Descriptor_Tag_Function_Instance,\
+    .name = slice_literal_fields(#_NAME_),\
+    .bit_size = {sizeof(void *) * CHAR_BIT},\
+    .bit_alignment = _Alignof(void *) * CHAR_BIT,\
+    .Function_Instance = { .info = &descriptor_##_NAME_##__info, .call_setup = 0/*FIXME*/, },\
+  };
+
 #define VALUE_STATIC_EPOCH 0
 
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\

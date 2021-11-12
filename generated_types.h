@@ -4707,6 +4707,28 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_static_value);
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  mass_handle_operator_proc,
+  &descriptor_value_pointer,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_execution_context_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_value_view,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_operator_pointer,
+    },
+  }
+)
 MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_flags, Memory_Layout_Item_Flags)
 static C_Enum_Item memory_layout_item_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -5691,6 +5713,22 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  calling_convention_call_setup_proc,
+  &descriptor_function_call_setup,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_allocator_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_function_info_pointer,
+    },
+  }
+)
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
 MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
@@ -5708,6 +5746,44 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  token_statement_matcher_proc,
+  &descriptor_u32,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_execution_context_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_value_view,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_lazy_value_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_void_pointer,
+    },
+  }
+)
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  mass_trampoline_proc,
+  &descriptor_void,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_void_pointer,
+    },
+  }
+)
 MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline_ptr, Array_Mass_Trampoline_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline, Array_Mass_Trampoline)
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_trampoline, Mass_Trampoline,
@@ -6045,6 +6121,34 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  lazy_value_proc,
+  &descriptor_value_pointer,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_compilation_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_function_builder_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_expected_result_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_void_pointer,
+    },
+  }
+)
 MASS_DEFINE_OPAQUE_C_TYPE(instruction_extension_type, Instruction_Extension_Type)
 static C_Enum_Item instruction_extension_type_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
