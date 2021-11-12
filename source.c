@@ -2756,7 +2756,7 @@ static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value
 ) {
-  if (value->descriptor == &descriptor_lazy_value) {
+  if (value->descriptor == &descriptor_lazy_value && value->storage.tag == Storage_Tag_Static) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
     return lazy->descriptor;
   }
