@@ -515,19 +515,6 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
-    // FIXME
-    xit("should be able to parse and run if statement") {
-      s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
-        "is_positive", &test_context,
-        "is_positive :: fn(x : s32) -> (s8) {\n"
-          "if x < 10 { return 0 }\n"
-          "1\n"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(42) == 1);
-      check(checker(-2) == 0);
-    }
     it("should be able to parse and run if / else statement ") {
       s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
         "is_positive", &test_context,
