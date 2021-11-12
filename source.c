@@ -5131,23 +5131,6 @@ mass_handle_assignment_operator(
     target = mass_define_stack_value_from_typed_symbol(context, typed_symbol, target->source_range);
   }
 
-  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target);
-
-  if (
-    target_descriptor != &descriptor_void && // allow assigning to ()
-    // FIXME this repeats the logic in `assign`
-    !(value_is_non_lazy_static(source) && source->descriptor == &descriptor_tuple) &&
-    !same_value_type_or_can_implicitly_move_cast(target_descriptor, source)
-  ) {
-    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = operands.source_range,
-      .Type_Mismatch = { .expected = target_descriptor, .actual = source_descriptor },
-    });
-    return 0;
-  }
-
   *payload = (Mass_Assignment_Lazy_Payload) {
     .source_range = operands.source_range,
     .target = target,
