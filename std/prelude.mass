@@ -94,7 +94,7 @@ size_of :: fn(x) => (i64) MASS.size_of
 pointer_to :: macro(type : Type) -> (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
 }
-pointer_to :: fn(x) => (pointer_to(type_of(x))) MASS.pointer_to
+pointer_to :: fn(x) => (pointer_to(x)) MASS.pointer_to
 
 template_signed_integer_overloads :: macro(template, impl) {
   f :: template(impl, s64)

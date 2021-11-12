@@ -988,7 +988,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "identity :: fn(x : s64) -> (type_of(x)) { x }\n"
+          "identity :: fn(x : s64) -> (x) { x }\n"
           "checker :: fn() -> (s64) { identity(42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -999,7 +999,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "identity :: fn(x) -> (type_of(x)) { x }\n"
+          "identity :: fn(x) -> (x) { x }\n"
           "checker :: fn() -> (s64) { x := 42; identity(x) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -1010,7 +1010,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "identity :: fn(x) -> (type_of(x)) { x }\n"
+          "identity :: fn(x) -> (x) { x }\n"
           "checker :: fn() -> (s64) { identity(cast(s64, 39)) + identity(cast(s64, 3)) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -1021,7 +1021,7 @@ spec("source") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "identity :: fn(x) -> (type_of(x)) { x }\n"
+          "identity :: fn(x) -> (x) { x }\n"
           "checker :: fn() -> (u64) {\n"
             "string := identity(\"foo\"); string.length + identity(cast(u64, 39))\n"
           "}"
@@ -1034,7 +1034,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "weird_plus :: fn(x) -> (type_of(x)) { x }\n"
+          "weird_plus :: fn(x) -> (x) { x }\n"
           "weird_plus :: fn(x : s64, y : s64) -> (s64) { x + y }\n"
           "checker :: fn() -> (s64) { weird_plus(39, 3); }"
         );
@@ -1046,7 +1046,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "weird_plus :: fn(x, y, z) -> (type_of(x)) { x }\n"
+          "weird_plus :: fn(x, y, z) -> (x) { x }\n"
           "weird_plus :: fn(x : s64, y : s64) -> (s64) { x + y }\n"
           "checker :: fn() -> (s64) { weird_plus(39, 3); }"
         );

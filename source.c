@@ -3613,8 +3613,8 @@ ensure_parameter_descriptors(
     Source_Range source_range = param->declaration.source_range;
     Value *param_value = value_init(
       allocator_allocate(temp_context.temp_allocator, Value),
-      param->declaration.descriptor,
-      storage_none,
+      &descriptor_descriptor_pointer,
+      storage_static(&param->declaration.descriptor),
       source_range
     );
     scope_define_value(
