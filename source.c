@@ -2911,24 +2911,6 @@ mass_handle_cast_lazy_proc(
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
   const Source_Range *source_range = &expression->source_range;
 
-  if (target_descriptor->tag == Descriptor_Tag_Pointer_To) {
-    if (source_descriptor->tag != Descriptor_Tag_Pointer_To) {
-       compilation_error(compilation, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = *source_range,
-        .Type_Mismatch = {
-          .expected = descriptor_pointer_to(compilation->allocator, source_descriptor),
-          .actual = source_descriptor,
-        },
-      });
-      return 0;
-    }
-
-    return expected_result_ensure_value_or_temp(
-      compilation, builder, expected_result, expression
-    );
-  }
-
   Expected_Result expected_source = expected_result_any(source_descriptor);
   Value *value = value_force(compilation, builder, &expected_source, expression);
   MASS_ON_ERROR(*compilation->result) return 0;
