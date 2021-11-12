@@ -239,6 +239,16 @@ mass_error_to_string(
       Slice source = source_from_source_range(compilation, &error->source_range);
       APPEND_SLICE(source);
     } break;
+    case Mass_Error_Tag_No_Runtime_Use: {
+      if (error->detailed_message.length) {
+        APPEND_SLICE(error->detailed_message);
+      } else {
+        APPEND_LITERAL("Value can't be used at runtime");
+      }
+      APPEND_LITERAL(":\n");
+      Slice source = source_from_source_range(compilation, &error->source_range);
+      APPEND_SLICE(source);
+    } break;
   }
   #undef APPEND_SLICE
   #undef APPEND_LITERAL

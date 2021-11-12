@@ -2065,6 +2065,9 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Non_Function_Overload">
     Non_Function_Overload
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_No_Runtime_Use">
+    No_Runtime_Use
+  </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="detailed_message">detailed_message</Item>

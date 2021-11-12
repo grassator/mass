@@ -626,6 +626,58 @@ spec("source") {
       check(answer == 42);
     }
 
+    it("should be able to put a function literal into a typed local variable") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "local : (fn() -> (s64)) = fn() -> (s64) { 42 };"
+          "local()"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 answer = checker();
+      check(answer == 42);
+    }
+
+    it("should be able to put a function literal into an inferred local variable") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "local := fn() -> (s64) { 42 };"
+          "local()"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 answer = checker();
+      check(answer == 42);
+    }
+
+    it("should report an error when trying to use a macro as fn pointer") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "local := macro() { 42 };"
+          "local()"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_No_Runtime_Use);
+    }
+
+    it("should report an error when trying to use an inferred local from a generic function") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "local := macro() { 42 };"
+          "local()"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_No_Runtime_Use);
+    }
+
     it("should be able to parse and run functions with overloads") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "checker", &test_context,

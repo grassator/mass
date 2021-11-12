@@ -574,6 +574,33 @@ deduce_runtime_descriptor_for_value(
       const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
       return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
     }
+    if (value->descriptor == &descriptor_function_literal) {
+      const Function_Literal *literal = storage_static_as_c_type(&value->storage, Function_Literal);
+      if (literal->flags & Function_Literal_Flags_Macro) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_No_Runtime_Use,
+          .source_range = value->source_range,
+          .detailed_message = slice_literal("Macros can't be used as a runtime value"),
+        });
+        return 0;
+      }
+      if (literal->flags & Function_Literal_Flags_Generic) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_No_Runtime_Use,
+          .source_range = value->source_range,
+          .detailed_message = slice_literal(
+            "A generic function can't be used as a runtime value. You need to cast to a concrete type."
+          ),
+        });
+        return 0;
+      }
+      // Non-generic functions should not need actual args to get an instance
+      Value_View args_view = {0};
+      Value *instance =
+        ensure_function_instance(context->compilation, context->program, value, args_view);
+      MASS_ON_ERROR(*context->result) return 0;
+      return instance->descriptor;
+    }
   }
   return value_or_lazy_value_descriptor(value);
 }
@@ -886,6 +913,32 @@ assign(
 
   if (source->descriptor == &descriptor_tuple) {
     return assign_tuple(compilation, builder, target, source, source_range);
+  }
+
+  if (target->descriptor->tag == Descriptor_Tag_Function_Instance) {
+    if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+      });
+      return *compilation->result;
+    }
+    if (source->descriptor == &descriptor_function_literal) {
+      Value_View args_view = {0}; // FIXME provide proper args here
+      source = ensure_function_instance(compilation, builder->program, source, args_view);
+      MASS_TRY(*compilation->result);
+      assert(source->descriptor->tag == Descriptor_Tag_Function_Instance);
+    } else if (source->descriptor == &descriptor_overload_set) {
+      panic("TODO");
+    }
+
+    if (source->descriptor->tag == Descriptor_Tag_Function_Instance) {
+      load_address(builder, source_range, target, source->storage);
+    } else {
+      panic("UNREACHABLE");
+    }
+    return *compilation->result;
   }
 
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
