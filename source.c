@@ -917,7 +917,10 @@ assign(
 
   if (target->descriptor->tag == Descriptor_Tag_Function_Instance) {
     const Function_Info *target_info = target->descriptor->Function_Instance.info;
-    if (source->descriptor == &descriptor_function_literal) {
+    if (
+      source->descriptor == &descriptor_function_literal ||
+      source->descriptor == &descriptor_overload_set
+    ) {
       Array_Value_Ptr fake_args = dyn_array_make(
         Array_Value_Ptr,
         .allocator = compilation->allocator,
@@ -935,11 +938,17 @@ assign(
         dyn_array_push(fake_args, fake_value);
       }
       Value_View args_view = value_view_from_value_array(fake_args, &source->source_range);
-      source = ensure_function_instance(compilation, builder->program, source, args_view);
+
+      Overload_Match_Found match_found;
+      if (!mass_match_overload_or_error(compilation, source, args_view, &match_found)) {
+        return *compilation->result;
+      }
+
+      source = ensure_function_instance(
+        compilation, builder->program, match_found.value, args_view
+      );
       MASS_TRY(*compilation->result);
       assert(source->descriptor->tag == Descriptor_Tag_Function_Instance);
-    } else if (source->descriptor == &descriptor_overload_set) {
-      panic("TODO");
     }
 
     if (same_type(target->descriptor, source->descriptor)) {
@@ -3786,6 +3795,44 @@ mass_match_overload(
   };
 }
 
+static bool
+mass_match_overload_or_error(
+  Compilation *compilation,
+  Value *target,
+  Value_View args_view,
+  Overload_Match_Found *match_found
+) {
+  Overload_Match match = mass_match_overload(target, args_view);
+  switch(match.tag) {
+    case Overload_Match_Tag_No_Match: {
+      Array_Value_Ptr error_args = value_view_to_value_array(compilation->allocator, args_view);
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_No_Matching_Overload,
+        .source_range = args_view.source_range,
+        .No_Matching_Overload = { .target = target, .arguments = error_args },
+      });
+      return false;
+    }
+    case Overload_Match_Tag_Undecidable: {
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Undecidable_Overload,
+        .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
+        .source_range = args_view.source_range,
+      });
+      return false;
+    }
+    case Overload_Match_Tag_Found: {
+      *match_found = match.Found;
+      return true;
+    }
+    default: {
+      panic("Unexpected Overload_Match_Tag");
+      break;
+    }
+  }
+  return false;
+}
+
 static Value *
 mass_intrinsic_call(
   Execution_Context *context,
@@ -4091,40 +4138,12 @@ token_handle_function_call(
     return token_parse_block_view(&capture_context, capture->view);
   }
 
-  Overload_Match match = mass_match_overload(target_expression, args_view);
+  Compilation *compilation = context->compilation;
+  Overload_Match_Found match_found;
+  if (!mass_match_overload_or_error(compilation, target_expression, args_view, &match_found)) return 0;
 
-  Value *overload;
-  const Function_Info *info;
-  switch(match.tag) {
-    case Overload_Match_Tag_No_Match: {
-      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_No_Matching_Overload,
-        .source_range = source_range,
-        .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
-      });
-      return 0;
-    }
-    case Overload_Match_Tag_Undecidable: {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Undecidable_Overload,
-        .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
-        .source_range = source_range,
-      });
-      return 0;
-    }
-    case Overload_Match_Tag_Found: {
-      overload = match.Found.value;
-      info = match.Found.info;
-      break;
-    }
-    default: {
-      overload = 0;
-      info = 0;
-      panic("Unexpected Overload_Match_Tag");
-      break;
-    }
-  }
+  Value *overload = match_found.value;
+  const Function_Info *info = match_found.info;
 
   const Function_Literal *maybe_literal = 0;
   if (value_is_function_literal(overload)) maybe_literal = value_as_function_literal(overload);

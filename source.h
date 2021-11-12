@@ -59,6 +59,14 @@ mass_match_overload(
   Value_View args
 );
 
+static bool
+mass_match_overload_or_error(
+  Compilation *compilation,
+  Value *target,
+  Value_View args_view,
+  Overload_Match_Found *match_found
+);
+
 static inline Scope *
 scope_make(
   const Allocator *allocator,

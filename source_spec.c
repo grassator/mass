@@ -652,6 +652,21 @@ spec("source") {
       check(answer == 42);
     }
 
+    it("should be able to put select from an overload set into a typed local variable") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "foo :: fn(x : s64) -> (s64) { x }\n"
+          "foo :: fn(x : s32) -> (s32) { x }\n"
+          "local : (fn(x : s64) -> (s64)) = foo\n"
+          "local(42)"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 answer = checker();
+      check(answer == 42);
+    }
+
     it("should be able to put a function literal into an inferred local variable") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
