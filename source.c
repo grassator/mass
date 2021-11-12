@@ -2284,6 +2284,7 @@ token_handle_user_defined_operator_proc(
     Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
     for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
       *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
+      MASS_ON_ERROR(*context->result) return 0;
     }
     args = value_view_from_value_array(args_array, &args.source_range);
   }
