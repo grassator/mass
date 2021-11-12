@@ -1128,10 +1128,10 @@ main(void) {
     { "Slice", "text" },
   }));
 
-  push_type(type_struct("Source_Range", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Source_Range", (Struct_Item[]){
     { "const Source_File *", "file" },
     { "Range_u32", "offsets" },
-  }));
+  })));
 
   push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
     struct_empty("Not_Specified"),
