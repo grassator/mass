@@ -1344,7 +1344,7 @@ main(void) {
     }),
   }));
 
-  push_type(type_union("Static_Memory", (Struct_Type[]){
+  export_compiler(push_type(type_union("Static_Memory", (Struct_Type[]){
     struct_fields("U8", (Struct_Item[]){{ "u8", "value" }}),
     struct_fields("U16", (Struct_Item[]){{ "u16", "value" }}),
     struct_fields("U32", (Struct_Item[]){{ "u32", "value" }}),
@@ -1352,7 +1352,7 @@ main(void) {
     struct_fields("Heap", (Struct_Item[]){
       { "const void *", "pointer" },
     }),
-  }));
+  })));
 
   export_compiler(push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
     struct_empty("None"),

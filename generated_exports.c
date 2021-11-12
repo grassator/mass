@@ -66,6 +66,55 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Syscall")),
     type_syscall_value
   );
+  Source_Range Static_Memory__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory__source_range, "Static_Memory");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Static_Memory__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Static_Memory")),
+    type_static_memory_value
+  );
+  Source_Range Static_Memory_Tag__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory_Tag__source_range, "Static_Memory_Tag");
+  scope_define_enum(
+    compilation, scope, Static_Memory_Tag__source_range,
+    slice_literal("Static_Memory_Tag"), type_static_memory_tag_value,
+    static_memory_tag_items, countof(static_memory_tag_items)
+  );
+  Source_Range Static_Memory_U8__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory_U8__source_range, "Static_Memory_U8");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Static_Memory_U8__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Static_Memory_U8")),
+    type_static_memory_u8_value
+  );
+  Source_Range Static_Memory_U16__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory_U16__source_range, "Static_Memory_U16");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Static_Memory_U16__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Static_Memory_U16")),
+    type_static_memory_u16_value
+  );
+  Source_Range Static_Memory_U32__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory_U32__source_range, "Static_Memory_U32");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Static_Memory_U32__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Static_Memory_U32")),
+    type_static_memory_u32_value
+  );
+  Source_Range Static_Memory_U64__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory_U64__source_range, "Static_Memory_U64");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Static_Memory_U64__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Static_Memory_U64")),
+    type_static_memory_u64_value
+  );
+  Source_Range Static_Memory_Heap__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Static_Memory_Heap__source_range, "Static_Memory_Heap");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Static_Memory_Heap__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Static_Memory_Heap")),
+    type_static_memory_heap_value
+  );
   Source_Range Storage__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Storage__source_range, "Storage");
   scope_define_value(

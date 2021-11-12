@@ -5262,6 +5262,7 @@ mass_handle_field_access_lazy_proc(
       Storage base_storage = storage_register(reg, struct_descriptor->bit_size);
       struct_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
       move_value(builder, &struct_->source_range, &base_storage, &struct_->storage);
+      value_release_if_temporary(builder, struct_);
       is_temporary = true;
     }
   }

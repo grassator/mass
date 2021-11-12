@@ -922,7 +922,25 @@ spec("source") {
       checker();
     }
 
-    // FIXME this breaks because meta.c does not correctly define descriptor_lazy_value_proc
+    it("should be able to allocate and return a static value through an intrinsic") {
+      u64(*checker)() = (u64(*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn() => () intrinsic {\n"
+            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+            "value.source_range = arguments.source_range\n"
+            "value.descriptor = u64\n"
+            "value.storage.tag = MASS.Storage_Tag.Static\n"
+            "value.storage.bit_size = value.descriptor.bit_size\n"
+            "value.storage.Static.memory.U64.value = 42\n"
+            "value\n"
+          "}\n"
+          "checker :: fn() -> (u64) { my_intrinsic() }\n"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    // FIXME some weird
     xit("should be able to allocate and return a lazy void value through an intrinsic") {
       void (*checker)() = test_program_inline_source_function(
           "checker", &test_context,
