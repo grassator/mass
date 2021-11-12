@@ -916,16 +916,25 @@ assign(
   }
 
   if (target->descriptor->tag == Descriptor_Tag_Function_Instance) {
-    if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
-      compilation_error(compilation, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = *source_range,
-        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-      });
-      return *compilation->result;
-    }
+    const Function_Info *target_info = target->descriptor->Function_Instance.info;
     if (source->descriptor == &descriptor_function_literal) {
-      Value_View args_view = {0}; // FIXME provide proper args here
+      Array_Value_Ptr fake_args = dyn_array_make(
+        Array_Value_Ptr,
+        .allocator = compilation->allocator,
+        .capacity = dyn_array_length(target_info->parameters),
+      );
+      DYN_ARRAY_FOREACH(Function_Parameter, param, target_info->parameters) {
+        assert(param->tag == Function_Parameter_Tag_Runtime);
+        assert(param->declaration.descriptor);
+        Value *fake_value = value_init(
+          allocator_allocate(compilation->allocator, Value),
+          param->declaration.descriptor,
+          storage_none,
+          param->declaration.source_range
+        );
+        dyn_array_push(fake_args, fake_value);
+      }
+      Value_View args_view = value_view_from_value_array(fake_args, &source->source_range);
       source = ensure_function_instance(compilation, builder->program, source, args_view);
       MASS_TRY(*compilation->result);
       assert(source->descriptor->tag == Descriptor_Tag_Function_Instance);
@@ -933,10 +942,15 @@ assign(
       panic("TODO");
     }
 
-    if (source->descriptor->tag == Descriptor_Tag_Function_Instance) {
+    if (same_type(target->descriptor, source->descriptor)) {
       load_address(builder, source_range, target, source->storage);
     } else {
-      panic("UNREACHABLE");
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+      });
+      return *compilation->result;
     }
     return *compilation->result;
   }

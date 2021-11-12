@@ -626,12 +626,25 @@ spec("source") {
       check(answer == 42);
     }
 
-    it("should be able to put a function literal into a typed local variable") {
+    it("should be able to put a non-generic function literal into a typed local variable") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn() -> (s64) {"
           "local : (fn() -> (s64)) = fn() -> (s64) { 42 };"
           "local()"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 answer = checker();
+      check(answer == 42);
+    }
+
+    it("should be able to put a generic function literal into a typed local variable") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "local : (fn(x : s64) -> (s64)) = fn(x) -> (x) { x };"
+          "local(42)"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
