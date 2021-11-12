@@ -410,10 +410,11 @@ value_indirect_from_reference_or_pointer(
 ) {
   const Allocator *allocator = compilation->allocator;
   const Descriptor *referenced_descriptor;
-  if (source->descriptor->tag == Descriptor_Tag_Reference_To) {
-    referenced_descriptor = source->descriptor->Reference_To.descriptor;
-  } else if (source->descriptor->tag == Descriptor_Tag_Pointer_To) {
-    referenced_descriptor = source->descriptor->Pointer_To.descriptor;
+  const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
+  if (source_descriptor->tag == Descriptor_Tag_Reference_To) {
+    referenced_descriptor = source_descriptor->Reference_To.descriptor;
+  } else if (source_descriptor->tag == Descriptor_Tag_Pointer_To) {
+    referenced_descriptor = source_descriptor->Pointer_To.descriptor;
   } else {
     panic("Unexpected descriptor tag for an indirect value");
     return 0;
@@ -433,7 +434,7 @@ value_indirect_from_reference_or_pointer(
       Value *temp = value_temporary_acquire_indirect_for_descriptor(
         allocator, builder, reg, referenced_descriptor, source->source_range
       );
-      Storage reg_storage = storage_register(reg, source->descriptor->bit_size);
+      Storage reg_storage = storage_register(reg, source_descriptor->bit_size);
       move_value(builder, &source->source_range, &reg_storage, &source->storage);
       return temp;
     }
