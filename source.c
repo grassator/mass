@@ -24,14 +24,25 @@ value_from_expected_result(
       return value_from_exact_expected_result(expected_result);
     } break;
     case Expected_Result_Tag_Flexible: {
-      const Descriptor *return_descriptor = expected_result_descriptor(expected_result);
-      // FIXME :ExpectedStack
-      if (return_descriptor == &descriptor_void) return &void_value;
-      Storage storage = reserve_stack_storage(builder, return_descriptor->bit_size);
-      return value_init(
-        allocator_allocate(allocator, Value),
-        return_descriptor, storage, source_range
-      );
+      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
+      const Descriptor *descriptor = expected_result_descriptor(expected_result);
+      if (descriptor == &descriptor_void) return &void_value;
+      Storage storage;
+      if (
+        (flexible->storage & Expected_Result_Storage_Register) &&
+        descriptor->bit_size.as_u64 <= 64
+      ) {
+        Register reg = register_acquire_temp(builder);
+        storage = storage_register(reg, descriptor->bit_size);
+      } else if (flexible->storage & Expected_Result_Storage_Memory) {
+        storage = reserve_stack_storage(builder, descriptor->bit_size);
+      } else {
+        storage = storage_none;
+        panic("Unexpected flexible storage request");
+      }
+      Value *value = value_init(allocator_allocate(allocator, Value), descriptor, storage, source_range);
+      value->is_temporary = true;
+      return value;
     } break;
   }
   panic("UNREACHABLE");
@@ -4877,21 +4888,6 @@ mass_startup(
   );
 }
 
-static Value *
-mass_handle_address_of_lazy_proc(
-  Compilation *compilation,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Value *pointee
-) {
-  Source_Range source_range = pointee->source_range;
-  Value *result_value = value_from_expected_result(
-    compilation->allocator, builder, expected_result, source_range
-  );
-  load_address(builder, &source_range, result_value, pointee->storage);
-  return result_value;
-}
-
 static const Descriptor *
 user_presentable_descriptor_for(
   Value *expression
@@ -4945,6 +4941,21 @@ mass_size_of(
 }
 
 static Value *
+mass_pointer_to_lazy_proc(
+  Compilation *compilation,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Value *pointee
+) {
+  Source_Range source_range = pointee->source_range;
+  Value *result_value = value_from_expected_result(
+    compilation->allocator, builder, expected_result, source_range
+  );
+  load_address(builder, &source_range, result_value, pointee->storage);
+  return result_value;
+}
+
+static Value *
 mass_pointer_to(
   Execution_Context *context,
   Value_View args
@@ -4954,7 +4965,7 @@ mass_pointer_to(
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
   return mass_make_lazy_value(
-    context, args.source_range, pointee, descriptor, mass_handle_address_of_lazy_proc
+    context, args.source_range, pointee, descriptor, mass_pointer_to_lazy_proc
   );
 }
 
