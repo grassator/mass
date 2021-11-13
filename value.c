@@ -102,7 +102,7 @@ mass_error_append_function_signature_string(
     mass_error_append_descriptor(result, arg->declaration.descriptor);
   }
   APPEND_LITERAL(") -> (");
-  mass_error_append_descriptor(result, info->returns.declaration.descriptor);
+  mass_error_append_descriptor(result, info->returns.descriptor);
   APPEND_LITERAL(")");
 }
 
@@ -319,7 +319,7 @@ same_function_signature(
   const Function_Info *a_info,
   const Function_Info *b_info
 ) {
-  if (!same_type(a_info->returns.declaration.descriptor, b_info->returns.declaration.descriptor)) {
+  if (!same_type(a_info->returns.descriptor, b_info->returns.descriptor)) {
     return false;
   }
   if (dyn_array_length(a_info->parameters) != dyn_array_length(b_info->parameters)) {
@@ -1272,7 +1272,7 @@ function_info_init(
 ) {
   *info = (Function_Info) {
     .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .returns.declaration = {.descriptor = &descriptor_void},
+    .returns = {.descriptor = &descriptor_void},
   };
 }
 

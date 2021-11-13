@@ -1673,7 +1673,7 @@ function_parameter_as_exact_static(Function_Parameter *function_parameter) {
 }
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
 typedef struct Function_Return {
-  Declaration declaration;
+  const Descriptor * descriptor;
   Value_View maybe_type_expression;
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
@@ -4878,9 +4878,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_declaration,
-    .name = slice_literal_fields("declaration"),
-    .Base_Relative.offset = offsetof(Function_Return, declaration),
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .Base_Relative.offset = offsetof(Function_Return, descriptor),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

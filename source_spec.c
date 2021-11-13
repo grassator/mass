@@ -859,16 +859,6 @@ spec("source") {
       check(checker(42) == 42);
     }
 
-    it("should report an error when encountering multiple return types") {
-      test_program_inline_source_base(
-        "exit", &test_context,
-        "exit :: fn(status: s32) -> (s32, s32) {}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Unimplemented);
-    }
-
     it("should report an error when non-type id is being used as a type") {
       test_program_inline_source_base(
         "main", &test_context,

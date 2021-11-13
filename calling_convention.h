@@ -633,7 +633,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   bool is_indirect_return = false;
-  if (function->returns.declaration.descriptor == &descriptor_void) {
+  if (function->returns.descriptor == &descriptor_void) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
@@ -654,17 +654,15 @@ calling_convention_x86_64_system_v_call_setup_proc(
     };
 
     System_V_Classification classification =
-      x86_64_system_v_classify(function->returns.declaration.descriptor);
+      x86_64_system_v_classify(function->returns.descriptor);
     if (classification.class == SYSTEM_V_MEMORY) {
       is_indirect_return = true;
-      Bits bit_size = function->returns.declaration.descriptor->bit_size;
+      Bits bit_size = function->returns.descriptor->bit_size;
       result.caller_return = storage_indirect(bit_size, Register_A);
       result.callee_return = storage_indirect(bit_size, Register_DI);
     } else {
       u64 stack_offset = 0;
-      Slice return_name = function->returns.declaration.symbol
-        ? function->returns.declaration.symbol->name
-        : (Slice){0};
+      Slice return_name = (Slice){0};
       Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
         &registers, &classification, return_name, &stack_offset
       );
@@ -720,13 +718,12 @@ calling_convention_x86_64_system_v_call_setup_proc(
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (is_indirect_return) {
-    const Descriptor *descriptor = function->returns.declaration.descriptor;
+    const Descriptor *descriptor = function->returns.descriptor;
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = descriptor,
-      .source_range = function->returns.declaration.source_range,
       .Absolute = { .storage = storage_indirect(descriptor->bit_size, Register_DI), },
     });
   }
@@ -743,12 +740,12 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Syscall},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
-  if (function->returns.declaration.descriptor == &descriptor_void) {
+  if (function->returns.descriptor == &descriptor_void) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
     // TODO provide user error? or should it be handled earlier?
-    assert(function->returns.declaration.descriptor->bit_size.as_u64 == 32);
+    assert(function->returns.descriptor->bit_size.as_u64 == 32);
 
     Storage common_storage = storage_register(Register_A, (Bits){32});
     result.callee_return = common_storage;
@@ -817,19 +814,19 @@ calling_convention_x86_64_windows_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_windows,
   };
   bool is_indirect_return = false;
-  if (function->returns.declaration.descriptor == &descriptor_void) {
+  if (function->returns.descriptor == &descriptor_void) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
-    Bits bit_size = function->returns.declaration.descriptor->bit_size;
-    if (descriptor_is_float(function->returns.declaration.descriptor)) {
+    Bits bit_size = function->returns.descriptor->bit_size;
+    if (descriptor_is_float(function->returns.descriptor)) {
       Storage common_storage = storage_register(Register_Xmm0, bit_size);
       result.callee_return = common_storage;
       result.caller_return = common_storage;
     } else {
       if (bit_size.as_u64 > 64) {
         is_indirect_return = true;
-        const Descriptor *return_descriptor = function->returns.declaration.descriptor;
+        const Descriptor *return_descriptor = function->returns.descriptor;
 
         result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
         result.callee_return = storage_indirect(return_descriptor->bit_size, Register_C);
@@ -895,13 +892,12 @@ calling_convention_x86_64_windows_call_setup_proc(
   }
 
   if (is_indirect_return) {
-    const Descriptor *return_descriptor = function->returns.declaration.descriptor;
+    const Descriptor *return_descriptor = function->returns.descriptor;
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = return_descriptor,
-      .source_range = function->returns.declaration.source_range,
       .Absolute = { .storage = storage_indirect(return_descriptor->bit_size, Register_C), },
     });
   }

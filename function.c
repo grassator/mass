@@ -663,11 +663,11 @@ ensure_function_instance(
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(compilation->allocator, end_label_pieces, countof(end_label_pieces));
 
-  const Descriptor *return_descriptor = fn_info->returns.declaration.descriptor;
+  const Descriptor *return_descriptor = fn_info->returns.descriptor;
   Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
   Value *return_value = value_init(
     allocator_allocate(compilation->allocator, Value),
-    return_descriptor, return_storage, fn_info->returns.declaration.source_range
+    return_descriptor, return_storage, fn_info->returns.maybe_type_expression.source_range
   );
 
   Function_Builder *builder = &(Function_Builder){
@@ -699,16 +699,6 @@ ensure_function_instance(
     }
   }
 
-  // Return value can be named in which case it should be accessible in the fn body
-  if (fn_info->returns.declaration.symbol) {
-    scope_define_value(
-      body_scope,
-      body_context.epoch,
-      return_value->source_range,
-      fn_info->returns.declaration.symbol,
-      return_value
-    );
-  }
   Value *parse_result = 0;
   if (value_is_group_curly(literal->body)) {
     parse_result = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));

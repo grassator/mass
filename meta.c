@@ -1694,7 +1694,7 @@ main(void) {
   }));
 
   push_type(type_struct("Function_Return", (Struct_Item[]){
-    { "Declaration", "declaration" },
+    { "const Descriptor *", "descriptor" },
     { "Value_View", "maybe_type_expression" },
   }));
 
