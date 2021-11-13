@@ -848,30 +848,6 @@ load_address(
   }
 }
 
-static void
-load_address_to_indirect(
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Storage target,
-  Storage source
-) {
-  assert(target.tag == Storage_Tag_Memory);
-  assert(target.Memory.location.tag == Memory_Location_Tag_Indirect);
-  assert(target.Memory.location.Indirect.offset == 0);
-  assert(source.tag == Storage_Tag_Memory);
-
-  Storage register_storage = {
-    .tag = Storage_Tag_Register,
-    .Register.index = target.Memory.location.Indirect.base_register,
-    .bit_size = {64},
-  };
-
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range,
-    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(source)}}
-  );
-}
-
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Compilation *compilation,
@@ -3624,7 +3600,14 @@ call_function_overload(
 
     Value *source_arg = *dyn_array_get(temp_arguments, i);
     if (storage_is_indirect(&param->storage)) {
-      load_address_to_indirect(builder, source_range, param->storage, source_arg->storage);
+      Register base_register = param->storage.Memory.location.Indirect.base_register;
+      Storage target_storage = storage_register(base_register, (Bits){64});
+      Storage source_storage = storage_adjusted_for_lea(source_arg->storage);
+
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *source_range,
+        &(Instruction_Assembly){lea, {target_storage, source_storage}}
+      );
     } else {
       MASS_ON_ERROR(assign(compilation, builder, param, source_arg, source_range)) return 0;
     }
