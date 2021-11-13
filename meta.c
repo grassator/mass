@@ -1902,6 +1902,7 @@ main(void) {
 
   push_type(type_struct("Mass_Trampoline", (Struct_Item[]){
     { "const Descriptor *", "args_descriptor" },
+    { "const Function_Info *", "original_info" },
     { "Mass_Trampoline_Proc", "proc"},
   }));
 

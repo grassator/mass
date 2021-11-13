@@ -2050,6 +2050,7 @@ typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
 typedef struct Mass_Trampoline {
   const Descriptor * args_descriptor;
+  const Function_Info * original_info;
   Mass_Trampoline_Proc proc;
 } Mass_Trampoline;
 typedef dyn_array_type(Mass_Trampoline) Array_Mass_Trampoline;
@@ -5775,6 +5776,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_trampoline, Mass_Trampoline,
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("args_descriptor"),
     .Base_Relative.offset = offsetof(Mass_Trampoline, args_descriptor),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_function_info_pointer,
+    .name = slice_literal_fields("original_info"),
+    .Base_Relative.offset = offsetof(Mass_Trampoline, original_info),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

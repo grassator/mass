@@ -473,7 +473,9 @@ c_struct_aligner_next_byte_offset(
   const Descriptor *descriptor
 ) {
   u64 field_bit_alignment = descriptor->bit_alignment.as_u64;
-  aligner->bit_size = u64_align(aligner->bit_size, field_bit_alignment);
+  if (field_bit_alignment) {
+    aligner->bit_size = u64_align(aligner->bit_size, field_bit_alignment);
+  }
   u64 field_bit_offset = aligner->bit_size;
   aligner->bit_size += descriptor->bit_size.as_u64;
   aligner->bit_alignment = u64_max(aligner->bit_alignment, field_bit_alignment);
@@ -4016,6 +4018,7 @@ mass_ensure_trampoline(
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
     .proc = (Mass_Trampoline_Proc)value_as_function(program, instance),
+    .original_info = original_info,
   };
   hash_map_set(context->compilation->trampoline_map, original, trampoline);
   return trampoline;
@@ -4051,21 +4054,27 @@ mass_trampoline_call(
     );
     memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
   }
-  const Memory_Layout_Item *return_field = dyn_array_last(fields);
-  assert(return_field->tag == Memory_Layout_Item_Tag_Base_Relative);
+
   trampoline->proc(args_struct_memory);
-  const void *temp_return_memory = args_struct_memory + return_field->Base_Relative.offset;
-  u64 return_byte_size = descriptor_byte_size(return_field->descriptor);
-  void *return_memory = allocator_allocate_bytes(
-    context->allocator,
-    return_byte_size,
-    descriptor_byte_alignment(return_field->descriptor)
-  );
-  memcpy(return_memory, temp_return_memory, return_byte_size);
+  Value *result;
+  if (trampoline->original_info->returns.descriptor == &descriptor_void) {
+    result = &void_value;
+  } else {
+    const Memory_Layout_Item *return_field = dyn_array_last(fields);
+    assert(return_field->tag == Memory_Layout_Item_Tag_Base_Relative);
+    const void *temp_return_memory = args_struct_memory + return_field->Base_Relative.offset;
+    u64 return_byte_size = descriptor_byte_size(return_field->descriptor);
+    void *return_memory = allocator_allocate_bytes(
+      context->allocator,
+      return_byte_size,
+      descriptor_byte_alignment(return_field->descriptor)
+    );
+    memcpy(return_memory, temp_return_memory, return_byte_size);
 
-  Storage return_storage = storage_static_internal(return_memory, return_field->descriptor->bit_size);
+    Storage return_storage = storage_static_internal(return_memory, return_field->descriptor->bit_size);
 
-  Value *result = value_make(context, return_field->descriptor, return_storage, args_view.source_range);
+    result = value_make(context, return_field->descriptor, return_storage, args_view.source_range);
+  }
   context_temp_reset_to_mark(context, temp_mark);
 
   return result;
