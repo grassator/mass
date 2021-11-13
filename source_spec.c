@@ -980,7 +980,7 @@ spec("source") {
       void (*checker)() = test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn() => () intrinsic {\n"
-            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
             "value.source_range = arguments.source_range\n"
             "value.descriptor = type_of(())\n"
             "value.storage.tag = MASS.Storage_Tag.None\n"
@@ -996,7 +996,7 @@ spec("source") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn() => () intrinsic {\n"
-            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
             "value.source_range = arguments.source_range\n"
             "value.descriptor = u64\n"
             "value.storage.tag = MASS.Storage_Tag.Static\n"
@@ -1020,16 +1020,16 @@ spec("source") {
               "expected_result : &MASS.Expected_Result,"
               "payload : &type_of(())"
             ") -> (&MASS.Value) {\n"
-              "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+              "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
               "value.source_range = cast(&MASS.Value, payload).source_range\n"
               "value.descriptor = type_of(())\n"
               "value.storage.tag = MASS.Storage_Tag.None\n"
               "value.storage.bit_size = value.descriptor.bit_size\n"
               "value"
             "}\n"
-            "value : &MASS.Value = compile_time_allocate(MASS.Value)\n"
+            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
 
-            "lazy_value : &MASS.Lazy_Value = compile_time_allocate(MASS.Lazy_Value)\n"
+            "lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)\n"
             "lazy_value.context = context.*\n"
             "lazy_value.descriptor = type_of(())\n"
             "lazy_value.proc = lazy_value_proc\n"
