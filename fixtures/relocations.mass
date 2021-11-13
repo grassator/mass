@@ -3,11 +3,7 @@ global_char_pointer := &global_char
 
 global_static_string :: "b"
 
-test :: fn() -> (char_string : String) {
-  char_string.bytes = global_char_pointer
-  char_string.length = 1
-  char_string
-}
+test :: fn() -> (String) { [global_char_pointer, 1] }
 
 main :: fn() {
   process :: import("std/process")

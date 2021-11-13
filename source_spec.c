@@ -408,15 +408,15 @@ spec("source") {
   describe("Raw Machine Code") {
     // This test relies on Windows calling convention
     it("should be able to include raw machine code bytes") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "foo", &test_context,
-        "foo :: fn() -> (result : s64) {"
-          "inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00);"
-          "result"
+        "foo :: fn(x : s64) -> (s64) {"
+          "inline_machine_code_bytes(0x48, 0xc7, 0xc1, 0x2a, 0x00, 0x00, 0x00)\n"
+          "x"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
+      check(checker(21) == 42);
     }
 
     it("should be able to reference a declared label in raw machine code bytes") {

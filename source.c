@@ -2145,37 +2145,8 @@ token_match_return_type(
 ) {
   Function_Return returns = {
     .declaration.source_range = view.source_range,
+    .maybe_type_expression = view,
   };
-  if (context->result->tag != Mass_Result_Tag_Success) return returns;
-
-  Value_View lhs;
-  Value_View rhs;
-  Value *operator;
-  if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
-    if (lhs.length == 0) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = operator->source_range,
-        .detailed_message = slice_literal("':' operator expects an identifier on the left hand side")
-      });
-      goto err;
-    }
-    if (lhs.length > 1 || !value_is_symbol(value_view_get(lhs, 0))) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Invalid_Identifier,
-        .source_range = lhs.source_range,
-      });
-      goto err;
-    }
-
-    returns.maybe_type_expression = rhs;
-    returns.declaration.source_range = rhs.source_range,
-    returns.declaration.symbol = value_as_symbol(value_view_get(lhs, 0));
-  } else {
-    returns.maybe_type_expression = view;
-  }
-
-  err:
   return returns;
 }
 
