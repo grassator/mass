@@ -4942,6 +4942,17 @@ mass_handle_address_of_lazy_proc(
   return result_value;
 }
 
+static const Descriptor *
+user_presentable_descriptor_for(
+  Value *expression
+) {
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
+  if (descriptor_is_implicit_pointer(descriptor)) {
+    descriptor = descriptor->Pointer_To.descriptor;
+  }
+  return descriptor;
+}
+
 static Value *
 mass_type_of(
   Execution_Context *context,
@@ -4949,7 +4960,7 @@ mass_type_of(
 ) {
   assert(args.length == 1);
   Value *expression = value_view_get(args, 0);
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
+  const Descriptor *descriptor = user_presentable_descriptor_for(expression);
 
   return value_init(
     allocator_allocate(context->allocator, Value),
@@ -4966,7 +4977,7 @@ mass_size_of(
 ) {
   assert(args.length == 1);
   Value *expression = value_view_get(args, 0);
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
+  const Descriptor *descriptor = user_presentable_descriptor_for(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 
   allocator_allocate_bulk(context->allocator, combined, {
