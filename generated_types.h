@@ -786,37 +786,37 @@ static i64 mass_i64_equal
 static i64 mass_i64_not_equal
   (i64 a, i64 b);
 
-static Value * mass_add
+static Value * mass_integer_add
   (Execution_Context * context, Value_View args);
 
-static Value * mass_subtract
+static Value * mass_integer_subtract
   (Execution_Context * context, Value_View args);
 
-static Value * mass_multiply
+static Value * mass_integer_multiply
   (Execution_Context * context, Value_View args);
 
-static Value * mass_divide
+static Value * mass_integer_divide
   (Execution_Context * context, Value_View args);
 
-static Value * mass_remainder
+static Value * mass_integer_remainder
   (Execution_Context * context, Value_View args);
 
-static Value * mass_less
+static Value * mass_integer_less
   (Execution_Context * context, Value_View args);
 
-static Value * mass_greater
+static Value * mass_integer_greater
   (Execution_Context * context, Value_View args);
 
-static Value * mass_less_equal
+static Value * mass_integer_less_equal
   (Execution_Context * context, Value_View args);
 
-static Value * mass_greater_equal
+static Value * mass_integer_greater_equal
   (Execution_Context * context, Value_View args);
 
-static Value * mass_equal
+static Value * mass_integer_equal
   (Execution_Context * context, Value_View args);
 
-static Value * mass_not_equal
+static Value * mass_integer_not_equal
   (Execution_Context * context, Value_View args);
 
 typedef dyn_array_type(char *) Array_char_Ptr;
@@ -2697,17 +2697,17 @@ static Descriptor descriptor_mass_i64_add;
 static Descriptor descriptor_mass_i64_subtract;
 static Descriptor descriptor_mass_i64_equal;
 static Descriptor descriptor_mass_i64_not_equal;
-static Descriptor descriptor_mass_add;
-static Descriptor descriptor_mass_subtract;
-static Descriptor descriptor_mass_multiply;
-static Descriptor descriptor_mass_divide;
-static Descriptor descriptor_mass_remainder;
-static Descriptor descriptor_mass_less;
-static Descriptor descriptor_mass_greater;
-static Descriptor descriptor_mass_less_equal;
-static Descriptor descriptor_mass_greater_equal;
-static Descriptor descriptor_mass_equal;
-static Descriptor descriptor_mass_not_equal;
+static Descriptor descriptor_mass_integer_add;
+static Descriptor descriptor_mass_integer_subtract;
+static Descriptor descriptor_mass_integer_multiply;
+static Descriptor descriptor_mass_integer_divide;
+static Descriptor descriptor_mass_integer_remainder;
+static Descriptor descriptor_mass_integer_less;
+static Descriptor descriptor_mass_integer_greater;
+static Descriptor descriptor_mass_integer_less_equal;
+static Descriptor descriptor_mass_integer_greater_equal;
+static Descriptor descriptor_mass_integer_equal;
+static Descriptor descriptor_mass_integer_not_equal;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
 static Descriptor descriptor_array_char_ptr;

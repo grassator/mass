@@ -2112,17 +2112,17 @@ main(void) {
   #define DEFINE_ARITHMETIC(_NAME_)\
     export_compiler_custom_name(#_NAME_, push_type(type_intrinsic("mass_" #_NAME_)))
 
-  DEFINE_ARITHMETIC(add);
-  DEFINE_ARITHMETIC(subtract);
-  DEFINE_ARITHMETIC(multiply);
-  DEFINE_ARITHMETIC(divide);
-  DEFINE_ARITHMETIC(remainder);
-  DEFINE_ARITHMETIC(less);
-  DEFINE_ARITHMETIC(greater);
-  DEFINE_ARITHMETIC(less_equal);
-  DEFINE_ARITHMETIC(greater_equal);
-  DEFINE_ARITHMETIC(equal);
-  DEFINE_ARITHMETIC(not_equal);
+  DEFINE_ARITHMETIC(integer_add);
+  DEFINE_ARITHMETIC(integer_subtract);
+  DEFINE_ARITHMETIC(integer_multiply);
+  DEFINE_ARITHMETIC(integer_divide);
+  DEFINE_ARITHMETIC(integer_remainder);
+  DEFINE_ARITHMETIC(integer_less);
+  DEFINE_ARITHMETIC(integer_greater);
+  DEFINE_ARITHMETIC(integer_less_equal);
+  DEFINE_ARITHMETIC(integer_greater_equal);
+  DEFINE_ARITHMETIC(integer_equal);
+  DEFINE_ARITHMETIC(integer_not_equal);
 
   // Standard C types
   set_flags(push_type(

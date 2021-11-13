@@ -161,22 +161,22 @@ arithmetic_template :: macro(impl, type : Type) {
   fn(x : type, y : type) => (type) impl
 }
 
-add :: template_integer_overloads(arithmetic_template, MASS.add)
-subtract :: template_integer_overloads(arithmetic_template, MASS.subtract)
-multiply :: template_integer_overloads(arithmetic_template, MASS.multiply)
-divide :: template_integer_overloads(arithmetic_template, MASS.divide)
-remainder :: template_integer_overloads(arithmetic_template, MASS.remainder)
+add :: template_integer_overloads(arithmetic_template, MASS.integer_add)
+subtract :: template_integer_overloads(arithmetic_template, MASS.integer_subtract)
+multiply :: template_integer_overloads(arithmetic_template, MASS.integer_multiply)
+divide :: template_integer_overloads(arithmetic_template, MASS.integer_divide)
+remainder :: template_integer_overloads(arithmetic_template, MASS.integer_remainder)
 
 comparison_template :: macro(impl, type : Type) {
   fn(x : type, y : type) => (bool) impl
 }
 
-less :: template_integer_overloads(comparison_template, MASS.less)
-less_equal :: template_integer_overloads(comparison_template, MASS.less_equal)
-greater :: template_integer_overloads(comparison_template, MASS.greater)
-greater_equal :: template_integer_overloads(comparison_template, MASS.greater_equal)
-equal :: template_integer_overloads(comparison_template, MASS.equal)
-not_equal :: template_integer_overloads(comparison_template, MASS.not_equal)
+less :: template_integer_overloads(comparison_template, MASS.integer_less)
+less_equal :: template_integer_overloads(comparison_template, MASS.integer_less_equal)
+greater :: template_integer_overloads(comparison_template, MASS.integer_greater)
+greater_equal :: template_integer_overloads(comparison_template, MASS.integer_greater_equal)
+equal :: template_integer_overloads(comparison_template, MASS.integer_equal)
+not_equal :: template_integer_overloads(comparison_template, MASS.integer_not_equal)
 
 
 add :: MASS.i64_add

@@ -799,7 +799,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_add, "add", &descriptor_value_pointer,
+    mass_integer_add, "integer_add", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -811,7 +811,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_subtract, "subtract", &descriptor_value_pointer,
+    mass_integer_subtract, "integer_subtract", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -823,7 +823,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_multiply, "multiply", &descriptor_value_pointer,
+    mass_integer_multiply, "integer_multiply", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -835,7 +835,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_divide, "divide", &descriptor_value_pointer,
+    mass_integer_divide, "integer_divide", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -847,7 +847,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_remainder, "remainder", &descriptor_value_pointer,
+    mass_integer_remainder, "integer_remainder", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -859,7 +859,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_less, "less", &descriptor_value_pointer,
+    mass_integer_less, "integer_less", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -871,7 +871,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_greater, "greater", &descriptor_value_pointer,
+    mass_integer_greater, "integer_greater", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -883,7 +883,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_less_equal, "less_equal", &descriptor_value_pointer,
+    mass_integer_less_equal, "integer_less_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -895,7 +895,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_greater_equal, "greater_equal", &descriptor_value_pointer,
+    mass_integer_greater_equal, "integer_greater_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -907,7 +907,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_equal, "equal", &descriptor_value_pointer,
+    mass_integer_equal, "integer_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
@@ -919,7 +919,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_not_equal, "not_equal", &descriptor_value_pointer,
+    mass_integer_not_equal, "integer_not_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer

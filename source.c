@@ -4643,19 +4643,19 @@ mass_handle_arithmetic_operation(
   }
 }
 
-static inline Value *mass_add(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_add(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Add);
 }
-static inline Value *mass_subtract(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_subtract(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Subtract);
 }
-static inline Value *mass_multiply(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_multiply(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Multiply);
 }
-static inline Value *mass_divide(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_divide(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Divide);
 }
-static inline Value *mass_remainder(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_remainder(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Remainder);
 }
 
@@ -4667,7 +4667,7 @@ typedef struct {
 } Mass_Comparison_Operator_Lazy_Payload;
 
 static Value *
-mass_handle_comparison_operation_lazy_proc(
+mass_handle_integer_comparison_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
@@ -4805,7 +4805,7 @@ mass_handle_comparison_operation_lazy_proc(
 }
 
 static inline Value *
-mass_handle_comparison_operation(
+mass_handle_integer_comparison(
   Execution_Context *context,
   Value_View arguments,
   void *raw_payload
@@ -4820,7 +4820,7 @@ mass_handle_comparison_operation(
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(&descriptor__bool);
-    return mass_handle_comparison_operation_lazy_proc(
+    return mass_handle_integer_comparison_lazy_proc(
       context->compilation, 0, &expected_result, &stack_lazy_payload
     );
   } else {
@@ -4828,28 +4828,28 @@ mass_handle_comparison_operation(
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
     *payload = stack_lazy_payload;
     return mass_make_lazy_value(
-      context, arguments.source_range, payload, &descriptor__bool, mass_handle_comparison_operation_lazy_proc
+      context, arguments.source_range, payload, &descriptor__bool, mass_handle_integer_comparison_lazy_proc
     );
   }
 }
 
-static inline Value *mass_less(Execution_Context *context, Value_View arguments) {
-  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Less);
+static inline Value *mass_integer_less(Execution_Context *context, Value_View arguments) {
+  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Less);
 }
-static inline Value *mass_greater(Execution_Context *context, Value_View arguments) {
-  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Greater);
+static inline Value *mass_integer_greater(Execution_Context *context, Value_View arguments) {
+  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Greater);
 }
-static inline Value *mass_less_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Less_Equal);
+static inline Value *mass_integer_less_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Less_Equal);
 }
-static inline Value *mass_greater_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Greater_Equal);
+static inline Value *mass_integer_greater_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Greater_Equal);
 }
-static inline Value *mass_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Equal);
+static inline Value *mass_integer_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Equal);
 }
-static inline Value *mass_not_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Not_Equal);
+static inline Value *mass_integer_not_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Not_Equal);
 }
 
 static Value *
