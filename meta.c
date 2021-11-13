@@ -1781,9 +1781,7 @@ main(void) {
       { "Memory_Layout", "memory_layout" },
     }),
     struct_fields("Pointer_To", (Struct_Item[]){
-      { "const Descriptor *", "descriptor" },
-    }),
-    struct_fields("Reference_To", (Struct_Item[]){
+      { "u64", "is_implicit" },
       { "const Descriptor *", "descriptor" },
     }),
   }), (Struct_Item[]){

@@ -338,18 +338,14 @@ same_type(
   const Descriptor *a,
   const Descriptor *b
 ) {
-  if (a->tag == Descriptor_Tag_Reference_To) {
-    return same_type(a->Reference_To.descriptor, b);
+  if (descriptor_is_implicit_pointer(a)) {
+    a = a->Pointer_To.descriptor;
   }
-  if (b->tag == Descriptor_Tag_Reference_To) {
-    return same_type(a, b->Reference_To.descriptor);
+  if (descriptor_is_implicit_pointer(b)) {
+    b = b->Pointer_To.descriptor;
   }
   if (a->tag != b->tag) return false;
   switch(a->tag) {
-    case Descriptor_Tag_Reference_To: {
-      panic("Should be unwrapped above");
-      return false;
-    }
     case Descriptor_Tag_Pointer_To: {
       if (
         a->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
@@ -810,7 +806,6 @@ storage_static_equal_internal(
   switch(a_descriptor->tag) {
     // Opaques, references and pointers can be compared with memcmp
     case Descriptor_Tag_Opaque:
-    case Descriptor_Tag_Reference_To:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
     }
@@ -1295,21 +1290,6 @@ descriptor_function_instance(
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function_Instance = { .info = info, .call_setup = call_setup, },
-  };
-  return result;
-}
-
-static inline Descriptor *
-descriptor_reference_to(
-  const Allocator *allocator,
-  const Descriptor *descriptor
-) {
-  Descriptor *result = allocator_allocate(allocator, Descriptor);
-  *result = (const Descriptor) {
-    .tag = Descriptor_Tag_Reference_To,
-    .bit_size = {sizeof(void *) * CHAR_BIT},
-    .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Reference_To.descriptor = descriptor,
   };
   return result;
 }

@@ -529,7 +529,6 @@ load_address(
 ) {
   assert(
     result_value->descriptor->tag == Descriptor_Tag_Pointer_To ||
-    result_value->descriptor->tag == Descriptor_Tag_Reference_To ||
     result_value->descriptor->tag == Descriptor_Tag_Function_Instance
   );
 

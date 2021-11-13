@@ -344,10 +344,7 @@ assign_from_static(
 ) {
   if (
     builder->program != compilation->jit.program &&
-    (
-      source->descriptor->tag == Descriptor_Tag_Pointer_To ||
-      source->descriptor->tag == Descriptor_Tag_Reference_To
-    )
+    source->descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     // If a static value contains a pointer, we expect an entry in a special map used to track
     // whether the target memory is also already copied to the compiled binary.
@@ -403,7 +400,7 @@ assign_from_static(
 }
 
 static PRELUDE_NO_DISCARD Value *
-value_indirect_from_reference_or_pointer(
+value_indirect_from_pointer(
   Compilation *compilation,
   Function_Builder *builder,
   Value *source
@@ -411,9 +408,7 @@ value_indirect_from_reference_or_pointer(
   const Allocator *allocator = compilation->allocator;
   const Descriptor *referenced_descriptor;
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
-  if (source_descriptor->tag == Descriptor_Tag_Reference_To) {
-    referenced_descriptor = source_descriptor->Reference_To.descriptor;
-  } else if (source_descriptor->tag == Descriptor_Tag_Pointer_To) {
+  if (source_descriptor->tag == Descriptor_Tag_Pointer_To) {
     referenced_descriptor = source_descriptor->Pointer_To.descriptor;
   } else {
     panic("Unexpected descriptor tag for an indirect value");
@@ -838,18 +833,14 @@ assign(
     return *compilation->result;
   }
 
-  if (
-    source->descriptor->tag == Descriptor_Tag_Reference_To &&
-    target->descriptor->tag != Descriptor_Tag_Reference_To
-  ) {
-    Value *referenced_value = value_indirect_from_reference_or_pointer(compilation, builder, source);
-    MASS_TRY(assign(compilation, builder, target, referenced_value, source_range));
-    value_release_if_temporary(builder, referenced_value);
+  if (descriptor_is_implicit_pointer(source->descriptor)) {
+    Value *ref_source = value_indirect_from_pointer(compilation, builder, source);
+    MASS_TRY(assign(compilation, builder, target, ref_source, source_range));
+    value_release_if_temporary(builder, ref_source);
     return *compilation->result;
-  } else if (
-    target->descriptor->tag == Descriptor_Tag_Reference_To &&
-    source->descriptor->tag != Descriptor_Tag_Reference_To
-  ) {
+  }
+
+  if (descriptor_is_implicit_pointer(target->descriptor)) {
     if (
       (
         source->storage.tag == Storage_Tag_Static &&
@@ -857,30 +848,19 @@ assign(
       ) ||
       source->descriptor == &descriptor_tuple
     ) {
-      Value *referenced_target = value_indirect_from_reference_or_pointer(compilation, builder, target);
+      Value *referenced_target = value_indirect_from_pointer(compilation, builder, target);
       MASS_TRY(assign(compilation, builder, referenced_target, source, source_range));
       value_release_if_temporary(builder, referenced_target);
       return *compilation->result;
     } else {
-      const Descriptor *reference_descriptor = target->descriptor->Reference_To.descriptor;
-      if (!same_value_type_or_can_implicitly_move_cast(reference_descriptor, source)) goto err;
+      const Descriptor *original_descriptor = target->descriptor->Pointer_To.descriptor;
+      if (!same_value_type_or_can_implicitly_move_cast(original_descriptor, source)) goto err;
       load_address(builder, source_range, target, source->storage);
     }
     return *compilation->result;
-  } else if (
-    target->descriptor->tag == Descriptor_Tag_Reference_To &&
-    source->descriptor->tag == Descriptor_Tag_Reference_To
-  ) {
-    if (!same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) goto err;
-    if (!storage_equal(&target->storage, &source->storage)) {
-      Value *referenced_source = value_indirect_from_reference_or_pointer(compilation, builder, source);
-      Value *referenced_target = value_indirect_from_reference_or_pointer(compilation, builder, target);
-      MASS_TRY(assign(compilation, builder, referenced_target, referenced_source, source_range));
-      value_release_if_temporary(builder, referenced_source);
-      value_release_if_temporary(builder, referenced_target);
-    }
-    return *compilation->result;
-  } else if (value_is_static_i64(source)) {
+  }
+
+  if (value_is_static_i64(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const i64 *literal = storage_static_as_c_type(&source->storage, i64);
       if (literal->bits == 0) {
@@ -3424,12 +3404,12 @@ call_function_overload(
       compilation, source_arg, target_item->descriptor, source_range
     );
     const Descriptor *stack_descriptor = target_item->descriptor;
-    if (stack_descriptor->tag == Descriptor_Tag_Reference_To) {
-      stack_descriptor = stack_descriptor->Reference_To.descriptor;
+    if (descriptor_is_implicit_pointer(stack_descriptor)) {
+      stack_descriptor = stack_descriptor->Pointer_To.descriptor;
     }
     bool source_is_stack = (
       storage_is_stack(&source_arg->storage) &&
-      source_arg->descriptor->tag != Descriptor_Tag_Reference_To
+      descriptor_is_implicit_pointer(source_arg->descriptor)
     );
     bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
 
@@ -3443,7 +3423,7 @@ call_function_overload(
       !(builder->register_occupied_bitset & target_arg_register_bitset);
     bool can_assign_straight_to_target = (
       target_arg_registers_are_free &&
-      target_item->descriptor->tag != Descriptor_Tag_Reference_To
+      descriptor_is_implicit_pointer(target_item->descriptor)
     );
 
     bool can_use_source_registers = false;
@@ -3452,7 +3432,7 @@ call_function_overload(
       source_arg->descriptor != &descriptor_lazy_value &&
       source_arg->descriptor != &descriptor_void &&
       source_arg->storage.tag != Storage_Tag_Static &&
-      target_arg->storage.tag != Descriptor_Tag_Reference_To
+      !descriptor_is_implicit_pointer(target_item->descriptor)
     ) {
       source_registers_bitset = register_bitset_from_storage(&source_arg->storage);
       if (!(all_used_arguments_register_bitset & source_registers_bitset)) {
@@ -3477,7 +3457,7 @@ call_function_overload(
       register_acquire_bitset(builder, source_registers_bitset);
     } else if (
       value_is_non_lazy_static(source_arg) &&
-      target_item->descriptor->tag != Descriptor_Tag_Reference_To
+      !descriptor_is_implicit_pointer(target_item->descriptor)
     ) {
       arg_value = source_arg;
       should_assign = false;
@@ -3495,7 +3475,7 @@ call_function_overload(
       if (
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
-        target_item->descriptor->tag != Descriptor_Tag_Reference_To &&
+        !descriptor_is_implicit_pointer(target_item->descriptor)&&
         required_register_count == 1 &&
         register_bitset_occupied_count(allowed_temp_registers) > 1
       ) {
@@ -5453,8 +5433,8 @@ mass_handle_dereference_operator_lazy_proc(
   const Expected_Result *expected_result,
   Value* pointer
 ) {
-  // TODO value_indirect_from_reference_or_pointer should probably take an expected_result
-  Value *value = value_indirect_from_reference_or_pointer(compilation, builder, pointer);
+  // TODO value_indirect_from_pointer should probably take an expected_result
+  Value *value = value_indirect_from_pointer(compilation, builder, pointer);
   return expected_result_ensure_value_or_temp(compilation, builder, expected_result, value);
 }
 

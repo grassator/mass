@@ -395,7 +395,6 @@ x86_64_system_v_classify(
   switch(descriptor->tag) {
     case Descriptor_Tag_Function_Instance:
     case Descriptor_Tag_Pointer_To:
-    case Descriptor_Tag_Reference_To:
     case Descriptor_Tag_Opaque: {
       if (descriptor->bit_size.as_u64 == 0) {
         return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
@@ -530,7 +529,6 @@ x86_64_system_v_classify_field_recursively(
     switch(it->item->tag) {
       case Descriptor_Tag_Function_Instance:
       case Descriptor_Tag_Pointer_To:
-      case Descriptor_Tag_Reference_To:
       case Descriptor_Tag_Opaque: {
         u64 start_eightbyte_index = field_offset_in_root_aggregate / eightbyte;
         u64 end_eightbyte_index = (field_offset_in_root_aggregate + item_byte_size - 1) / eightbyte;
@@ -869,7 +867,17 @@ calling_convention_x86_64_windows_call_setup_proc(
     bool is_large_argument = item.descriptor->bit_size.as_u64 > 64;
     Storage arg_storage;
     if (is_large_argument) {
-      item.descriptor = descriptor_reference_to(allocator, item.descriptor);
+      Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
+      *descriptor = (Descriptor) {
+        .tag = Descriptor_Tag_Pointer_To,
+        .bit_size = {64},
+        .bit_alignment = {64},
+        .Pointer_To = {
+          .descriptor = item.descriptor,
+          .is_implicit = true,
+        },
+      };
+      item.descriptor = descriptor;
     }
     if (index < countof(general_registers)) {
       Register reg = descriptor_is_float(item.descriptor)

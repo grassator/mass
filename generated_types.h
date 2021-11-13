@@ -1758,7 +1758,6 @@ typedef enum {
   Descriptor_Tag_Fixed_Size_Array = 2,
   Descriptor_Tag_Struct = 3,
   Descriptor_Tag_Pointer_To = 4,
-  Descriptor_Tag_Reference_To = 5,
 } Descriptor_Tag;
 
 typedef struct Descriptor_Opaque {
@@ -1778,11 +1777,9 @@ typedef struct Descriptor_Struct {
   Memory_Layout memory_layout;
 } Descriptor_Struct;
 typedef struct Descriptor_Pointer_To {
+  u64 is_implicit;
   const Descriptor * descriptor;
 } Descriptor_Pointer_To;
-typedef struct Descriptor_Reference_To {
-  const Descriptor * descriptor;
-} Descriptor_Reference_To;
 typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
@@ -1795,7 +1792,6 @@ typedef struct Descriptor {
     Descriptor_Fixed_Size_Array Fixed_Size_Array;
     Descriptor_Struct Struct;
     Descriptor_Pointer_To Pointer_To;
-    Descriptor_Reference_To Reference_To;
   };
 } Descriptor;
 static inline Descriptor_Opaque *
@@ -1822,11 +1818,6 @@ static inline Descriptor_Pointer_To *
 descriptor_as_pointer_to(Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Pointer_To);
   return &descriptor->Pointer_To;
-}
-static inline Descriptor_Reference_To *
-descriptor_as_reference_to(Descriptor *descriptor) {
-  assert(descriptor->tag == Descriptor_Tag_Reference_To);
-  return &descriptor->Reference_To;
 }
 typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
@@ -5139,7 +5130,6 @@ static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Fixed_Size_Array"), .value = 2 },
 { .name = slice_literal_fields("Struct"), .value = 3 },
 { .name = slice_literal_fields("Pointer_To"), .value = 4 },
-{ .name = slice_literal_fields("Reference_To"), .value = 5 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_opaque, Descriptor_Opaque,
   {
@@ -5204,21 +5194,18 @@ MASS_DEFINE_TYPE_VALUE(descriptor_struct);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_pointer_to, Descriptor_Pointer_To,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("is_implicit"),
+    .Base_Relative.offset = offsetof(Descriptor_Pointer_To, is_implicit),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("descriptor"),
     .Base_Relative.offset = offsetof(Descriptor_Pointer_To, descriptor),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_pointer_to);
-MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_reference_to, Descriptor_Reference_To,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_descriptor_pointer,
-    .name = slice_literal_fields("descriptor"),
-    .Base_Relative.offset = offsetof(Descriptor_Reference_To, descriptor),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(descriptor_reference_to);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5273,12 +5260,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .name = slice_literal_fields("Pointer_To"),
     .descriptor = &descriptor_descriptor_pointer_to,
     .Base_Relative.offset = offsetof(Descriptor, Pointer_To),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("Reference_To"),
-    .descriptor = &descriptor_descriptor_reference_to,
-    .Base_Relative.offset = offsetof(Descriptor, Reference_To),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor);

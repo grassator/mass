@@ -311,13 +311,6 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Descriptor_Pointer_To")),
     type_descriptor_pointer_to_value
   );
-  Source_Range Descriptor_Reference_To__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Descriptor_Reference_To__source_range, "Descriptor_Reference_To");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Descriptor_Reference_To__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Descriptor_Reference_To")),
-    type_descriptor_reference_to_value
-  );
   Source_Range Error__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Error__source_range, "Error");
   scope_define_value(
