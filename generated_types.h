@@ -756,9 +756,6 @@ static Value * mass_startup
 static Value * mass_inline_machine_code_bytes
   (Execution_Context * context, Value_View args);
 
-static Value * mass_compile_time_error
-  (Execution_Context * context, Value_View args);
-
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
@@ -2690,7 +2687,6 @@ static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_startup;
 static Descriptor descriptor_mass_inline_machine_code_bytes;
-static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_mass_i64_logical_shift_left;

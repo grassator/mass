@@ -4979,36 +4979,6 @@ mass_pointer_to(
 }
 
 static Value *
-mass_compile_time_error(
-  Execution_Context *context,
-  Value_View args
-) {
-  if (args.length != 2) goto err;
-  Value *name_value = value_view_get(args, 0);
-  Value *message_value = value_view_get(args, 1);
-  if (name_value->descriptor != &descriptor_slice) goto err;
-  if (message_value->descriptor != &descriptor_slice) goto err;
-  Slice name = *storage_static_as_c_type(&name_value->storage, Slice);
-  Slice message = *storage_static_as_c_type(&message_value->storage, Slice);
-
-  context_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_User_Defined,
-    .User_Defined.name = name,
-    .detailed_message = message,
-    .source_range = args.source_range,
-  });
-  return &void_value;
-
-  err:
-  context_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_Parse,
-    .source_range = args.source_range,
-    .detailed_message = slice_literal("compile_time_error() expects a two string arguments"),
-  });
-  return 0;
-}
-
-static Value *
 mass_call(
   Execution_Context *context,
   Value_View args_view

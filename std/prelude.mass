@@ -44,10 +44,49 @@ Symbol :: MASS.Symbol
 true :: cast(bool, 1)
 false :: cast(bool, 0)
 
-compile_time_error :: fn(name : String, description : String) => () MASS.compile_time_error
+assert :: fn(condition : bool, message := "Assertion failed") {
+  process :: import("std/process")
+  io :: import("io")
+  if condition then {} else {
+    // FIXME This explodes. Maybe library import is from a wrong program?
+    // io.print(message)
+    process.exit(1)
+  }
+}
 
-static_assert :: macro(condition : bool, message : String) {
-  @{if condition then { compile_time_error("Static Assert Failed", message) } else {}}
+reify :: macro(value : &MASS.Value, type : Type) {
+  // FIXME these casts should not be necessary and are broken probably because == does not
+  //       properly release temp operands
+  //assert(cast(s32, value.storage.tag) == cast(s32, MASS.Storage_Tag.Static))
+  //assert(cast(s32, value.storage.Static.memory.tag) == cast(s32, MASS.Static_Memory_Tag.Heap))
+  //assert(cast(s64, value.descriptor) == cast(s64, type))
+  cast(&type, value.storage.Static.memory.Heap.pointer)
+}
+
+context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
+  //assert(context.result.tag == MASS.Result_Tag.Success)
+  context.result.tag = MASS.Result_Tag.Error
+  context.result.Error.error = error
+}
+
+static_assert :: fn(condition : bool, message : String) => () intrinsic {
+  condition := reify(arguments.values.0, bool)
+  message := reify(arguments.values.1, String)
+
+  if condition then {} else {
+    error : MASS.Error
+    error.tag = MASS.Error_Tag.User_Defined
+    error.source_range = arguments.source_range
+    error.detailed_message = message.*
+    error.User_Defined.name = "Static Assert Failed"
+    context_error(context, error)
+  }
+
+  void := allocate(MASS.allocator, MASS.Value)
+  void.descriptor = type_of(())
+  void.storage.tag = MASS.Storage_Tag.None
+  void.source_range = arguments.source_range
+  void
 }
 
 apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) => (MASS.Scope) MASS.inline_module

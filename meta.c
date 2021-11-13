@@ -2075,8 +2075,6 @@ main(void) {
   export_compiler_custom_name("startup", push_type(type_intrinsic("mass_startup")));
   export_compiler_custom_name("inline_machine_code_bytes", push_type(type_intrinsic("mass_inline_machine_code_bytes")));
 
-  export_compiler_custom_name("compile_time_error", push_type(type_intrinsic("mass_compile_time_error")));
-
   export_compiler_custom_name("allocator_allocate_bytes", push_type(
     type_function(Default, "allocator_allocate_bytes", "void *", (Argument_Type[]){
       { "const Allocator *", "allocator" },
