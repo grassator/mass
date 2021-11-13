@@ -803,6 +803,75 @@ assign_tuple(
   return *compilation->result;
 }
 
+static inline Storage
+storage_adjusted_for_lea(
+  Storage source
+) {
+  assert(source.tag == Storage_Tag_Memory);
+  // `LEA` is a weird instruction in that the size of the operands affects
+  // what the instruction *does*, instead of describing the operands.
+  // For the purposes of this compiler we always want it to generate 64-bit
+  // effective address and then store that full address in the target register.
+  // This is why here we are forcing the source memory operand to be 8 bytes.
+  Storage adjusted_source = source;
+  adjusted_source.bit_size.as_u64 = 64;
+  return adjusted_source;
+}
+
+static void
+load_address(
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  Value *result_value,
+  Storage source
+) {
+  assert(
+    result_value->descriptor->tag == Descriptor_Tag_Pointer_To ||
+    result_value->descriptor->tag == Descriptor_Tag_Function_Instance
+  );
+
+  bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
+  Storage register_storage = can_reuse_result_as_temp
+    ? result_value->storage
+    : storage_register(register_acquire_temp(builder), result_value->descriptor->bit_size);
+
+  assert(register_storage.bit_size.as_u64 == 64);
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range,
+    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(source)}}
+  );
+
+  if (!can_reuse_result_as_temp) {
+    assert(register_storage.tag == Storage_Tag_Register);
+    move_value(builder, source_range, &result_value->storage, &register_storage);
+    register_release(builder, register_storage.Register.index);
+  }
+}
+
+static void
+load_address_to_indirect(
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  Storage target,
+  Storage source
+) {
+  assert(target.tag == Storage_Tag_Memory);
+  assert(target.Memory.location.tag == Memory_Location_Tag_Indirect);
+  assert(target.Memory.location.Indirect.offset == 0);
+  assert(source.tag == Storage_Tag_Memory);
+
+  Storage register_storage = {
+    .tag = Storage_Tag_Register,
+    .Register.index = target.Memory.location.Indirect.base_register,
+    .bit_size = {64},
+  };
+
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range,
+    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(source)}}
+  );
+}
+
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Compilation *compilation,

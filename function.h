@@ -65,14 +65,6 @@ fn_encode(
   Function_Layout *out_layout
 );
 
-static void
-load_address(
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *result_value,
-  Storage storage
-);
-
 // Register bitset manipulation
 
 

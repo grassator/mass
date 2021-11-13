@@ -24,6 +24,14 @@ assign(
   const Source_Range *source_range
 );
 
+static void
+load_address(
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  Value *result_value,
+  Storage storage
+);
+
 static inline const Descriptor *
 expected_result_descriptor(
   const Expected_Result *expected_result
