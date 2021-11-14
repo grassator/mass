@@ -4276,88 +4276,6 @@ token_handle_parsed_function_call(
   return call_return_value;
 }
 
-static Storage
-storage_load_index_address(
-  Compilation *compilation,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *target,
-  const Descriptor *item_descriptor,
-  Value *index_value
-) {
-  const Allocator *allocator = compilation->allocator;
-  if (target->storage.tag == Storage_Tag_Static) {
-    index_value = token_value_force_immediate_integer(
-      compilation, index_value, &descriptor_u64, source_range
-    );
-    MASS_ON_ERROR(*compilation->result) return (Storage){0};
-    u64 index = *storage_static_as_c_type(&index_value->storage, u64);
-    // TODO do bounds checking if possible
-    s8 *target_bytes = 0;
-    if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      target_bytes =
-        *(s8**)get_static_storage_with_bit_size(&target->storage, target->storage.bit_size);
-    } else {
-      panic("TODO support more static dereferences");
-    }
-    return storage_static_internal(target_bytes + index, item_descriptor->bit_size);
-  }
-
-  // @Volatile :TemporaryRegisterForIndirectMemory
-  Value *new_base = value_temporary_acquire_register_for_descriptor(
-    allocator, builder, register_find_available(builder, 0),  &descriptor_s64, *source_range
-  );
-
-  // Move the index into the register
-  move_value(builder, source_range, &new_base->storage, &index_value->storage);
-
-  // Multiplication by 1 byte is useless so checking it here
-  if (item_descriptor->bit_size.as_u64 != 8) {
-    u32 item_byte_size = u64_to_u32(descriptor_byte_size(item_descriptor));
-
-    // Multiply index by the item byte size
-    Value *reg_byte_size_value = value_temporary_acquire_register_for_descriptor(
-      allocator, builder, register_find_available(builder, 0), &descriptor_s64, *source_range
-    );
-
-    Storage item_byte_size_storage = imm32(item_byte_size);
-    move_value(builder, source_range, &reg_byte_size_value->storage, &item_byte_size_storage);
-
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){imul, {new_base->storage, reg_byte_size_value->storage}}
-    );
-    value_release_if_temporary(builder, reg_byte_size_value);
-  }
-
-  {
-    // @InstructionQuality
-    // TODO If the source does not have index, on X64 it should be possible to avoid
-    //      using an extra register and put the index into SIB
-
-    // Load previous address into a temp register
-    Value *temp_value = value_temporary_acquire_register_for_descriptor(
-      allocator, builder,register_find_available(builder, 0),
-      &descriptor_void_pointer, *source_range
-    );
-
-    if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      move_value(builder, source_range, &temp_value->storage, &target->storage);
-    } else {
-      assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-      load_address(builder, source_range, temp_value, target->storage);
-    }
-
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){add, {new_base->storage, temp_value->storage}}
-    );
-    value_release_if_temporary(builder, temp_value);
-  }
-
-  return storage_indirect(item_descriptor->bit_size, new_base->storage.Register.index);
-}
-
 typedef enum {
   Mass_Arithmetic_Operator_Add = 1,
   Mass_Arithmetic_Operator_Subtract = 2,
@@ -5393,7 +5311,42 @@ typedef struct {
   Memory_Layout_Item *field;
 } Mass_Field_Access_Lazy_Payload;
 
-static inline Value *
+static Storage
+value_maybe_dereference(
+  Compilation *compilation,
+  Function_Builder *builder,
+  Value *value,
+  bool *is_temporary
+) {
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
+  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(descriptor);
+  // Auto dereference pointers to structs
+  bool is_pointer = descriptor != unwrapped_descriptor;
+  if (!is_pointer) {
+    *is_temporary = value->is_temporary;
+    return value->storage;
+  } else {
+    if (value->storage.tag == Storage_Tag_Static) {
+      const void *pointed_memory = *storage_static_as_c_type(&value->storage, void *);
+      *is_temporary = false;
+      return storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
+    } else if (value->storage.tag == Storage_Tag_Register) {
+      Register reg = value->storage.Register.index;
+      *is_temporary = false;
+      return storage_indirect(unwrapped_descriptor->bit_size, reg);
+    } else {
+      Register reg = register_acquire_temp(builder);
+      Storage base_storage = storage_register(reg, descriptor->bit_size);
+      Storage storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
+      move_value(builder, &value->source_range, &base_storage, &value->storage);
+      value_release_if_temporary(builder, value);
+      *is_temporary = true;
+      return storage;
+    }
+  }
+}
+
+static Value *
 mass_handle_field_access_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
@@ -5407,37 +5360,13 @@ mass_handle_field_access_lazy_proc(
   Value *struct_ = value_force(compilation, builder, &expected_struct, payload->struct_);
   MASS_ON_ERROR(*compilation->result) return 0;
 
-  const Descriptor *struct_descriptor = struct_->descriptor;
+  const Descriptor *struct_descriptor = value_or_lazy_value_descriptor(struct_);
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(struct_descriptor);
   const Memory_Layout *layout = &unwrapped_descriptor->Struct.memory_layout;
   assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
 
-  Storage struct_storage;
   bool is_temporary;
-
-  // Auto dereference pointers to structs
-  bool is_pointer = struct_descriptor != unwrapped_descriptor;
-  if (!is_pointer) {
-    struct_storage = struct_->storage;
-    is_temporary = struct_->is_temporary;
-  } else {
-    if (struct_->storage.tag == Storage_Tag_Static) {
-      const void *pointed_memory = *storage_static_as_c_type(&struct_->storage, void *);
-      struct_storage = storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
-      is_temporary = false;
-    } else if (struct_->storage.tag == Storage_Tag_Register) {
-      Register reg = struct_->storage.Register.index;
-      struct_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
-      is_temporary = false;
-    } else {
-      Register reg = register_acquire_temp(builder);
-      Storage base_storage = storage_register(reg, struct_descriptor->bit_size);
-      struct_storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
-      move_value(builder, &struct_->source_range, &base_storage, &struct_->storage);
-      value_release_if_temporary(builder, struct_);
-      is_temporary = true;
-    }
-  }
+  Storage struct_storage = value_maybe_dereference(compilation, builder, struct_, &is_temporary);
 
   Storage field_storage = memory_layout_item_storage(&struct_storage, layout, field);
   Value *field_value = value_init(
@@ -5449,7 +5378,7 @@ mass_handle_field_access_lazy_proc(
   // to propagate the temporary flag correctly
   field_value->is_temporary = is_temporary;
 
-  if (!is_pointer && (struct_->flags & Value_Flags_Constant)) {
+  if (struct_descriptor->tag != Descriptor_Tag_Pointer_To && (struct_->flags & Value_Flags_Constant)) {
     field_value->flags |= Value_Flags_Constant;
   }
 
@@ -5481,48 +5410,93 @@ mass_handle_array_access_lazy_proc(
 
   MASS_ON_ERROR(*compilation->result) return 0;
 
+
   index = maybe_coerce_i64_to_integer(
     compilation, index, &descriptor_u64, &index->source_range
   );
   Value *array_element_value;
-  if (array->descriptor->tag == Descriptor_Tag_Pointer_To) {
-    const Descriptor *item_descriptor = array->descriptor->Pointer_To.descriptor;
-    Storage storage =
-      storage_load_index_address(compilation, builder, array_range, array, item_descriptor, index);
-    array_element_value = value_init(
-      allocator_allocate(compilation->allocator, Value),
-      item_descriptor, storage, *array_range
-    );
-    // @Volatile :TemporaryRegisterForIndirectMemory
-    // We have to mark this value as temporary so it is correctly released, but the whole
-    // setup is very awkward. Firstly it only works base registers. Secondly, the setting
-    // of temporary is disconnected from the creation of storage making it extra problematic.
-    if (storage.tag != Storage_Tag_Static) array_element_value->is_temporary = true;
+
+  const Descriptor *array_descriptor = value_or_lazy_value_descriptor(array);
+  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(array_descriptor);
+  const Descriptor *item_descriptor;
+  if(unwrapped_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+    item_descriptor = unwrapped_descriptor->Fixed_Size_Array.item;
   } else {
-    assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+    assert(array_descriptor->tag == Descriptor_Tag_Pointer_To);
+    item_descriptor = unwrapped_descriptor;
+  }
 
-    const Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
+  u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
-    u64 item_byte_size = descriptor_byte_size(item_descriptor);
+  Storage element_storage;
+  bool element_storage_is_temporary;
+  if (index->storage.tag == Storage_Tag_Static) {
+    s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
+    s32 offset = index_number * u64_to_s32(item_byte_size);
+    Storage array_storage = value_maybe_dereference(compilation, builder, array, &element_storage_is_temporary);
+    element_storage = storage_with_offset_and_bit_size(&array_storage, offset, item_descriptor->bit_size);
+  } else {
+    bool array_is_temporary = false;
+    Storage array_storage = value_maybe_dereference(compilation, builder, array, &array_is_temporary);
 
-    Storage element_storage;
-    if (index->storage.tag == Storage_Tag_Static) {
-      s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
-      s32 offset = index_number * u64_to_s32(item_byte_size);
-      element_storage =
-        storage_with_offset_and_bit_size(&array->storage, offset, item_descriptor->bit_size);
-    } else {
-      // @Volatile :TemporaryRegisterForIndirectMemory
-      element_storage =
-        storage_load_index_address(compilation, builder, array_range, array, item_descriptor, index);
+    Register base_register = register_acquire_temp(builder);
+    Storage base_storage = storage_register(base_register, (Bits){64});
+
+    // Move the index into the register
+    move_value(builder, array_range, &base_storage, &index->storage);
+
+    // Multiplication by 1 byte is useless so checking it here
+    if (item_descriptor->bit_size.as_u64 != 8) {
+      u32 item_byte_size = u64_to_u32(descriptor_byte_size(item_descriptor));
+      Register byte_size_register = register_acquire_temp(builder);
+      Storage byte_size_storage = storage_register(byte_size_register, (Bits){64});
+
+      // Multiply index by the item byte size
+      Storage item_byte_size_storage = imm32(item_byte_size);
+      move_value(builder, array_range, &byte_size_storage, &item_byte_size_storage);
+
+      // TODO @InstructionQuality this should use shifts for power-of-2 item byte sizes
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *array_range,
+        &(Instruction_Assembly){imul, {base_storage, byte_size_storage}}
+      );
+      register_release(builder, byte_size_register);
     }
 
-    array_element_value = value_init(
-      allocator_allocate(compilation->allocator, Value),
-      item_descriptor, element_storage, array->source_range
-    );
-    array_element_value->is_temporary = true;
+    {
+      // @InstructionQuality
+      // TODO If the source does not have index, on X64 it should be possible to avoid
+      //      using an extra register and put the index into SIB
+
+      // Load previous address into a temp register
+      Register address_register = register_acquire_temp(builder);
+      Storage address_storage = storage_register(address_register, (Bits){64});
+      Value *address_value = value_init(
+        allocator_allocate(compilation->allocator, Value),
+        &descriptor_void_pointer, address_storage, *array_range
+      );
+      load_address(builder, array_range, address_value, array_storage);
+
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *array_range,
+        &(Instruction_Assembly){add, {base_storage, address_storage}}
+      );
+      register_release(builder, address_register);
+    }
+
+    element_storage = storage_indirect(item_descriptor->bit_size, base_register);
+    element_storage_is_temporary = true;
+
+    if (array_is_temporary) {
+      register_release_bitset(builder, register_bitset_from_storage(&array_storage));
+    }
   }
+
+  array_element_value = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    item_descriptor, element_storage, array->source_range
+  );
+  array_element_value->is_temporary = element_storage_is_temporary;
 
   if (array->flags & Value_Flags_Constant) {
     array_element_value->flags |= Value_Flags_Constant;
