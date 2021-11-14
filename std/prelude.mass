@@ -55,16 +55,14 @@ assert :: fn(condition : bool, message := "Assertion failed") {
 }
 
 reify :: macro(value : &MASS.Value, type : Type) {
-  // FIXME these casts should not be necessary and are broken probably because == does not
-  //       properly release temp operands
-  //assert(cast(s32, value.storage.tag) == cast(s32, MASS.Storage_Tag.Static))
-  //assert(cast(s32, value.storage.Static.memory.tag) == cast(s32, MASS.Static_Memory_Tag.Heap))
-  //assert(cast(s64, value.descriptor) == cast(s64, type))
+  //assert(value.storage.tag == MASS.Storage_Tag.Static)
+  //assert(value.storage.Static.memory.tag == MASS.Static_Memory_Tag.Heap)
+  //assert(value.descriptor == type)
   cast(&type, value.storage.Static.memory.Heap.pointer)
 }
 
 context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
-  //assert(context.result.tag == MASS.Result_Tag.Success)
+  assert(context.result.tag == MASS.Result_Tag.Success)
   context.result.tag = MASS.Result_Tag.Error
   context.result.Error.error = error
 }
@@ -178,6 +176,8 @@ greater_equal :: template_integer_overloads(comparison_template, MASS.integer_gr
 equal :: template_integer_overloads(comparison_template, MASS.integer_equal)
 not_equal :: template_integer_overloads(comparison_template, MASS.integer_not_equal)
 
+equal :: fn(x, y : x) => (bool) MASS.generic_equal
+not_equal :: fn(x, y : x) => (bool) MASS.generic_not_equal
 
 add :: MASS.i64_add
 subtract :: MASS.i64_subtract

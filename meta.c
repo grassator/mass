@@ -2109,20 +2109,20 @@ main(void) {
     ));
   }
 
-  #define DEFINE_ARITHMETIC(_NAME_)\
-    export_compiler_custom_name(#_NAME_, push_type(type_intrinsic("mass_" #_NAME_)))
+  export_compiler_custom_name("integer_add", push_type(type_intrinsic("mass_integer_add")));
+  export_compiler_custom_name("integer_subtract", push_type(type_intrinsic("mass_integer_subtract")));
+  export_compiler_custom_name("integer_multiply", push_type(type_intrinsic("mass_integer_multiply")));
+  export_compiler_custom_name("integer_divide", push_type(type_intrinsic("mass_integer_divide")));
+  export_compiler_custom_name("integer_remainder", push_type(type_intrinsic("mass_integer_remainder")));
+  export_compiler_custom_name("integer_less", push_type(type_intrinsic("mass_integer_less")));
+  export_compiler_custom_name("integer_greater", push_type(type_intrinsic("mass_integer_greater")));
+  export_compiler_custom_name("integer_less_equal", push_type(type_intrinsic("mass_integer_less_equal")));
+  export_compiler_custom_name("integer_greater_equal", push_type(type_intrinsic("mass_integer_greater_equal")));
+  export_compiler_custom_name("integer_equal", push_type(type_intrinsic("mass_integer_equal")));
+  export_compiler_custom_name("integer_not_equal", push_type(type_intrinsic("mass_integer_not_equal")));
 
-  DEFINE_ARITHMETIC(integer_add);
-  DEFINE_ARITHMETIC(integer_subtract);
-  DEFINE_ARITHMETIC(integer_multiply);
-  DEFINE_ARITHMETIC(integer_divide);
-  DEFINE_ARITHMETIC(integer_remainder);
-  DEFINE_ARITHMETIC(integer_less);
-  DEFINE_ARITHMETIC(integer_greater);
-  DEFINE_ARITHMETIC(integer_less_equal);
-  DEFINE_ARITHMETIC(integer_greater_equal);
-  DEFINE_ARITHMETIC(integer_equal);
-  DEFINE_ARITHMETIC(integer_not_equal);
+  export_compiler_custom_name("generic_equal", push_type(type_intrinsic("mass_generic_equal")));
+  export_compiler_custom_name("generic_not_equal", push_type(type_intrinsic("mass_generic_not_equal")));
 
   // Standard C types
   set_flags(push_type(

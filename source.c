@@ -4804,10 +4804,123 @@ mass_handle_integer_comparison_lazy_proc(
   );
 }
 
+static Value *
+mass_handle_generic_comparison_lazy_proc(
+  Compilation *compilation,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Mass_Comparison_Operator_Lazy_Payload *payload
+) {
+  Compare_Type compare_type = payload->compare_type;
+  const Allocator *allocator = compilation->allocator;
+  const Source_Range *source_range = &payload->source_range;
+
+  Value *lhs = payload->lhs;
+  Value *rhs = payload->rhs;
+  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
+
+  if (!same_type(lhs_descriptor, rhs_descriptor)) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = *source_range,
+      .Type_Mismatch = { .expected = lhs_descriptor, .actual = rhs_descriptor },
+    });
+    return 0;
+  }
+
+  bool negated;
+  switch(compare_type) {
+    case Compare_Type_Equal: {
+      negated = false;
+    } break;
+    case Compare_Type_Not_Equal: {
+      negated = true;
+    } break;
+
+    case Compare_Type_Unsigned_Below:
+    case Compare_Type_Unsigned_Below_Equal:
+    case Compare_Type_Unsigned_Above:
+    case Compare_Type_Unsigned_Above_Equal:
+    case Compare_Type_Signed_Less:
+    case Compare_Type_Signed_Less_Equal:
+    case Compare_Type_Signed_Greater:
+    case Compare_Type_Signed_Greater_Equal:
+    default: {
+      assert(!"Unsupported comparison");
+      negated = false;
+    } break;
+  }
+
+  if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
+    bool equal = storage_static_equal(lhs->descriptor, &lhs->storage, rhs->descriptor, &rhs->storage);
+    if (negated) equal = !equal;
+    return value_init(
+      allocator_allocate(compilation->allocator, Value),
+      &descriptor__bool, storage_static_inline(&equal), *source_range
+    );
+  }
+
+  Value *result = 0;
+  switch(lhs_descriptor->tag) {
+    case Descriptor_Tag_Pointer_To:
+    case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Function_Instance: {
+      if (lhs_descriptor->bit_size.as_u64 > 64) {
+        panic("TODO support larger than register compares");
+      }
+
+      // @CopyPaste from integer compares
+
+      // Try to reuse result_value if we can
+      // TODO should also be able to reuse memory operands
+      Value *temp_a = value_temporary_acquire_register_for_descriptor(
+        allocator, builder, register_find_available(builder, 0), lhs_descriptor, *source_range
+      );
+
+      Expected_Result expected_a = expected_result_from_value(temp_a);
+      temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
+
+      // TODO This can be optimized in cases where one of the operands is an immediate
+      Value *temp_b = value_temporary_acquire_register_for_descriptor(
+        allocator, builder, register_find_available(builder, 0), rhs_descriptor, *source_range
+      );
+      Expected_Result expected_b = expected_result_from_value(temp_b);
+      temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
+
+      MASS_ON_ERROR(*compilation->result) return 0;
+
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *source_range,
+        &(Instruction_Assembly){cmp, {temp_a->storage, temp_b->storage}}
+      );
+
+      result = value_init(
+        allocator_allocate(compilation->allocator, Value),
+        &descriptor__bool, storage_eflags(compare_type), *source_range
+      );
+
+      value_release_if_temporary(builder, temp_a);
+      value_release_if_temporary(builder, temp_b);
+    } break;
+    case Descriptor_Tag_Fixed_Size_Array: {
+      panic("TODO figure out semantics and support comparing fixed size");
+    } break;
+    case Descriptor_Tag_Struct: {
+      panic("TODO figure out semantics and support comparing structs");
+    } break;
+  }
+
+  return expected_result_ensure_value_or_temp(
+    compilation, builder, expected_result, result
+  );
+}
+
 static inline Value *
-mass_handle_integer_comparison(
+mass_handle_comparison(
   Execution_Context *context,
   Value_View arguments,
+  Lazy_Value_Proc lazy_value_proc,
   void *raw_payload
 ) {
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
@@ -4820,36 +4933,57 @@ mass_handle_integer_comparison(
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(&descriptor__bool);
-    return mass_handle_integer_comparison_lazy_proc(
-      context->compilation, 0, &expected_result, &stack_lazy_payload
-    );
+    return lazy_value_proc(context->compilation, 0, &expected_result, &stack_lazy_payload);
   } else {
     Mass_Comparison_Operator_Lazy_Payload *payload =
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
     *payload = stack_lazy_payload;
     return mass_make_lazy_value(
-      context, arguments.source_range, payload, &descriptor__bool, mass_handle_integer_comparison_lazy_proc
+      context, arguments.source_range, payload, &descriptor__bool, lazy_value_proc
     );
   }
 }
 
 static inline Value *mass_integer_less(Execution_Context *context, Value_View arguments) {
-  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Less);
+  return mass_handle_comparison(
+    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Less
+  );
 }
 static inline Value *mass_integer_greater(Execution_Context *context, Value_View arguments) {
-  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Greater);
+  return mass_handle_comparison(
+    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Greater
+  );
 }
 static inline Value *mass_integer_less_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Less_Equal);
+  return mass_handle_comparison(
+    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Less_Equal
+  );
 }
 static inline Value *mass_integer_greater_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Signed_Greater_Equal);
+  return mass_handle_comparison(
+    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Greater_Equal
+  );
 }
 static inline Value *mass_integer_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Equal);
+  return mass_handle_comparison(
+    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Equal
+  );
 }
 static inline Value *mass_integer_not_equal(Execution_Context *context, Value_View arguments) {
-  return mass_handle_integer_comparison(context, arguments, (void*)Compare_Type_Not_Equal);
+  return mass_handle_comparison(
+    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Not_Equal
+  );
+}
+
+static inline Value *mass_generic_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison(
+    context, arguments, mass_handle_generic_comparison_lazy_proc, (void*)Compare_Type_Equal
+  );
+}
+static inline Value *mass_generic_not_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison(
+    context, arguments, mass_handle_generic_comparison_lazy_proc, (void*)Compare_Type_Not_Equal
+  );
 }
 
 static Value *

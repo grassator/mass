@@ -819,6 +819,12 @@ static Value * mass_integer_equal
 static Value * mass_integer_not_equal
   (Execution_Context * context, Value_View args);
 
+static Value * mass_generic_equal
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_generic_not_equal
+  (Execution_Context * context, Value_View args);
+
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
 
@@ -2708,6 +2714,8 @@ static Descriptor descriptor_mass_integer_less_equal;
 static Descriptor descriptor_mass_integer_greater_equal;
 static Descriptor descriptor_mass_integer_equal;
 static Descriptor descriptor_mass_integer_not_equal;
+static Descriptor descriptor_mass_generic_equal;
+static Descriptor descriptor_mass_generic_not_equal;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
 static Descriptor descriptor_array_char_ptr;
