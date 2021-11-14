@@ -874,10 +874,6 @@ assign(
     return *compilation->result;
   }
 
-  if (target->storage.tag == Storage_Tag_Eflags) {
-    panic("Internal Error: Trying to move into Eflags");
-  }
-
   if (source->descriptor == &descriptor_lazy_value) {
     value_force_exact(compilation, builder, target, source);
     return *compilation->result;
