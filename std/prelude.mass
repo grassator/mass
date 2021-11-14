@@ -45,12 +45,11 @@ true :: cast(bool, 1)
 false :: cast(bool, 0)
 
 assert :: fn(condition : bool, message := "Assertion failed") {
-  process :: import("std/process")
   io :: import("io")
   if condition then {} else {
     // FIXME This explodes. Maybe library import is from a wrong program?
     // io.print(message)
-    process.exit(1)
+    debugger
   }
 }
 
