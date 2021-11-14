@@ -1558,13 +1558,24 @@ compilation_init(
     .jit = {0},
   };
 
+  void *permanent_arena_address = 0;
+  void *temp_arena_address = 0;
+  #if !defined(NDEBUG)
+  permanent_arena_address = (void *)0x10000000000;
+  temp_arena_address = (void *)0x20000000000;
+  #endif
+
   // Get 16 gigabytes of virtual permanent space
-  virtual_memory_buffer_init(&compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024);
+  virtual_memory_buffer_init_at_address(
+    &compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024, permanent_arena_address
+  );
   compilation->allocation_buffer.commit_step_byte_size = 1024 * 1024;
   compilation->allocator = virtual_memory_buffer_allocator_make(&compilation->allocation_buffer);
 
   // Get 1 gigabyte of temp space
-  virtual_memory_buffer_init(&compilation->temp_buffer, 1llu * 1024 * 1024 * 1024);
+  virtual_memory_buffer_init_at_address(
+    &compilation->temp_buffer, 1llu * 1024 * 1024 * 1024, temp_arena_address
+  );
   compilation->temp_buffer.commit_step_byte_size = 1024 * 1024;
   compilation->temp_allocator = virtual_memory_buffer_allocator_make(&compilation->temp_buffer);
 

@@ -621,9 +621,10 @@ typedef struct {
 // you can use this allocator that simply ignores deallocate calls
 static void allocator_static_deallocate(Allocator_Handle handle, void *address, u64 size){}
 static const Allocator allocator_static = {
-  0,
-  allocator_static_deallocate,
-  0,
+  .allocate = 0,
+  .deallocate = allocator_static_deallocate,
+  .reallocate = 0,
+  .handle = 0,
 };
 
 static inline void *
@@ -657,9 +658,10 @@ allocator_default_reallocate(
 }
 
 const Allocator *allocator_default = &(Allocator){
-  allocator_default_allocate,
-  allocator_default_deallocate,
-  allocator_default_reallocate
+  .allocate = allocator_default_allocate,
+  .deallocate = allocator_default_deallocate,
+  .reallocate = allocator_default_reallocate,
+  .handle = 0,
 };
 
 #ifdef _WIN32
@@ -734,9 +736,10 @@ allocator_system_reallocate(
 }
 
 const Allocator *allocator_system = &(Allocator){
-  allocator_system_allocate,
-  allocator_system_deallocate,
-  allocator_system_reallocate,
+  .allocate = allocator_system_allocate,
+  .deallocate = allocator_system_deallocate,
+  .reallocate = allocator_system_reallocate,
+  .handle = 0,
 };
 
 static inline void *
@@ -2728,23 +2731,25 @@ typedef struct {
   s8 *memory;
 } Virtual_Memory_Buffer;
 
-static void
-virtual_memory_buffer_init(
+static inline void
+virtual_memory_buffer_init_at_address(
   Virtual_Memory_Buffer *buffer,
-  u64 minimum_capacity
+  u64 minimum_capacity,
+  void *address
 ) {
+  assert(((uintptr_t)address) % memory_page_size() == 0);
   u64 granularity = s32_to_u64(memory_allocation_granularity());
   u64 capacity = u64_align(minimum_capacity, granularity);
 #ifdef _WIN32
-  void *memory = VirtualAlloc(0, capacity, MEM_RESERVE, PAGE_READWRITE);
+  void *memory = VirtualAlloc(address, capacity, MEM_RESERVE, PAGE_READWRITE);
 #else
-  void *address = 0; // system chosen
   int prot = PROT_READ | PROT_WRITE;
   int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
   int fd = -1; // Required by MAP_ANONYMOUS
   size_t offset = 0; // Required by MAP_ANONYMOUS
-  void *memory = mmap(0, capacity, prot, flags, fd, offset);
+  void *memory = mmap(address, capacity, prot, flags, fd, offset);
 #endif
+  assert(memory);
   *buffer = (Virtual_Memory_Buffer) {
     .capacity = capacity,
     .occupied = 0,
@@ -2752,6 +2757,15 @@ virtual_memory_buffer_init(
     .memory = memory,
     .commit_step_byte_size = 16 * memory_page_size(),
   };
+}
+
+
+static inline void
+virtual_memory_buffer_init(
+  Virtual_Memory_Buffer *buffer,
+  u64 minimum_capacity
+) {
+  virtual_memory_buffer_init_at_address(buffer, minimum_capacity, 0);
 }
 
 static void
