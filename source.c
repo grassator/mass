@@ -40,9 +40,8 @@ value_from_expected_result(
         storage = storage_none;
         panic("Unexpected flexible storage request");
       }
-      Value *value = value_init(allocator_allocate(allocator, Value), descriptor, storage, source_range);
-      value->is_temporary = true;
-      return value;
+      storage.flags |= Storage_Flags_Temporary;
+      return value_init(allocator_allocate(allocator, Value), descriptor, storage, source_range);
     } break;
   }
   panic("UNREACHABLE");
@@ -436,12 +435,15 @@ value_indirect_from_pointer(
       return value;
     }
     case Storage_Tag_Memory: {
-      Register reg = register_find_available(builder, 0);
-      Value *temp = value_temporary_acquire_indirect_for_descriptor(
-        allocator, builder, reg, referenced_descriptor, source->source_range
-      );
+      Register reg = register_acquire_temp(builder);
       Storage reg_storage = storage_register(reg, source_descriptor->bit_size);
       move_value(builder, &source->source_range, &reg_storage, &source->storage);
+      Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
+      referenced_storage.flags |= Storage_Flags_Temporary;
+      Value *temp = value_init(
+        allocator_allocate(allocator, Value),
+        referenced_descriptor, referenced_storage, source->source_range
+      );
       return temp;
     }
     default:
@@ -894,7 +896,7 @@ assign(
   if (descriptor_is_implicit_pointer(source->descriptor)) {
     Value *ref_source = value_indirect_from_pointer(compilation, builder, source);
     MASS_TRY(assign(compilation, builder, target, ref_source, source_range));
-    value_release_if_temporary(builder, ref_source);
+    storage_release_if_temporary(builder, &ref_source->storage);
     return *compilation->result;
   }
 
@@ -908,7 +910,7 @@ assign(
     ) {
       Value *referenced_target = value_indirect_from_pointer(compilation, builder, target);
       MASS_TRY(assign(compilation, builder, referenced_target, source, source_range));
-      value_release_if_temporary(builder, referenced_target);
+      storage_release_if_temporary(builder, &referenced_target->storage);
       return *compilation->result;
     } else {
       const Descriptor *original_descriptor = target->descriptor->Pointer_To.descriptor;
@@ -2191,7 +2193,7 @@ expected_result_ensure_value_or_temp(
         value->storage.tag != Storage_Tag_Static &&
         !storage_occupies_same_memory(&result_value->storage, &value->storage)
       ) {
-        value_release_if_temporary(builder, value);
+        storage_release_if_temporary(builder, &value->storage);
       }
       return result_value;
     }
@@ -2244,13 +2246,14 @@ expected_result_ensure_value_or_temp(
         if (value->storage.tag == Storage_Tag_Register) {
           return value;
         }
-        Value *temp_result = value_temporary_acquire_register_for_descriptor(
-          compilation->allocator, builder,
-          register_find_available(builder, 0),
-          expected_descriptor, value->source_range
+        Register temp_register = register_acquire_temp(builder);
+        Storage temp_storage = storage_register(temp_register, expected_descriptor->bit_size);
+        Value *temp_result = value_init(
+          allocator_allocate(compilation->allocator, Value),
+          expected_descriptor, temp_storage, value->source_range
         );
-        value_release_if_temporary(builder, value);
         MASS_ON_ERROR(assign(compilation, builder, temp_result, value, &value->source_range)) return 0;
+        storage_release_if_temporary(builder, &value->storage);
         return temp_result;
       }
       if (flexible->storage & Expected_Result_Storage_Memory) {
@@ -3002,21 +3005,24 @@ mass_handle_cast_lazy_proc(
       panic("TODO user error or trying to cast to a larger type");
       return 0;
     } else {
+      Storage result_storage = value->storage;
+      if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
+        if (result_storage.tag == Storage_Tag_Static) {
+          const void *memory = get_static_storage_with_bit_size(&value->storage, original_bit_size);
+          result_storage = storage_static_internal(memory, cast_to_bit_size);
+        } else {
+          result_storage.bit_size = cast_to_bit_size;
+        }
+      } else {
+        result_storage = value->storage;
+      }
       result_value = value_init(
         allocator_allocate(compilation->allocator, Value),
-        target_descriptor, value->storage, *source_range
+        target_descriptor, result_storage, *source_range
       );
-      if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
-        if (result_value->storage.tag == Storage_Tag_Static) {
-          const void *memory = get_static_storage_with_bit_size(&value->storage, original_bit_size);
-          result_value->storage = storage_static_internal(memory, cast_to_bit_size);
-        } else {
-          result_value->storage.bit_size = cast_to_bit_size;
-        }
-      }
       // TODO This is awkward and there might be a better way.
       //      It is also might be necessary to somehow mark the original value as invalid maybe?
-      result_value->is_temporary = value->is_temporary;
+      result_value->storage.flags |= (value->storage.flags & Storage_Flags_Temporary);
     }
   }
 
@@ -3398,11 +3404,11 @@ call_function_overload(
     fn_return_value = &void_value;
   } else {
     Storage return_storage = instance_descriptor->call_setup.caller_return;
+    return_storage.flags |= Storage_Flags_Temporary;
     fn_return_value = value_init(
       allocator_allocate(compilation->allocator, Value),
       return_descriptor, return_storage, *source_range
     );
-    fn_return_value->is_temporary = true;
   }
 
   const Function_Call_Setup *call_setup = &instance_descriptor->call_setup;
@@ -3549,13 +3555,13 @@ call_function_overload(
         required_register_count == 1 &&
         register_bitset_occupied_count(allowed_temp_registers) > 1
       ) {
-        u64 temp_register = register_find_available(builder, prohibited_registers);
+        Register temp_register = register_find_available(builder, prohibited_registers);
         register_acquire(builder, temp_register);
         register_bitset_set(&temp_register_argument_bitset, temp_register);
         arg_value = value_register_for_descriptor(
           compilation->allocator, temp_register, target_item->descriptor, target_item->source_range
         );
-        arg_value->is_temporary = true;
+        arg_value->storage.flags |= Storage_Flags_Temporary;
       } else {
         // The code below is useful to check how many spills to stack happen
         //static int stack_counter = 0;
@@ -3565,7 +3571,7 @@ call_function_overload(
           allocator_allocate(compilation->allocator, Value),
           stack_descriptor, stack_storage, *source_range
         );
-        arg_value->is_temporary = true;
+        arg_value->storage.flags |= Storage_Flags_Temporary;
       }
     };
     if (should_assign) {
@@ -4370,16 +4376,19 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
-      Value *temp_lhs = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, register_find_available(builder, 0), descriptor, result_range
+      Storage temp_lhs_storage = storage_register_temp(builder, descriptor->bit_size);
+      Value *temp_lhs = value_init(
+        allocator_allocate(allocator, Value), descriptor, temp_lhs_storage, result_range
       );
 
       Expected_Result expected_a = expected_result_from_value(temp_lhs);
       temp_lhs = value_force(compilation, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
-      Value *temp_rhs = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, register_find_available(builder, 0), descriptor, result_range
+      Storage temp_rhs_storage = storage_register_temp(builder, descriptor->bit_size);
+      Value *temp_rhs = value_init(
+        allocator_allocate(allocator, Value),
+        descriptor, temp_rhs_storage, result_range
       );
       Expected_Result expected_b = expected_result_from_value(temp_rhs);
       temp_rhs = value_force(compilation, builder, &expected_b, payload->rhs);
@@ -4392,7 +4401,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         &builder->code_block, result_range,
         &(Instruction_Assembly){mnemonic, {temp_lhs->storage, temp_rhs->storage}}
       );
-      value_release_if_temporary(builder, temp_rhs);
+      storage_release_if_temporary(builder, &temp_rhs_storage);
 
       // temp_a is used as a result so it is intentionnaly not released
       return expected_result_ensure_value_or_temp(
@@ -4401,11 +4410,6 @@ mass_handle_arithmetic_operation_lazy_proc(
     }
     case Mass_Arithmetic_Operator_Multiply: {
       maybe_constant_fold(compilation, builder, &result_range, expected_result, lhs, rhs, *);
-
-      // We need both D and A for this operation so using either as temp will not work
-      u64 disallowed_temp_registers = 0;
-      register_bitset_set(&disallowed_temp_registers, Register_D);
-      register_bitset_set(&disallowed_temp_registers, Register_A);
 
       // Save RDX as it will be used for the result overflow
       // but we should not save or restore it if it is the result
@@ -4419,22 +4423,33 @@ mass_handle_arithmetic_operation_lazy_proc(
           Register_D
         )
       ) {
+        // We need both D and A for this operation so using either as temp will not work
+        u64 disallowed_temp_registers = 0;
+        register_bitset_set(&disallowed_temp_registers, Register_D);
+        register_bitset_set(&disallowed_temp_registers, Register_A);
+
         Register temp_register = register_find_available(builder, disallowed_temp_registers);
         register_acquire(builder, temp_register);
         maybe_saved_rdx = storage_register(temp_register, (Bits){64});
         move_value(builder, &result_range, &maybe_saved_rdx, &reg_d);
       }
 
-      Value *temp_a = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, Register_A, descriptor, result_range
+      Storage temp_a_storage =
+        storage_register(register_acquire(builder, Register_A), descriptor->bit_size);
+      temp_a_storage.flags |= Storage_Flags_Temporary;
+      Value *temp_a = value_init(
+        allocator_allocate(allocator, Value),
+        descriptor, temp_a_storage, result_range
       );
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
 
       // TODO we do not acquire here because it is done by maybe_saved_rdx,
       //      but it is awkward that it is disconnected so need to think about
-      Value *temp_b = value_register_for_descriptor(
-        allocator, Register_D, descriptor, result_range
+      Storage temp_b_storage = storage_register(Register_D, descriptor->bit_size);
+      Value *temp_b = value_init(
+        allocator_allocate(allocator, Value),
+        descriptor, temp_b_storage, result_range
       );
       Expected_Result expected_b = expected_result_from_value(temp_b);
       temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
@@ -4477,16 +4492,23 @@ mass_handle_arithmetic_operation_lazy_proc(
       register_bitset_set(&disallowed_temp_registers, Register_D);
       register_bitset_set(&disallowed_temp_registers, Register_A);
 
-
-      Value *temp_dividend = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, Register_A, descriptor, result_range
+      Storage register_a_storage = storage_register(Register_A, descriptor->bit_size);
+      register_acquire(builder, Register_A);
+      register_a_storage.flags |= Storage_Flags_Temporary;
+      Value *temp_dividend = value_init(
+        allocator_allocate(allocator, Value),
+        descriptor, register_a_storage, result_range
       );
       Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
       temp_dividend = value_force(compilation, builder, &expected_dividend, payload->lhs);
 
       Register temp_divisor_register = register_find_available(builder, disallowed_temp_registers);
-      Value *temp_divisor = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, temp_divisor_register, descriptor, payload->rhs->source_range
+      register_acquire(builder, temp_divisor_register);
+      Storage temp_divisor_storage = storage_register(temp_divisor_register, descriptor->bit_size);
+      temp_divisor_storage.flags |= Storage_Flags_Temporary;
+      Value *temp_divisor = value_init(
+        allocator_allocate(allocator, Value),
+        descriptor, temp_divisor_storage, payload->rhs->source_range
       );
       Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
       temp_divisor = value_force(compilation, builder, &expected_divisor, payload->rhs);
@@ -4564,7 +4586,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         }
       }
 
-      value_release_if_temporary(builder, temp_divisor);
+      storage_release_if_temporary(builder, &temp_divisor->storage);
       if (maybe_saved_rdx.tag != Storage_Tag_None) {
         assert(maybe_saved_rdx.tag == Storage_Tag_Register);
         move_value(builder, &result_range, &reg_d, &maybe_saved_rdx);
@@ -4740,17 +4762,20 @@ mass_handle_integer_comparison_lazy_proc(
 
   // Try to reuse result_value if we can
   // TODO should also be able to reuse memory operands
-  Value *temp_a = value_temporary_acquire_register_for_descriptor(
-    allocator, builder, register_find_available(builder, 0),
-    descriptor, *source_range
+  Storage temp_a_storage = storage_register_temp(builder, descriptor->bit_size);
+  Value *temp_a = value_init(
+    allocator_allocate(allocator, Value),
+    descriptor, temp_a_storage, *source_range
   );
 
   Expected_Result expected_a = expected_result_from_value(temp_a);
   temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
 
   // TODO This can be optimized in cases where one of the operands is an immediate
-  Value *temp_b = value_temporary_acquire_register_for_descriptor(
-    allocator, builder, register_find_available(builder, 0), descriptor, *source_range
+  Storage temp_b_storage = storage_register_temp(builder, descriptor->bit_size);
+  Value *temp_b = value_init(
+    allocator_allocate(allocator, Value),
+    descriptor, temp_b_storage, *source_range
   );
   Expected_Result expected_b = expected_result_from_value(temp_b);
   temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
@@ -4767,8 +4792,8 @@ mass_handle_integer_comparison_lazy_proc(
     &descriptor__bool, storage_eflags(compare_type), *source_range
   );
 
-  value_release_if_temporary(builder, temp_a);
-  value_release_if_temporary(builder, temp_b);
+  storage_release_if_temporary(builder, &temp_a_storage);
+  storage_release_if_temporary(builder, &temp_b_storage);
 
   return expected_result_ensure_value_or_temp(
     compilation, builder, expected_result, comparison_value
@@ -4845,16 +4870,20 @@ mass_handle_generic_comparison_lazy_proc(
 
       // Try to reuse result_value if we can
       // TODO should also be able to reuse memory operands
-      Value *temp_a = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, register_find_available(builder, 0), lhs_descriptor, *source_range
+      Storage temp_a_storage = storage_register_temp(builder, lhs_descriptor->bit_size);
+      Value *temp_a = value_init(
+        allocator_allocate(allocator, Value),
+        lhs_descriptor, temp_a_storage, *source_range
       );
 
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
-      Value *temp_b = value_temporary_acquire_register_for_descriptor(
-        allocator, builder, register_find_available(builder, 0), rhs_descriptor, *source_range
+      Storage temp_b_storage = storage_register_temp(builder, rhs_descriptor->bit_size);
+      Value *temp_b = value_init(
+        allocator_allocate(allocator, Value),
+        rhs_descriptor, temp_b_storage, *source_range
       );
       Expected_Result expected_b = expected_result_from_value(temp_b);
       temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
@@ -4871,8 +4900,8 @@ mass_handle_generic_comparison_lazy_proc(
         &descriptor__bool, storage_eflags(compare_type), *source_range
       );
 
-      value_release_if_temporary(builder, temp_a);
-      value_release_if_temporary(builder, temp_b);
+      storage_release_if_temporary(builder, &temp_a_storage);
+      storage_release_if_temporary(builder, &temp_b_storage);
     } break;
     case Descriptor_Tag_Fixed_Size_Array: {
       panic("TODO figure out semantics and support comparing fixed size");
@@ -5197,7 +5226,7 @@ mass_handle_assignment_lazy_proc(
   MASS_ON_ERROR(*compilation->result) return 0;
 
   value_force_exact(compilation, builder, target, payload->expression);
-  value_release_if_temporary(builder, target);
+  storage_release_if_temporary(builder, &target->storage);
   MASS_ON_ERROR(*compilation->result) return 0;
 
   const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
@@ -5368,32 +5397,28 @@ static Storage
 value_maybe_dereference(
   Compilation *compilation,
   Function_Builder *builder,
-  Value *value,
-  bool *is_temporary
+  Value *value
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(descriptor);
   // Auto dereference pointers to structs
   bool is_pointer = descriptor != unwrapped_descriptor;
   if (!is_pointer) {
-    *is_temporary = value->is_temporary;
     return value->storage;
   } else {
     if (value->storage.tag == Storage_Tag_Static) {
       const void *pointed_memory = *storage_static_as_c_type(&value->storage, void *);
-      *is_temporary = false;
       return storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
     } else if (value->storage.tag == Storage_Tag_Register) {
       Register reg = value->storage.Register.index;
-      *is_temporary = false;
       return storage_indirect(unwrapped_descriptor->bit_size, reg);
     } else {
       Register reg = register_acquire_temp(builder);
       Storage base_storage = storage_register(reg, descriptor->bit_size);
       Storage storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
+      storage.flags |= Storage_Flags_Temporary;
       move_value(builder, &value->source_range, &base_storage, &value->storage);
-      value_release_if_temporary(builder, value);
-      *is_temporary = true;
+      storage_release_if_temporary(builder, &value->storage);
       return storage;
     }
   }
@@ -5418,18 +5443,19 @@ mass_handle_field_access_lazy_proc(
   const Memory_Layout *layout = &unwrapped_descriptor->Struct.memory_layout;
   assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
 
-  bool is_temporary;
-  Storage struct_storage = value_maybe_dereference(compilation, builder, struct_, &is_temporary);
+  Storage struct_storage = value_maybe_dereference(compilation, builder, struct_);
 
+  // Since storage_field_access reuses indirect memory storage of the struct
+  // the release of memory will be based on the field value release and we need
+  // to propagate the temporary flag correctly
+  // TODO should `memory_layout_item_storage` always copy the flags? Or maybe it should be mutating?
   Storage field_storage = memory_layout_item_storage(&struct_storage, layout, field);
+  field_storage.flags = struct_storage.flags;
+
   Value *field_value = value_init(
     allocator_allocate(compilation->allocator, Value),
     field->descriptor, field_storage, struct_->source_range
   );
-  // Since storage_field_access reuses indirect memory storage of the struct
-  // the release of memory will be based on the field value release and we need
-  // to propagate the temporary flag correctly
-  field_value->is_temporary = is_temporary;
 
   if (struct_descriptor->tag != Descriptor_Tag_Pointer_To && (struct_->flags & Value_Flags_Constant)) {
     field_value->flags |= Value_Flags_Constant;
@@ -5482,15 +5508,14 @@ mass_handle_array_access_lazy_proc(
   u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
   Storage element_storage;
-  bool element_storage_is_temporary;
   if (index->storage.tag == Storage_Tag_Static) {
     s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
     s32 offset = index_number * u64_to_s32(item_byte_size);
-    Storage array_storage = value_maybe_dereference(compilation, builder, array, &element_storage_is_temporary);
+    Storage array_storage = value_maybe_dereference(compilation, builder, array);
     element_storage = storage_with_offset_and_bit_size(&array_storage, offset, item_descriptor->bit_size);
+    element_storage.flags = array_storage.flags;
   } else {
-    bool array_is_temporary = false;
-    Storage array_storage = value_maybe_dereference(compilation, builder, array, &array_is_temporary);
+    Storage array_storage = value_maybe_dereference(compilation, builder, array);
 
     Register base_register = register_acquire_temp(builder);
     Storage base_storage = storage_register(base_register, (Bits){64});
@@ -5538,18 +5563,15 @@ mass_handle_array_access_lazy_proc(
     }
 
     element_storage = storage_indirect(item_descriptor->bit_size, base_register);
-    element_storage_is_temporary = true;
+    element_storage.flags |= Storage_Flags_Temporary;
 
-    if (array_is_temporary) {
-      register_release_bitset(builder, register_bitset_from_storage(&array_storage));
-    }
+    storage_release_if_temporary(builder, &array_storage);
   }
 
   array_element_value = value_init(
     allocator_allocate(compilation->allocator, Value),
     item_descriptor, element_storage, array->source_range
   );
-  array_element_value->is_temporary = element_storage_is_temporary;
 
   if (array->flags & Value_Flags_Constant) {
     array_element_value->flags |= Value_Flags_Constant;

@@ -984,6 +984,9 @@ value_init(
     .storage = storage,
     .source_range = source_range,
   };
+  if (descriptor && storage.tag != Storage_Tag_None && !storage_is_label(&storage)) {
+    assert(descriptor->bit_size.as_u64 == storage.bit_size.as_u64);
+  }
   return result;
 }
 
@@ -1127,6 +1130,17 @@ storage_register(
   return result;
 }
 
+static inline Storage
+storage_register_temp(
+  Function_Builder *builder,
+  Bits bit_size
+) {
+  Register reg = register_acquire_temp(builder);
+  Storage storage = storage_register(reg, bit_size);
+  storage.flags |= Storage_Flags_Temporary;
+  return storage;
+}
+
 static inline Value *
 value_register_for_descriptor(
   const Allocator *allocator,
@@ -1141,56 +1155,23 @@ value_register_for_descriptor(
   );
 }
 
-static inline Value *
-value_temporary_acquire_indirect_for_descriptor(
-  const Allocator *allocator,
-  Function_Builder *builder,
-  Register reg,
-  const Descriptor *descriptor,
-  Source_Range source_range
-) {
-  register_acquire(builder, reg);
-  Storage storage = storage_indirect(descriptor->bit_size, reg);
-  Value *value = allocator_allocate(allocator, Value);
-  value_init(value, descriptor, storage, source_range);
-  value->is_temporary = true;
-  return value;
-}
-
-static inline Value *
-value_temporary_acquire_register_for_descriptor(
-  const Allocator *allocator,
-  Function_Builder *builder,
-  Register reg,
-  const Descriptor *descriptor,
-  Source_Range source_range
-) {
-  register_acquire(builder, reg);
-  Storage storage = storage_register(reg, descriptor->bit_size);
-  Value *value = allocator_allocate(allocator, Value);
-  value_init(value, descriptor, storage, source_range);
-  value->is_temporary = true;
-  return value;
-}
-
 static inline void
-value_release_if_temporary(
+storage_release_if_temporary(
   Function_Builder *builder,
-  Value *value
+  const Storage *storage
 ) {
-  if (!value || !value->is_temporary) return;
-  switch (value->storage.tag) {
+  if (!(storage->flags & Storage_Flags_Temporary)) return;
+  switch (storage->tag) {
     case Storage_Tag_Register: {
-      register_release(builder, value->storage.Register.index);
+      register_release(builder, storage->Register.index);
       break;
     }
     case Storage_Tag_Xmm: {
-      register_release(builder, value->storage.Xmm.index);
+      register_release(builder, storage->Xmm.index);
       break;
     }
     case Storage_Tag_Memory: {
-      // @Volatile :TemporaryRegisterForIndirectMemory
-      Memory_Location *location = &value->storage.Memory.location;
+      const Memory_Location *location = &storage->Memory.location;
       switch(location->tag) {
         case Memory_Location_Tag_Indirect: {
           Register reg = location->Indirect.base_register;
@@ -1213,8 +1194,8 @@ value_release_if_temporary(
       break;
     }
     case Storage_Tag_Unpacked: {
-      register_release(builder, value->storage.Unpacked.registers[0]);
-      register_release(builder, value->storage.Unpacked.registers[1]);
+      register_release(builder, storage->Unpacked.registers[0]);
+      register_release(builder, storage->Unpacked.registers[1]);
       break;
     }
     case Storage_Tag_None:

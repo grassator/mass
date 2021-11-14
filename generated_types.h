@@ -266,6 +266,21 @@ typedef struct Static_Memory Static_Memory;
 typedef dyn_array_type(Static_Memory *) Array_Static_Memory_Ptr;
 typedef dyn_array_type(const Static_Memory *) Array_Const_Static_Memory_Ptr;
 
+typedef enum Storage_Flags {
+  Storage_Flags_None = 0,
+  Storage_Flags_Temporary = 1,
+} Storage_Flags;
+
+const char *storage_flags_name(Storage_Flags value) {
+  if (value == 0) return "Storage_Flags_None";
+  if (value == 1) return "Storage_Flags_Temporary";
+  assert(!"Unexpected value for enum Storage_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Storage_Flags *) Array_Storage_Flags_Ptr;
+typedef dyn_array_type(const Storage_Flags *) Array_Const_Storage_Flags_Ptr;
+
 typedef struct Storage Storage;
 typedef dyn_array_type(Storage *) Array_Storage_Ptr;
 typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
@@ -1255,6 +1270,8 @@ typedef struct Storage_Unpacked {
 typedef struct Storage {
   Storage_Tag tag;
   char _tag_padding[4];
+  Storage_Flags flags;
+  u32 _flags_padding;
   Bits bit_size;
   union {
     Storage_Eflags Eflags;
@@ -1554,8 +1571,8 @@ typedef struct Declaration {
 typedef dyn_array_type(Declaration) Array_Declaration;
 
 typedef struct Value {
-  u32 is_temporary;
   Value_Flags flags;
+  u32 _flags_padding;
   const Descriptor * descriptor;
   Storage storage;
   Source_Range source_range;
@@ -2335,6 +2352,12 @@ static Descriptor descriptor_array_static_memory_ptr;
 static Descriptor descriptor_array_const_static_memory_ptr;
 static Descriptor descriptor_static_memory_pointer;
 static Descriptor descriptor_static_memory_pointer_pointer;
+static Descriptor descriptor_storage_flags;
+static Descriptor descriptor_array_storage_flags;
+static Descriptor descriptor_array_storage_flags_ptr;
+static Descriptor descriptor_array_const_storage_flags_ptr;
+static Descriptor descriptor_storage_flags_pointer;
+static Descriptor descriptor_storage_flags_pointer_pointer;
 static Descriptor descriptor_storage;
 static Descriptor descriptor_array_storage;
 static Descriptor descriptor_array_storage_ptr;
@@ -3645,6 +3668,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory, Static_Memory,
 );
 MASS_DEFINE_TYPE_VALUE(static_memory);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(storage_flags, Storage_Flags)
+static C_Enum_Item storage_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Temporary"), .value = 1 },
+};
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_storage_ptr, Array_Storage_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_storage, Array_Storage)
@@ -3736,6 +3764,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
     .name = slice_literal_fields("tag"),
     .descriptor = &descriptor_storage_tag,
     .Base_Relative.offset = offsetof(Storage, tag),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_storage_flags,
+    .name = slice_literal_fields("flags"),
+    .Base_Relative.offset = offsetof(Storage, flags),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_flags_padding"),
+    .Base_Relative.offset = offsetof(Storage, _flags_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4546,15 +4586,15 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("is_temporary"),
-    .Base_Relative.offset = offsetof(Value, is_temporary),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_value_flags,
     .name = slice_literal_fields("flags"),
     .Base_Relative.offset = offsetof(Value, flags),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_flags_padding"),
+    .Base_Relative.offset = offsetof(Value, _flags_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

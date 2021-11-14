@@ -1377,6 +1377,11 @@ main(void) {
     }),
   })));
 
+  push_type(type_enum("Storage_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Temporary", 1 << 0 },
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
     struct_empty("None"),
     struct_fields("Eflags", (Struct_Item[]){
@@ -1401,6 +1406,8 @@ main(void) {
       { "Register", "registers", 2 },
     }),
   }), (Struct_Item[]){
+    { "Storage_Flags", "flags" },
+    { "u32", "_flags_padding" },
     { "Bits", "bit_size" },
   })));
 
@@ -1603,8 +1610,8 @@ main(void) {
   }));
 
   export_compiler(push_type(type_struct("Value", (Struct_Item[]){
-    { "u32", "is_temporary" },
     { "Value_Flags", "flags" },
+    { "u32", "_flags_padding" },
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Source_Range", "source_range" },
