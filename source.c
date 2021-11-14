@@ -1905,6 +1905,7 @@ mass_handle_statement_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *lazy_value
 ) {
   assert(expected_result_descriptor(expected_result) == &descriptor_void);
@@ -2293,7 +2294,7 @@ value_force(
       });
       return 0;
     }
-    Value *result = lazy->proc(compilation, builder, expected_result, lazy->payload);
+    Value *result = lazy->proc(compilation, builder, expected_result, &value->source_range, lazy->payload);
     MASS_ON_ERROR(*compilation->result) return 0;
     // TODO is there a better way to cache the result?
     *value = *result;
@@ -2987,12 +2988,12 @@ mass_handle_cast_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Cast_Lazy_Payload *payload
 ) {
   const Descriptor *target_descriptor = payload->target;
   Value *expression = payload->expression;
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
-  const Source_Range *source_range = &expression->source_range;
 
   Expected_Result expected_source = expected_result_any(source_descriptor);
   Value *value = value_force(compilation, builder, &expected_source, expression);
@@ -3042,13 +3043,13 @@ mass_handle_tuple_cast_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Cast_Lazy_Payload *payload
 ) {
   const Allocator *allocator = compilation->allocator;
   const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
   assert(expected_descriptor == payload->target);
   assert(payload->target->tag == Descriptor_Tag_Struct);
-  const Source_Range *source_range = &payload->expression->source_range;
   Value *result = value_from_expected_result(allocator, builder, expected_result, *source_range);
   MASS_ON_ERROR(assign(compilation, builder, result, payload->expression, source_range)) return 0;
   return result;
@@ -3080,7 +3081,7 @@ mass_cast_helper(
 
   if (value_is_non_lazy_static(expression)) {
     Expected_Result expected_result = expected_result_static(target_descriptor);
-    return mass_handle_cast_lazy_proc(context->compilation, 0, &expected_result, &lazy_payload);
+    return mass_handle_cast_lazy_proc(context->compilation, 0, &expected_result, &source_range, &lazy_payload);
   }
 
   Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
@@ -3226,11 +3227,11 @@ mass_macro_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *body_value
 ) {
-  Value *result_value = value_from_expected_result(
-    compilation->allocator, builder, expected_result, body_value->source_range
-  );
+  Value *result_value =
+    value_from_expected_result(compilation->allocator, builder, expected_result, *source_range);
 
   Label *saved_return_label = builder->code_block.end_label;
   Value *saved_return_value = builder->return_value;
@@ -3261,6 +3262,7 @@ mass_macro_temp_param_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *arg
 ) {
   const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
@@ -3272,7 +3274,7 @@ mass_macro_temp_param_lazy_proc(
   Storage stack_storage = reserve_stack_storage(builder, expected_descriptor->bit_size);
   Value *forced = value_init(
     allocator_allocate(compilation->allocator, Value),
-    expected_descriptor, stack_storage, arg->source_range
+    expected_descriptor, stack_storage, *source_range
   );
   value_force_exact(compilation, builder, forced, arg);
   return expected_result_ensure_value_or_temp(compilation, builder, expected_result, forced);
@@ -3365,8 +3367,9 @@ mass_handle_macro_call(
     return body_value;
   }
 
+  Source_Range return_range = literal->info->returns.maybe_type_expression.source_range;
   return mass_make_lazy_value(
-    context, source_range, body_value, return_descriptor, mass_macro_lazy_proc
+    context, return_range, body_value, return_descriptor, mass_macro_lazy_proc
   );
 
   err:
@@ -3382,7 +3385,6 @@ typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 typedef struct {
   Array_Value_Ptr args;
   Value *overload;
-  Source_Range source_range;
 } Mass_Function_Call_Lazy_Payload;
 
 static Value *
@@ -3390,9 +3392,9 @@ call_function_overload(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Function_Call_Lazy_Payload *payload
 ) {
-  const Source_Range *source_range = &payload->source_range;
   Value *to_call = payload->overload;
   Array_Value_Ptr arguments = payload->args;
 
@@ -4281,7 +4283,6 @@ token_handle_function_call(
   *call_payload = (Mass_Function_Call_Lazy_Payload){
     .overload = overload,
     .args = value_view_to_value_array(context->allocator, args_view),
-    .source_range = source_range,
   };
 
   const Descriptor *lazy_descriptor = info->returns.descriptor;
@@ -4360,6 +4361,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = expected_result_descriptor(expected_result);
@@ -4599,7 +4601,7 @@ mass_handle_arithmetic_operation(
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(descriptor);
     return mass_handle_arithmetic_operation_lazy_proc(
-      context->compilation, 0, &expected_result, &stack_lazy_payload
+      context->compilation, 0, &expected_result, &arguments.source_range, &stack_lazy_payload
     );
   } else {
     Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
@@ -4631,7 +4633,6 @@ typedef struct {
   Compare_Type compare_type;
   Value *lhs;
   Value *rhs;
-  Source_Range source_range;
 } Mass_Comparison_Operator_Lazy_Payload;
 
 static Value *
@@ -4639,10 +4640,10 @@ mass_handle_integer_comparison_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
-  const Source_Range *source_range = &payload->source_range;
 
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(compilation, payload->lhs, payload->rhs);
@@ -4770,10 +4771,10 @@ mass_handle_generic_comparison_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
-  const Source_Range *source_range = &payload->source_range;
 
   Value *lhs = payload->lhs;
   Value *rhs = payload->rhs;
@@ -4888,7 +4889,9 @@ mass_handle_comparison(
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(&descriptor__bool);
-    return lazy_value_proc(context->compilation, 0, &expected_result, &stack_lazy_payload);
+    return lazy_value_proc(
+      context->compilation, 0, &expected_result, &arguments.source_range, &stack_lazy_payload
+    );
   } else {
     Mass_Comparison_Operator_Lazy_Payload *payload =
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
@@ -4946,6 +4949,7 @@ mass_handle_startup_call_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *startup_function
 ) {
   if(startup_function->descriptor != &descriptor_function_literal) goto err;
@@ -4963,7 +4967,7 @@ mass_handle_startup_call_lazy_proc(
   err:
   compilation_error(compilation, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
-    .source_range = startup_function->source_range,
+    .source_range = *source_range,
     .detailed_message = slice_literal("`startup` expects a () -> () {...} function as an argument"),
   });
   return 0;
@@ -5043,13 +5047,13 @@ mass_pointer_to_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *pointee
 ) {
-  Source_Range source_range = pointee->source_range;
   Value *result_value = value_from_expected_result(
-    compilation->allocator, builder, expected_result, source_range
+    compilation->allocator, builder, expected_result, *source_range
   );
-  load_address(builder, &source_range, result_value, pointee->storage);
+  load_address(builder, source_range, result_value, pointee->storage);
   return result_value;
 }
 
@@ -5143,7 +5147,6 @@ mass_handle_typed_symbol_operator(
 
 typedef struct {
   const Descriptor *descriptor;
-  Source_Range source_range;
 } Mass_Variable_Definition_Lazy_Payload;
 
 static Value *
@@ -5151,6 +5154,7 @@ mass_handle_variable_definition_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Variable_Definition_Lazy_Payload *payload
 ) {
   Storage storage = payload->descriptor == &descriptor_void
@@ -5158,12 +5162,11 @@ mass_handle_variable_definition_lazy_proc(
     : reserve_stack_storage(builder, payload->descriptor->bit_size);
   return value_init(
     allocator_allocate(compilation->allocator, Value),
-    payload->descriptor, storage, payload->source_range
+    payload->descriptor, storage, *source_range
   );
 }
 
 typedef struct {
-  Source_Range source_range;
   Value *target;
   Value *expression;
 } Mass_Assignment_Lazy_Payload;
@@ -5173,6 +5176,7 @@ mass_handle_assignment_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Assignment_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
@@ -5188,7 +5192,7 @@ mass_handle_assignment_lazy_proc(
   if (expected_descriptor != &descriptor_void) {
     compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = target->source_range,
+      .source_range = *source_range,
       .Type_Mismatch = { .expected = expected_descriptor, .actual = &descriptor_void },
     });
     return 0;
@@ -5206,7 +5210,6 @@ mass_define_stack_value_from_typed_symbol(
   Mass_Variable_Definition_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
   *payload = (Mass_Variable_Definition_Lazy_Payload){
-    .source_range = source_range,
     .descriptor = typed_symbol->descriptor,
   };
   Value *defined = mass_make_lazy_value(
@@ -5237,7 +5240,6 @@ mass_handle_assignment_operator(
   }
 
   *payload = (Mass_Assignment_Lazy_Payload) {
-    .source_range = operands.source_range,
     .target = target,
     .expression = source,
   };
@@ -5253,6 +5255,7 @@ mass_goto_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *payload_target
 ) {
   Expected_Result expected_target = expected_result_any(&descriptor_label_pointer);
@@ -5262,7 +5265,7 @@ mass_goto_lazy_proc(
   if (target->descriptor != &descriptor_label_pointer) {
     compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = target->source_range,
+      .source_range = *source_range,
       .Type_Mismatch = { .expected = &descriptor_label_pointer, .actual = target->descriptor },
     });
     return 0;
@@ -5270,7 +5273,7 @@ mass_goto_lazy_proc(
 
   Label *label = *storage_static_as_c_type(&target->storage, Label *);
   push_eagerly_encoded_assembly(
-    &builder->code_block, payload_target->source_range,
+    &builder->code_block, *source_range,
     &(Instruction_Assembly){jmp, {code_label32(label)}}
   );
 
@@ -5384,6 +5387,7 @@ mass_handle_field_access_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_Field_Access_Lazy_Payload *payload
 ) {
   Memory_Layout_Item *field = payload->field;
@@ -5409,7 +5413,7 @@ mass_handle_field_access_lazy_proc(
 
   Value *field_value = value_init(
     allocator_allocate(compilation->allocator, Value),
-    field->descriptor, field_storage, struct_->source_range
+    field->descriptor, field_storage, *source_range
   );
 
   if (struct_descriptor->tag != Descriptor_Tag_Pointer_To && (struct_->flags & Value_Flags_Constant)) {
@@ -5431,10 +5435,10 @@ mass_handle_array_access_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   void *raw_payload
 ) {
   Mass_Array_Access_Lazy_Payload *payload = raw_payload;
-  const Source_Range *array_range = &payload->array->source_range;
   Expected_Result expected_array =
     expected_result_any(value_or_lazy_value_descriptor(payload->array));
   Value *array = value_force(compilation, builder, &expected_array, payload->array);
@@ -5476,7 +5480,7 @@ mass_handle_array_access_lazy_proc(
     Storage base_storage = storage_register(base_register, (Bits){64});
 
     // Move the index into the register
-    move_value(builder, array_range, &base_storage, &index->storage);
+    move_value(builder, source_range, &base_storage, &index->storage);
 
     // Multiplication by 1 byte is useless so checking it here
     if (item_descriptor->bit_size.as_u64 != 8) {
@@ -5486,11 +5490,11 @@ mass_handle_array_access_lazy_proc(
 
       // Multiply index by the item byte size
       Storage item_byte_size_storage = imm32(item_byte_size);
-      move_value(builder, array_range, &byte_size_storage, &item_byte_size_storage);
+      move_value(builder, source_range, &byte_size_storage, &item_byte_size_storage);
 
       // TODO @InstructionQuality this should use shifts for power-of-2 item byte sizes
       push_eagerly_encoded_assembly(
-        &builder->code_block, *array_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){imul, {base_storage, byte_size_storage}}
       );
       register_release(builder, byte_size_register);
@@ -5506,12 +5510,12 @@ mass_handle_array_access_lazy_proc(
       Storage address_storage = storage_register(address_register, (Bits){64});
       Value *address_value = value_init(
         allocator_allocate(compilation->allocator, Value),
-        &descriptor_void_pointer, address_storage, *array_range
+        &descriptor_void_pointer, address_storage, *source_range
       );
-      load_address(builder, array_range, address_value, array_storage);
+      load_address(builder, source_range, address_value, array_storage);
 
       push_eagerly_encoded_assembly(
-        &builder->code_block, *array_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){add, {base_storage, address_storage}}
       );
       register_release(builder, address_register);
@@ -5541,7 +5545,8 @@ static Value *
 mass_struct_field_access(
   Execution_Context *context,
   Value *struct_,
-  Memory_Layout_Item *field
+  Memory_Layout_Item *field,
+  const Source_Range *source_range
 ) {
   Mass_Field_Access_Lazy_Payload stack_lazy_payload = {
     .struct_ = struct_,
@@ -5551,7 +5556,7 @@ mass_struct_field_access(
   if (value_is_non_lazy_static(struct_)) {
     Expected_Result expected_result = expected_result_static(field->descriptor);
     return mass_handle_field_access_lazy_proc(
-      context->compilation, 0, &expected_result, &stack_lazy_payload
+      context->compilation, 0, &expected_result, source_range, &stack_lazy_payload
     );
   } else {
     Mass_Field_Access_Lazy_Payload *lazy_payload =
@@ -5560,7 +5565,7 @@ mass_struct_field_access(
 
     return mass_make_lazy_value(
       context,
-      struct_->source_range,
+      *source_range,
       lazy_payload,
       field->descriptor,
       mass_handle_field_access_lazy_proc
@@ -5572,6 +5577,7 @@ mass_handle_dereference_operator_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value* pointer
 ) {
   // TODO value_indirect_from_pointer should probably take an expected_result
@@ -5645,7 +5651,7 @@ mass_handle_dot_operator(
       }
       Memory_Layout_Item *field =
         dyn_array_get(unwrapped_descriptor->Struct.memory_layout.items, index);
-      return mass_struct_field_access(context, lhs, field);
+      return mass_struct_field_access(context, lhs, field, &args_view.source_range);
     }
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
@@ -5687,7 +5693,7 @@ mass_handle_dot_operator(
         });
         return 0;
       }
-      return mass_struct_field_access(context, lhs, field);
+      return mass_struct_field_access(context, lhs, field, &args_view.source_range);
     }
   } else if (
     lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
@@ -5777,6 +5783,7 @@ mass_handle_if_expression_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Mass_If_Expression_Lazy_Payload *payload
 ) {
   // TODO support any If-able descriptors instead of accepting literally anything
@@ -6335,6 +6342,7 @@ mass_handle_block_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_block_result,
+  const Source_Range *block_source_range,
   void *raw_payload
 ) {
   Array_Value_Ptr lazy_statements;
@@ -6585,14 +6593,14 @@ mass_handle_label_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *label_value
 ) {
-  Source_Range source_range = label_value->source_range;
   if (label_value->descriptor != &descriptor_label_pointer) {
-    Slice source = source_from_source_range(compilation, &source_range);
+    Slice source = source_from_source_range(compilation, source_range);
     compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Redifinition,
-      .source_range = source_range,
+      .source_range = *source_range,
       .other_source_range = label_value->source_range,
       .Redifinition = { .name = source, },
       .detailed_message = slice_literal("Trying to redefine a non-label variable as a label"),
@@ -6673,18 +6681,16 @@ mass_handle_explicit_return_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Value *parse_result
 ) {
-  MASS_ON_ERROR(assign(
-    compilation, builder, builder->return_value, parse_result, &parse_result->source_range
-  )) {
+  MASS_ON_ERROR(assign(compilation, builder, builder->return_value, parse_result, source_range)) {
     return 0;
   }
   Storage return_label = code_label32(builder->code_block.end_label);
 
   push_eagerly_encoded_assembly(
-    &builder->code_block,
-    builder->return_value->source_range,
+    &builder->code_block, *source_range,
     &(Instruction_Assembly) {jmp, {return_label}}
   );
 
@@ -6708,7 +6714,6 @@ mass_handle_return_operator(
 
 typedef struct {
   Array_Value_Ptr args;
-  Source_Range source_range;
 } Inline_Machine_Code_Bytes_Payload;
 
 static Value *
@@ -6716,9 +6721,10 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Source_Range *source_range,
   Inline_Machine_Code_Bytes_Payload *payload
 ) {
-  Value_View args_view = value_view_from_value_array(payload->args, &payload->source_range);
+  Value_View args_view = value_view_from_value_array(payload->args, source_range);
   if (args_view.length >= 15) {
     compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -6757,7 +6763,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       bytes.memory[bytes.length++] = 0;
     } else if (value->storage.tag == Storage_Tag_Static) {
       value = token_value_force_immediate_integer(
-        compilation, value, &descriptor_u8, &payload->source_range
+        compilation, value, &descriptor_u8, source_range
       );
       MASS_ON_ERROR(*compilation->result) return 0;
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
@@ -6803,7 +6809,6 @@ mass_inline_machine_code_bytes(
     allocator_allocate(context->allocator, Inline_Machine_Code_Bytes_Payload);
   *payload = (Inline_Machine_Code_Bytes_Payload) {
     .args = args_copy,
-    .source_range = args_view.source_range,
   };
 
   return mass_make_lazy_value(
@@ -6851,7 +6856,6 @@ token_define_global_variable(
       Mass_Assignment_Lazy_Payload *assignment_payload =
         allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
       *assignment_payload = (Mass_Assignment_Lazy_Payload) {
-        .source_range = expression.source_range,
         .target = global_value,
         .expression = value,
       };
@@ -6894,7 +6898,6 @@ token_define_local_variable(
   Mass_Variable_Definition_Lazy_Payload *variable_payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
   *variable_payload = (Mass_Variable_Definition_Lazy_Payload){
-    .source_range = symbol->source_range,
     .descriptor = variable_descriptor,
   };
 
@@ -6910,7 +6913,6 @@ token_define_local_variable(
   Mass_Assignment_Lazy_Payload *assignment_payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
   *assignment_payload = (Mass_Assignment_Lazy_Payload) {
-    .source_range = *source_range,
     .target = variable_value,
     .expression = value,
   };

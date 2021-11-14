@@ -662,7 +662,7 @@ typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
-  (Compilation * compilation, Function_Builder * builder, const Expected_Result * expected_result, void * payload);
+  (Compilation * compilation, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, void * payload);
 
 typedef enum Instruction_Extension_Type {
   Instruction_Extension_Type_None = 0,
@@ -6181,6 +6181,12 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
     .tag = Function_Parameter_Tag_Runtime,
     .declaration = {
       .descriptor = &descriptor_expected_result_pointer,
+    },
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .descriptor = &descriptor_source_range_pointer,
     },
   },
   {

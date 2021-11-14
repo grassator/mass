@@ -2021,6 +2021,7 @@ main(void) {
     { "Compilation *", "compilation" },
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
+    { "const Source_Range *", "source_range" },
     { "void *", "payload" },
   }));
 
