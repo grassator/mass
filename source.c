@@ -877,12 +877,13 @@ assign(
   if (target->storage.tag == Storage_Tag_Eflags) {
     panic("Internal Error: Trying to move into Eflags");
   }
-  if (target->descriptor == &descriptor_void) {
-    return *compilation->result;
-  }
 
   if (source->descriptor == &descriptor_lazy_value) {
     value_force_exact(compilation, builder, target, source);
+    return *compilation->result;
+  }
+
+  if (target->descriptor == &descriptor_void) {
     return *compilation->result;
   }
 
