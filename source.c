@@ -5,27 +5,20 @@
 #include "generated_exports.c"
 
 static inline Value *
-value_from_exact_expected_result(
-  const Expected_Result *expected_result
-) {
-  assert(expected_result->tag == Expected_Result_Tag_Exact);
-  return expected_result->Exact.value;
-}
-
-static inline Value *
 value_from_expected_result(
   const Allocator *allocator,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   Source_Range source_range
 ) {
+  const Descriptor *descriptor = expected_result_descriptor(expected_result);
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
-      return value_from_exact_expected_result(expected_result);
+      Storage storage = expected_result->Exact.storage;
+      return value_init(allocator_allocate(allocator, Value), descriptor, storage, source_range);
     } break;
     case Expected_Result_Tag_Flexible: {
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
-      const Descriptor *descriptor = expected_result_descriptor(expected_result);
       if (descriptor == &descriptor_void) return &void_value;
       Storage storage;
       if (
@@ -54,7 +47,7 @@ expected_result_descriptor(
   const Expected_Result *expected_result
 ) {
   switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: return expected_result->Exact.value->descriptor;
+    case Expected_Result_Tag_Exact: return expected_result->Exact.descriptor;
     case Expected_Result_Tag_Flexible: return expected_result->Flexible.descriptor;
   }
   panic("Unknown Expected_Result tag");
@@ -62,12 +55,13 @@ expected_result_descriptor(
 }
 
 static inline Expected_Result
-expected_result_from_value(
-  Value *value
+expected_result_exact(
+  const Descriptor *descriptor,
+  Storage storage
 ) {
   return (Expected_Result) {
     .tag = Expected_Result_Tag_Exact,
-    .Exact = { .value = value },
+    .Exact = { .descriptor = descriptor, .storage = storage },
   };
 }
 
@@ -111,9 +105,8 @@ expected_result_validate(
   if (!actual_value) return 0;
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
-      Value *expected_value = expected_result->Exact.value;
-      assert(same_value_type(expected_value, actual_value));
-      assert(storage_equal(&expected_value->storage, &actual_value->storage));
+      assert(same_type(expected_result->Exact.descriptor, actual_value->descriptor));
+      assert(storage_equal(&expected_result->Exact.storage, &actual_value->storage));
       break;
     }
     case Expected_Result_Tag_Flexible: {
@@ -2186,7 +2179,10 @@ expected_result_ensure_value_or_temp(
 ) {
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
-      Value *result_value = value_from_exact_expected_result(expected_result);
+      Value *result_value = value_init(
+        allocator_allocate(compilation->allocator, Value),
+        expected_result->Exact.descriptor, expected_result->Exact.storage, value->source_range
+      );
       MASS_ON_ERROR(assign(compilation, builder, result_value, value, &value->source_range)) return 0;
       // @Hack there should be a better and more robust way to do this
       if (
@@ -2314,11 +2310,21 @@ value_force_exact(
   Value *target,
   Value *source
 ) {
-  Expected_Result expected_result = expected_result_from_value(target);
+  if (target->flags & Value_Flags_Constant) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Assignment_To_Constant,
+      .source_range = target->source_range,
+    });
+    return;
+  }
+  Expected_Result expected_result = expected_result_exact(target->descriptor, target->storage);
   Value *forced = value_force(compilation, builder, &expected_result, source);
   if (!forced) return;
   assert(forced->descriptor == target->descriptor);
-  if (target->descriptor != &descriptor_void) assert(forced == target);
+  if (target->descriptor != &descriptor_void) {
+    assert(forced->descriptor == target->descriptor);
+    assert(storage_equal(&forced->storage, &target->storage));
+  }
 }
 
 static void
@@ -3264,12 +3270,11 @@ mass_macro_temp_param_lazy_proc(
   // track which registers were allocated for macro arguments so that they are properly
   // released upon returning.
   Storage stack_storage = reserve_stack_storage(builder, expected_descriptor->bit_size);
-  Value *temp = value_init(
+  Value *forced = value_init(
     allocator_allocate(compilation->allocator, Value),
     expected_descriptor, stack_storage, arg->source_range
   );
-  Expected_Result expected_stack = expected_result_from_value(temp);
-  Value *forced = value_force(compilation, builder, &expected_stack, arg);
+  value_force_exact(compilation, builder, forced, arg);
   return expected_result_ensure_value_or_temp(compilation, builder, expected_result, forced);
 }
 
@@ -3584,7 +3589,7 @@ call_function_overload(
   u64 expected_result_bitset = 0;
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
-      const Storage *expected = &value_from_exact_expected_result(expected_result)->storage;
+      const Storage *expected = &expected_result->Exact.storage;
       if (expected->tag == Storage_Tag_Register || expected->tag == Storage_Tag_Unpacked) {
         expected_result_bitset = register_bitset_from_storage(expected);
       }
@@ -4357,7 +4362,6 @@ mass_handle_arithmetic_operation_lazy_proc(
   const Expected_Result *expected_result,
   Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
-  const Allocator *allocator = compilation->allocator;
   const Descriptor *descriptor = expected_result_descriptor(expected_result);
   assert(descriptor_is_integer(descriptor));
 
@@ -4377,21 +4381,13 @@ mass_handle_arithmetic_operation_lazy_proc(
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
       Storage temp_lhs_storage = storage_register_temp(builder, descriptor->bit_size);
-      Value *temp_lhs = value_init(
-        allocator_allocate(allocator, Value), descriptor, temp_lhs_storage, result_range
-      );
-
-      Expected_Result expected_a = expected_result_from_value(temp_lhs);
-      temp_lhs = value_force(compilation, builder, &expected_a, payload->lhs);
+      Expected_Result expected_a = expected_result_exact(descriptor, temp_lhs_storage);
+      Value *temp_lhs = value_force(compilation, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Storage temp_rhs_storage = storage_register_temp(builder, descriptor->bit_size);
-      Value *temp_rhs = value_init(
-        allocator_allocate(allocator, Value),
-        descriptor, temp_rhs_storage, result_range
-      );
-      Expected_Result expected_b = expected_result_from_value(temp_rhs);
-      temp_rhs = value_force(compilation, builder, &expected_b, payload->rhs);
+      Expected_Result expected_b = expected_result_exact(descriptor, temp_rhs_storage);
+      Value *temp_rhs = value_force(compilation, builder, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*compilation->result) return 0;
 
@@ -4418,10 +4414,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       Storage reg_d = storage_register(Register_D, (Bits){64});
       if (
         expected_result->tag != Expected_Result_Tag_Exact ||
-        !storage_is_register_index(
-          &value_from_exact_expected_result(expected_result)->storage,
-          Register_D
-        )
+        !storage_is_register_index(&expected_result->Exact.storage, Register_D)
       ) {
         // We need both D and A for this operation so using either as temp will not work
         u64 disallowed_temp_registers = 0;
@@ -4437,22 +4430,14 @@ mass_handle_arithmetic_operation_lazy_proc(
       Storage temp_a_storage =
         storage_register(register_acquire(builder, Register_A), descriptor->bit_size);
       temp_a_storage.flags |= Storage_Flags_Temporary;
-      Value *temp_a = value_init(
-        allocator_allocate(allocator, Value),
-        descriptor, temp_a_storage, result_range
-      );
-      Expected_Result expected_a = expected_result_from_value(temp_a);
-      temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
+      Expected_Result expected_a = expected_result_exact(descriptor, temp_a_storage);
+      Value *temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
 
       // TODO we do not acquire here because it is done by maybe_saved_rdx,
       //      but it is awkward that it is disconnected so need to think about
       Storage temp_b_storage = storage_register(Register_D, descriptor->bit_size);
-      Value *temp_b = value_init(
-        allocator_allocate(allocator, Value),
-        descriptor, temp_b_storage, result_range
-      );
-      Expected_Result expected_b = expected_result_from_value(temp_b);
-      temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
+      Expected_Result expected_b = expected_result_exact(descriptor, temp_b_storage);
+      Value *temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*compilation->result) return 0;
 
@@ -4495,23 +4480,15 @@ mass_handle_arithmetic_operation_lazy_proc(
       Storage register_a_storage = storage_register(Register_A, descriptor->bit_size);
       register_acquire(builder, Register_A);
       register_a_storage.flags |= Storage_Flags_Temporary;
-      Value *temp_dividend = value_init(
-        allocator_allocate(allocator, Value),
-        descriptor, register_a_storage, result_range
-      );
-      Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
-      temp_dividend = value_force(compilation, builder, &expected_dividend, payload->lhs);
+      Expected_Result expected_dividend = expected_result_exact(descriptor, register_a_storage);
+      Value *temp_dividend = value_force(compilation, builder, &expected_dividend, payload->lhs);
 
       Register temp_divisor_register = register_find_available(builder, disallowed_temp_registers);
       register_acquire(builder, temp_divisor_register);
       Storage temp_divisor_storage = storage_register(temp_divisor_register, descriptor->bit_size);
       temp_divisor_storage.flags |= Storage_Flags_Temporary;
-      Value *temp_divisor = value_init(
-        allocator_allocate(allocator, Value),
-        descriptor, temp_divisor_storage, payload->rhs->source_range
-      );
-      Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
-      temp_divisor = value_force(compilation, builder, &expected_divisor, payload->rhs);
+      Expected_Result expected_divisor = expected_result_exact(descriptor, temp_divisor_storage);
+      Value *temp_divisor = value_force(compilation, builder, &expected_divisor, payload->rhs);
 
       // Save RDX as it will be used for the remainder
       // but we should not save or restore it if it is the result
@@ -4521,9 +4498,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       if (register_bitset_get(builder->register_occupied_bitset, Register_D)) {
         if (
           expected_result->tag != Expected_Result_Tag_Exact ||
-          !storage_is_register_index(
-            &value_from_exact_expected_result(expected_result)->storage, Register_D
-          )
+          !storage_is_register_index(&expected_result->Exact.storage, Register_D)
         ) {
           Register temp_register = register_find_available(builder, disallowed_temp_registers);
           register_acquire(builder, temp_register);
@@ -4667,7 +4642,6 @@ mass_handle_integer_comparison_lazy_proc(
   Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
-  const Allocator *allocator = compilation->allocator;
   const Source_Range *source_range = &payload->source_range;
 
   const Descriptor *descriptor =
@@ -4763,22 +4737,13 @@ mass_handle_integer_comparison_lazy_proc(
   // Try to reuse result_value if we can
   // TODO should also be able to reuse memory operands
   Storage temp_a_storage = storage_register_temp(builder, descriptor->bit_size);
-  Value *temp_a = value_init(
-    allocator_allocate(allocator, Value),
-    descriptor, temp_a_storage, *source_range
-  );
-
-  Expected_Result expected_a = expected_result_from_value(temp_a);
-  temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
+  Expected_Result expected_a = expected_result_exact(descriptor, temp_a_storage);
+  Value *temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
 
   // TODO This can be optimized in cases where one of the operands is an immediate
   Storage temp_b_storage = storage_register_temp(builder, descriptor->bit_size);
-  Value *temp_b = value_init(
-    allocator_allocate(allocator, Value),
-    descriptor, temp_b_storage, *source_range
-  );
-  Expected_Result expected_b = expected_result_from_value(temp_b);
-  temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
+  Expected_Result expected_b = expected_result_exact(descriptor, temp_b_storage);
+  Value *temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
 
   MASS_ON_ERROR(*compilation->result) return 0;
 
@@ -4808,7 +4773,6 @@ mass_handle_generic_comparison_lazy_proc(
   Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
-  const Allocator *allocator = compilation->allocator;
   const Source_Range *source_range = &payload->source_range;
 
   Value *lhs = payload->lhs;
@@ -4871,22 +4835,13 @@ mass_handle_generic_comparison_lazy_proc(
       // Try to reuse result_value if we can
       // TODO should also be able to reuse memory operands
       Storage temp_a_storage = storage_register_temp(builder, lhs_descriptor->bit_size);
-      Value *temp_a = value_init(
-        allocator_allocate(allocator, Value),
-        lhs_descriptor, temp_a_storage, *source_range
-      );
-
-      Expected_Result expected_a = expected_result_from_value(temp_a);
-      temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
+      Expected_Result expected_a = expected_result_exact(lhs_descriptor, temp_a_storage);
+      Value *temp_a = value_force(compilation, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Storage temp_b_storage = storage_register_temp(builder, rhs_descriptor->bit_size);
-      Value *temp_b = value_init(
-        allocator_allocate(allocator, Value),
-        rhs_descriptor, temp_b_storage, *source_range
-      );
-      Expected_Result expected_b = expected_result_from_value(temp_b);
-      temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
+      Expected_Result expected_b = expected_result_exact(rhs_descriptor, temp_b_storage);
+      Value *temp_b = value_force(compilation, builder, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*compilation->result) return 0;
 
@@ -5853,8 +5808,7 @@ mass_handle_if_expression_lazy_proc(
     .Label.pointer = else_label,
   });
 
-  Expected_Result expected_else = expected_result_from_value(result_value);
-  result_value = value_force(compilation, builder, &expected_else, payload->else_);
+  value_force_exact(compilation, builder, result_value, payload->else_);
   MASS_ON_ERROR(*compilation->result) return 0;
 
   push_instruction(&builder->code_block, (Instruction) {
@@ -6388,7 +6342,7 @@ mass_handle_block_lazy_proc(
   u64 statement_count = dyn_array_length(lazy_statements);
   assert(statement_count);
   Value *result_value = 0;
-  Expected_Result expected_void = expected_result_from_value(&void_value);
+  Expected_Result expected_void = expected_result_exact(&descriptor_void, storage_none);
   for (u64 i = 0; i < statement_count; ++i) {
     MASS_ON_ERROR(*compilation->result) return 0;
     u64 registers_before = builder ? builder->register_occupied_bitset : 0;

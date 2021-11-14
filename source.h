@@ -147,8 +147,9 @@ value_force_exact(
 );
 
 static inline Expected_Result
-expected_result_from_value(
-  Value *value
+expected_result_exact(
+  const Descriptor *descriptor,
+  Storage storage
 );
 
 static inline const Descriptor *

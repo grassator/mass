@@ -1629,7 +1629,8 @@ main(void) {
 
   export_compiler(push_type(type_union("Expected_Result", (Struct_Type[]){
     struct_fields("Exact", (Struct_Item[]){
-      { "Value *", "value" },
+      { "const Descriptor *", "descriptor" },
+      { "Storage", "storage" },
     }),
     struct_fields("Flexible", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },

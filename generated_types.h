@@ -1585,7 +1585,8 @@ typedef enum {
 } Expected_Result_Tag;
 
 typedef struct Expected_Result_Exact {
-  Value * value;
+  const Descriptor * descriptor;
+  Storage storage;
 } Expected_Result_Exact;
 typedef struct Expected_Result_Flexible {
   const Descriptor * descriptor;
@@ -4637,9 +4638,15 @@ static C_Enum_Item expected_result_tag_items[] = {
 MASS_DEFINE_STRUCT_DESCRIPTOR(expected_result_exact, Expected_Result_Exact,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_value_pointer,
-    .name = slice_literal_fields("value"),
-    .Base_Relative.offset = offsetof(Expected_Result_Exact, value),
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .Base_Relative.offset = offsetof(Expected_Result_Exact, descriptor),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_storage,
+    .name = slice_literal_fields("storage"),
+    .Base_Relative.offset = offsetof(Expected_Result_Exact, storage),
   },
 );
 MASS_DEFINE_TYPE_VALUE(expected_result_exact);
