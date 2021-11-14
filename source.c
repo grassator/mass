@@ -7409,7 +7409,7 @@ mass_maybe_trim_shebang(
   Source_Range *source_range
 ) {
   Range_u32 *offsets = &source_range->offsets;
-  for (offsets->from; offsets->from < offsets->to; offsets->from += 1) {
+  for (; offsets->from < offsets->to; offsets->from += 1) {
     char ch = source_range->file->text.bytes[offsets->from];
     if (isspace(ch)) continue;
     if (ch == '#') {
