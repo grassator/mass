@@ -3244,6 +3244,29 @@ mass_macro_lazy_proc(
   return result_value;
 }
 
+static Value *
+mass_macro_temp_param_lazy_proc(
+  Compilation *compilation,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Value *arg
+) {
+  const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
+
+  // @InstructionQuality
+  // Would be nice to get rid of the stack allocation, but we would need to somehow
+  // track which registers were allocated for macro arguments so that they are properly
+  // released upon returning.
+  Storage stack_storage = reserve_stack_storage(builder, expected_descriptor->bit_size);
+  Value *temp = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    expected_descriptor, stack_storage, arg->source_range
+  );
+  Expected_Result expected_stack = expected_result_from_value(temp);
+  Value *forced = value_force(compilation, builder, &expected_stack, arg);
+  return expected_result_ensure_value_or_temp(compilation, builder, expected_result, forced);
+}
+
 static inline Value *
 mass_handle_macro_call(
   Execution_Context *context,
@@ -3260,29 +3283,55 @@ mass_handle_macro_call(
   Scope *body_scope = scope_make(context->allocator, literal->context.scope);
 
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
-    MASS_ON_ERROR(*context->result) return 0;
-    Function_Parameter *arg = dyn_array_get(literal->info->parameters, i);
-    if (arg->declaration.symbol) {
+    MASS_ON_ERROR(*context->result) goto err;
+    Function_Parameter *param = dyn_array_get(literal->info->parameters, i);
+    if (param->declaration.symbol) {
       Value *arg_value;
       if (i >= args_view.length) {
-        arg_value = arg->maybe_default_value;
+        arg_value = param->maybe_default_value;
       } else {
         arg_value = value_view_get(args_view, i);
       }
 
       arg_value = maybe_coerce_i64_to_integer(
-        context->compilation, arg_value, arg->declaration.descriptor, &source_range
+        context->compilation, arg_value, param->declaration.descriptor, &source_range
       );
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
 
-      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->declaration.symbol, arg_value);
+      bool needs_casting = (
+        // FIXME pass in resolved Function_Info from call and remove a guard on the next line
+        param->declaration.descriptor &&
+        !same_type(param->declaration.descriptor, arg_value->descriptor)
+      );
+
+      // Macro parameters, like function ones are expected to be non-lazy values
+      // in the compiler and should not have side effects when accessed multiple times
+      // in the body of the macro.
+      //
+      // This assumption holds if the argument is exactly the right type and is statically known
+      Value *param_value;
+      if (value_is_non_lazy_static(arg_value) && !needs_casting) {
+        param_value = arg_value;
+      } else {
+        // Otherwise we will create a temp copy
+        // TODO should this be forced or is first access ok?
+        param_value = mass_make_lazy_value(
+          context, param->declaration.source_range,
+          arg_value, param->declaration.descriptor,
+          mass_macro_temp_param_lazy_proc
+        );
+      }
+
+      scope_define_value(
+        body_scope, arg_epoch, param->declaration.source_range, param->declaration.symbol, param_value
+      );
     }
   }
 
   Execution_Context body_context = *context;
   body_context.scope = body_scope;
   Value *body_value = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*context->result) goto err;
 
   const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
   if (
@@ -3298,15 +3347,19 @@ mass_handle_macro_call(
         .actual = return_descriptor,
       },
     });
-    return 0;
+    goto err;
   }
 
   if (value_is_non_lazy_static(body_value)) {
     return body_value;
   }
+
   return mass_make_lazy_value(
     context, source_range, body_value, return_descriptor, mass_macro_lazy_proc
   );
+
+  err:
+  return 0;
 }
 
 typedef struct {

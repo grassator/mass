@@ -1674,16 +1674,6 @@ spec("source") {
       check(checker() == 21);
     }
 
-    it("should allow changes to the passed arguments to macro function") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "process :: macro(y : s64) -> () { y = 42; }\n"
-        "checker :: fn() -> (s64) { x := 20; process(x); x }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should type check macro return value if it is defined") {
       test_program_inline_source_base(
         "checker", &test_context,
@@ -1697,7 +1687,7 @@ spec("source") {
       check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
-    it("should support macro paramaters without type assertions") {
+    it("should support macro parameters without type assertions") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
