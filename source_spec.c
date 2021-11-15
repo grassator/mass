@@ -197,7 +197,7 @@ spec("source") {
   static Execution_Context test_context = {0};
 
   before_each() {
-    compilation_init(&test_compilation, host_calling_convention());
+    compilation_init(&test_compilation, host_os());
     test_context = execution_context_from_compilation(&test_compilation);
   }
 

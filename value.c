@@ -1460,17 +1460,6 @@ memory_layout_item_storage_at_index(
   return memory_layout_item_storage(base, layout, dyn_array_get(layout->items, index));
 }
 
-static const Calling_Convention *
-host_calling_convention() {
-  #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
-  return &calling_convention_x86_64_windows;
-  #elif (defined(__linux__) && defined(__x86_64__)) || (defined(__MACH__) && defined(__x86_64__))
-  return &calling_convention_x86_64_system_v;
-  #else
-  static_assert(false, "TODO add Calling_Convention for this host system");
-  #endif
-}
-
 static const Os
 host_os() {
   #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
@@ -1540,7 +1529,7 @@ jit_deinit(
 static void
 compilation_init(
   Compilation *compilation,
-  const Calling_Convention *target_calling_convention
+  Os target_os
 ) {
   *compilation = (Compilation) {
     .module_map = hash_map_make(Imported_Module_Map),
@@ -1577,13 +1566,10 @@ compilation_init(
 
   compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
 
-  // TODO :CrossCompilation
-  Os os = host_os();
-
-  program_init(compilation->allocator, compilation->runtime_program, target_calling_convention, os);
+  program_init(compilation->allocator, compilation->runtime_program, target_os);
 
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
-  program_init(compilation->allocator, jit_program, host_calling_convention(), os);
+  program_init(compilation->allocator, jit_program, host_os());
   jit_init(&compilation->jit, jit_program);
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
@@ -1616,7 +1602,7 @@ compilation_init(
     .operator_space = mass_ensure_symbol(compilation, slice_literal(" ")),
   };
 
-  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
+  scope_define_builtins(compilation, compilation->root_scope);
 }
 
 static void

@@ -93,21 +93,21 @@ int main(s32 argc, char **argv) {
   }
   Slice file_path = slice_from_c_string(raw_file_path);
 
-  const Calling_Convention *calling_convention = 0;
+  Os os = Os_Windows;
   switch(mode) {
     case Mass_Cli_Mode_Compile: {
-      calling_convention = &calling_convention_x86_64_windows;
+      os = Os_Windows;
       break;
     }
     case Mass_Cli_Mode_Run:
     case Mass_Cli_Mode_Script: {
-      calling_convention = host_calling_convention();
+      os = host_os();
       break;
     }
   }
 
   Compilation compilation;
-  compilation_init(&compilation, calling_convention);
+  compilation_init(&compilation, os);
   Execution_Context context = execution_context_from_compilation(&compilation);
 
   Mass_Result result =

@@ -6,13 +6,33 @@
 #include "posix_runtime.h"
 #endif
 
+static const Calling_Convention *
+default_calling_convention_for_os(
+  Os os
+) {
+  switch(os) {
+    case Os_Windows: {
+      return &calling_convention_x86_64_windows;
+    } break;
+    case Os_Linux:
+    case Os_Mac: {
+      return &calling_convention_x86_64_system_v;
+    } break;
+    default: {
+      panic("Unsupported OS");
+      return 0;
+    } break;
+  }
+}
+
 static void
 program_init(
   Allocator *allocator,
   Program *program,
-  const Calling_Convention *default_calling_convention,
   Os os
 ) {
+  const Calling_Convention *default_calling_convention = default_calling_convention_for_os(os);
+
   *program = (Program) {
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
