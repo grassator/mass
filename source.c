@@ -2295,7 +2295,7 @@ value_force(
     MASS_ON_ERROR(*compilation->result) return 0;
     // TODO is there a better way to cache the result?
     *value = *result;
-    return result;
+    return expected_result_ensure_value_or_temp(compilation, builder, expected_result, value);
   }
 
   return expected_result_ensure_value_or_temp(compilation, builder, expected_result, value);
@@ -5802,8 +5802,7 @@ mass_handle_if_expression_lazy_proc(
   const Source_Range *source_range,
   Mass_If_Expression_Lazy_Payload *payload
 ) {
-  // TODO support any If-able descriptors instead of accepting literally anything
-  Expected_Result expected_condition = expected_result_any(0);
+  Expected_Result expected_condition = expected_result_any(&descriptor__bool);
   Value *condition = value_force(compilation, builder, &expected_condition, payload->condition);
   MASS_ON_ERROR(*compilation->result) return 0;
 
