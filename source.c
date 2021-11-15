@@ -2196,19 +2196,17 @@ expected_result_ensure_value_or_temp(
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
       const Descriptor *expected_descriptor =
         flexible->descriptor ? flexible->descriptor : value->descriptor;
-      // FIXME :ExpectedResultCheck
-      //       descriptor should be verified here but it causes a lot of errors atm
-      //if (
-        //expected_descriptor != &descriptor_void &&
-        //!same_value_type_or_can_implicitly_move_cast(expected_descriptor, value)
-      //) {
-        //compilation_error(compilation, (Mass_Error) {
-          //.tag = Mass_Error_Tag_Type_Mismatch,
-          //.source_range = value->source_range,
-          //.Type_Mismatch = { .expected = expected_descriptor, .actual = value->descriptor },
-        //});
-        //return 0;
-      //}
+      if (
+        expected_descriptor != &descriptor_void &&
+        !same_value_type_or_can_implicitly_move_cast(expected_descriptor, value)
+      ) {
+        compilation_error(compilation, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = value->source_range,
+          .Type_Mismatch = { .expected = expected_descriptor, .actual = value->descriptor },
+        });
+        return 0;
+      }
       if (value->storage.tag == Storage_Tag_None) {
         return value;
       }
@@ -5195,8 +5193,8 @@ mass_handle_assignment_lazy_proc(
   const Source_Range *source_range,
   Mass_Assignment_Lazy_Payload *payload
 ) {
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
-  Expected_Result expected_target = expected_result_any(descriptor);
+  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(payload->target);
+  Expected_Result expected_target = expected_result_any(target_descriptor);
   Value *target = value_force(compilation, builder, &expected_target, payload->target);
   MASS_ON_ERROR(*compilation->result) return 0;
 

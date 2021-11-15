@@ -1751,6 +1751,7 @@ same_value_type_or_can_implicitly_move_cast(
   Value *source
 ) {
   if (value_is_tuple(source)) {
+    if (target == &descriptor_tuple) return true; // TODO Does this make sense in all the cases?
     if (target->tag != Descriptor_Tag_Struct) return false;
     const Memory_Layout *layout = &target->Struct.memory_layout;
     const Tuple *tuple = value_as_tuple(source);

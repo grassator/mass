@@ -29,10 +29,10 @@ print :: fn(x : s64) {
   integer := x
   count := {
     count := 0
-    for temp := integer ; temp ; temp = temp / 10 {
+    for temp := integer ; temp != 0 ; temp = temp / 10 {
       count = count + 1
     }
-    if count then count else 1
+    if count != 0 then count else 1
   }
 
   buffer : u8*64
