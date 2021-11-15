@@ -1876,6 +1876,12 @@ main(void) {
     })
   })));
 
+  export_compiler(push_type(type_enum("Os", (Enum_Type_Item[]){
+    { "Windows", 1 },
+    { "Linux", 2 },
+    { "Mac", 3 },
+  })));
+
   push_type(type_struct("Program", (Struct_Item[]){
     { "Array_Import_Library", "import_libraries" },
     { "Array_Label_Location_Diff_Patch_Info", "patch_info_array" },
@@ -1885,6 +1891,8 @@ main(void) {
     { "Array_Function_Builder", "functions" },
     { "Program_Memory", "memory" },
     { "const Calling_Convention *", "default_calling_convention"},
+    { "Os", "os"},
+    { "u32", "_padding_os"},
   }));
 
   push_type(type_function(Typedef, "Calling_Convention_Call_Setup_Proc", "Function_Call_Setup", (Argument_Type[]){

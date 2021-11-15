@@ -222,6 +222,18 @@ external :: fn(
   [library_name, symbol_name]
 }
 
+os :: MASS.Os
+get_target_os :: fn() => (os._Type) intrinsic {
+  value := allocate(MASS.allocator, MASS.Value)
+  value.source_range = arguments.source_range
+  value.descriptor = os._Type
+  value.storage.tag = MASS.Storage_Tag.Static
+  value.storage.bit_size = value.descriptor.bit_size
+  value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U32
+  value.storage.Static.memory.U32.value = cast(u32, context.program.os)
+  value
+}
+
 syscall :: fn(number : s64) => (MASS.Syscall) { [number] }
 
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {

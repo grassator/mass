@@ -458,6 +458,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Result_Error")),
     type_mass_result_error_value
   );
+  Source_Range Os__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Os__source_range, "Os");
+  scope_define_enum(
+    compilation, scope, Os__source_range,
+    slice_literal("Os"), type_os_value,
+    os_items, countof(os_items)
+  );
   Source_Range Compilation__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Compilation__source_range, "Compilation");
   scope_define_value(

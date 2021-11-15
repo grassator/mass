@@ -7,7 +7,8 @@ static void
 program_init(
   Allocator *allocator,
   Program *program,
-  const Calling_Convention *default_calling_convention
+  const Calling_Convention *default_calling_convention,
+  Os os
 );
 
 static void

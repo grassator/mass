@@ -1,0 +1,7 @@
+exports {..}
+
+STDOUT_FILENO :: 1
+
+sys_write :: fn(descriptor : s32, buffer : &u8, size : u64) -> (s32) syscall(1)
+sys_exit :: fn(status : s32) -> (s32) syscall(60)
+

@@ -610,6 +610,23 @@ typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
+typedef enum Os {
+  Os_Windows = 1,
+  Os_Linux = 2,
+  Os_Mac = 3,
+} Os;
+
+const char *os_name(Os value) {
+  if (value == 1) return "Os_Windows";
+  if (value == 2) return "Os_Linux";
+  if (value == 3) return "Os_Mac";
+  assert(!"Unexpected value for enum Os");
+  return 0;
+};
+
+typedef dyn_array_type(Os *) Array_Os_Ptr;
+typedef dyn_array_type(const Os *) Array_Const_Os_Ptr;
+
 typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
@@ -2060,6 +2077,8 @@ typedef struct Program {
   Array_Function_Builder functions;
   Program_Memory memory;
   const Calling_Convention * default_calling_convention;
+  Os os;
+  u32 _padding_os;
 } Program;
 typedef dyn_array_type(Program) Array_Program;
 
@@ -2627,6 +2646,12 @@ static Descriptor descriptor_array_mass_result_ptr;
 static Descriptor descriptor_array_const_mass_result_ptr;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
+static Descriptor descriptor_os;
+static Descriptor descriptor_array_os;
+static Descriptor descriptor_array_os_ptr;
+static Descriptor descriptor_array_const_os_ptr;
+static Descriptor descriptor_os_pointer;
+static Descriptor descriptor_os_pointer_pointer;
 static Descriptor descriptor_program;
 static Descriptor descriptor_array_program;
 static Descriptor descriptor_array_program_ptr;
@@ -5695,6 +5720,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_result, Mass_Result,
 );
 MASS_DEFINE_TYPE_VALUE(mass_result);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(os, Os)
+static C_Enum_Item os_items[] = {
+{ .name = slice_literal_fields("Windows"), .value = 1 },
+{ .name = slice_literal_fields("Linux"), .value = 2 },
+{ .name = slice_literal_fields("Mac"), .value = 3 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
 MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
@@ -5745,6 +5776,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
     .descriptor = &descriptor_calling_convention_pointer,
     .name = slice_literal_fields("default_calling_convention"),
     .Base_Relative.offset = offsetof(Program, default_calling_convention),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_os,
+    .name = slice_literal_fields("os"),
+    .Base_Relative.offset = offsetof(Program, os),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_padding_os"),
+    .Base_Relative.offset = offsetof(Program, _padding_os),
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);

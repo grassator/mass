@@ -10,7 +10,8 @@ static void
 program_init(
   Allocator *allocator,
   Program *program,
-  const Calling_Convention *default_calling_convention
+  const Calling_Convention *default_calling_convention,
+  Os os
 ) {
   *program = (Program) {
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
@@ -19,6 +20,7 @@ program_init(
     .relocations = dyn_array_make(Array_Relocation, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
     .default_calling_convention = default_calling_convention,
+    .os = os,
   };
 
   #define MAX_CODE_SIZE (640llu * 1024llu * 1024llu) // 640Mb

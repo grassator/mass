@@ -1471,6 +1471,19 @@ host_calling_convention() {
   #endif
 }
 
+static const Os
+host_os() {
+  #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
+  return Os_Windows;
+  #elif (defined(__MACH__) && defined(__x86_64__))
+  return Os_Mac;
+  #elif (defined(__linux__) && defined(__x86_64__))
+  return Os_Linux;
+  #else
+  static_assert(false, "TODO add Os enum variant for this host system");
+  #endif
+}
+
 static inline const Symbol *
 mass_ensure_symbol_for_map(
   const Allocator *allocator,
@@ -1563,10 +1576,14 @@ compilation_init(
   compilation->result = allocator_allocate(compilation->allocator, Mass_Result);
 
   compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
-  program_init(compilation->allocator, compilation->runtime_program, target_calling_convention);
+
+  // TODO :CrossCompilation
+  Os os = host_os();
+
+  program_init(compilation->allocator, compilation->runtime_program, target_calling_convention, os);
 
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
-  program_init(compilation->allocator, jit_program, host_calling_convention());
+  program_init(compilation->allocator, jit_program, host_calling_convention(), os);
   jit_init(&compilation->jit, jit_program);
 
   compilation->root_scope = scope_make(compilation->allocator, 0);

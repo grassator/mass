@@ -1,5 +1,11 @@
 exports {exit}
 
-ExitProcess :: fn(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
-
-exit :: fn(status : s32) -> () { ExitProcess(status) }
+exit :: fn(status : s32) -> () {
+  if get_target_os() == os.Windows then {
+    win32 :: import("std/win32")
+    win32.ExitProcess(status)
+  } else {
+    linux :: import("std/linux")
+    linux.sys_exit(status)
+  }
+}

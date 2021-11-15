@@ -1001,6 +1001,7 @@ spec("source") {
             "value.descriptor = u64\n"
             "value.storage.tag = MASS.Storage_Tag.Static\n"
             "value.storage.bit_size = value.descriptor.bit_size\n"
+            "value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U64\n"
             "value.storage.Static.memory.U64.value = 42\n"
             "value\n"
           "}\n"
@@ -2386,7 +2387,6 @@ spec("source") {
   }
 
   describe("Script mode") {
-    #if defined(_WIN32) // TODO support on Linux
     it("should support script-mode execution") {
       Mass_Result result =
         program_load_file_module_into_root_scope(&test_context, slice_literal("std/prelude"));
@@ -2394,7 +2394,6 @@ spec("source") {
       mass_run_script(&test_context, slice_literal("fixtures/script_mode"));
       check(spec_check_mass_result(test_context.result));
     }
-    #endif
   }
 
   describe("PE32 Executables") {
@@ -2412,6 +2411,7 @@ spec("source") {
 
     it("should parse and write an executable that prints Hello, world!") {
       Program *test_program = test_context.program;
+      test_program->os = Os_Windows;
       test_program->default_calling_convention = &calling_convention_x86_64_windows;
       test_program->entry_point = test_program_external_source_base(
         "main", &test_context, "fixtures/hello_world"
@@ -2515,7 +2515,6 @@ spec("source") {
   }
 
   describe("Complex Examples") {
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz =
         test_program_external_source_function("fizz_buzz", &test_context, "fixtures/fizz_buzz");
@@ -2523,6 +2522,5 @@ spec("source") {
       check(fizz_buzz);
       fizz_buzz();
     }
-    #endif
   }
 }
