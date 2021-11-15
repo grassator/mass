@@ -94,20 +94,21 @@ tokenize(
 
       $ { break; }
 
+      // @Volatile :TokenizerNumbers
       // integer literals
-      decimal = '0' | [1-9][0-9]*;
+      decimal = '0' | [1-9][0-9_]*;
       decimal {
         Slice digits = slice_sub(input, token_start_offset, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_10, digits);
         continue;
       }
-      binary = '0b' [01]+;
+      binary = '0b' [01_]+;
       binary {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_2, digits);
         continue;
       }
-      hex = '0x' [0-9a-fA-F]+;
+      hex = '0x' [0-9a-fA-F_]+;
       hex {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_16, digits);

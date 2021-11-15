@@ -192,7 +192,7 @@ tokenize(
 yy2:
   ++offset;
 yy3:
-#line 152 "tokenizer.re.c"
+#line 153 "tokenizer.re.c"
   { TOKENIZER_HANDLE_ERROR((Slice){0}); }
 #line 198 "generated_tokenizer.c"
 yy4:
@@ -208,13 +208,13 @@ yy4:
   default:  goto yy6;
   }
 yy6:
-#line 146 "tokenizer.re.c"
+#line 147 "tokenizer.re.c"
   { continue; }
 #line 214 "generated_tokenizer.c"
 yy7:
   ++offset;
 yy8:
-#line 128 "tokenizer.re.c"
+#line 129 "tokenizer.re.c"
   {
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
@@ -259,7 +259,7 @@ yy11:
   default:  goto yy12;
   }
 yy12:
-#line 125 "tokenizer.re.c"
+#line 126 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
 #line 265 "generated_tokenizer.c"
 yy13:
@@ -277,12 +277,12 @@ yy14:
   goto yy12;
 yy15:
   ++offset;
-#line 117 "tokenizer.re.c"
+#line 118 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(paren); continue; }
 #line 283 "generated_tokenizer.c"
 yy17:
   ++offset;
-#line 120 "tokenizer.re.c"
+#line 121 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(paren); continue; }
 #line 288 "generated_tokenizer.c"
 yy19:
@@ -306,7 +306,7 @@ yy20:
   default:  goto yy21;
   }
 yy21:
-#line 99 "tokenizer.re.c"
+#line 100 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_10, digits);
@@ -326,7 +326,8 @@ yy22:
   case '6':
   case '7':
   case '8':
-  case '9':  goto yy22;
+  case '9':
+  case '_':  goto yy22;
   default:  goto yy21;
   }
 yy24:
@@ -399,29 +400,29 @@ yy24:
   default:  goto yy26;
   }
 yy26:
-#line 149 "tokenizer.re.c"
+#line 150 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 405 "generated_tokenizer.c"
+#line 406 "generated_tokenizer.c"
 yy27:
   ++offset;
-#line 118 "tokenizer.re.c"
+#line 119 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(square); continue; }
-#line 410 "generated_tokenizer.c"
+#line 411 "generated_tokenizer.c"
 yy29:
   ++offset;
-#line 121 "tokenizer.re.c"
+#line 122 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(square); continue; }
-#line 415 "generated_tokenizer.c"
+#line 416 "generated_tokenizer.c"
 yy31:
   ++offset;
-#line 119 "tokenizer.re.c"
+#line 120 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(curly); continue; }
-#line 420 "generated_tokenizer.c"
+#line 421 "generated_tokenizer.c"
 yy33:
   ++offset;
-#line 122 "tokenizer.re.c"
+#line 123 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(curly); continue; }
-#line 425 "generated_tokenizer.c"
+#line 426 "generated_tokenizer.c"
 yy35:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -452,7 +453,7 @@ yy38:
   }
 yy39:
   ++offset;
-#line 136 "tokenizer.re.c"
+#line 137 "tokenizer.re.c"
   {
         Slice raw_bytes = slice_sub(input, token_start_offset + 1, offset - 1);
         tokenizer_push_string_literal(
@@ -460,7 +461,7 @@ yy39:
         );
         continue;
       }
-#line 464 "generated_tokenizer.c"
+#line 465 "generated_tokenizer.c"
 yy41:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -505,7 +506,8 @@ yy44:
   yych = offset < end_offset ? input.bytes[offset] : 0;
   switch (yych) {
   case '0':
-  case '1':  goto yy48;
+  case '1':
+  case '_':  goto yy48;
   default:  goto yy36;
   }
 yy45:
@@ -528,6 +530,7 @@ yy45:
   case 'D':
   case 'E':
   case 'F':
+  case '_':
   case 'a':
   case 'b':
   case 'c':
@@ -551,17 +554,18 @@ yy48:
   yych = offset < end_offset ? input.bytes[offset] : 0;
   switch (yych) {
   case '0':
-  case '1':  goto yy48;
+  case '1':
+  case '_':  goto yy48;
   default:  goto yy50;
   }
 yy50:
-#line 105 "tokenizer.re.c"
+#line 106 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_2, digits);
         continue;
       }
-#line 565 "generated_tokenizer.c"
+#line 569 "generated_tokenizer.c"
 yy51:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -582,6 +586,7 @@ yy51:
   case 'D':
   case 'E':
   case 'F':
+  case '_':
   case 'a':
   case 'b':
   case 'c':
@@ -591,19 +596,19 @@ yy51:
   default:  goto yy53;
   }
 yy53:
-#line 111 "tokenizer.re.c"
+#line 112 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_16, digits);
         continue;
       }
-#line 601 "generated_tokenizer.c"
+#line 606 "generated_tokenizer.c"
 yy54:
 #line 95 "tokenizer.re.c"
   { break; }
-#line 605 "generated_tokenizer.c"
+#line 610 "generated_tokenizer.c"
 }
-#line 153 "tokenizer.re.c"
+#line 154 "tokenizer.re.c"
 
   }
 

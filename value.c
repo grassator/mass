@@ -1012,39 +1012,32 @@ value_i64(
   Number_Base base,
   Source_Range source_range
 ) {
-  static const i64 single_decimal_digits[10] = {
-    {.bits = 0}, {.bits = 1}, {.bits = 2}, {.bits = 3}, {.bits = 4},
-    {.bits = 5}, {.bits = 6}, {.bits = 7}, {.bits = 8}, {.bits = 9},
+  // @Volatile :TokenizerNumbers This code just assumes valid tokens
+  static const u8 digit_decoder[128] = {
+    ['0'] = 0, ['1'] = 1, ['2'] = 2, ['3'] = 3, ['4'] = 4,
+    ['5'] = 5, ['6'] = 6, ['7'] = 7, ['8'] = 8, ['9'] = 9,
+    ['a'] = 10, ['b'] = 11, ['c'] = 12, ['d'] = 13, ['e'] = 14, ['f'] = 15,
+    ['A'] = 10, ['B'] = 11, ['C'] = 12, ['D'] = 13, ['E'] = 14, ['F'] = 15,
   };
 
-  const i64 *literal;
-  if (base == Number_Base_10 && digits.length == 1) {
+  i64 literal;
+  if (digits.length == 1) {
     char byte = digits.bytes[0];
-    assert(byte >= '0' && byte <= '9');
-    byte -= '0';
-    literal = &single_decimal_digits[byte];
-    return value_init(
-      allocator_allocate(allocator, Value),
-      &descriptor_i64, storage_static(literal), source_range
-    );
+    literal = (i64){ digit_decoder[byte] };
   } else {
     u64 bits = 0;
-    bool ok = true;
-    switch(base) {
-      case Number_Base_2: bits = slice_parse_binary(digits, &ok); break;
-      case Number_Base_10: bits = slice_parse_u64(digits, &ok); break;
-      case Number_Base_16: bits = slice_parse_hex(digits, &ok); break;
-      default: panic("Internal Error: Unexpected number base"); break;
+    for (const char *ch = digits.bytes; ch < digits.bytes + digits.length; ++ch) {
+      assert(*ch < 128);
+      if (*ch == '_') continue;
+      bits *= base;
+      bits += digit_decoder[*ch];
     }
-    if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
-
-    Value *value = allocator_allocate(allocator, Value);
-
-    i64 literal = { .bits = bits, };
-    return value_init(
-      value, &descriptor_i64, storage_static_inline(&literal), source_range
-    );
+    literal = (i64){ bits };
   }
+  return value_init(
+    allocator_allocate(allocator, Value),
+    &descriptor_i64, storage_static_inline(&literal), source_range
+  );
 }
 
 static inline Label *
