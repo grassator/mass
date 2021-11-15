@@ -1,11 +1,31 @@
-exports {reify, same_type}
+exports {reify, same_type, Value}
 
+Value :: MASS.Value
 same_type :: MASS.same_type
 
-reify :: macro(value : &MASS.Value, type : Type) {
+pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   assert(value.storage.tag == MASS.Storage_Tag.Static)
-  // FIXME check all variants
-  //assert(value.storage.Static.memory.tag == MASS.Static_Memory_Tag.Heap)
   assert(same_type(value.descriptor, type))
-  cast(&type, value.storage.Static.memory.Heap.pointer)
+  assert(value.descriptor.bit_size.as_u64 == value.storage.bit_size.as_u64)
+  memory := &value.storage.Static.memory
+  Tag :: MASS.Static_Memory_Tag
+  memory.Heap.pointer
+  if memory.tag == Tag.Heap then {
+    memory.Heap.pointer
+  } else if memory.tag == Tag.U64 then {
+    &memory.U64.value
+  } else if memory.tag == Tag.U32 then {
+    &memory.U32.value
+  } else if memory.tag == Tag.U16 then {
+    &memory.U16.value
+  } else if memory.tag == Tag.U8 then {
+    &memory.U8.value
+  } else {
+    assert(false, "unreacheable")
+    0
+  }
+}
+
+reify :: macro(value : &Value, type : Type) {
+  cast(&type, pointer_from_static_value(value, type))
 }
