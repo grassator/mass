@@ -173,8 +173,33 @@ not_equal :: fn(x, y : x) => (bool) MASS.generic_not_equal
 
 add :: MASS.i64_add
 subtract :: MASS.i64_subtract
-equal :: MASS.i64_equal
-not_equal :: MASS.i64_not_equal
+signed_multiply :: MASS.i64_signed_multiply
+unsigned_multiply :: MASS.i64_unsigned_multiply
+signed_divide :: MASS.i64_signed_divide
+unsigned_divide :: MASS.i64_unsigned_divide
+signed_remainder :: MASS.i64_signed_remainder
+unsigned_remainder :: MASS.i64_unsigned_remainder
+
+i64_is_compile_positive :: macro(x : i64) {
+  static_assert(x & 0x8000000000000000 == 0, "i64 value must be positive for this operation")
+}
+
+multiply :: macro(x : i64, y : i64) {
+  i64_is_compile_positive(x)
+  i64_is_compile_positive(y)
+  unsigned_multiply(x, y)
+}
+divide :: macro(x : i64, y : i64) {
+  i64_is_compile_positive(x)
+  i64_is_compile_positive(y)
+  unsigned_divide(x, y)
+}
+remainder :: macro(x : i64, y : i64) {
+  i64_is_compile_positive(x)
+  i64_is_compile_positive(y)
+  unsigned_remainder(x, y)
+}
+
 logical_shift_left :: MASS.i64_logical_shift_left
 logical_shift_right :: MASS.i64_logical_shift_right
 bitwise_or :: MASS.i64_bitwise_or

@@ -815,10 +815,22 @@ static i64 mass_i64_add
 static i64 mass_i64_subtract
   (i64 a, i64 b);
 
-static i64 mass_i64_equal
+static i64 mass_i64_signed_multiply
   (i64 a, i64 b);
 
-static i64 mass_i64_not_equal
+static i64 mass_i64_unsigned_multiply
+  (i64 a, i64 b);
+
+static i64 mass_i64_signed_divide
+  (i64 a, i64 b);
+
+static i64 mass_i64_unsigned_divide
+  (i64 a, i64 b);
+
+static i64 mass_i64_signed_remainder
+  (i64 a, i64 b);
+
+static i64 mass_i64_unsigned_remainder
   (i64 a, i64 b);
 
 static Value * mass_integer_add
@@ -2753,8 +2765,12 @@ static Descriptor descriptor_mass_i64_bitwise_and;
 static Descriptor descriptor_mass_i64_bitwise_or;
 static Descriptor descriptor_mass_i64_add;
 static Descriptor descriptor_mass_i64_subtract;
-static Descriptor descriptor_mass_i64_equal;
-static Descriptor descriptor_mass_i64_not_equal;
+static Descriptor descriptor_mass_i64_signed_multiply;
+static Descriptor descriptor_mass_i64_unsigned_multiply;
+static Descriptor descriptor_mass_i64_signed_divide;
+static Descriptor descriptor_mass_i64_unsigned_divide;
+static Descriptor descriptor_mass_i64_signed_remainder;
+static Descriptor descriptor_mass_i64_unsigned_remainder;
 static Descriptor descriptor_mass_integer_add;
 static Descriptor descriptor_mass_integer_subtract;
 static Descriptor descriptor_mass_integer_multiply;

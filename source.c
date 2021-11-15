@@ -2970,6 +2970,12 @@ typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
 static i64 mass_i64_add(i64 a, i64 b) { return (i64){a.bits + b.bits}; }
 static i64 mass_i64_subtract(i64 a, i64 b) { return (i64){a.bits - b.bits}; }
+static i64 mass_i64_signed_multiply(i64 a, i64 b) { return (i64){(u64)((s64)a.bits * (s64)b.bits)}; }
+static i64 mass_i64_unsigned_multiply(i64 a, i64 b) { return (i64){a.bits * b.bits}; }
+static i64 mass_i64_signed_divide(i64 a, i64 b) { return (i64){(u64)((s64)a.bits / (s64)b.bits)}; }
+static i64 mass_i64_unsigned_divide(i64 a, i64 b) { return (i64){a.bits / b.bits}; }
+static i64 mass_i64_signed_remainder(i64 a, i64 b) { return (i64){(u64)((s64)a.bits % (s64)b.bits)}; }
+static i64 mass_i64_unsigned_remainder(i64 a, i64 b) { return (i64){a.bits % b.bits}; }
 
 static i64 mass_i64_equal(i64 a, i64 b) { return (i64){a.bits == b.bits}; }
 static i64 mass_i64_not_equal(i64 a, i64 b) { return (i64){a.bits != b.bits}; }

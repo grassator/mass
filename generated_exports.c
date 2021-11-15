@@ -794,7 +794,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
-    mass_i64_equal, "i64_equal", &descriptor_i64,
+    mass_i64_signed_multiply, "i64_signed_multiply", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
 &descriptor_i64
@@ -806,7 +806,55 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
-    mass_i64_not_equal, "i64_not_equal", &descriptor_i64,
+    mass_i64_unsigned_multiply, "i64_unsigned_multiply", &descriptor_i64,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_signed_divide, "i64_signed_divide", &descriptor_i64,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_unsigned_divide, "i64_unsigned_divide", &descriptor_i64,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_signed_remainder, "i64_signed_remainder", &descriptor_i64,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_unsigned_remainder, "i64_unsigned_remainder", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
 &descriptor_i64

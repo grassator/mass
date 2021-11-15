@@ -2117,7 +2117,9 @@ main(void) {
     "logical_shift_left", "logical_shift_right",
     "bitwise_and", "bitwise_or",
     "add", "subtract",
-    "equal", "not_equal",
+    "signed_multiply", "unsigned_multiply",
+    "signed_divide", "unsigned_divide",
+    "signed_remainder", "unsigned_remainder",
   };
 
   for (u64 i = 0; i < countof(i64_ops); ++i) {

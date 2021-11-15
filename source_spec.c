@@ -1263,15 +1263,6 @@ spec("source") {
           "test :: fn(x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
         )
     describe("division") {
-      #if 0
-      it("debug math witout a macro") {
-        MATH_CHECKER_FN(u8, u8, /);
-        check(spec_check_mass_result(test_context.result));
-        check(checker(10u, 3u) == 10u / 3u);
-        check(checker(UINT8_MAX, 3u) == UINT8_MAX / 3u);
-      }
-      #endif
-
       #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
         it("should correctly handle u"#BITS" divide") {\
           MATH_CHECKER_FN(u##BITS, u##BITS, /);\
@@ -1317,6 +1308,26 @@ spec("source") {
       MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(16)
       MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(32)
       MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(64)
+
+      it("should allow division of positive i64 literals") {
+        s64(*checker)() = (s64(*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "FOO :: 84 / 2\n"
+          "checker :: fn() -> (s64) { FOO }"
+        );
+        check(spec_check_mass_result(test_context.result));
+        check(checker() == 42);
+      }
+
+      it("should allow remainder of positive i64 literals") {
+        s64(*checker)() = (s64(*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "FOO :: 142 % 100\n"
+          "checker :: fn() -> (s64) { FOO }"
+        );
+        check(spec_check_mass_result(test_context.result));
+        check(checker() == 42);
+      }
     }
 
     describe("multiplication") {
@@ -1329,6 +1340,23 @@ spec("source") {
         MATH_CHECKER_FN(u8, u8, *);
         check(spec_check_mass_result(test_context.result));
         check(checker(128u, 3u) == 128u);
+      }
+      it("should allow multiplication of positive i64 literals") {
+        s64(*checker)() = (s64(*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "FOO :: 21 * 2\n"
+          "checker :: fn() -> (s64) { FOO }"
+        );
+        check(spec_check_mass_result(test_context.result));
+        check(checker() == 42);
+      }
+      it("should disallow multiplication of negative i64 literals") {
+        test_program_inline_source_function(
+          "checker", &test_context,
+          "FOO :: 0x8000_0000_0000_0001 * 2\n"
+          "checker :: fn() -> (s64) { FOO }"
+        );
+        check(test_context.result->tag == Mass_Result_Tag_Error);
       }
     }
 
