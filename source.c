@@ -408,7 +408,6 @@ value_indirect_from_pointer(
   Function_Builder *builder,
   Value *source
 ) {
-  const Allocator *allocator = compilation->allocator;
   const Descriptor *referenced_descriptor;
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
   if (source_descriptor->tag == Descriptor_Tag_Pointer_To) {
@@ -417,12 +416,18 @@ value_indirect_from_pointer(
     panic("Unexpected descriptor tag for an indirect value");
     return 0;
   }
+  if (value_is_lazy_or_static(source)) {
+    Expected_Result expected_result = expected_result_any(source_descriptor);
+    source = value_force(compilation, builder, &expected_result, source);
+  }
+
   switch(source->storage.tag) {
     case Storage_Tag_Register: {
       Register reg = source->storage.Register.index;
       Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
+      referenced_storage.flags |= source->storage.flags & Storage_Flags_Temporary;
       Value *value = value_init(
-        allocator_allocate(allocator, Value),
+        allocator_allocate(compilation->allocator, Value),
         referenced_descriptor, referenced_storage, source->source_range
       );
       return value;
@@ -431,10 +436,11 @@ value_indirect_from_pointer(
       Register reg = register_acquire_temp(builder);
       Storage reg_storage = storage_register(reg, source_descriptor->bit_size);
       move_value(builder, &source->source_range, &reg_storage, &source->storage);
+      storage_release_if_temporary(builder, &source->storage);
       Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
       referenced_storage.flags |= Storage_Flags_Temporary;
       Value *temp = value_init(
-        allocator_allocate(allocator, Value),
+        allocator_allocate(compilation->allocator, Value),
         referenced_descriptor, referenced_storage, source->source_range
       );
       return temp;
@@ -2256,6 +2262,7 @@ expected_result_ensure_value_or_temp(
           expected_descriptor, storage, value->source_range
         );
         MASS_ON_ERROR(assign(compilation, builder, temp_result, value, &value->source_range)) return 0;
+        storage_release_if_temporary(builder, &value->storage);
         return temp_result;
       }
       // FIXME support floats
@@ -5809,6 +5816,7 @@ mass_handle_if_expression_lazy_proc(
     make_label(compilation->allocator, program, &program->memory.code, slice_literal("else"));
 
   encode_inverted_conditional_jump(builder, else_label, &condition->source_range, condition);
+  storage_release_if_temporary(builder, &condition->storage);
 
   Label *after_label =
     make_label(compilation->allocator, program, &program->memory.code, slice_literal("endif"));

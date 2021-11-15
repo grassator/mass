@@ -1202,8 +1202,7 @@ spec("source") {
         "test", &test_context,
         "test :: fn() -> (s8) {\n"
           "x := 42\n"
-          "pointer := cast(&s8, &x)\n"
-          "pointer.*"
+          "cast(&s8, &x).*\n"
         "};"
       );
       check(spec_check_mass_result(test_context.result));
@@ -2327,6 +2326,19 @@ spec("source") {
     }
   }
 
+  describe("Asserts") {
+    it("should support static_assert") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() { static_assert(false, \"Oops\") }\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_User_Defined);
+      spec_check_slice(error->User_Defined.name, slice_literal("Static Assert Failed"));
+      spec_check_slice(error->detailed_message, slice_literal("Oops"));
+    }
+  }
 
   describe("Modules") {
     it("should support importing modules") {
@@ -2348,17 +2360,6 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 84);
-    }
-    it("should support static_assert") {
-      test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() { static_assert(false, \"Oops\") }\n"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_User_Defined);
-      spec_check_slice(error->User_Defined.name, slice_literal("Static Assert Failed"));
-      spec_check_slice(error->detailed_message, slice_literal("Oops"));
     }
 
     it("should support inline modules") {

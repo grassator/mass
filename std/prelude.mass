@@ -61,11 +61,10 @@ context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
 
 static_assert :: fn(condition : bool, message : String) => () intrinsic {
   meta :: import("std/meta")
-  condition_pointer := meta.reify(arguments.values.0, bool)
-  condition := condition_pointer.* // FIXME should be possible to deref inside reify
+  condition := meta.reify(arguments.values.0, bool)
   message := meta.reify(arguments.values.1, String)
 
-  if condition then {} else {
+  if condition.* then {} else {
     error : MASS.Error
     error.tag = MASS.Error_Tag.User_Defined
     error.source_range = arguments.source_range
