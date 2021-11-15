@@ -3245,7 +3245,8 @@ mass_macro_lazy_proc(
       slice_literal("macro return")
     );
     builder->return_value = result_value;
-    result_value = value_force(compilation, builder, expected_result, body_value);
+    value_force_exact(compilation, builder, result_value, body_value);
+
     MASS_ON_ERROR(*compilation->result) return 0;
 
     push_instruction( &builder->code_block, (Instruction) {
