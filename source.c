@@ -5047,11 +5047,17 @@ mass_pointer_to_lazy_proc(
   const Source_Range *source_range,
   Value *pointee
 ) {
-  Value *result_value = value_from_expected_result(
-    compilation->allocator, builder, expected_result, *source_range
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(pointee);
+  Expected_Result expected_pointee = expected_result_any(descriptor);
+  Value *forced = value_force(compilation, builder, &expected_pointee, pointee);
+  MASS_ON_ERROR(*compilation->result) return 0;
+  Value *pointer_value =
+    value_from_expected_result(compilation->allocator, builder, expected_result, *source_range);
+  load_address(builder, source_range, pointer_value, forced->storage);
+  storage_release_if_temporary(builder, &forced->storage);
+  return expected_result_ensure_value_or_temp(
+    compilation, builder, expected_result, pointer_value
   );
-  load_address(builder, source_range, result_value, pointee->storage);
-  return result_value;
 }
 
 static Value *
