@@ -1,0 +1,10 @@
+exports {reify}
+
+reify :: macro(value : &MASS.Value, type : Type) {
+  assert(value.storage.tag == MASS.Storage_Tag.Static)
+  // FIXME check all variants
+  //assert(value.storage.Static.memory.tag == MASS.Static_Memory_Tag.Heap)
+  // FIXME need to get `same_type` in here
+  //assert(value.descriptor == type)
+  cast(&type, value.storage.Static.memory.Heap.pointer)
+}

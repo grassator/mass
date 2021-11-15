@@ -53,15 +53,6 @@ assert :: fn(condition : bool, message := "Assertion failed") {
   }
 }
 
-reify :: macro(value : &MASS.Value, type : Type) {
-  assert(value.storage.tag == MASS.Storage_Tag.Static)
-  // FIXME check all variants
-  //assert(value.storage.Static.memory.tag == MASS.Static_Memory_Tag.Heap)
-  // FIXME need to get `same_type` in here
-  //assert(value.descriptor == type)
-  cast(&type, value.storage.Static.memory.Heap.pointer)
-}
-
 context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
   assert(context.result.tag == MASS.Result_Tag.Success)
   context.result.tag = MASS.Result_Tag.Error
@@ -69,8 +60,9 @@ context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
 }
 
 static_assert :: fn(condition : bool, message : String) => () intrinsic {
-  condition := reify(arguments.values.0, bool)
-  message := reify(arguments.values.1, String)
+  meta :: import("std/meta")
+  condition := meta.reify(arguments.values.0, bool)
+  message := meta.reify(arguments.values.1, String)
 
   if condition then {} else {
     error : MASS.Error
