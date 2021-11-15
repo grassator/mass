@@ -1640,7 +1640,6 @@ main(void) {
   })));
 
   export_compiler(push_type(type_struct("Lazy_Value", (Struct_Item[]){
-    { "Execution_Context", "context" },
     { "u64", "epoch" },
     { "const Descriptor *", "descriptor" },
     { "Lazy_Value_Proc", "proc" },

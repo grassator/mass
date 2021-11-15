@@ -1032,7 +1032,7 @@ spec("source") {
             "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
 
             "lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)\n"
-            "lazy_value.context = context.*\n"
+            "lazy_value.epoch = context.epoch\n"
             "lazy_value.descriptor = type_of(())\n"
             "lazy_value.proc = lazy_value_proc\n"
             "lazy_value.payload = 0\n"

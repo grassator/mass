@@ -2392,7 +2392,7 @@ mass_make_lazy_value_with_epoch(
 
   Lazy_Value *lazy = &combined->lazy_value;
   *lazy = (Lazy_Value) {
-    .context = *context,
+    .epoch = epoch,
     .descriptor = descriptor,
     .proc = proc,
     .payload = payload,
@@ -6446,7 +6446,6 @@ token_parse_block_view(
     }
     Lazy_Value lazy_value = {
       .epoch = context->epoch,
-      .context = *context,
       .descriptor = &descriptor_void,
     };
     match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, context->scope);

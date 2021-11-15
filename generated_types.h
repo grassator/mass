@@ -1633,7 +1633,6 @@ expected_result_as_flexible(Expected_Result *expected_result) {
 }
 typedef dyn_array_type(Expected_Result) Array_Expected_Result;
 typedef struct Lazy_Value {
-  Execution_Context context;
   u64 epoch;
   const Descriptor * descriptor;
   Lazy_Value_Proc proc;
@@ -4725,12 +4724,6 @@ MASS_DEFINE_TYPE_VALUE(expected_result);
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_execution_context,
-    .name = slice_literal_fields("context"),
-    .Base_Relative.offset = offsetof(Lazy_Value, context),
-  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_u64,
