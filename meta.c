@@ -2100,10 +2100,17 @@ main(void) {
     })
   ));
 
-  export_compiler_custom_name("descriptor_pointer_to", push_type(
+  export_compiler(push_type(
     type_function(Compile_Time, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
       { "const Allocator *", "allocator" },
       { "const Descriptor *", "descriptor" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "same_type", "_Bool", (Argument_Type[]){
+      { "const Descriptor *", "a" },
+      { "const Descriptor *", "b" },
     })
   ));
 

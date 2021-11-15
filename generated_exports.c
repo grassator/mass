@@ -709,6 +709,18 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    same_type, "same_type", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_descriptor_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_descriptor_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
     mass_i64_logical_shift_left, "i64_logical_shift_left", &descriptor_i64,
     function_parameter(

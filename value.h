@@ -372,12 +372,6 @@ descriptor_array_of(
 );
 
 static inline bool
-same_type(
-  const Descriptor *a,
-  const Descriptor *b
-);
-
-static inline bool
 same_value_type(
   const Value *a,
   const Value *b
