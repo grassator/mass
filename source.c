@@ -3503,7 +3503,7 @@ call_function_overload(
       !(builder->register_occupied_bitset & target_arg_register_bitset);
     bool can_assign_straight_to_target = (
       target_arg_registers_are_free &&
-      descriptor_is_implicit_pointer(target_item->descriptor)
+      !descriptor_is_implicit_pointer(target_item->descriptor)
     );
 
     bool can_use_source_registers = false;

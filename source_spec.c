@@ -765,8 +765,8 @@ spec("source") {
         "checker", &test_context,
         "foo :: fn(x : [s64]) -> (s64) { 21 }\n"
         "foo :: fn(x : [String]) -> (s64) { 42 }\n"
-        "checker :: fn() -> (s64) {"
-          "foo([\"bar\"])"
+        "checker :: fn() -> (s64) {\n"
+          "foo([\"bar\"])\n"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
