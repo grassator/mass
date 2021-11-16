@@ -2902,7 +2902,7 @@ compile_time_eval(
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Section *section = &jit->program->memory.code;
-  Label *eval_label_index = make_label(
+  Label *eval_label = make_label(
     context->allocator, jit->program, section, slice_literal("compile_time_eval")
   );
   Function_Builder eval_builder = {
@@ -2912,7 +2912,7 @@ compile_time_eval(
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .code_block = {
       .allocator = context->allocator,
-      .start_label = eval_label_index,
+      .start_label = eval_label,
       .end_label = make_label(
         context->allocator, jit->program, section, slice_literal("compile_time_eval_end")
       ),
@@ -2982,7 +2982,7 @@ compile_time_eval(
     return 0;
   }
 
-  fn_type_opaque jitted_code = c_function_from_label(jit->program, eval_label_index);
+  fn_type_opaque jitted_code = (fn_type_opaque)rip_value_pointer_from_label(eval_label);
   jitted_code();
 
   return value_init(
@@ -3962,8 +3962,8 @@ mass_intrinsic_call(
   }
   fn_type_opaque jitted_code;
   if (storage_is_label(&instance->storage)) {
-    jitted_code = c_function_from_label(
-      jit->program, instance->storage.Memory.location.Instruction_Pointer_Relative.label
+    jitted_code = (fn_type_opaque)rip_value_pointer_from_label(
+      instance->storage.Memory.location.Instruction_Pointer_Relative.label
     );
   } else {
     u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);

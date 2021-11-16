@@ -1275,17 +1275,6 @@ descriptor_pointer_to(
   return result;
 }
 
-static fn_type_opaque
-c_function_from_label(
-  Program *program,
-  const Label *label
-) {
-  Section *section = label->section;
-  assert(section == &program->memory.code);
-  s8 *target = section->buffer.memory + label->offset_in_section;
-  return (fn_type_opaque)target;
-}
-
 static const Function_Info *
 function_literal_info_for_args(
   const Function_Literal *literal,
@@ -1394,7 +1383,7 @@ value_as_function(
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     if (builder->function != info) continue;
-    return c_function_from_label(program, builder->code_block.start_label);
+    return (fn_type_opaque)rip_value_pointer_from_label(builder->code_block.start_label);
   }
   panic("Could not find resolve runtime function for value");
   return 0;
