@@ -1475,7 +1475,6 @@ mass_ensure_symbol_for_map(
   s32 hash = Symbol_Map__hash(name);
   const Symbol *symbol = 0;
   if (!symbol) {
-    // Symbol type is derived from name anyway so it does not need to be part of the key
     Symbol **cache_entry = hash_map_get_by_hash(map, hash, name);
     if (cache_entry) {
       symbol = *cache_entry;
