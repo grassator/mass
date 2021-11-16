@@ -652,22 +652,6 @@ imm_auto_8_or_32(
 }
 
 static inline Storage
-imm_auto(
-  s64 value
-) {
-  if (s64_fits_into_s8(value)) {
-    return imm8((s8) value);
-  }
-  if (s64_fits_into_s16(value)) {
-    return imm16((s16) value);
-  }
-  if (s64_fits_into_s32(value)) {
-    return imm32((s32) value);
-  }
-  return imm64(value);
-}
-
-static inline Storage
 storage_stack(
   s32 offset,
   Bits bit_size,
@@ -1048,23 +1032,6 @@ allocate_section_memory(
   label->resolved = true;
 
   return label;
-}
-
-static inline Value *
-value_global(
-  Execution_Context *context,
-  Descriptor *descriptor,
-  Source_Range source_range
-) {
-  Program *program = context->program;
-  Section *section = &program->memory.rw_data;
-  u64 byte_size = descriptor_byte_size(descriptor);
-  u64 alignment = descriptor_byte_alignment(descriptor);
-
-  Label *label = allocate_section_memory(
-    context->allocator, context->program, section, byte_size, alignment
-  );
-  return value_make(context, descriptor, data_label32(label, descriptor->bit_size), source_range);
 }
 
 static inline Storage
