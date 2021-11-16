@@ -36,8 +36,6 @@ eval :: @fn(curly : MASS.Group_Curly) MASS.eval
 eval :: @fn(paren : MASS.Group_Paren) MASS.eval
 fragment :: fn(curly : MASS.Group_Curly) => (MASS.Code_Fragment) MASS.fragment
 
-inline_machine_code_bytes :: MASS.inline_machine_code_bytes
-
 Void :: type_of(())
 debugger :: fn() => () intrinsic {
   lazy_value_proc :: fn(

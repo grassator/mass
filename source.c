@@ -1055,6 +1055,7 @@ assign(
     }
     return *compilation->result;
   }
+
   if (source->storage.tag == Storage_Tag_Static) {
     if (assign_from_static(compilation, builder, target, source, source_range)) {
       return *compilation->result;
@@ -5508,7 +5509,6 @@ mass_handle_array_access_lazy_proc(
 
   MASS_ON_ERROR(*compilation->result) return 0;
 
-
   index = maybe_coerce_i64_to_integer(
     compilation, index, &descriptor_u64, &index->source_range
   );
@@ -5516,6 +5516,7 @@ mass_handle_array_access_lazy_proc(
 
   const Descriptor *array_descriptor = value_or_lazy_value_descriptor(array);
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(array_descriptor);
+
   const Descriptor *item_descriptor;
   if(unwrapped_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
     item_descriptor = unwrapped_descriptor->Fixed_Size_Array.item;
@@ -6768,111 +6769,6 @@ mass_handle_return_operator(
   return mass_make_lazy_value(
     context, args.source_range, return_value, &descriptor_void,
     mass_handle_explicit_return_lazy_proc
-  );
-}
-
-typedef struct {
-  Array_Value_Ptr args;
-} Inline_Machine_Code_Bytes_Payload;
-
-static Value *
-mass_handle_inline_machine_code_bytes_lazy_proc(
-  Compilation *compilation,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range,
-  Inline_Machine_Code_Bytes_Payload *payload
-) {
-  Value_View args_view = value_view_from_value_array(payload->args, source_range);
-  if (args_view.length >= 15) {
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args_view.source_range,
-      .detailed_message = slice_literal("Expected a maximum of 15 bytes"),
-    });
-    return 0;
-  }
-
-  Instruction_Bytes bytes = {0};
-
-  enum {MAX_PATCH_COUNT = 2};
-  Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};
-  s32 patch_count = 0;
-
-  for (u64 arg_index = 0; arg_index < args_view.length; arg_index += 1) {
-    MASS_ON_ERROR(*compilation->result) return 0;
-    Value *value = value_view_get(args_view, arg_index);
-
-    if (value->descriptor == &descriptor_label_pointer) {
-      if (patch_count == MAX_PATCH_COUNT) {
-        compilation_error(compilation, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = value->source_range,
-          .detailed_message = slice_literal("inline_machine_code_bytes supports no more than 2 labels"),
-        });
-        return 0;
-      }
-      patches[patch_count++] = (Instruction_Label_Patch) {
-        .label = *storage_static_as_c_type(&value->storage, Label *),
-        .offset = bytes.length
-      };
-      bytes.memory[bytes.length++] = 0;
-      bytes.memory[bytes.length++] = 0;
-      bytes.memory[bytes.length++] = 0;
-      bytes.memory[bytes.length++] = 0;
-    } else if (value->storage.tag == Storage_Tag_Static) {
-      value = token_value_force_immediate_integer(
-        compilation, value, &descriptor_u8, source_range
-      );
-      MASS_ON_ERROR(*compilation->result) return 0;
-      u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
-      bytes.memory[bytes.length++] = byte;
-    } else {
-      compilation_error(compilation, (Mass_Error) {
-        .tag = Mass_Error_Tag_Expected_Static,
-        .source_range = value->source_range,
-      });
-      return 0;
-    }
-  }
-
-  push_instruction(&builder->code_block, (Instruction) {
-    .tag = Instruction_Tag_Location,
-    .Location = { .source_range = args_view.source_range },
-  });
-
-  push_instruction(&builder->code_block, (Instruction) {
-    .tag = Instruction_Tag_Bytes,
-    .Bytes = bytes,
-  });
-
-  for (s32 i = 0; i < patch_count; i += 1) {
-    patches[i].offset -= bytes.length;
-    push_instruction(&builder->code_block, (Instruction) {
-      .tag = Instruction_Tag_Label_Patch,
-      .Label_Patch = patches[i],
-    });
-  }
-
-  return expected_result_validate(expected_result, &void_value);
-}
-
-static Value *
-mass_inline_machine_code_bytes(
-  Execution_Context *context,
-  Value_View args_view
-) {
-  Array_Value_Ptr args_copy = value_view_to_value_array(context->allocator, args_view);
-
-  Inline_Machine_Code_Bytes_Payload *payload =
-    allocator_allocate(context->allocator, Inline_Machine_Code_Bytes_Payload);
-  *payload = (Inline_Machine_Code_Bytes_Payload) {
-    .args = args_copy,
-  };
-
-  return mass_make_lazy_value(
-    context, args_view.source_range, payload, &descriptor_void,
-    mass_handle_inline_machine_code_bytes_lazy_proc
   );
 }
 
