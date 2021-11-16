@@ -1389,20 +1389,6 @@ value_as_function(
   return 0;
 }
 
-static inline Memory_Layout_Item *
-memory_layout_item_find_by_name(
-  const Memory_Layout *layout,
-  Slice field_name
-) {
-  for (u64 i = 0; i < dyn_array_length(layout->items); ++i) {
-    Memory_Layout_Item *field = dyn_array_get(layout->items, i);
-    if (slice_equal(field->name, field_name)) {
-      return field;
-    }
-  }
-  return 0;
-}
-
 static inline Storage
 memory_layout_item_storage(
   const Storage *base,
@@ -1423,15 +1409,6 @@ memory_layout_item_storage(
   }
   panic("Not reached");
   return storage_none;
-}
-
-static inline Storage
-memory_layout_item_storage_at_index(
-  const Storage *base,
-  const Memory_Layout *layout,
-  u64 index
-) {
-  return memory_layout_item_storage(base, layout, dyn_array_get(layout->items, index));
 }
 
 static const Os
