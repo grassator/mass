@@ -618,7 +618,7 @@ spec("source") {
       check(answer == 42);
     }
 
-    it("should be able to put select from an overload set into a typed local variable") {
+    it("should be able to select from an overload set into a typed local variable") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn() -> (s64) {"
@@ -639,6 +639,21 @@ spec("source") {
         "checker :: fn() -> (s64) {"
           "local := fn() -> (s64) { 42 };"
           "local()"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 answer = checker();
+      check(answer == 42);
+    }
+
+    it("should be able to select from an overload set into a function argument") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
+          "foo :: fn(x : s64) -> (s64) { x }\n"
+          "foo :: fn(x : s32) -> (s32) { x }\n"
+          "callback :: fn(f : fn(x : s64) -> (s64)) -> (s64) { 42 }\n"
+          "callback(foo)"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
