@@ -635,7 +635,7 @@ ensure_function_instance(
     descriptor_function_instance(compilation->allocator, fn_name, fn_info, call_setup);
 
   if (value_is_external_symbol(literal->body)) {
-    const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
+    const External_Symbol *symbol = value_as_external_symbol(literal->body);
     Storage storage = import_symbol(compilation->allocator, program, symbol->library_name, symbol->symbol_name);
     Value *cached_instance = value_init(
       allocator_allocate(compilation->allocator, Value),
@@ -703,7 +703,7 @@ ensure_function_instance(
   if (value_is_group_curly(literal->body)) {
     parse_result = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));
   } else if (literal->body->descriptor == &descriptor_value_view) {
-    const Value_View *view = storage_static_as_c_type(&literal->body->storage, Value_View);
+    const Value_View *view = value_as_value_view(literal->body);
     parse_result = token_parse_block_view(&body_context, *view);
   } else if (literal->body->descriptor == &descriptor_lazy_value) {
     parse_result = literal->body;

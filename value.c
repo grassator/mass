@@ -284,9 +284,6 @@ get_static_storage_with_bit_size(
   return 0;
 }
 
-#define storage_static_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)get_static_storage_with_bit_size(_OPERAND_, (Bits){sizeof(_TYPE_) * CHAR_BIT}))
-
 #define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
   static inline bool\
   value_is_##_SUFFIX_(\
@@ -295,24 +292,48 @@ get_static_storage_with_bit_size(
     if (!value) return false;\
     return value->descriptor == &descriptor_##_SUFFIX_;\
   }\
-  static inline const _C_TYPE_ *\
+  static inline  _C_TYPE_ const *\
   value_as_##_SUFFIX_(\
     const Value *value\
   ) {\
     assert(value_is_##_SUFFIX_(value));\
-    return storage_static_as_c_type(&value->storage, _C_TYPE_);\
+    return (_C_TYPE_ const *)get_static_storage_with_bit_size(\
+      &value->storage, value->descriptor->bit_size\
+    );\
   }
 
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal)
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Syscall, syscall)
+DEFINE_VALUE_IS_AS_HELPERS(Quoted, quoted)
 DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple)
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol)
 DEFINE_VALUE_IS_AS_HELPERS(i64, i64)
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Module_Exports, module_exports)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Curly, group_curly)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square)
+DEFINE_VALUE_IS_AS_HELPERS(Overload_Set, overload_set)
+DEFINE_VALUE_IS_AS_HELPERS(Value_View, value_view)
+DEFINE_VALUE_IS_AS_HELPERS(Lazy_Static_Value, lazy_static_value)
+DEFINE_VALUE_IS_AS_HELPERS(Lazy_Value, lazy_value)
+DEFINE_VALUE_IS_AS_HELPERS(Operator, operator)
+DEFINE_VALUE_IS_AS_HELPERS(Macro_Capture, macro_capture)
+DEFINE_VALUE_IS_AS_HELPERS(Code_Fragment, code_fragment)
+DEFINE_VALUE_IS_AS_HELPERS(Scope, scope)
+DEFINE_VALUE_IS_AS_HELPERS(Label *, label_pointer)
+DEFINE_VALUE_IS_AS_HELPERS(Descriptor *, descriptor_pointer)
+DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool)
+DEFINE_VALUE_IS_AS_HELPERS(s8, s8)
+DEFINE_VALUE_IS_AS_HELPERS(s16, s16)
+DEFINE_VALUE_IS_AS_HELPERS(s32, s32)
+DEFINE_VALUE_IS_AS_HELPERS(s64, s64)
+DEFINE_VALUE_IS_AS_HELPERS(u8, u8)
+DEFINE_VALUE_IS_AS_HELPERS(u16, u16)
+DEFINE_VALUE_IS_AS_HELPERS(u32, u32)
+DEFINE_VALUE_IS_AS_HELPERS(u64, u64)
 
 static bool
 same_function_signature(
@@ -410,10 +431,10 @@ storage_static_value_up_to_s64(
   const Storage *operand
 ) {
   switch(operand->bit_size.as_u64) {
-    case 8: return *storage_static_as_c_type(operand, s8);
-    case 16: return *storage_static_as_c_type(operand, s16);
-    case 32: return *storage_static_as_c_type(operand, s32);
-    case 64: return *storage_static_as_c_type(operand, s64);
+    case 8: return *(s8*)get_static_storage_with_bit_size(operand, (Bits){8});
+    case 16: return *(s16*)get_static_storage_with_bit_size(operand, (Bits){16});
+    case 32: return *(s32*)get_static_storage_with_bit_size(operand, (Bits){32});
+    case 64: return *(s64*)get_static_storage_with_bit_size(operand, (Bits){64});
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -426,10 +447,10 @@ storage_static_value_up_to_u64(
   const Storage *operand
 ) {
   switch(operand->bit_size.as_u64) {
-    case 8: return *storage_static_as_c_type(operand, u8);
-    case 16: return *storage_static_as_c_type(operand, u16);
-    case 32: return *storage_static_as_c_type(operand, u32);
-    case 64: return *storage_static_as_c_type(operand, u64);
+    case 8: return *(u8*)get_static_storage_with_bit_size(operand, (Bits){8});
+    case 16: return *(u16*)get_static_storage_with_bit_size(operand, (Bits){16});
+    case 32: return *(u32*)get_static_storage_with_bit_size(operand, (Bits){32});
+    case 64: return *(u64*)get_static_storage_with_bit_size(operand, (Bits){64});
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -459,23 +480,12 @@ print_storage(
       break;
     }
     case Storage_Tag_Static: {
+      u64 value = storage_static_value_up_to_u64(storage);
       switch(storage->bit_size.as_u64) {
-        case 8: {
-          printf("imm8(0x%02x)", *storage_static_as_c_type(storage, u8));
-          break;
-        }
-        case 16: {
-          printf("imm16(0x%04x)", *storage_static_as_c_type(storage, u16));
-          break;
-        }
-        case 32: {
-          printf("imm32(0x%08x)", *storage_static_as_c_type(storage, u32));
-          break;
-        }
-        case 64: {
-          printf("imm64(0x%016" PRIx64 ")", *storage_static_as_c_type(storage, u64));
-          break;
-        }
+        case 8: { printf("imm8(0x%02" PRIx64 ")", value); break; }
+        case 16: { printf("imm16(0x%04" PRIx64 ")", value); break; }
+        case 32: { printf("imm32(0x%08" PRIx64 ")", value); break; }
+        case 64: { printf("imm64(0x%016" PRIx64 ")", value); break; }
         default: {
           panic("Unsupported immediate size when printing");
           break;
@@ -1570,13 +1580,11 @@ value_i64_cast_to(
   u64 *out_bits,
   u64 *out_bit_size
 ) {
-  assert(value_is_static_i64(value));
-
   if (!descriptor_is_integer(target_descriptor)) {
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  const i64 *literal = storage_static_as_c_type(&value->storage, i64);
+  const i64 *literal = value_as_i64(value);
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
@@ -1641,7 +1649,7 @@ same_value_type_or_can_implicitly_move_cast(
   }
   if (target->tag == Descriptor_Tag_Function_Instance) {
     if (source->descriptor == &descriptor_overload_set) {
-      const Overload_Set *set = storage_static_as_c_type(&source->storage, Overload_Set);
+      const Overload_Set *set = value_as_overload_set(source);
       for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
         Value *overload = *dyn_array_get(set->items, i);
         if (same_value_type_or_can_implicitly_move_cast(target, overload)) return true;
@@ -1656,7 +1664,7 @@ same_value_type_or_can_implicitly_move_cast(
   if (value_is_static_i64(source) && target != &descriptor_i64) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer_To) {
-      const i64 *literal = storage_static_as_c_type(&source->storage, i64);
+      const i64 *literal = value_as_i64(source);
       return literal->bits == 0;
     } else {
       Literal_Cast_Result cast_result = value_i64_cast_to(source, target, &(u64){0}, &(u64){0});

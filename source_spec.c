@@ -110,8 +110,8 @@ test_program_source_base(
     context, test_module->own_scope, symbol, &symbol_source_range
   );
   if (value) {
-    if (value->descriptor == &descriptor_overload_set) {
-      const Overload_Set *set = storage_static_as_c_type(&value->storage, Overload_Set);
+    if (value_is_overload_set(value)) {
+      const Overload_Set *set = value_as_overload_set(value);
       assert(dyn_array_length(set->items) == 1);
       value = *dyn_array_get(set->items, 0);
     }
@@ -286,7 +286,7 @@ spec("source") {
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0xCAFE"));
       check(token->descriptor == &descriptor_i64);
       check(token->storage.tag == Storage_Tag_Static);
-      i64 *literal = storage_static_as_c_type(&token->storage, i64);
+      const i64 *literal = value_as_i64(token);
       check(literal->bits == 0xCAFE);
     }
 
@@ -300,7 +300,7 @@ spec("source") {
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0b100"));
       check(token->descriptor == &descriptor_i64);
       check(token->storage.tag == Storage_Tag_Static);
-      i64 *literal = storage_static_as_c_type(&token->storage, i64);
+      const i64 *literal = value_as_i64(token);
       check(literal->bits == 0b100);
     }
 
@@ -1567,7 +1567,7 @@ spec("source") {
       check(descriptor_is_integer(status->descriptor));
       check(status->storage.tag == Storage_Tag_Static);
       check(status->storage.bit_size.as_u64 == 8);
-      check(*storage_static_as_c_type(&status->storage, s8) == 42);
+      check(*value_as_s8(status) == 42);
     }
 
     it("should be able to to do nested compile time calls") {
@@ -1583,7 +1583,7 @@ spec("source") {
       check(descriptor_is_integer(result->descriptor));
       check(result->storage.tag == Storage_Tag_Static);
       check(result->storage.bit_size.as_u64 == 8);
-      check(*storage_static_as_c_type(&result->storage, s8) == 42);
+      check(*value_as_s8(result) == 42);
     }
 
     it("should support compile time blocks") {
@@ -1614,7 +1614,7 @@ spec("source") {
       check(value);
       check(value->descriptor == &descriptor_i64);
       check(value->storage.tag == Storage_Tag_Static);
-      i64 *literal = storage_static_as_c_type(&value->storage, i64);
+      const i64 *literal = value_as_i64(value);
       check(literal->bits == 42);
     }
 
@@ -1627,7 +1627,7 @@ spec("source") {
       check(value);
       check(value->descriptor == &descriptor_i64);
       check(value->storage.tag == Storage_Tag_Static);
-      i64 *literal = storage_static_as_c_type(&value->storage, i64);
+      const i64 *literal = value_as_i64(value);
       check(literal->bits == 42);
     }
 

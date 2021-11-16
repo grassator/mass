@@ -205,7 +205,7 @@ token_statement_matcher_in_scopes(
 static void
 use_scope(
   Execution_Context *context,
-  Scope *scope_to_use
+  const Scope *scope_to_use
 ) {
   Scope_Using *using_entry = allocator_allocate(context->allocator, Scope_Using);
   *using_entry = (Scope_Using) {
@@ -352,7 +352,7 @@ assign_from_static(
     // If a static value contains a pointer, we expect an entry in a special map used to track
     // whether the target memory is also already copied to the compiled binary.
     // This is done to only include static values actually used at runtime.
-    void *source_memory = *storage_static_as_c_type(&source->storage, void *);
+    void *source_memory = *(void **)get_static_storage_with_bit_size(&source->storage, (Bits){64});
     Value *static_pointer = hash_map_get(compilation->static_pointer_map, source_memory);
     assert(static_pointer);
     if (static_pointer->storage.tag == Storage_Tag_None) {
@@ -577,11 +577,11 @@ deduce_runtime_descriptor_for_value(
       return &descriptor_s64;
     }
     if (value->descriptor == &descriptor_tuple) {
-      const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
+      const Tuple *tuple = value_as_tuple(value);
       return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
     }
     if (value->descriptor == &descriptor_function_literal) {
-      const Function_Literal *literal = storage_static_as_c_type(&value->storage, Function_Literal);
+      const Function_Literal *literal = value_as_function_literal(value);
       if (literal->flags & Function_Literal_Flags_Macro) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_No_Runtime_Use,
@@ -917,7 +917,7 @@ assign(
 
   if (value_is_static_i64(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      const i64 *literal = storage_static_as_c_type(&source->storage, i64);
+      const i64 *literal = value_as_i64(source);
       if (literal->bits == 0) {
         Storage zero = imm64(0);
         move_value(builder, source_range, &target->storage, &zero);
@@ -1110,8 +1110,8 @@ value_force_lazy_static(
   Value *value,
   Slice name
 ) {
-  assert(value->descriptor == &descriptor_lazy_static_value);
-  Lazy_Static_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Static_Value);
+  // TODO figure out how to get rid of this cast
+  Lazy_Static_Value *lazy = (Lazy_Static_Value *)value_as_lazy_static_value(value);
   if (lazy->resolving) {
     context_error(&lazy->context, (Mass_Error) {
       .tag = Mass_Error_Tag_Circular_Dependency,
@@ -1148,7 +1148,7 @@ scope_entry_force_value(
 
   if (entry->value->descriptor == &descriptor_overload_set) {
 
-    const Overload_Set *set = storage_static_as_c_type(&entry->value->storage, Overload_Set);
+    const Overload_Set *set = value_as_overload_set(entry->value);
     for (u64 i = 0; i < dyn_array_length(set->items); ++i) {
       Value **overload_pointer = dyn_array_get(set->items, i);
       Value *overload = *overload_pointer;
@@ -1217,7 +1217,8 @@ scope_define_value(
     if (it->value->descriptor != &descriptor_overload_set) {
       it->value = value_wrap_in_overload_set(scope, it->value, symbol->name, &source_range);
     }
-    Overload_Set *set = storage_static_as_c_type(&it->value->storage, Overload_Set);
+    // TODO avoid this cast
+    Overload_Set *set = (Overload_Set *)value_as_overload_set(it->value);
     dyn_array_push(set->items, value);
   } else {
     Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
@@ -1280,7 +1281,7 @@ scope_lookup_operator(
   Scope_Entry *maybe_operator_entry = scope_lookup(scope, operator_symbol);
   if (!maybe_operator_entry) return 0;
   if (maybe_operator_entry->value->descriptor != &descriptor_operator) return 0;
-  return storage_static_as_c_type(&maybe_operator_entry->value->storage, Operator);
+  return value_as_operator(maybe_operator_entry->value);
 }
 
 static inline Value *
@@ -1628,8 +1629,8 @@ value_ensure_type(
   Source_Range source_range
 ) {
   if (!value) return 0;
-  if (value->descriptor == &descriptor_tuple) {
-    const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
+  if (value_is_tuple(value)) {
+    const Tuple *tuple = value_as_tuple(value);
     return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
   }
   if (!same_type(value->descriptor, &descriptor_descriptor_pointer)) {
@@ -1643,7 +1644,7 @@ value_ensure_type(
     });
     return 0;
   }
-  return *storage_static_as_c_type(&value->storage, const Descriptor *);
+  return *value_as_descriptor_pointer(value);
 }
 
 static inline Value_View
@@ -1780,7 +1781,7 @@ token_parse_single(
   } else if (value->descriptor == &descriptor_group_square) {
     return token_parse_tuple(context, value_as_group_square(value)->children);
   } else if (value->descriptor == &descriptor_quoted) {
-    Quoted *quoted = storage_static_as_c_type(&value->storage, Quoted);
+    const Quoted *quoted = value_as_quoted(value);
     return quoted->value;
   } else if (value_is_symbol(value)) {
     return scope_lookup_force(context, context->scope, value_as_symbol(value), &value->source_range);
@@ -2317,8 +2318,8 @@ value_force(
 ) {
   if (!value) return 0;
 
-  if (value->descriptor == &descriptor_lazy_value) {
-    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+  if (value_is_lazy_value(value)) {
+    const Lazy_Value *lazy = value_as_lazy_value(value);
 
     if (lazy->epoch != VALUE_STATIC_EPOCH && lazy->epoch != builder->epoch) {
       compilation_error(compilation, (Mass_Error) {
@@ -2667,7 +2668,7 @@ mass_import(
   if (args.length != 1) goto parse_err;
   Value *file_path_value = value_view_get(args, 0);
   if (file_path_value->descriptor != &descriptor_slice) goto parse_err;
-  Slice file_path = *storage_static_as_c_type(&file_path_value->storage, Slice);
+  Slice file_path = *value_as_slice(file_path_value);
 
   Module *module;
   if (slice_equal(file_path, slice_literal("mass"))) {
@@ -2874,7 +2875,7 @@ value_or_lazy_value_descriptor(
   const Value *value
 ) {
   if (value->descriptor == &descriptor_lazy_value && value->storage.tag == Storage_Tag_Static) {
-    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    const Lazy_Value *lazy = value_as_lazy_value(value);
     return lazy->descriptor;
   }
   return value->descriptor;
@@ -3841,8 +3842,8 @@ mass_match_overload_candidate(
   struct Overload_Match_State *match,
   struct Overload_Match_State *best_conflict_match
 ) {
-  if (candidate->descriptor == &descriptor_overload_set) {
-    const Overload_Set *set = storage_static_as_c_type(&candidate->storage, Overload_Set);
+  if (value_is_overload_set(candidate)) {
+    const Overload_Set *set = value_as_overload_set(candidate);
     for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
       Value *overload = *dyn_array_get(set->items, i);
       mass_match_overload_candidate(overload, args, match, best_conflict_match);
@@ -4209,8 +4210,8 @@ token_handle_function_call(
   Value_View args_view,
   Source_Range source_range
 ) {
-  if (target_expression->descriptor == &descriptor_macro_capture) {
-    Macro_Capture *capture = storage_static_as_c_type(&target_expression->storage, Macro_Capture);
+  if (value_is_macro_capture(target_expression)) {
+    const Macro_Capture *capture = value_as_macro_capture(target_expression);
     Execution_Context capture_context = *context;
     capture_context.scope = capture->scope;
     if (args_view.length == 0) {
@@ -4226,7 +4227,7 @@ token_handle_function_call(
         });
         return 0;
       }
-      Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
+      const Scope *argument_scope = value_as_scope(scope_arg);
       use_scope(&capture_context, argument_scope);
     } else {
       Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
@@ -4339,7 +4340,7 @@ token_handle_parsed_function_call(
       });
       goto defer;
     }
-    args_view = *storage_static_as_c_type(&args_token->storage, Value_View);
+    args_view = *value_as_value_view(args_token);
   } else {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -5132,7 +5133,7 @@ mass_handle_apply_operator(
   }
 
   if (rhs_value->descriptor == &descriptor_value_view) {
-    Value_View args_view = *storage_static_as_c_type(&rhs_value->storage, Value_View);
+    Value_View args_view = *value_as_value_view(rhs_value);
     return token_handle_function_call(context, lhs_value, args_view, source_range);
   }
 
@@ -5305,7 +5306,7 @@ mass_goto_lazy_proc(
     return 0;
   }
 
-  Label *label = *storage_static_as_c_type(&target->storage, Label *);
+  Label *label = *value_as_label_pointer(target);
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range,
     &(Instruction_Assembly){jmp, {code_label32(label)}}
@@ -5398,7 +5399,8 @@ value_maybe_dereference(
     return value->storage;
   } else {
     if (value->storage.tag == Storage_Tag_Static) {
-      const void *pointed_memory = *storage_static_as_c_type(&value->storage, void *);
+      const void *pointed_memory =
+        *(void **)get_static_storage_with_bit_size(&value->storage, (Bits){64});
       return storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
     } else if (value->storage.tag == Storage_Tag_Register) {
       Register reg = value->storage.Register.index;
@@ -5705,7 +5707,7 @@ mass_handle_dot_operator(
         });
         return 0;
       }
-      const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
+      const Scope *module_scope = value_as_scope(lhs);
       Scope_Entry *entry = scope_lookup_shallow(module_scope, field_symbol);
       if (!entry) {
         context_error(context, (Mass_Error) {
@@ -5915,7 +5917,7 @@ token_parse_if_expression(
       });
       return 0;
     }
-    bool condition = *storage_static_as_c_type(&value_condition->storage, bool);
+    bool condition = *value_as__bool(value_condition);
     return condition ? value_then : value_else;
   }
 
@@ -6178,7 +6180,7 @@ token_parse_function_literal(
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
-    i64 syscall_number = storage_static_as_c_type(&body_value->storage, Syscall)->number;
+    i64 syscall_number = value_as_syscall(body_value)->number;
     assert(call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
     call_setup.jump.Syscall.number = u64_to_s64(syscall_number.bits);
 
@@ -6487,8 +6489,8 @@ token_parse_block_view(
     MASS_ON_ERROR(*context->result) goto defer;
 
     if (parse_result->storage.tag == Storage_Tag_Static) {
-      if (parse_result->descriptor == &descriptor_code_fragment) {
-        const Code_Fragment *fragment = storage_static_as_c_type(&parse_result->storage, Code_Fragment);
+      if (value_is_code_fragment(parse_result)) {
+        const Code_Fragment *fragment = value_as_code_fragment(parse_result);
         Scope *saved_scope = context->scope;
         context->scope = fragment->scope;
         parse_result = token_parse_block_view(context, fragment->children);
@@ -6497,7 +6499,7 @@ token_parse_block_view(
         parse_result = mass_define_stack_value_from_typed_symbol(
           context, value_as_typed_symbol(parse_result), parse_result->source_range
         );
-      } else if (parse_result->descriptor == &descriptor_module_exports) {
+      } else if (value_is_module_exports(parse_result)) {
         Value_View match_view = value_view_slice(&rest, 0, match_length);
         if (!(context->flags & Execution_Context_Flags_Global)) {
           context_error(context, (Mass_Error) {
@@ -6516,8 +6518,7 @@ token_parse_block_view(
           });
           goto defer;
         }
-        const Module_Exports *exports =
-          storage_static_as_c_type(&parse_result->storage, Module_Exports);
+        const Module_Exports *exports = value_as_module_exports(parse_result);
         context->module->exports = *exports;
         continue;
       }
@@ -6613,7 +6614,7 @@ token_parse_statement_using(
     goto err;
   }
 
-  Scope *using_scope = storage_static_as_c_type(&result->storage, Scope);
+  const Scope *using_scope = value_as_scope(result);
   use_scope(context, using_scope);
 
   err:
@@ -6640,7 +6641,7 @@ mass_handle_label_lazy_proc(
     return 0;
   }
 
-  Label *label = *storage_static_as_c_type(&label_value->storage, Label *);
+  Label *label = *value_as_label_pointer(label_value);
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
     .Label.pointer = label,
@@ -6907,8 +6908,7 @@ scope_define_enum(
   Scope *enum_scope = scope_make(allocator, 0);
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
-    const Descriptor *enum_descriptor =
-      *storage_static_as_c_type(&enum_type_value->storage, const Descriptor *);
+    const Descriptor *enum_descriptor = *value_as_descriptor_pointer(enum_type_value);
     Value *item_value = value_init(
       allocator_allocate(allocator, Value),
       enum_descriptor, storage_static(&it->value), source_range
