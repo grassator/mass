@@ -4,15 +4,6 @@
 #include "calling_convention.h"
 
 static inline bool
-value_is_static_i64(
-  const Value *value
-) {
-  if (value->descriptor != &descriptor_i64) return false;
-  if (value->storage.tag != Storage_Tag_Static) return false;
-  return true;
-}
-
-static inline bool
 value_is_lazy_or_static(
   const Value *value
 ) {
@@ -1558,7 +1549,7 @@ same_value_type_or_can_implicitly_move_cast(
       return same_function_signature(target->Function_Instance.info, literal->info);
     }
   }
-  if (value_is_static_i64(source) && target != &descriptor_i64) {
+  if (value_is_i64(source) && target != &descriptor_i64) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer_To) {
       const i64 *literal = value_as_i64(source);

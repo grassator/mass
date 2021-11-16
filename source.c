@@ -268,7 +268,7 @@ token_value_force_immediate_integer(
   const Source_Range *source_range
 ) {
   assert(descriptor_is_integer(target_descriptor));
-  if (value_is_static_i64(value)) {
+  if (value_is_i64(value)) {
     u64 bits = 0xCCccCCccCCccCCcc;
     u64 bit_size = 0xCCccCCccCCccCCcc;
     Literal_Cast_Result cast_result =
@@ -641,8 +641,8 @@ large_enough_common_integer_descriptor_for_values(
   bool left_is_integer = descriptor_is_integer(left);
   bool right_is_integer = descriptor_is_integer(right);
 
-  bool left_is_literal = value_is_static_i64(left_value);
-  bool right_is_literal = value_is_static_i64(right_value);
+  bool left_is_literal = value_is_i64(left_value);
+  bool right_is_literal = value_is_i64(right_value);
 
   if (!left_is_integer && !left_is_literal) {
     // TODO :GenericIntegerType
@@ -915,7 +915,7 @@ assign(
     return *compilation->result;
   }
 
-  if (value_is_static_i64(source)) {
+  if (value_is_i64(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const i64 *literal = value_as_i64(source);
       if (literal->bits == 0) {
@@ -3043,7 +3043,7 @@ mass_handle_cast_lazy_proc(
   Bits original_bit_size = source_descriptor->bit_size;
 
   Value *result_value = value;
-  if (value_is_static_i64(expression) && descriptor_is_integer(target_descriptor)) {
+  if (value_is_i64(expression) && descriptor_is_integer(target_descriptor)) {
     result_value = token_value_force_immediate_integer(
       compilation, value, target_descriptor, source_range
     );

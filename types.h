@@ -174,6 +174,7 @@ get_static_storage_with_bit_size();
     const Value *value\
   ) {\
     if (!value) return false;\
+    if (value->storage.tag != Storage_Tag_Static) return false;\
     return value->descriptor == &descriptor_##_SUFFIX_;\
   }\
   static inline  _C_TYPE_ const *\
