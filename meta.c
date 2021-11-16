@@ -819,16 +819,17 @@ print_mass_descriptor_and_type(
   FILE *file,
   Meta_Type *type
 ) {
+  char *lowercase_name = strtolower(type->name);
   switch(type->tag) {
     case Meta_Type_Tag_Struct: {
-      char *lowercase_name = strtolower(type->name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
       print_mass_struct(file, type->name, &type->struct_);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
     }
     case Meta_Type_Tag_C_Opaque: {
-      char *lowercase_name = strtolower(type->name);
       const char *numeric_interpretation_string = 0;
       switch(type->c_opaque.numeric_interpretation) {
         case Opaque_Numeric_Interpretation_None: {
@@ -844,10 +845,11 @@ print_mass_descriptor_and_type(
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s, .Opaque.numeric_interpretation = %s)\n",
         lowercase_name, type->name, numeric_interpretation_string);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
     }
     case Meta_Type_Tag_Enum: {
-      char *lowercase_name = strtolower(type->name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->name);
 
       fprintf(file, "static C_Enum_Item %s_items[] = {\n", lowercase_name);
@@ -859,11 +861,12 @@ print_mass_descriptor_and_type(
         );
       }
       fprintf(file, "};\n");
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
     }
     case Meta_Type_Tag_Tagged_Union: {
       fprintf(file, "/*union struct start */\n");
-      char *lowercase_name = strtolower(type->name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
 
@@ -925,13 +928,14 @@ print_mass_descriptor_and_type(
         fprintf(file, ");\n");
         fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);
       }
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       fprintf(file, "/*union struct end*/\n");
       break;
     }
     case Meta_Type_Tag_Function: {
       // Exported functions are handled separately
       Function_Type *function = &type->function;
-      char *lowercase_name = strtolower(type->name);
       if (function->kind == Function_Kind_Typedef) {
         fprintf(file, "MASS_DEFINE_FUNCTION_DESCRIPTOR(\n  %s,\n", lowercase_name);
         {

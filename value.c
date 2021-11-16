@@ -284,57 +284,6 @@ get_static_storage_with_bit_size(
   return 0;
 }
 
-#define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
-  static inline bool\
-  value_is_##_SUFFIX_(\
-    const Value *value\
-  ) {\
-    if (!value) return false;\
-    return value->descriptor == &descriptor_##_SUFFIX_;\
-  }\
-  static inline  _C_TYPE_ const *\
-  value_as_##_SUFFIX_(\
-    const Value *value\
-  ) {\
-    assert(value_is_##_SUFFIX_(value));\
-    return (_C_TYPE_ const *)get_static_storage_with_bit_size(\
-      &value->storage, value->descriptor->bit_size\
-    );\
-  }
-
-DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal)
-DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
-DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
-DEFINE_VALUE_IS_AS_HELPERS(Syscall, syscall)
-DEFINE_VALUE_IS_AS_HELPERS(Quoted, quoted)
-DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple)
-DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol)
-DEFINE_VALUE_IS_AS_HELPERS(i64, i64)
-DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
-DEFINE_VALUE_IS_AS_HELPERS(Module_Exports, module_exports)
-DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren)
-DEFINE_VALUE_IS_AS_HELPERS(Group_Curly, group_curly)
-DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square)
-DEFINE_VALUE_IS_AS_HELPERS(Overload_Set, overload_set)
-DEFINE_VALUE_IS_AS_HELPERS(Value_View, value_view)
-DEFINE_VALUE_IS_AS_HELPERS(Lazy_Static_Value, lazy_static_value)
-DEFINE_VALUE_IS_AS_HELPERS(Lazy_Value, lazy_value)
-DEFINE_VALUE_IS_AS_HELPERS(Operator, operator)
-DEFINE_VALUE_IS_AS_HELPERS(Macro_Capture, macro_capture)
-DEFINE_VALUE_IS_AS_HELPERS(Code_Fragment, code_fragment)
-DEFINE_VALUE_IS_AS_HELPERS(Scope, scope)
-DEFINE_VALUE_IS_AS_HELPERS(Label *, label_pointer)
-DEFINE_VALUE_IS_AS_HELPERS(Descriptor *, descriptor_pointer)
-DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool)
-DEFINE_VALUE_IS_AS_HELPERS(s8, s8)
-DEFINE_VALUE_IS_AS_HELPERS(s16, s16)
-DEFINE_VALUE_IS_AS_HELPERS(s32, s32)
-DEFINE_VALUE_IS_AS_HELPERS(s64, s64)
-DEFINE_VALUE_IS_AS_HELPERS(u8, u8)
-DEFINE_VALUE_IS_AS_HELPERS(u16, u16)
-DEFINE_VALUE_IS_AS_HELPERS(u32, u32)
-DEFINE_VALUE_IS_AS_HELPERS(u64, u64)
-
 static bool
 same_function_signature(
   const Function_Info *a_info,
@@ -454,58 +403,6 @@ storage_static_value_up_to_u64(
     default: {
       panic("Unsupported integer immediate size");
       return 0;
-    }
-  }
-}
-
-static void
-print_storage(
-  const Storage *storage
-) {
-  switch (storage->tag) {
-    case Storage_Tag_None: {
-      printf("_");
-      break;
-    }
-    case Storage_Tag_Eflags: {
-      printf("eflags");
-      break;
-    }
-    case Storage_Tag_Register: {
-      printf("r%"PRIu64, storage->bit_size.as_u64);
-      break;
-    }
-    case Storage_Tag_Xmm: {
-      printf("xmm%"PRIu64, storage->bit_size.as_u64);
-      break;
-    }
-    case Storage_Tag_Static: {
-      u64 value = storage_static_value_up_to_u64(storage);
-      switch(storage->bit_size.as_u64) {
-        case 8: { printf("imm8(0x%02" PRIx64 ")", value); break; }
-        case 16: { printf("imm16(0x%04" PRIx64 ")", value); break; }
-        case 32: { printf("imm32(0x%08" PRIx64 ")", value); break; }
-        case 64: { printf("imm64(0x%016" PRIx64 ")", value); break; }
-        default: {
-          panic("Unsupported immediate size when printing");
-          break;
-        }
-      }
-      break;
-    }
-    case Storage_Tag_Memory: {
-      // TODO print better info
-      printf("m%"PRIu64, storage->bit_size.as_u64);
-      if (storage->Memory.location.tag == Memory_Location_Tag_Indirect) {
-        Register reg_index = storage->Memory.location.Indirect.base_register;
-        printf("(r%d)", reg_index);
-      }
-      break;
-    }
-    case Storage_Tag_Unpacked:
-    default: {
-      printf("<unknown>");
-      break;
     }
   }
 }
