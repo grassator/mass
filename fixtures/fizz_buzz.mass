@@ -1,7 +1,7 @@
 fizz_buzz :: fn() {
   io :: import("std/io")
 
-  for i : s8 = 1; i <= 100; i = i + 1 {
+  for i := 1; i <= 100; i = i + 1 {
     print_number := true
     if i % 3 == 0 then {
       print_number = false

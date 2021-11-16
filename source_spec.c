@@ -1178,7 +1178,7 @@ spec("source") {
     it("should be able to define, assign and lookup an s64 variable on the stack") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "foo :: fn() -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
+        "foo :: fn() -> (s64) { y : s64; y = 10; x := 21; x = 32; x + y }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
