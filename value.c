@@ -828,27 +828,19 @@ storage_static_equal_internal(
     }
     case Descriptor_Tag_Struct: {
       // compare field by field
-      u64 a_field_count = dyn_array_length(a_descriptor->Struct.memory_layout.items);
-      u64 b_field_count = dyn_array_length(b_descriptor->Struct.memory_layout.items);
+      u64 a_field_count = dyn_array_length(a_descriptor->Struct.fields);
+      u64 b_field_count = dyn_array_length(b_descriptor->Struct.fields);
       if (a_field_count != b_field_count) {
         return false;
       }
       for (u64 i = 0; i < a_field_count; ++i) {
-        Memory_Layout_Item *a_field = dyn_array_get(a_descriptor->Struct.memory_layout.items, i);
-        Memory_Layout_Item *b_field = dyn_array_get(b_descriptor->Struct.memory_layout.items, i);
-        if (a_field->tag != b_field->tag) return false;
-        switch(a_field->tag) {
-          case Memory_Layout_Item_Tag_Base_Relative: {
-            if (!storage_static_equal_internal(
-              a_field->descriptor, (s8 *)a_memory + a_field->Base_Relative.offset,
-              b_field->descriptor, (s8 *)b_memory + b_field->Base_Relative.offset
-            )) {
-              return false;
-            }
-          } break;
-          case Memory_Layout_Item_Tag_Absolute: {
-            panic("TODO");
-          } break;
+        const Struct_Field *a_field = dyn_array_get(a_descriptor->Struct.fields, i);
+        const Struct_Field *b_field = dyn_array_get(b_descriptor->Struct.fields, i);
+        if (!storage_static_equal_internal(
+          a_field->descriptor, (s8 *)a_memory + a_field->offset,
+          b_field->descriptor, (s8 *)b_memory + b_field->offset
+        )) {
+          return false;
         }
       }
       break;
@@ -1697,12 +1689,12 @@ same_type_or_can_implicitly_move_cast(
     target->Struct.is_tuple
   ) {
     assert(source->tag == Descriptor_Tag_Struct);
-    Array_Memory_Layout_Item source_fields = source->Struct.memory_layout.items;
-    Array_Memory_Layout_Item target_fields = target->Struct.memory_layout.items;
-    if (dyn_array_length(source_fields) != dyn_array_length(target_fields)) return false;
-    for (u64 i = 0; i < dyn_array_length(source_fields); ++i) {
-      const Descriptor *source_field = dyn_array_get(source_fields, i)->descriptor;
-      const Descriptor *target_field = dyn_array_get(target_fields, i)->descriptor;
+    if (dyn_array_length(source->Struct.fields) != dyn_array_length(target->Struct.fields)) {
+      return false;
+    }
+    for (u64 i = 0; i < dyn_array_length(source->Struct.fields); ++i) {
+      const Descriptor *source_field = dyn_array_get(source->Struct.fields, i)->descriptor;
+      const Descriptor *target_field = dyn_array_get(target->Struct.fields, i)->descriptor;
       if (!same_type(target_field, source_field)) return false;
     }
     return true;
@@ -1718,12 +1710,12 @@ same_value_type_or_can_implicitly_move_cast(
   if (value_is_tuple(source)) {
     if (target == &descriptor_tuple) return true; // TODO Does this make sense in all the cases?
     if (target->tag != Descriptor_Tag_Struct) return false;
-    const Memory_Layout *layout = &target->Struct.memory_layout;
+    Array_Struct_Field fields = target->Struct.fields;
     const Tuple *tuple = value_as_tuple(source);
-    if ((dyn_array_length(layout->items) != dyn_array_length(tuple->items))) return false;
+    if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) return false;
     for (u64 i = 0; i < dyn_array_length(tuple->items); i += 1) {
       Value *item = *dyn_array_get(tuple->items, i);
-      Memory_Layout_Item *field = dyn_array_get(layout->items, i);
+      const Struct_Field *field = dyn_array_get(fields, i);
       if (!same_value_type_or_can_implicitly_move_cast(field->descriptor, item)) return false;
     }
     return true;

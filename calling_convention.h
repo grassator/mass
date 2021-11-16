@@ -322,7 +322,7 @@ system_v_item_iterator_count(
   switch(it->tag) {
     case System_V_Aggregate_Iterator_Tag_Struct: {
       assert(it->aggregate->tag == Descriptor_Tag_Struct);
-      return dyn_array_length(it->aggregate->Struct.memory_layout.items);
+      return dyn_array_length(it->aggregate->Struct.fields);
     }
     case System_V_Aggregate_Iterator_Tag_Array: {
       assert(it->aggregate->tag == Descriptor_Tag_Fixed_Size_Array);
@@ -342,11 +342,9 @@ system_v_item_iterator_next(
   switch(it->tag) {
     case System_V_Aggregate_Iterator_Tag_Struct: {
       assert(it->aggregate->tag == Descriptor_Tag_Struct);
-      const Memory_Layout_Item *item =
-        dyn_array_get(it->aggregate->Struct.memory_layout.items, it->next_index);
-      it->item = item->descriptor;
-      assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
-      it->offset = item->Base_Relative.offset;
+      const Struct_Field *field = dyn_array_get(it->aggregate->Struct.fields, it->next_index);
+      it->item = field->descriptor;
+      it->offset = field->offset;
     } break;
     case System_V_Aggregate_Iterator_Tag_Array: {
       assert(it->aggregate->tag == Descriptor_Tag_Fixed_Size_Array);

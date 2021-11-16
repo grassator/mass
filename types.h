@@ -49,8 +49,8 @@
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
 
 #define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, _C_TYPE_, ...)\
-  dyn_array_struct(Memory_Layout_Item) descriptor_##_NAME_##_fields = {\
-    .length = countof((const Memory_Layout_Item[]){__VA_ARGS__}),\
+  dyn_array_struct(Struct_Field) descriptor_##_NAME_##_fields = {\
+    .length = countof((const Struct_Field[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
   };\
   static Descriptor descriptor_##_NAME_ = {\
@@ -59,9 +59,7 @@
     .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
     .Struct = {\
-      .memory_layout = {\
-        .items = {(Dyn_Array_Internal *)&descriptor_##_NAME_##_fields},\
-      }\
+      .fields = {(Dyn_Array_Internal *)&descriptor_##_NAME_##_fields},\
     },\
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\

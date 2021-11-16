@@ -774,7 +774,6 @@ print_mass_struct_item(
   Struct_Item *item
 ) {
   fprintf(file, "  {\n");
-  fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
   Slice lowercase_type = slice_from_c_string(strtolower(item->type));
   // TODO support const
   Slice const_prefix = slice_literal("const ");
@@ -795,7 +794,7 @@ print_mass_struct_item(
   if (item->array_length > 1) fprintf(file, "_%u", item->array_length);
   fprintf(file, ",\n");
   fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
-  fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", struct_name, item->name);
+  fprintf(file, "    .offset = offsetof(%s, %s),\n", struct_name, item->name);
   fprintf(file, "  },\n");
 }
 
@@ -901,10 +900,9 @@ print_mass_descriptor_and_type(
         fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, %s,\n", lowercase_name, type->name);
 
         fprintf(file, "  {\n");
-        fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
         fprintf(file, "    .name = slice_literal_fields(\"tag\"),\n");
         fprintf(file, "    .descriptor = &descriptor_%s_tag,\n", lowercase_name);
-        fprintf(file, "    .Base_Relative.offset = offsetof(%s, tag),\n", type->name);
+        fprintf(file, "    .offset = offsetof(%s, tag),\n", type->name);
         fprintf(file, "  },\n");
 
         for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
@@ -918,10 +916,9 @@ print_mass_descriptor_and_type(
             const char *struct_lowercase_name = strtolower(struct_->name);
 
             fprintf(file, "  {\n");
-            fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
             fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", struct_->name);
             fprintf(file, "    .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
-            fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", type->name, struct_->name);
+            fprintf(file, "    .offset = offsetof(%s, %s),\n", type->name, struct_->name);
             fprintf(file, "  },\n");
           }
         }
@@ -1770,6 +1767,14 @@ main(void) {
     { "Ieee_Float", Opaque_Numeric_Interpretation_Ieee_Float },
   }));
 
+  push_type(type_struct("Struct_Field", (Struct_Item[]){
+    // TODO This should probably be "const Symbol *", but generating that is a giant pain
+    { "Slice", "name"},
+    { "const Descriptor *", "descriptor"},
+    { "Source_Range", "source_range"},
+    { "u64", "offset" },
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_fields("Opaque", (Struct_Item[]){
       { "Opaque_Numeric_Interpretation", "numeric_interpretation" },
@@ -1785,7 +1790,7 @@ main(void) {
     }),
     struct_fields("Struct", (Struct_Item[]){
       { "u64", "is_tuple" },
-      { "Memory_Layout", "memory_layout" },
+      { "Array_Struct_Field", "fields" },
     }),
     struct_fields("Pointer_To", (Struct_Item[]){
       { "u64", "is_implicit" },

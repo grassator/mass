@@ -514,8 +514,8 @@ anonymous_struct_descriptor_from_tuple(
   Tuple_Eval_Mode tuple_eval_mode
 ) {
   C_Struct_Aligner struct_aligner = {0};
-  Array_Memory_Layout_Item fields = dyn_array_make(
-    Array_Memory_Layout_Item,
+  Array_Struct_Field fields = dyn_array_make(
+    Array_Struct_Field,
     .allocator = context->allocator,
     .capacity = dyn_array_length(tuple->items),
   );
@@ -544,12 +544,11 @@ anonymous_struct_descriptor_from_tuple(
     }
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
 
-    dyn_array_push(fields, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Base_Relative,
+    dyn_array_push(fields, (Struct_Field) {
       .name = name,
       .descriptor = field_descriptor,
       .source_range = item->source_range,
-      .Base_Relative.offset = field_byte_offset,
+      .offset = field_byte_offset,
     });
   }
   c_struct_aligner_end(&struct_aligner);
@@ -561,9 +560,7 @@ anonymous_struct_descriptor_from_tuple(
     .bit_alignment = {struct_aligner.bit_alignment},
     .Struct = {
       .is_tuple = true,
-      .memory_layout = {
-        .items = fields,
-      }
+      .fields = fields,
     },
   };
 
@@ -789,9 +786,9 @@ assign_tuple(
     });
     return *compilation->result;
   }
-  const Memory_Layout *layout = &target->descriptor->Struct.memory_layout;
-  if ((dyn_array_length(layout->items) != dyn_array_length(tuple->items))) {
-    Slice message = dyn_array_length(layout->items) > dyn_array_length(tuple->items)
+  Array_Struct_Field fields = target->descriptor->Struct.fields;
+  if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) {
+    Slice message = dyn_array_length(fields) > dyn_array_length(tuple->items)
       ? slice_literal("Tuple does not have enough fields to match the struct it is assigned to")
       : slice_literal("Tuple has too many fields for the struct it is assigned to");
     compilation_error(compilation, (Mass_Error) {
@@ -804,11 +801,13 @@ assign_tuple(
   }
 
   u64 index = 0;
-  DYN_ARRAY_FOREACH(Memory_Layout_Item, field, layout->items) {
+  DYN_ARRAY_FOREACH(Struct_Field, field, fields) {
     Value *tuple_item = *dyn_array_get(tuple->items, index);
     Value target_field = {
       .descriptor = field->descriptor,
-      .storage = memory_layout_item_storage_at_index(&target->storage, layout, index),
+      .storage = storage_with_offset_and_bit_size(
+        &target->storage, u64_to_s32(field->offset), field->descriptor->bit_size
+      ),
       .source_range = target->source_range,
     };
     MASS_TRY(assign(compilation, builder, &target_field, tuple_item, source_range));
@@ -1035,19 +1034,18 @@ assign(
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
 
-    for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.memory_layout.items); ++i) {
-      Memory_Layout_Item *field = dyn_array_get(source->descriptor->Struct.memory_layout.items, i);
+    DYN_ARRAY_FOREACH(Struct_Field, field, source->descriptor->Struct.fields) {
       Value source_field = {
         .descriptor = field->descriptor,
-        .storage = memory_layout_item_storage_at_index(
-          &source->storage, &source->descriptor->Struct.memory_layout, i
+        .storage = storage_with_offset_and_bit_size(
+          &source->storage, u64_to_s32(field->offset), field->descriptor->bit_size
         ),
         .source_range = source->source_range,
       };
       Value target_field = {
         .descriptor = field->descriptor,
-        .storage = memory_layout_item_storage_at_index(
-          &target->storage, &target->descriptor->Struct.memory_layout, i
+        .storage = storage_with_offset_and_bit_size(
+          &target->storage, u64_to_s32(field->offset), field->descriptor->bit_size
         ),
         .source_range = target->source_range,
       };
@@ -4004,8 +4002,8 @@ mass_ensure_trampoline(
   }
 
   C_Struct_Aligner struct_aligner = {0};
-  Array_Memory_Layout_Item fields = dyn_array_make(
-    Array_Memory_Layout_Item,
+  Array_Struct_Field fields = dyn_array_make(
+    Array_Struct_Field,
     .allocator = context->allocator,
     .capacity = args_view.length,
   );
@@ -4015,23 +4013,22 @@ mass_ensure_trampoline(
     assert(item->descriptor != &descriptor_lazy_value);
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
 
-    dyn_array_push(fields, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Base_Relative,
+    dyn_array_push(fields, (Struct_Field) {
       .name = {0},
       .descriptor = field_descriptor,
       .source_range = item->source_range,
-      .Base_Relative.offset = field_byte_offset,
+      .offset = field_byte_offset,
     });
   }
 
   const Descriptor *return_descriptor = original_info->returns.descriptor;
   u64 return_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, return_descriptor);
   {
-    dyn_array_push(fields, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Base_Relative,
+    dyn_array_push(fields, (Struct_Field) {
       .name = slice_literal("returns"),
       .descriptor = return_descriptor,
-      .Base_Relative.offset = return_byte_offset,
+      .source_range = original_info->returns.maybe_type_expression.source_range,
+      .offset = return_byte_offset,
     });
   }
 
@@ -4042,12 +4039,7 @@ mass_ensure_trampoline(
     .tag = Descriptor_Tag_Struct,
     .bit_size = {struct_aligner.bit_size},
     .bit_alignment = {struct_aligner.bit_alignment},
-    .Struct = {
-      .is_tuple = true,
-      .memory_layout = {
-        .items = fields,
-      }
-    },
+    .Struct = { .is_tuple = true, .fields = fields, },
   };
 
   Execution_Context *trampoline_context = allocator_allocate(context->allocator, Execution_Context);
@@ -4148,14 +4140,13 @@ mass_trampoline_call(
     descriptor_byte_alignment(trampoline->args_descriptor)
   );
 
-  Array_Memory_Layout_Item fields = trampoline->args_descriptor->Struct.memory_layout.items;
+  Array_Struct_Field fields = trampoline->args_descriptor->Struct.fields;
   assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < args_view.length; ++i) {
     Value *item = value_view_get(args_view, i);
     assert(value_is_non_lazy_static(item));
-    Memory_Layout_Item *field = dyn_array_get(fields, i);
-    assert(field->tag == Memory_Layout_Item_Tag_Base_Relative);
-    u64 offset = field->Base_Relative.offset;
+    const Struct_Field *field = dyn_array_get(fields, i);
+    u64 offset = field->offset;
     void *arg_memory = args_struct_memory + offset;
     const void *source_memory = get_static_storage_with_bit_size(
       &item->storage, item->descriptor->bit_size
@@ -4168,9 +4159,8 @@ mass_trampoline_call(
   if (trampoline->original_info->returns.descriptor == &descriptor_void) {
     result = &void_value;
   } else {
-    const Memory_Layout_Item *return_field = dyn_array_last(fields);
-    assert(return_field->tag == Memory_Layout_Item_Tag_Base_Relative);
-    const void *temp_return_memory = args_struct_memory + return_field->Base_Relative.offset;
+    const Struct_Field *return_field = dyn_array_last(fields);
+    const void *temp_return_memory = args_struct_memory + return_field->offset;
     u64 return_byte_size = descriptor_byte_size(return_field->descriptor);
     void *return_memory = allocator_allocate_bytes(
       context->allocator,
@@ -5372,14 +5362,13 @@ mass_eval(
   }
 }
 
-static inline Memory_Layout_Item *
+static inline const Struct_Field *
 struct_find_field_by_name(
   const Descriptor *descriptor,
   Slice field_name
 ) {
   assert(descriptor->tag == Descriptor_Tag_Struct);
-  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.memory_layout.items); ++i) {
-    Memory_Layout_Item *field = dyn_array_get(descriptor->Struct.memory_layout.items, i);
+  DYN_ARRAY_FOREACH(Struct_Field, field, descriptor->Struct.fields) {
     if (slice_equal(field->name, field_name)) {
       return field;
     }
@@ -5389,7 +5378,7 @@ struct_find_field_by_name(
 
 typedef struct {
   Value *struct_;
-  Memory_Layout_Item *field;
+  const Struct_Field *field;
 } Mass_Field_Access_Lazy_Payload;
 
 static Storage
@@ -5431,7 +5420,7 @@ mass_handle_field_access_lazy_proc(
   const Source_Range *source_range,
   Mass_Field_Access_Lazy_Payload *payload
 ) {
-  Memory_Layout_Item *field = payload->field;
+  const Struct_Field *field = payload->field;
 
   Expected_Result expected_struct =
     expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
@@ -5440,7 +5429,6 @@ mass_handle_field_access_lazy_proc(
 
   const Descriptor *struct_descriptor = value_or_lazy_value_descriptor(struct_);
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(struct_descriptor);
-  const Memory_Layout *layout = &unwrapped_descriptor->Struct.memory_layout;
   assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
 
   Storage struct_storage = value_maybe_dereference(compilation, builder, struct_);
@@ -5449,7 +5437,9 @@ mass_handle_field_access_lazy_proc(
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
   // TODO should `memory_layout_item_storage` always copy the flags? Or maybe it should be mutating?
-  Storage field_storage = memory_layout_item_storage(&struct_storage, layout, field);
+  Storage field_storage = storage_with_offset_and_bit_size(
+    &struct_storage, u64_to_s32(field->offset), field->descriptor->bit_size
+  );
   field_storage.flags = struct_storage.flags;
 
   Value *field_value = value_init(
@@ -5586,7 +5576,7 @@ static Value *
 mass_struct_field_access(
   Execution_Context *context,
   Value *struct_,
-  Memory_Layout_Item *field,
+  const Struct_Field *field,
   const Source_Range *source_range
 ) {
   Mass_Field_Access_Lazy_Payload stack_lazy_payload = {
@@ -5679,7 +5669,7 @@ mass_handle_dot_operator(
     if (value_is_i64(rhs)) {
       u64 index = value_as_i64(rhs)->bits;
       if (unwrapped_descriptor->tag != Descriptor_Tag_Struct) goto err;
-      if (index >= dyn_array_length(unwrapped_descriptor->Struct.memory_layout.items)) {
+      if (index >= dyn_array_length(unwrapped_descriptor->Struct.fields)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
@@ -5690,8 +5680,7 @@ mass_handle_dot_operator(
         });
         return 0;
       }
-      Memory_Layout_Item *field =
-        dyn_array_get(unwrapped_descriptor->Struct.memory_layout.items, index);
+      const Struct_Field *field = dyn_array_get(unwrapped_descriptor->Struct.fields, index);
       return mass_struct_field_access(context, lhs, field, &args_view.source_range);
     }
     if (!value_is_symbol(rhs)) {
@@ -5725,7 +5714,7 @@ mass_handle_dot_operator(
       }
       return scope_entry_force_value(context, entry);
     } else {
-      Memory_Layout_Item *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
+      const Struct_Field *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
       if (!field) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
