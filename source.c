@@ -1000,6 +1000,38 @@ assign(
     return *compilation->result;
   }
 
+  if (source->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+    if (!same_type(target->descriptor, source->descriptor)) goto err;
+    const Descriptor *item_descriptor = source->descriptor->Fixed_Size_Array.item;
+
+    Storage source_array_storage = value_maybe_dereference(compilation, builder, source);
+    Storage target_array_storage = value_maybe_dereference(compilation, builder, target);
+
+    for (u64 i = 0; i < source->descriptor->Fixed_Size_Array.length; ++i) {
+      s32 index_number = (u64_to_s32(i));
+      s32 offset = index_number * u64_to_s32(descriptor_byte_size(item_descriptor));
+
+      Value source_field = {
+        .descriptor = item_descriptor,
+        .storage = storage_with_offset_and_bit_size(
+          &source_array_storage, offset, item_descriptor->bit_size
+        ),
+        .source_range = source->source_range,
+      };
+      Value target_field = {
+        .descriptor = item_descriptor,
+        .storage = storage_with_offset_and_bit_size(
+          &target_array_storage, offset, item_descriptor->bit_size
+        ),
+        .source_range = target->source_range,
+      };
+      MASS_TRY(assign(compilation, builder, &target_field, &source_field, source_range));
+    }
+    storage_release_if_temporary(builder, &source_array_storage);
+    storage_release_if_temporary(builder, &target_array_storage);
+    return *compilation->result;
+  }
+
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
 

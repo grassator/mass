@@ -32,6 +32,13 @@ load_address(
   Storage storage
 );
 
+static Storage
+value_maybe_dereference(
+  Compilation *compilation,
+  Function_Builder *builder,
+  Value *value
+);
+
 static inline const Descriptor *
 expected_result_descriptor(
   const Expected_Result *expected_result
