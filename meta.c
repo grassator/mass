@@ -1421,7 +1421,7 @@ main(void) {
     { "Storage", "operands", 3 },
   }));
 
-  push_type(add_common_fields(type_union("Instruction", (Struct_Type[]){
+  export_compiler(push_type(add_common_fields(type_union("Instruction", (Struct_Type[]){
     struct_fields("Label", (Struct_Item[]){
       { "Label *", "pointer" },
     }),
@@ -1442,7 +1442,7 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Scope *", "scope" },
-  }));
+  })));
 
   push_type(type_struct("Instruction_Bucket", (Struct_Item[]){
     { "Instruction", "items", 15},
@@ -2072,6 +2072,11 @@ main(void) {
     { "Compilation *", "compilation" },
     { "Source_Range", "source_range" },
     { "Value_View *", "out_tokens" },
+  })));
+
+  export_compiler(push_type(type_function(Default, "push_instruction", "void", (Argument_Type[]){
+    {"Code_Block *", "code_block"},
+    {"Instruction", "instruction"},
   })));
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));

@@ -740,6 +740,9 @@ typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 static Mass_Result tokenize
   (Compilation * compilation, Source_Range source_range, Value_View * out_tokens);
 
+static void push_instruction
+  (Code_Block * code_block, Instruction instruction);
+
 static Value * mass_intrinsic
   (Execution_Context * context, Value_View args);
 
@@ -783,9 +786,6 @@ static Value * mass_size_of
   (Execution_Context * context, Value_View args);
 
 static Value * mass_startup
-  (Execution_Context * context, Value_View args);
-
-static Value * mass_inline_machine_code_bytes
   (Execution_Context * context, Value_View args);
 
 static void * allocator_allocate_bytes
@@ -2740,6 +2740,7 @@ static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
+static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_import;
@@ -2755,7 +2756,6 @@ static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_startup;
-static Descriptor descriptor_mass_inline_machine_code_bytes;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_same_type;

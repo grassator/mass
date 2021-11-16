@@ -38,7 +38,54 @@ fragment :: fn(curly : MASS.Group_Curly) => (MASS.Code_Fragment) MASS.fragment
 
 inline_machine_code_bytes :: MASS.inline_machine_code_bytes
 
-debugger :: ~> { inline_machine_code_bytes(0xCC) }
+Void :: type_of(())
+debugger :: fn() => () intrinsic {
+  lazy_value_proc :: fn(
+    compilation : &MASS.Compilation,
+    builder : &MASS.Function_Builder,
+    expected_result : &MASS.Expected_Result,
+    source_range : &MASS.Source_Range,
+    payload : &Void
+  ) -> (&MASS.Value) {
+    {
+      instruction : MASS.Instruction
+      instruction.tag = MASS.Instruction_Tag.Location
+      instruction.Location.source_range = source_range.*
+    }
+
+    {
+      instruction : MASS.Instruction
+      instruction.tag = MASS.Instruction_Tag.Bytes
+      instruction.Bytes.memory.0 = 0xcc
+      instruction.Bytes.length = 1
+      MASS.push_instruction(&builder.code_block, instruction);
+    }
+
+    value : &MASS.Value = allocate(MASS.allocator, MASS.Value)
+    value.source_range = source_range.*
+    value.descriptor = Void
+    value.storage.tag = MASS.Storage_Tag.None
+    value.storage.bit_size = value.descriptor.bit_size
+    value
+  }
+
+  value : &MASS.Value = allocate(MASS.allocator, MASS.Value)
+
+  lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)
+  lazy_value.epoch = context.epoch
+  lazy_value.descriptor = Void
+  lazy_value.proc = lazy_value_proc
+  lazy_value.payload = 0
+
+  value.source_range = arguments.source_range
+  value.descriptor = MASS.Lazy_Value
+  value.storage.tag = MASS.Storage_Tag.Static
+  value.storage.bit_size = value.descriptor.bit_size
+  value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap
+  value.storage.Static.memory.Heap.pointer = lazy_value
+  value
+}
+
 
 Symbol :: MASS.Symbol
 true :: cast(bool, 1)
@@ -48,7 +95,7 @@ assert :: fn(condition : bool, message := "Assertion failed\n") {
   io :: import("std/io")
   if condition then {} else {
     io.print(message)
-    debugger
+    debugger()
   }
 }
 

@@ -178,6 +178,55 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Storage_Unpacked")),
     type_storage_unpacked_value
   );
+  Source_Range Instruction__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction__source_range, "Instruction");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Instruction__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Instruction")),
+    type_instruction_value
+  );
+  Source_Range Instruction_Tag__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction_Tag__source_range, "Instruction_Tag");
+  scope_define_enum(
+    compilation, scope, Instruction_Tag__source_range,
+    slice_literal("Instruction_Tag"), type_instruction_tag_value,
+    instruction_tag_items, countof(instruction_tag_items)
+  );
+  Source_Range Instruction_Label__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction_Label__source_range, "Instruction_Label");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Instruction_Label__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Instruction_Label")),
+    type_instruction_label_value
+  );
+  Source_Range Instruction_Bytes__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction_Bytes__source_range, "Instruction_Bytes");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Instruction_Bytes__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Instruction_Bytes")),
+    type_instruction_bytes_value
+  );
+  Source_Range Instruction_Label_Patch__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction_Label_Patch__source_range, "Instruction_Label_Patch");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Instruction_Label_Patch__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Instruction_Label_Patch")),
+    type_instruction_label_patch_value
+  );
+  Source_Range Instruction_Stack_Patch__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction_Stack_Patch__source_range, "Instruction_Stack_Patch");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Instruction_Stack_Patch__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Instruction_Stack_Patch")),
+    type_instruction_stack_patch_value
+  );
+  Source_Range Instruction_Location__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Instruction_Location__source_range, "Instruction_Location");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Instruction_Location__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Instruction_Location")),
+    type_instruction_location_value
+  );
   Source_Range Function_Builder__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Builder__source_range, "Function_Builder");
   scope_define_value(
@@ -489,6 +538,18 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    push_instruction, "push_instruction", &descriptor_void,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("code_block")),
+&descriptor_code_block_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("instruction")),
+&descriptor_instruction
+    )
+  );
+  MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_intrinsic, "intrinsic", &descriptor_value_pointer,
     function_parameter(
@@ -659,18 +720,6 @@ compiler_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_startup, "startup", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
-    mass_inline_machine_code_bytes, "inline_machine_code_bytes", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer

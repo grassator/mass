@@ -2366,6 +2366,14 @@ spec("source") {
       spec_check_slice(error->User_Defined.name, slice_literal("Static Assert Failed"));
       spec_check_slice(error->detailed_message, slice_literal("Oops"));
     }
+    xit("should support runtime asserts") {
+      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() { assert(false, \"Oops\") }\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
   }
 
   describe("Modules") {
