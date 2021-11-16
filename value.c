@@ -1126,20 +1126,6 @@ storage_register_temp(
   return storage;
 }
 
-static inline Value *
-value_register_for_descriptor(
-  const Allocator *allocator,
-  Register reg,
-  const Descriptor *descriptor,
-  Source_Range source_range
-) {
-  Storage storage = storage_register(reg, descriptor->bit_size);
-  return value_init(
-    allocator_allocate(allocator, Value),
-    descriptor, storage, source_range
-  );
-}
-
 static inline void
 storage_release_if_temporary(
   Function_Builder *builder,

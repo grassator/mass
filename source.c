@@ -3605,8 +3605,11 @@ call_function_overload(
         Register temp_register = register_find_available(builder, prohibited_registers);
         register_acquire(builder, temp_register);
         register_bitset_set(&temp_register_argument_bitset, temp_register);
-        arg_value = value_register_for_descriptor(
-          compilation->allocator, temp_register, target_item->descriptor, target_item->source_range
+        arg_value = value_init(
+          allocator_allocate(compilation->allocator, Value),
+          target_item->descriptor,
+          storage_register(temp_register, target_item->descriptor->bit_size),
+          target_item->source_range
         );
         arg_value->storage.flags |= Storage_Flags_Temporary;
       } else {
