@@ -4265,41 +4265,34 @@ token_handle_function_call(
   ) {
     Value *result;
     const Descriptor *expected_descriptor = info->returns.descriptor;
-    if (info->flags & Function_Info_Flags_Intrinsic) {
-      result = mass_intrinsic_call(context, overload, args_view);
-      // @Hack Have to reset the expected descriptor here because
-      //       it is always Value * for the intrinsic.
-      expected_descriptor = 0;
+    if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
+      result = mass_intrinsic_call(context, maybe_literal->body, args_view);
     } else {
-      if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
-        result = mass_intrinsic_call(context, maybe_literal->body, args_view);
+      if (mass_can_trampoline_call(info, args_view)) {
+        // This is necessary to avoid infinite recursion as the `mass_trampoline_call` called below
+        // will end up here as well. Indirect calls are allowed so we do not need a full stack
+        const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
+        context->compilation->current_compile_time_function_call_target = overload;
+        result = mass_trampoline_call(context, overload, args_view);
+        context->compilation->current_compile_time_function_call_target = saved_call_target;
       } else {
-        if (mass_can_trampoline_call(info, args_view)) {
-          // This is necessary to avoid infinite recursion as the `mass_trampoline_call` called below
-          // will end up here as well. Indirect calls are allowed so we do not need a full stack
-          const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
-          context->compilation->current_compile_time_function_call_target = overload;
-          result = mass_trampoline_call(context, overload, args_view);
-          context->compilation->current_compile_time_function_call_target = saved_call_target;
-        } else {
-          // It is important to create a new value with the range of the original expression,
-          // otherwise Value_View slicing will not work correctly
-          Value *temp_overload = value_make(context, overload->descriptor, overload->storage, source_range);
-          // This is necessary to avoid infinite recursion as the `compile_time_eval` called below
-          // will end up here as well. Indirect calls are allowed so we do not need a full stack
-          const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
-          context->compilation->current_compile_time_function_call_target = temp_overload;
-          Value *fake_args_token = value_make(
-            context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
-          );
-          Value_View fake_eval_view = {
-            .values = (Value *[]){temp_overload, fake_args_token},
-            .length = 2,
-            .source_range = source_range,
-          };
-          result = compile_time_eval(context, fake_eval_view);
-          context->compilation->current_compile_time_function_call_target = saved_call_target;
-        }
+        // It is important to create a new value with the range of the original expression,
+        // otherwise Value_View slicing will not work correctly
+        Value *temp_overload = value_make(context, overload->descriptor, overload->storage, source_range);
+        // This is necessary to avoid infinite recursion as the `compile_time_eval` called below
+        // will end up here as well. Indirect calls are allowed so we do not need a full stack
+        const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
+        context->compilation->current_compile_time_function_call_target = temp_overload;
+        Value *fake_args_token = value_make(
+          context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
+        );
+        Value_View fake_eval_view = {
+          .values = (Value *[]){temp_overload, fake_args_token},
+          .length = 2,
+          .source_range = source_range,
+        };
+        result = compile_time_eval(context, fake_eval_view);
+        context->compilation->current_compile_time_function_call_target = saved_call_target;
       }
     }
     if (result && expected_descriptor && expected_descriptor != &descriptor_void) {
