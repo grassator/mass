@@ -264,13 +264,13 @@ deallocate :: macro(pointer) {
   MASS.allocator_allocate_bytes(allocator, type.bit_size.as_u64 / 8, type.bit_alignment.as_u64 / 8)
 }
 
-Array :: fn(item : Type, length : u64) => (Type) {
-  t : Type = allocate(MASS.allocator, MASS.Descriptor)
+Array :: fn(item : Type, length : i64) => (Type) {
+  t := allocate(MASS.allocator, MASS.Descriptor)
 
   t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
-  t.bit_size = [item.bit_size.as_u64 * length]
+  t.bit_size = [item.bit_size.as_u64 * cast(u64, length)]
   t.bit_alignment = item.bit_alignment
-  t.Fixed_Size_Array = [item, length]
+  t.Fixed_Size_Array = [item, cast(u64, length)]
   t
 }
 
@@ -295,7 +295,7 @@ get_target_os :: fn() => (os._Type) intrinsic {
   value
 }
 
-syscall :: fn(number : s64) => (MASS.Syscall) { [number] }
+syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
 
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {
   macro(x : type) { 0 - x }

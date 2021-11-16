@@ -1317,7 +1317,7 @@ main(void) {
   })));
 
   export_compiler(push_type(type_struct("Syscall", (Struct_Item[]){
-    { "s64", "number" },
+    { "i64", "number" },
   })));
 
   push_type(type_struct("Import_Symbol", (Struct_Item[]){

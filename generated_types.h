@@ -1150,7 +1150,7 @@ typedef struct External_Symbol {
 typedef dyn_array_type(External_Symbol) Array_External_Symbol;
 
 typedef struct Syscall {
-  s64 number;
+  i64 number;
 } Syscall;
 typedef dyn_array_type(Syscall) Array_Syscall;
 
@@ -3482,7 +3482,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_syscall, Array_Syscall)
 MASS_DEFINE_STRUCT_DESCRIPTOR(syscall, Syscall,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_s64,
+    .descriptor = &descriptor_i64,
     .name = slice_literal_fields("number"),
     .Base_Relative.offset = offsetof(Syscall, number),
   },

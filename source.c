@@ -4276,23 +4276,10 @@ token_handle_function_call(
         result = mass_trampoline_call(context, overload, args_view);
         context->compilation->current_compile_time_function_call_target = saved_call_target;
       } else {
-        // It is important to create a new value with the range of the original expression,
-        // otherwise Value_View slicing will not work correctly
-        Value *temp_overload = value_make(context, overload->descriptor, overload->storage, source_range);
-        // This is necessary to avoid infinite recursion as the `compile_time_eval` called below
-        // will end up here as well. Indirect calls are allowed so we do not need a full stack
-        const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
-        context->compilation->current_compile_time_function_call_target = temp_overload;
-        Value *fake_args_token = value_make(
-          context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
-        );
-        Value_View fake_eval_view = {
-          .values = (Value *[]){temp_overload, fake_args_token},
-          .length = 2,
-          .source_range = source_range,
-        };
-        result = compile_time_eval(context, fake_eval_view);
-        context->compilation->current_compile_time_function_call_target = saved_call_target;
+        // Probably better to change `mass_can_trampoline_call` into `mass_can_trampoline_call`
+        // and make it report the error
+        panic("TODO user error when can not compile-time call");
+        result = 0;
       }
     }
     if (result && expected_descriptor && expected_descriptor != &descriptor_void) {
@@ -6199,9 +6186,9 @@ token_parse_function_literal(
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
-    s64 syscall_number = storage_static_as_c_type(&body_value->storage, Syscall)->number;
+    i64 syscall_number = storage_static_as_c_type(&body_value->storage, Syscall)->number;
     assert(call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
-    call_setup.jump.Syscall.number = syscall_number;
+    call_setup.jump.Syscall.number = u64_to_s64(syscall_number.bits);
 
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, call_setup);
