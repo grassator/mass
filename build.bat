@@ -3,8 +3,11 @@
 set "CC=%1"
 if "%CC%"=="" set "CC=cl"
 
+set VS2022="C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+set VS2019="C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
+
 if not defined DevEnvDir (
-    call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
+  if exist %VS2022% (call %VS2022%) else if exist %VS2019% (call %VS2019%)
 )
 
 rmdir /S /Q build
