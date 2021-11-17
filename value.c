@@ -901,7 +901,7 @@ value_i64(
   } else {
     u64 bits = 0;
     for (const char *ch = digits.bytes; ch < digits.bytes + digits.length; ++ch) {
-      assert(*ch < 128);
+      assert((u8)*ch < countof(digit_decoder));
       if (*ch == '_') continue;
       bits *= base;
       bits += digit_decoder[*ch];
