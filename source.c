@@ -3862,11 +3862,7 @@ mass_match_overload_candidate(
     } else {
       overload_info = maybe_function_info_from_value(candidate, args);
       if (!overload_info) return;
-      if (overload_info->flags & Function_Info_Flags_Intrinsic) {
-        score = 0;
-      } else {
-        score = calculate_arguments_match_score(overload_info, args);
-      }
+      score = calculate_arguments_match_score(overload_info, args);
     }
     if (score > match->score) {
       match->info = overload_info;
