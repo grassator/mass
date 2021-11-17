@@ -484,29 +484,6 @@ typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_
 typedef Value * (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, const Operator * operator);
 
-typedef enum Memory_Layout_Item_Flags {
-  Memory_Layout_Item_Flags_None = 0,
-  Memory_Layout_Item_Flags_Uninitialized = 1,
-} Memory_Layout_Item_Flags;
-
-const char *memory_layout_item_flags_name(Memory_Layout_Item_Flags value) {
-  if (value == 0) return "Memory_Layout_Item_Flags_None";
-  if (value == 1) return "Memory_Layout_Item_Flags_Uninitialized";
-  assert(!"Unexpected value for enum Memory_Layout_Item_Flags");
-  return 0;
-};
-
-typedef dyn_array_type(Memory_Layout_Item_Flags *) Array_Memory_Layout_Item_Flags_Ptr;
-typedef dyn_array_type(const Memory_Layout_Item_Flags *) Array_Const_Memory_Layout_Item_Flags_Ptr;
-
-typedef struct Memory_Layout_Item Memory_Layout_Item;
-typedef dyn_array_type(Memory_Layout_Item *) Array_Memory_Layout_Item_Ptr;
-typedef dyn_array_type(const Memory_Layout_Item *) Array_Const_Memory_Layout_Item_Ptr;
-
-typedef struct Memory_Layout Memory_Layout;
-typedef dyn_array_type(Memory_Layout *) Array_Memory_Layout_Ptr;
-typedef dyn_array_type(const Memory_Layout *) Array_Const_Memory_Layout_Ptr;
-
 typedef struct Function_Parameter Function_Parameter;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
 typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
@@ -564,6 +541,25 @@ typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Pt
 typedef struct Function_Call_Jump Function_Call_Jump;
 typedef dyn_array_type(Function_Call_Jump *) Array_Function_Call_Jump_Ptr;
 typedef dyn_array_type(const Function_Call_Jump *) Array_Const_Function_Call_Jump_Ptr;
+
+typedef enum Function_Call_Parameter_Flags {
+  Function_Call_Parameter_Flags_None = 0,
+  Function_Call_Parameter_Flags_Uninitialized = 1,
+} Function_Call_Parameter_Flags;
+
+const char *function_call_parameter_flags_name(Function_Call_Parameter_Flags value) {
+  if (value == 0) return "Function_Call_Parameter_Flags_None";
+  if (value == 1) return "Function_Call_Parameter_Flags_Uninitialized";
+  assert(!"Unexpected value for enum Function_Call_Parameter_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Function_Call_Parameter_Flags *) Array_Function_Call_Parameter_Flags_Ptr;
+typedef dyn_array_type(const Function_Call_Parameter_Flags *) Array_Const_Function_Call_Parameter_Flags_Ptr;
+
+typedef struct Function_Call_Parameter Function_Call_Parameter;
+typedef dyn_array_type(Function_Call_Parameter *) Array_Function_Call_Parameter_Ptr;
+typedef dyn_array_type(const Function_Call_Parameter *) Array_Const_Function_Call_Parameter_Ptr;
 
 typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
@@ -1664,46 +1660,6 @@ typedef struct Lazy_Static_Value {
 typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
 
 typedef enum {
-  Memory_Layout_Item_Tag_Absolute = 0,
-  Memory_Layout_Item_Tag_Base_Relative = 1,
-} Memory_Layout_Item_Tag;
-
-typedef struct Memory_Layout_Item_Absolute {
-  Storage storage;
-} Memory_Layout_Item_Absolute;
-typedef struct Memory_Layout_Item_Base_Relative {
-  s64 offset;
-} Memory_Layout_Item_Base_Relative;
-typedef struct Memory_Layout_Item {
-  Memory_Layout_Item_Tag tag;
-  char _tag_padding[4];
-  Memory_Layout_Item_Flags flags;
-  u32 _flags_padding;
-  Source_Range source_range;
-  const Descriptor * descriptor;
-  Slice name;
-  union {
-    Memory_Layout_Item_Absolute Absolute;
-    Memory_Layout_Item_Base_Relative Base_Relative;
-  };
-} Memory_Layout_Item;
-static inline Memory_Layout_Item_Absolute *
-memory_layout_item_as_absolute(Memory_Layout_Item *memory_layout_item) {
-  assert(memory_layout_item->tag == Memory_Layout_Item_Tag_Absolute);
-  return &memory_layout_item->Absolute;
-}
-static inline Memory_Layout_Item_Base_Relative *
-memory_layout_item_as_base_relative(Memory_Layout_Item *memory_layout_item) {
-  assert(memory_layout_item->tag == Memory_Layout_Item_Tag_Base_Relative);
-  return &memory_layout_item->Base_Relative;
-}
-typedef dyn_array_type(Memory_Layout_Item) Array_Memory_Layout_Item;
-typedef struct Memory_Layout {
-  Array_Memory_Layout_Item items;
-} Memory_Layout;
-typedef dyn_array_type(Memory_Layout) Array_Memory_Layout;
-
-typedef enum {
   Function_Parameter_Tag_Runtime = 0,
   Function_Parameter_Tag_Generic = 1,
   Function_Parameter_Tag_Exact_Static = 2,
@@ -1780,12 +1736,22 @@ function_call_jump_as_syscall(Function_Call_Jump *function_call_jump) {
   return &function_call_jump->Syscall;
 }
 typedef dyn_array_type(Function_Call_Jump) Array_Function_Call_Jump;
+typedef struct Function_Call_Parameter {
+  Function_Call_Parameter_Flags flags;
+  u32 _flags_padding;
+  Source_Range source_range;
+  const Descriptor * descriptor;
+  Slice name;
+  Storage storage;
+} Function_Call_Parameter;
+typedef dyn_array_type(Function_Call_Parameter) Array_Function_Call_Parameter;
+
 typedef struct Function_Call_Setup {
   u32 parameters_stack_size;
   u32 _parameters_stack_size_padding;
   Function_Call_Jump jump;
   const Calling_Convention * calling_convention;
-  Memory_Layout arguments_layout;
+  Array_Function_Call_Parameter parameters;
   Storage caller_return;
   Storage callee_return;
 } Function_Call_Setup;
@@ -2566,23 +2532,6 @@ static Descriptor descriptor_array_lazy_static_value_ptr;
 static Descriptor descriptor_lazy_static_value_pointer;
 static Descriptor descriptor_lazy_static_value_pointer_pointer;
 static Descriptor descriptor_mass_handle_operator_proc;
-static Descriptor descriptor_memory_layout_item_flags;
-static Descriptor descriptor_array_memory_layout_item_flags;
-static Descriptor descriptor_array_memory_layout_item_flags_ptr;
-static Descriptor descriptor_array_const_memory_layout_item_flags_ptr;
-static Descriptor descriptor_memory_layout_item_flags_pointer;
-static Descriptor descriptor_memory_layout_item_flags_pointer_pointer;
-static Descriptor descriptor_memory_layout_item;
-static Descriptor descriptor_array_memory_layout_item;
-static Descriptor descriptor_array_memory_layout_item_ptr;
-static Descriptor descriptor_array_const_memory_layout_item_ptr;
-static Descriptor descriptor_memory_layout_item_pointer;
-static Descriptor descriptor_memory_layout_item_pointer_pointer;
-static Descriptor descriptor_memory_layout;
-static Descriptor descriptor_array_memory_layout;
-static Descriptor descriptor_array_memory_layout_ptr;
-static Descriptor descriptor_memory_layout_pointer;
-static Descriptor descriptor_memory_layout_pointer_pointer;
 static Descriptor descriptor_function_parameter;
 static Descriptor descriptor_array_function_parameter;
 static Descriptor descriptor_array_function_parameter_ptr;
@@ -2627,6 +2576,17 @@ static Descriptor descriptor_array_function_call_jump_ptr;
 static Descriptor descriptor_array_const_function_call_jump_ptr;
 static Descriptor descriptor_function_call_jump_pointer;
 static Descriptor descriptor_function_call_jump_pointer_pointer;
+static Descriptor descriptor_function_call_parameter_flags;
+static Descriptor descriptor_array_function_call_parameter_flags;
+static Descriptor descriptor_array_function_call_parameter_flags_ptr;
+static Descriptor descriptor_array_const_function_call_parameter_flags_ptr;
+static Descriptor descriptor_function_call_parameter_flags_pointer;
+static Descriptor descriptor_function_call_parameter_flags_pointer_pointer;
+static Descriptor descriptor_function_call_parameter;
+static Descriptor descriptor_array_function_call_parameter;
+static Descriptor descriptor_array_function_call_parameter_ptr;
+static Descriptor descriptor_function_call_parameter_pointer;
+static Descriptor descriptor_function_call_parameter_pointer_pointer;
 static Descriptor descriptor_function_call_setup;
 static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
@@ -4730,95 +4690,6 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
     },
   }
 )
-MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_flags, Memory_Layout_Item_Flags)
-static C_Enum_Item memory_layout_item_flags_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Uninitialized"), .value = 1 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Memory_Layout_Item_Flags, memory_layout_item_flags);
-DEFINE_VALUE_IS_AS_HELPERS(Memory_Layout_Item_Flags *, memory_layout_item_flags_pointer);
-/*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_item_ptr, Array_Memory_Layout_Item_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_item, Array_Memory_Layout_Item)
-MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_tag, Memory_Layout_Item_Tag)
-static C_Enum_Item memory_layout_item_tag_items[] = {
-{ .name = slice_literal_fields("Absolute"), .value = 0 },
-{ .name = slice_literal_fields("Base_Relative"), .value = 1 },
-};
-MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item_absolute, Memory_Layout_Item_Absolute,
-  {
-    .descriptor = &descriptor_storage,
-    .name = slice_literal_fields("storage"),
-    .offset = offsetof(Memory_Layout_Item_Absolute, storage),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(memory_layout_item_absolute);
-MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item_base_relative, Memory_Layout_Item_Base_Relative,
-  {
-    .descriptor = &descriptor_s64,
-    .name = slice_literal_fields("offset"),
-    .offset = offsetof(Memory_Layout_Item_Base_Relative, offset),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(memory_layout_item_base_relative);
-MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item, Memory_Layout_Item,
-  {
-    .name = slice_literal_fields("tag"),
-    .descriptor = &descriptor_memory_layout_item_tag,
-    .offset = offsetof(Memory_Layout_Item, tag),
-  },
-  {
-    .descriptor = &descriptor_memory_layout_item_flags,
-    .name = slice_literal_fields("flags"),
-    .offset = offsetof(Memory_Layout_Item, flags),
-  },
-  {
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("_flags_padding"),
-    .offset = offsetof(Memory_Layout_Item, _flags_padding),
-  },
-  {
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .offset = offsetof(Memory_Layout_Item, source_range),
-  },
-  {
-    .descriptor = &descriptor_descriptor_pointer,
-    .name = slice_literal_fields("descriptor"),
-    .offset = offsetof(Memory_Layout_Item, descriptor),
-  },
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("name"),
-    .offset = offsetof(Memory_Layout_Item, name),
-  },
-  {
-    .name = slice_literal_fields("Absolute"),
-    .descriptor = &descriptor_memory_layout_item_absolute,
-    .offset = offsetof(Memory_Layout_Item, Absolute),
-  },
-  {
-    .name = slice_literal_fields("Base_Relative"),
-    .descriptor = &descriptor_memory_layout_item_base_relative,
-    .offset = offsetof(Memory_Layout_Item, Base_Relative),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(memory_layout_item);
-DEFINE_VALUE_IS_AS_HELPERS(Memory_Layout_Item, memory_layout_item);
-DEFINE_VALUE_IS_AS_HELPERS(Memory_Layout_Item *, memory_layout_item_pointer);
-/*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_ptr, Array_Memory_Layout_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout, Array_Memory_Layout)
-MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout, Memory_Layout,
-  {
-    .descriptor = &descriptor_array_memory_layout_item,
-    .name = slice_literal_fields("items"),
-    .offset = offsetof(Memory_Layout, items),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(memory_layout);
-DEFINE_VALUE_IS_AS_HELPERS(Memory_Layout, memory_layout);
-DEFINE_VALUE_IS_AS_HELPERS(Memory_Layout *, memory_layout_pointer);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter_ptr, Array_Function_Parameter_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter, Array_Function_Parameter)
@@ -5018,6 +4889,50 @@ MASS_DEFINE_TYPE_VALUE(function_call_jump);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Jump, function_call_jump);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Jump *, function_call_jump_pointer);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(function_call_parameter_flags, Function_Call_Parameter_Flags)
+static C_Enum_Item function_call_parameter_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Uninitialized"), .value = 1 },
+};
+DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter_Flags, function_call_parameter_flags);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter_Flags *, function_call_parameter_flags_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_parameter_ptr, Array_Function_Call_Parameter_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_parameter, Array_Function_Call_Parameter)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_parameter, Function_Call_Parameter,
+  {
+    .descriptor = &descriptor_function_call_parameter_flags,
+    .name = slice_literal_fields("flags"),
+    .offset = offsetof(Function_Call_Parameter, flags),
+  },
+  {
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("_flags_padding"),
+    .offset = offsetof(Function_Call_Parameter, _flags_padding),
+  },
+  {
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .offset = offsetof(Function_Call_Parameter, source_range),
+  },
+  {
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .offset = offsetof(Function_Call_Parameter, descriptor),
+  },
+  {
+    .descriptor = &descriptor_slice,
+    .name = slice_literal_fields("name"),
+    .offset = offsetof(Function_Call_Parameter, name),
+  },
+  {
+    .descriptor = &descriptor_storage,
+    .name = slice_literal_fields("storage"),
+    .offset = offsetof(Function_Call_Parameter, storage),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_call_parameter);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter, function_call_parameter);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter *, function_call_parameter_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup_ptr, Array_Function_Call_Setup_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
@@ -5042,9 +4957,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
     .offset = offsetof(Function_Call_Setup, calling_convention),
   },
   {
-    .descriptor = &descriptor_memory_layout,
-    .name = slice_literal_fields("arguments_layout"),
-    .offset = offsetof(Function_Call_Setup, arguments_layout),
+    .descriptor = &descriptor_array_function_call_parameter,
+    .name = slice_literal_fields("parameters"),
+    .offset = offsetof(Function_Call_Setup, parameters),
   },
   {
     .descriptor = &descriptor_storage,

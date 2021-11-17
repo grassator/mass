@@ -1539,78 +1539,6 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Memory_Layout_Item">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Memory_Layout_Item_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Memory_Layout_Item_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Memory_Layout_Item">
-  <DisplayString Condition="tag == Memory_Layout_Item_Tag_Absolute">
-    Absolute { Absolute }
-  </DisplayString>
-  <DisplayString Condition="tag == Memory_Layout_Item_Tag_Base_Relative">
-    Base_Relative { Base_Relative }
-  </DisplayString>
-  <Expand>
-    <Item Name="tag">tag</Item>
-    <Item Name="flags">flags</Item>
-    <Item Name="_flags_padding">_flags_padding</Item>
-    <Item Name="source_range">source_range</Item>
-    <Item Name="descriptor">descriptor</Item>
-    <Item Name="name">name</Item>
-    <Item Name="Absolute" Condition="tag == Memory_Layout_Item_Tag_Absolute">Absolute</Item>
-    <Item Name="Base_Relative" Condition="tag == Memory_Layout_Item_Tag_Base_Relative">Base_Relative</Item>
-  </Expand>
-</Type>
-<Type Name="Array_Memory_Layout">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Memory_Layout_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Memory_Layout_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
 <Type Name="Array_Function_Parameter">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -1801,6 +1729,33 @@
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="Syscall" Condition="tag == Function_Call_Jump_Tag_Syscall">Syscall</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Call_Parameter">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Call_Parameter_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Call_Parameter_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
   </Expand>
 </Type>
 <Type Name="Array_Function_Call_Setup">

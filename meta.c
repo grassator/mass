@@ -1659,30 +1659,6 @@ main(void) {
     { "const Operator *", "operator" },
   }));
 
-  push_type(type_enum("Memory_Layout_Item_Flags", (Enum_Type_Item[]){
-    { "None", 0 },
-    { "Uninitialized", 1 << 0 },
-  }));
-
-  push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct_Type[]){
-    struct_fields("Absolute", (Struct_Item[]){
-      { "Storage", "storage" },
-    }),
-    struct_fields("Base_Relative", (Struct_Item[]){
-      { "s64", "offset" },
-    }),
-  }), (Struct_Item[]){
-    { "Memory_Layout_Item_Flags", "flags" },
-    { "u32", "_flags_padding" },
-    { "Source_Range", "source_range" },
-    { "const Descriptor *", "descriptor" },
-    { "Slice", "name" },
-  }));
-
-  push_type(type_struct("Memory_Layout", (Struct_Item[]){
-    { "Array_Memory_Layout_Item", "items" },
-  }));
-
   push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
     struct_empty("Runtime"),
     struct_empty("Generic"),
@@ -1741,12 +1717,26 @@ main(void) {
     }),
   }));
 
+  push_type(type_enum("Function_Call_Parameter_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Uninitialized", 1 << 0 },
+  }));
+
+  push_type(type_struct("Function_Call_Parameter", (Struct_Item[]){
+    { "Function_Call_Parameter_Flags", "flags" },
+    { "u32", "_flags_padding" },
+    { "Source_Range", "source_range" },
+    { "const Descriptor *", "descriptor" },
+    { "Slice", "name" },
+    { "Storage", "storage" },
+  }));
+
   push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
     { "u32", "parameters_stack_size"},
     { "u32", "_parameters_stack_size_padding"},
     { "Function_Call_Jump", "jump"},
     { "const Calling_Convention *", "calling_convention" },
-    { "Memory_Layout", "arguments_layout" },
+    { "Array_Function_Call_Parameter", "parameters" },
     { "Storage", "caller_return" },
     { "Storage", "callee_return" },
   }));

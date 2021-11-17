@@ -3467,12 +3467,12 @@ call_function_overload(
   Array_Value_Ptr temp_arguments = dyn_array_make(
     Array_Value_Ptr,
     .allocator = compilation->temp_allocator,
-    .capacity = dyn_array_length(call_setup->arguments_layout.items),
+    .capacity = dyn_array_length(call_setup->parameters),
   );
   Array_Value target_params = dyn_array_make(
     Array_Value,
     .allocator = compilation->temp_allocator,
-    .capacity = dyn_array_length(call_setup->arguments_layout.items),
+    .capacity = dyn_array_length(call_setup->parameters),
   );
   Array_Saved_Register stack_saved_registers = dyn_array_make(
     Array_Saved_Register,
@@ -3480,16 +3480,12 @@ call_function_overload(
     .capacity = 32,
   );
 
-  Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Call_Target_Argument);
-
+  // TODO move this calculation to the call setup time as it does not change
   u64 all_used_arguments_register_bitset = 0;
-  DYN_ARRAY_FOREACH(Memory_Layout_Item, target_item, call_setup->arguments_layout.items) {
-    Storage storage = memory_layout_item_storage(
-      &stack_argument_base, &call_setup->arguments_layout, target_item
-    );
+  DYN_ARRAY_FOREACH(Function_Call_Parameter, target_item, call_setup->parameters) {
+    Storage storage = target_item->storage;
     if (storage_is_stack(&storage)) {
-      assert(storage.Memory.location.Stack.area != Stack_Area_Local);
-      storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
+      assert(storage.Memory.location.Stack.area == Stack_Area_Call_Target_Argument);
     }
     Value *param = dyn_array_push_uninitialized(target_params);
     value_init(param, target_item->descriptor, storage, target_item->source_range);
@@ -3506,12 +3502,12 @@ call_function_overload(
   u64 copied_straight_to_param_bitset = 0;
   u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
-    Memory_Layout_Item *target_item = dyn_array_get(call_setup->arguments_layout.items, i);
+    Function_Call_Parameter *target_item = dyn_array_get(call_setup->parameters, i);
     Value *target_arg = dyn_array_get(target_params, i);
     Value *source_arg;
     const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
-      if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
+      if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
         Storage source_storage = reserve_stack_storage(builder, target_arg->descriptor->bit_size);
         source_arg = value_init(
           allocator_allocate(compilation->allocator, Value),
@@ -3537,7 +3533,7 @@ call_function_overload(
       storage_is_stack(&source_arg->storage) &&
       descriptor_is_implicit_pointer(source_arg->descriptor)
     );
-    bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
+    bool should_assign = !(target_item->flags & Function_Call_Parameter_Flags_Uninitialized);
 
     u64 target_arg_register_bitset = register_bitset_from_storage(&target_arg->storage);
     if (target_arg_register_bitset >> 16) {
@@ -5462,7 +5458,7 @@ mass_handle_field_access_lazy_proc(
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
-  // TODO should `memory_layout_item_storage` always copy the flags? Or maybe it should be mutating?
+  // TODO should this always copy the flags? Or maybe it should be mutating?
   Storage field_storage = storage_with_offset_and_bit_size(
     &struct_storage, u64_to_s32(field->offset), field->descriptor->bit_size
   );

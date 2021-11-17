@@ -221,8 +221,8 @@ x86_64_system_v_adjust_classification_if_no_register_available(
   }
 }
 
-static Memory_Layout_Item
-x86_64_system_v_memory_layout_item_for_classification(
+static Function_Call_Parameter
+x86_64_system_v_parameter_for_classification(
   System_V_Register_State *registers,
   const System_V_Classification *classification,
   Slice name,
@@ -269,12 +269,12 @@ x86_64_system_v_memory_layout_item_for_classification(
     case SYSTEM_V_MEMORY: {
       u64 alignment = descriptor_byte_alignment(classification->descriptor);
       *stack_offset = u64_align(*stack_offset, u64_max(8, alignment));
-      Memory_Layout_Item result = {
-        .tag = Memory_Layout_Item_Tag_Base_Relative,
-        .flags = Memory_Layout_Item_Flags_None,
+      Bits bit_size = classification->descriptor->bit_size;
+      Function_Call_Parameter result = {
+        .flags = Function_Call_Parameter_Flags_None,
         .name = name,
         .descriptor = classification->descriptor,
-        .Base_Relative = {.offset = *stack_offset},
+        .storage = storage_stack(u64_to_s32(*stack_offset), bit_size, Stack_Area_Call_Target_Argument),
       };
       *stack_offset += byte_size;
       return result;
@@ -291,11 +291,10 @@ x86_64_system_v_memory_layout_item_for_classification(
   }
 
   absolute:
-  return (Memory_Layout_Item){
-    .tag = Memory_Layout_Item_Tag_Absolute,
+  return (Function_Call_Parameter){
     .name = name,
     .descriptor = classification->descriptor,
-    .Absolute = {.storage = storage},
+    .storage = storage,
   };
 }
 
@@ -661,13 +660,12 @@ calling_convention_x86_64_system_v_call_setup_proc(
     } else {
       u64 stack_offset = 0;
       Slice return_name = (Slice){0};
-      Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
+      Function_Call_Parameter item = x86_64_system_v_parameter_for_classification(
         &registers, &classification, return_name, &stack_offset
       );
-      assert(item.tag == Memory_Layout_Item_Tag_Absolute);
 
-      result.callee_return = item.Absolute.storage;
-      result.caller_return = item.Absolute.storage;
+      result.callee_return = item.storage;
+      result.caller_return = item.storage;
     }
   }
 
@@ -692,13 +690,11 @@ calling_convention_x86_64_system_v_call_setup_proc(
     },
   };
 
-  result.arguments_layout = (Memory_Layout){
-    .items = dyn_array_make(
-      Array_Memory_Layout_Item,
-      .allocator = allocator,
-      .capacity = dyn_array_length(function->parameters) + 1,
-    ),
-  };
+  result.parameters = dyn_array_make(
+    Array_Function_Call_Parameter,
+    .allocator = allocator,
+    .capacity = dyn_array_length(function->parameters) + 1,
+  );
 
   u64 stack_offset = 0;
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
@@ -707,22 +703,21 @@ calling_convention_x86_64_system_v_call_setup_proc(
       x86_64_system_v_classify(param->declaration.descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
-    Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
+    Function_Call_Parameter struct_item = x86_64_system_v_parameter_for_classification(
       &registers, &classification, param->declaration.symbol->name, &stack_offset
     );
 
-    dyn_array_push(result.arguments_layout.items, struct_item);
+    dyn_array_push(result.parameters, struct_item);
   }
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (is_indirect_return) {
     const Descriptor *descriptor = function->returns.descriptor;
-    dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = Memory_Layout_Item_Flags_Uninitialized,
+    dyn_array_push(result.parameters, (Function_Call_Parameter) {
+      .flags = Function_Call_Parameter_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = descriptor,
-      .Absolute = { .storage = storage_indirect(descriptor->bit_size, Register_DI), },
+      .storage = storage_indirect(descriptor->bit_size, Register_DI),
     });
   }
 
@@ -764,13 +759,11 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .vector = {0},
   };
 
-  result.arguments_layout = (Memory_Layout){
-    .items = dyn_array_make(
-      Array_Memory_Layout_Item,
-      .allocator = allocator,
-      .capacity = dyn_array_length(function->parameters),
-    ),
-  };
+  result.parameters =  dyn_array_make(
+    Array_Function_Call_Parameter,
+    .allocator = allocator,
+    .capacity = dyn_array_length(function->parameters),
+  );
 
   u64 stack_offset = 0;
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
@@ -790,11 +783,11 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
       assert("System V syscall support no more than 6 arguments");
     }
 
-    Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
+    Function_Call_Parameter parameter = x86_64_system_v_parameter_for_classification(
       &registers, &classification, param->declaration.symbol->name, &stack_offset
     );
     // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
-    dyn_array_push(result.arguments_layout.items, struct_item);
+    dyn_array_push(result.parameters, parameter);
   }
 
   assert(stack_offset == 0);
@@ -840,27 +833,24 @@ calling_convention_x86_64_windows_call_setup_proc(
   static const Register float_registers[] = {Register_Xmm0, Register_Xmm1, Register_Xmm2, Register_Xmm3};
   assert(countof(general_registers) == countof(float_registers));
 
-  result.arguments_layout = (Memory_Layout){
-    .items = dyn_array_make(
-      Array_Memory_Layout_Item,
-      .allocator = allocator,
-      .capacity = dyn_array_length(function->parameters) + 1,
-    ),
-  };
+  result.parameters = dyn_array_make(
+    Array_Function_Call_Parameter,
+    .allocator = allocator,
+    .capacity = dyn_array_length(function->parameters) + 1,
+  );
 
   u64 index = is_indirect_return ? 1 : 0;
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
-    Memory_Layout_Item item = {
-      .flags = Memory_Layout_Item_Flags_None,
+    Function_Call_Parameter item = {
+      .flags = Function_Call_Parameter_Flags_None,
       .descriptor = param->declaration.descriptor,
       .name = param->declaration.symbol->name,
       .source_range = param->declaration.source_range,
     };
 
     bool is_large_argument = item.descriptor->bit_size.as_u64 > 64;
-    Storage arg_storage;
     if (is_large_argument) {
       Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
       *descriptor = (Descriptor) {
@@ -878,25 +868,23 @@ calling_convention_x86_64_windows_call_setup_proc(
       Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[index]
         : general_registers[index];
-      arg_storage = storage_register(reg, item.descriptor->bit_size);
-      item.tag = Memory_Layout_Item_Tag_Absolute;
-      item.Absolute.storage = arg_storage;
+      item.storage = storage_register(reg, item.descriptor->bit_size);
     } else {
-      item.tag = Memory_Layout_Item_Tag_Base_Relative;
-      item.Base_Relative.offset = index * 8;
+      item.storage = storage_stack(
+        u64_to_s32(index * 8), item.descriptor->bit_size, Stack_Area_Call_Target_Argument
+      );
     }
-    dyn_array_push(result.arguments_layout.items, item);
+    dyn_array_push(result.parameters, item);
     index += 1;
   }
 
   if (is_indirect_return) {
     const Descriptor *return_descriptor = function->returns.descriptor;
-    dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = Memory_Layout_Item_Flags_Uninitialized,
+    dyn_array_push(result.parameters, (Function_Call_Parameter) {
+      .flags = Function_Call_Parameter_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = return_descriptor,
-      .Absolute = { .storage = storage_indirect(return_descriptor->bit_size, Register_C), },
+      .storage = storage_indirect(return_descriptor->bit_size, Register_C),
     });
   }
 

@@ -227,13 +227,6 @@ storage_is_stack(
 );
 
 static inline Storage
-memory_layout_item_storage_at_index(
-  const Storage *base,
-  const Memory_Layout *layout,
-  u64 index
-);
-
-static inline Storage
 storage_stack(
   s32 offset,
   Bits bit_size,

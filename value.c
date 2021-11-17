@@ -1240,28 +1240,6 @@ value_as_function(
   return 0;
 }
 
-static inline Storage
-memory_layout_item_storage(
-  const Storage *base,
-  const Memory_Layout *layout,
-  const Memory_Layout_Item *item
-) {
-  assert(item >= dyn_array_get(layout->items, 0));
-  assert(item <= dyn_array_last(layout->items));
-  switch(item->tag) {
-    case Memory_Layout_Item_Tag_Absolute: {
-      return item->Absolute.storage;
-    }
-    case Memory_Layout_Item_Tag_Base_Relative: {
-      return storage_with_offset_and_bit_size(
-        base, u64_to_s32(item->Base_Relative.offset), item->descriptor->bit_size
-      );
-    }
-  }
-  panic("Not reached");
-  return storage_none;
-}
-
 static const Os
 host_os() {
   #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))

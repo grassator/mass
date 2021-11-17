@@ -684,16 +684,21 @@ ensure_function_instance(
   };
 
   {
-    const Memory_Layout *arguments_layout = &call_setup.arguments_layout;
     Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Received_Argument);
-    DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
-      Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
-      Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
+    DYN_ARRAY_FOREACH(Function_Call_Parameter, param, call_setup.parameters) {
+      Storage storage = param->storage;
+      if (
+        storage_is_stack(&storage) &&
+        storage.Memory.location.Stack.area == Stack_Area_Call_Target_Argument
+      ) {
+        storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
+      }
+      Value *arg_value = value_make(&body_context, param->descriptor, storage, param->source_range);
       arg_value->flags |= Value_Flags_Constant;
-      if (item->name.length) {
+      if (param->name.length) {
         // TODO figure out how to avoid this lookup
-        const Symbol *item_symbol = mass_ensure_symbol(compilation, item->name);
-        scope_define_value(body_scope, body_context.epoch, item->source_range, item_symbol, arg_value);
+        const Symbol *param_symbol = mass_ensure_symbol(compilation, param->name);
+        scope_define_value(body_scope, body_context.epoch, param->source_range, param_symbol, arg_value);
       }
       mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
     }
