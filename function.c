@@ -760,11 +760,11 @@ calculate_arguments_match_score(
     const Descriptor *source_descriptor;
     if (arg_index >= args_view.length) {
       if (!param->maybe_default_value) return -1;
-      source_descriptor = target_descriptor;
+      source_arg = param->maybe_default_value;
     } else {
       source_arg = value_view_get(args_view, arg_index);
-      source_descriptor = value_or_lazy_value_descriptor(source_arg);
     }
+    source_descriptor = value_or_lazy_value_descriptor(source_arg);
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
         if (same_type(target_descriptor, source_descriptor)) {
@@ -779,7 +779,7 @@ calculate_arguments_match_score(
         }
       } break;
       case Function_Parameter_Tag_Exact_Static: {
-        if (!source_arg || !value_is_non_lazy_static(source_arg)) return -1;
+        if (!value_is_non_lazy_static(source_arg)) return -1;
         if (!storage_static_equal(
           target_descriptor, &param->Exact_Static.storage,
           source_arg->descriptor, &source_arg->storage
