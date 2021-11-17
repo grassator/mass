@@ -4056,7 +4056,7 @@ mass_ensure_trampoline(
   Source_Range args_source_range;
   INIT_LITERAL_SOURCE_RANGE(&args_source_range, "args");
   dyn_array_push(trampoline_info->parameters, (Function_Parameter) {
-    .tag = Function_Parameter_Tag_Generic,
+    .tag = Function_Parameter_Tag_Runtime,
     .declaration = {
       .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
       .descriptor = descriptor_pointer_to(context->allocator, args_struct_descriptor),
