@@ -6197,6 +6197,9 @@ token_parse_function_literal(
       return 0;
     }
     Function_Literal_Flags flags = Function_Literal_Flags_None;
+    if (value_is_intrinsic(body_value)) {
+      fn_info->flags |= Function_Info_Flags_Intrinsic;
+    }
 
     DYN_ARRAY_FOREACH(Function_Parameter, param, fn_info->parameters) {
       if (param->tag == Function_Parameter_Tag_Generic) {
