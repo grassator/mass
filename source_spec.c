@@ -924,6 +924,16 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support defining a void to void function") {
+      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "compile_time_fn :: fn() => () { }\n"
+        "checker :: fn() -> () { compile_time_fn() }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+
     it("should prefer a compile-time overload over a runtime if args are compile-time known") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,

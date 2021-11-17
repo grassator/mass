@@ -492,7 +492,9 @@ static void
 c_struct_aligner_end(
   C_Struct_Aligner *aligner
 ) {
-  aligner->bit_size = u64_align(aligner->bit_size, aligner->bit_alignment);
+  if (aligner->bit_size) {
+    aligner->bit_size = u64_align(aligner->bit_size, aligner->bit_alignment);
+  }
 }
 
 typedef enum {
@@ -4167,11 +4169,13 @@ mass_trampoline_call(
   MASS_ON_ERROR(*context->result) return 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
-  u8 *args_struct_memory = allocator_allocate_bytes(
-    context->temp_allocator,
-    descriptor_byte_size(trampoline->args_descriptor),
-    descriptor_byte_alignment(trampoline->args_descriptor)
-  );
+  u8 *args_struct_memory = trampoline->args_descriptor->bit_size.as_u64
+    ? allocator_allocate_bytes(
+      context->temp_allocator,
+      descriptor_byte_size(trampoline->args_descriptor),
+      descriptor_byte_alignment(trampoline->args_descriptor)
+    )
+    : 0;
 
   Array_Struct_Field fields = trampoline->args_descriptor->Struct.fields;
   assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
