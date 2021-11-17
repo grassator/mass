@@ -3952,20 +3952,20 @@ mass_intrinsic_call(
   Compilation *compilation = context->compilation;
   Jit *jit = &context->compilation->jit;
 
-  // TODO @Speed consider caching this whole block till ----
   Value *instance = ensure_function_instance(compilation, jit->program, overload, (Value_View){0});
   MASS_ON_ERROR(*compilation->result) return 0;
 
-  Mass_Result jit_result = program_jit(compilation, jit);
-  MASS_ON_ERROR(jit_result) {
-    context_error(context, jit_result.Error.error);
-    return 0;
-  }
   fn_type_opaque jitted_code;
   if (storage_is_label(&instance->storage)) {
-    jitted_code = (fn_type_opaque)rip_value_pointer_from_label(
-      instance->storage.Memory.location.Instruction_Pointer_Relative.label
-    );
+    Label *label = instance->storage.Memory.location.Instruction_Pointer_Relative.label;
+    if (!label->resolved) {
+      Mass_Result jit_result = program_jit(compilation, jit);
+      MASS_ON_ERROR(jit_result) {
+        context_error(context, jit_result.Error.error);
+        return 0;
+      }
+    }
+    jitted_code = (fn_type_opaque)rip_value_pointer_from_label(label);
   } else {
     u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);
     jitted_code = (fn_type_opaque)absolute_address;
