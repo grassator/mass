@@ -956,6 +956,20 @@ spec("source") {
       check(checker() == 42);
     }
 
+    // FIXME :IntrinsicReturnType
+    xit("should validate the return type of the intrinsic when specified") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "intrinsic_id :: fn(x : i64, y : String) => (i64) intrinsic { arguments.values.1 }\n"
+        "checker :: fn() -> () { intrinsic_id(42, \"foo\") }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_i64);
+      check(error->Type_Mismatch.actual == &descriptor_slice);
+    }
+
     it("should be able to have access to arguments view in user-defined intrinsics") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(

@@ -3952,6 +3952,7 @@ mass_intrinsic_call(
   Compilation *compilation = context->compilation;
   Jit *jit = &context->compilation->jit;
 
+  // TODO @Speed consider caching this whole block till ----
   Value *instance = ensure_function_instance(compilation, jit->program, overload, (Value_View){0});
   MASS_ON_ERROR(*compilation->result) return 0;
 
@@ -4245,34 +4246,38 @@ token_handle_function_call(
   Value *overload = match_found.value;
   const Function_Info *info = match_found.info;
 
-  const Function_Literal *maybe_literal = 0;
-  if (value_is_function_literal(overload)) maybe_literal = value_as_function_literal(overload);
+  if (value_is_function_literal(overload)) {
+    const Function_Literal *literal = value_as_function_literal(overload);
+    if (value_is_intrinsic(literal->body)) {
+      // FIXME :IntrinsicReturnType Should check the returned result here
+      return mass_intrinsic_call(context, literal->body, args_view);
+    }
+    if (literal->flags & Function_Literal_Flags_Macro) {
+      return mass_handle_macro_call(context, overload, args_view, source_range);
+    }
+  }
 
-  MASS_ON_ERROR(*context->result) return 0;
   if (
     overload != context->compilation->current_compile_time_function_call_target &&
-    info && (info->flags & Function_Info_Flags_Compile_Time)
+    (info->flags & Function_Info_Flags_Compile_Time)
   ) {
     Value *result;
-    const Descriptor *expected_descriptor = info->returns.descriptor;
-    if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
-      result = mass_intrinsic_call(context, maybe_literal->body, args_view);
+    if (mass_can_trampoline_call(info, args_view)) {
+      // This is necessary to avoid infinite recursion as the `mass_trampoline_call` called below
+      // will end up here as well. Indirect calls are allowed so we do not need a full stack
+      const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
+      context->compilation->current_compile_time_function_call_target = overload;
+      result = mass_trampoline_call(context, overload, args_view);
+      context->compilation->current_compile_time_function_call_target = saved_call_target;
     } else {
-      if (mass_can_trampoline_call(info, args_view)) {
-        // This is necessary to avoid infinite recursion as the `mass_trampoline_call` called below
-        // will end up here as well. Indirect calls are allowed so we do not need a full stack
-        const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
-        context->compilation->current_compile_time_function_call_target = overload;
-        result = mass_trampoline_call(context, overload, args_view);
-        context->compilation->current_compile_time_function_call_target = saved_call_target;
-      } else {
-        // Probably better to change `mass_can_trampoline_call` into `mass_can_trampoline_call`
-        // and make it report the error
-        panic("TODO user error when can not compile-time call");
-        result = 0;
-      }
+      // Probably better to change `mass_can_trampoline_call` into
+      // `mass_ensure_trampoline_call` and make it report the error
+      panic("TODO user error when can not compile-time call");
+      result = 0;
     }
-    if (result && expected_descriptor && expected_descriptor != &descriptor_void) {
+    MASS_ON_ERROR(*context->result) return 0;
+    const Descriptor *expected_descriptor = info->returns.descriptor;
+    if (expected_descriptor && expected_descriptor != &descriptor_void) {
       const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(result);
       if (!same_type(expected_descriptor, actual_descriptor)) {
         context_error(context, (Mass_Error) {
@@ -4284,10 +4289,6 @@ token_handle_function_call(
       }
     }
     return result;
-  }
-
-  if (maybe_literal && (maybe_literal->flags & Function_Literal_Flags_Macro)) {
-    return mass_handle_macro_call(context, overload, args_view, source_range);
   }
 
   Mass_Function_Call_Lazy_Payload *call_payload =
