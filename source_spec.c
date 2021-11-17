@@ -924,12 +924,23 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should prefer a compile-time function over a runtime if args are compile-time known") {
+    it("should prefer a compile-time overload over a runtime if args are compile-time known") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "foo :: fn(x : i64) => (i64) { 42 }\n"
         "foo :: fn(x : i64) -> (i64) { 21 }\n"
         "checker :: fn() -> (i64) { foo(1) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should not select a compile-time overload over a runtime one if args are runtime") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn(x : i64) => (i64) { 21 }\n"
+        "foo :: fn(x : i64) -> (i64) { 42 }\n"
+        "checker :: fn() -> (i64) { x : i64 = 1; foo(x) }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);

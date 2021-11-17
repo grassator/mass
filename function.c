@@ -769,6 +769,9 @@ calculate_arguments_match_score(
     } else {
       source_arg = value_view_get(args_view, arg_index);
     }
+    if (fn_is_compile_time) {
+      if (!value_is_non_lazy_static(source_arg)) return -1;
+    }
     source_descriptor = value_or_lazy_value_descriptor(source_arg);
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
