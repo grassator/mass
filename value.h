@@ -189,37 +189,36 @@ value_view_from_value_array(
   };
 }
 
-static inline Array_Value_Ptr
-value_view_to_value_array(
-  const Allocator *allocator,
-  Value_View view
-) {
-  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr, .allocator = allocator, .capacity = view.length);
-  for (u64 i = 0; i < view.length; ++i) {
-    dyn_array_push(result, value_view_get(view, i));
-  }
-  return result;
-}
-
-#define dyn_array_copy_from_temp(_TYPE_, _CONTEXT_, _TARGET_, _SOURCE_)\
+#define dyn_array_copy_from_raw_memory(_TYPE_, _ALLOCATOR_, _TARGET_, _SOURCE_PTR_, _SOURCE_COUNT_)\
   do {\
-    _TYPE_ copy_source = (_SOURCE_);\
-    u64 copy_count = dyn_array_length(copy_source);\
+    u64 copy_count = (_SOURCE_COUNT_);\
     if (copy_count) {\
-      _TYPE_ copy_target = dyn_array_make(\
-        _TYPE_,\
-        .allocator = (_CONTEXT_)->allocator,\
-        .capacity = copy_count,\
-      );\
-      copy_target.data->length = copy_target.data->capacity;\
-      s8 *first = (s8 *)(dyn_array_get(copy_source, 0));\
-      s8 *past_last = (s8 *)(dyn_array_last(copy_source) + 1);\
-      memcpy(dyn_array_raw(copy_target), first, past_last - first);\
+      _TYPE_ copy_target = dyn_array_make(_TYPE_, .allocator = (_ALLOCATOR_), .capacity = copy_count);\
+      copy_target.data->length = copy_count;\
+      memcpy(dyn_array_raw(copy_target), (_SOURCE_PTR_), sizeof((_SOURCE_PTR_)[0]) * copy_count);\
       *(_TARGET_) = copy_target;\
     } else {\
       *(_TARGET_) = dyn_array_static_empty(_TYPE_);\
     }\
   } while(0)
+
+#define dyn_array_copy_from_temp(_TYPE_, _CONTEXT_, _TARGET_, _SOURCE_)\
+  do {\
+    _TYPE_ copy_source = (_SOURCE_);\
+    dyn_array_copy_from_raw_memory(\
+      _TYPE_, (_CONTEXT_)->allocator, (_TARGET_), dyn_array_raw(copy_source), dyn_array_length(copy_source)\
+    );\
+  } while(0)
+
+static inline Array_Value_Ptr
+value_view_to_value_array(
+  const Allocator *allocator,
+  Value_View view
+) {
+  Array_Value_Ptr result;
+  dyn_array_copy_from_raw_memory(Array_Value_Ptr, allocator, &result, view.values, view.length);
+  return result;
+}
 
 static inline bool
 storage_is_stack(
