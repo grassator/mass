@@ -744,15 +744,20 @@ calculate_arguments_match_score(
   const Function_Info *descriptor,
   Value_View args_view
 ) {
+  enum {MAX_ARG_COUNT = 500};
   enum {
-    Score_Exact_Static = 1000 * 1000 * 1000,
-    Score_Exact_Type = 1000 * 1000,
-    Score_Exact_Default = 1000,
+    Score_Exact_Static = MAX_ARG_COUNT * MAX_ARG_COUNT * MAX_ARG_COUNT,
+    Score_Exact_Type_Static = MAX_ARG_COUNT * MAX_ARG_COUNT * MAX_ARG_COUNT,
+    Score_Exact_Type = MAX_ARG_COUNT * MAX_ARG_COUNT,
+    Score_Exact_Default = MAX_ARG_COUNT,
     Score_Cast = 1,
   };
-  assert(args_view.length < 1000);
+  assert(args_view.length < MAX_ARG_COUNT);
   s64 score = 0;
   if (args_view.length > dyn_array_length(descriptor->parameters)) return -1;
+  bool fn_is_compile_time =
+    (descriptor->flags & Function_Info_Flags_Compile_Time) &&
+    !(descriptor->flags & Function_Info_Flags_Intrinsic);
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     const Descriptor *target_descriptor = param->declaration.descriptor;
@@ -768,7 +773,7 @@ calculate_arguments_match_score(
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
         if (same_type(target_descriptor, source_descriptor)) {
-          score += Score_Exact_Type;
+          score += fn_is_compile_time ? Score_Exact_Type_Static : Score_Exact_Type;
         } else if (
           source_arg &&
           same_value_type_or_can_implicitly_move_cast(target_descriptor, source_arg)

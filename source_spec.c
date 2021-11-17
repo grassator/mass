@@ -924,6 +924,17 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should prefer a compile-time function over a runtime if args are compile-time known") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn(x : i64) => (i64) { 42 }\n"
+        "foo :: fn(x : i64) -> (i64) { 21 }\n"
+        "checker :: fn() -> (i64) { foo(1) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to accept a function as an argument and call it") {
       s64 (*checker)(Spec_Callback foo) =
         (s64 (*)(Spec_Callback))test_program_inline_source_function(
