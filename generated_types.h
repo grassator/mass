@@ -2190,7 +2190,6 @@ typedef struct Compilation {
   Symbol_Map * prefix_operator_symbol_map;
   Symbol_Map * infix_or_suffix_operator_symbol_map;
   Common_Symbols common_symbols;
-  const Value * current_compile_time_function_call_target;
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
 
@@ -6031,11 +6030,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_common_symbols,
     .name = slice_literal_fields("common_symbols"),
     .offset = offsetof(Compilation, common_symbols),
-  },
-  {
-    .descriptor = &descriptor_value_pointer,
-    .name = slice_literal_fields("current_compile_time_function_call_target"),
-    .offset = offsetof(Compilation, current_compile_time_function_call_target),
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);

@@ -2030,7 +2030,6 @@ main(void) {
     { "Symbol_Map *", "prefix_operator_symbol_map" },
     { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Common_Symbols", "common_symbols" },
-    { "const Value *", "current_compile_time_function_call_target" },
   })));
 
   push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){

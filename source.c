@@ -3991,15 +3991,47 @@ static const Mass_Trampoline *
 mass_ensure_trampoline(
   Execution_Context *context,
   Value *original,
+  const Function_Info *original_info,
   Value_View args_view
 ) {
-  const Function_Info *original_info = maybe_function_info_from_value(original, args_view);
-  assert(original_info);
-
   const Mass_Trampoline **maybe_trampoline_pointer =
     hash_map_get(context->compilation->trampoline_map, original);
   if (maybe_trampoline_pointer) {
     return *maybe_trampoline_pointer;
+  }
+
+  Compilation *compilation = context->compilation;
+  Program *program = compilation->jit.program;
+
+  // Whenever a trampoline is generated it needs an instance compiled for JIT execution.
+  // The `Function_Info` of that instance must not be marked `Compile_Time` otherwise
+  // it will not be matched during compilation of the trampoline body as the arguments
+  // to the trampoline are not compile-time known.
+  //
+  // To solve this here we create a clone of the instanced with a swapped out
+  // `Function_Info` that is not marked `Compile_Time`.
+  //
+  // TODO would be nice to structure the types in such a way that this would be easier to do
+  Value *proxy_value;
+  {
+    Value *runtime_instance = ensure_function_instance(compilation, program, original, args_view);
+    assert(runtime_instance->descriptor->tag == Descriptor_Tag_Function_Instance);
+    Function_Info *proxy_info = allocator_allocate(context->allocator, Function_Info);
+    *proxy_info = *original_info;
+    proxy_info->flags &= ~Function_Info_Flags_Compile_Time;
+
+    const Descriptor *proxy_descriptor = descriptor_function_instance(
+      context->allocator,
+      runtime_instance->descriptor->name,
+      proxy_info,
+      runtime_instance->descriptor->Function_Instance.call_setup
+    );
+    proxy_value = value_init(
+      allocator_allocate(context->allocator, Value),
+      proxy_descriptor,
+      runtime_instance->storage,
+      runtime_instance->source_range
+    );
   }
 
   C_Struct_Aligner struct_aligner = {0};
@@ -4065,15 +4097,15 @@ mass_ensure_trampoline(
     },
   });
 
-  Source_Range original_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&original_source_range, "original");
-  const Symbol *original_symbol = mass_ensure_symbol(context->compilation, slice_literal("original"));
+  Source_Range proxy_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&proxy_source_range, "proxy");
+  const Symbol *proxy_symbol = mass_ensure_symbol(context->compilation, slice_literal("proxy"));
   scope_define_value(
-    trampoline_context->scope, VALUE_STATIC_EPOCH, original_source_range, original_symbol, original
+    trampoline_context->scope, VALUE_STATIC_EPOCH, proxy_source_range, proxy_symbol, proxy_value
   );
   Fixed_Buffer *buffer =
     fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
-  fixed_buffer_append_slice(buffer, slice_literal("{args.returns = original("));
+  fixed_buffer_append_slice(buffer, slice_literal("{args.returns = proxy("));
   assert(args_view.length <= 10);
   for (u64 i = 0; i < args_view.length; ++i) {
     if (i != 0) {
@@ -4105,8 +4137,6 @@ mass_ensure_trampoline(
     context, &descriptor_function_literal, storage_static(trampoline_literal), body_range
   );
 
-  Compilation *compilation = context->compilation;
-  Program *program = compilation->jit.program;
   Value *instance = ensure_function_instance(compilation, program, literal_value, args_view);
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -4129,9 +4159,11 @@ static Value *
 mass_trampoline_call(
   Execution_Context *context,
   Value *original,
+  const Function_Info *original_info,
   Value_View args_view
 ) {
-  const Mass_Trampoline *trampoline = mass_ensure_trampoline(context, original, args_view);
+  const Mass_Trampoline *trampoline =
+    mass_ensure_trampoline(context, original, original_info, args_view);
   MASS_ON_ERROR(*context->result) return 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
@@ -4257,24 +4289,12 @@ token_handle_function_call(
     }
   }
 
-  if (
-    overload != context->compilation->current_compile_time_function_call_target &&
-    (info->flags & Function_Info_Flags_Compile_Time)
-  ) {
-    Value *result;
-    if (mass_can_trampoline_call(info, args_view)) {
-      // This is necessary to avoid infinite recursion as the `mass_trampoline_call` called below
-      // will end up here as well. Indirect calls are allowed so we do not need a full stack
-      const Value *saved_call_target = context->compilation->current_compile_time_function_call_target;
-      context->compilation->current_compile_time_function_call_target = overload;
-      result = mass_trampoline_call(context, overload, args_view);
-      context->compilation->current_compile_time_function_call_target = saved_call_target;
-    } else {
-      // Probably better to change `mass_can_trampoline_call` into
-      // `mass_ensure_trampoline_call` and make it report the error
-      panic("TODO user error when can not compile-time call");
-      result = 0;
+  if (info->flags & Function_Info_Flags_Compile_Time) {
+    if (!mass_can_trampoline_call(info, args_view)) {
+      panic("A compile-time overload should not have been matched if we can't call it");
     }
+
+    Value *result = mass_trampoline_call(context, overload, info, args_view);
     MASS_ON_ERROR(*context->result) return 0;
     const Descriptor *expected_descriptor = info->returns.descriptor;
     if (expected_descriptor && expected_descriptor != &descriptor_void) {
