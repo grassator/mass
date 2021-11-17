@@ -6123,15 +6123,6 @@ token_parse_function_literal(
   }
   if (!keyword) return 0;
 
-  if (is_macro && at) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = at->source_range,
-      .detailed_message = slice_literal("Function-like macro can not be marked compile time"),
-    });
-    return 0;
-  }
-
   Value *maybe_name = value_view_maybe_match_any_of(view, &peek_index, &descriptor_symbol);
   Value *args = value_view_next(view, &peek_index);
   if (!value_is_group_paren(args)) {
@@ -6150,6 +6141,16 @@ token_parse_function_literal(
     );
     if (arrow) is_compile_time = true;
   }
+
+  if (is_macro && is_compile_time) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = at->source_range,
+      .detailed_message = slice_literal("Function-like macro can not be marked compile time"),
+    });
+    return 0;
+  }
+
   if (arrow) {
     returns = value_view_next(view, &peek_index);
     if (!returns) {
