@@ -6300,7 +6300,7 @@ token_parse_expression(
         if (!token_handle_operator(
           context, view, &value_stack, &operator_stack, maybe_operator, value->source_range
         )) goto defer;
-        is_previous_an_operator = true;
+        is_previous_an_operator = (maybe_operator->fixity != Operator_Fixity_Postfix);
         continue;
       }
     }
