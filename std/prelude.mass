@@ -59,7 +59,7 @@ debugger :: fn() => () intrinsic {
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
-    value : &MASS.Value = allocate(MASS.allocator, MASS.Value)
+    value : &MASS.Value = allocate(compilation.allocator, MASS.Value)
     value.source_range = source_range.*
     value.descriptor = Void
     value.storage.tag = MASS.Storage_Tag.None
@@ -67,9 +67,9 @@ debugger :: fn() => () intrinsic {
     value
   }
 
-  value : &MASS.Value = allocate(MASS.allocator, MASS.Value)
+  value : &MASS.Value = allocate(context.allocator, MASS.Value)
 
-  lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)
+  lazy_value : &MASS.Lazy_Value = allocate(context.allocator, MASS.Lazy_Value)
   lazy_value.epoch = context.epoch
   lazy_value.descriptor = Void
   lazy_value.proc = lazy_value_proc
@@ -117,7 +117,7 @@ static_assert :: fn(condition : bool, message : String) => () intrinsic {
     context_error(context, error)
   }
 
-  void := allocate(MASS.allocator, MASS.Value)
+  void := allocate(context.allocator, MASS.Value)
   void.descriptor = type_of(())
   void.storage.tag = MASS.Storage_Tag.None
   void.source_range = arguments.source_range
@@ -285,7 +285,7 @@ external :: fn(
 
 os :: MASS.Os
 get_target_os :: fn() => (os._Type) intrinsic {
-  value := allocate(MASS.allocator, MASS.Value)
+  value := allocate(context.allocator, MASS.Value)
   value.source_range = arguments.source_range
   value.descriptor = os._Type
   value.storage.tag = MASS.Storage_Tag.Static
