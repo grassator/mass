@@ -823,7 +823,9 @@ print_mass_descriptor_and_type(
   switch(type->tag) {
     case Meta_Type_Tag_Struct: {
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->name);
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      }
       print_mass_struct(file, type->name, &type->struct_);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
@@ -844,7 +846,9 @@ print_mass_descriptor_and_type(
       }
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s, .Opaque.numeric_interpretation = %s)\n",
         lowercase_name, type->name, numeric_interpretation_string);
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      }
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
