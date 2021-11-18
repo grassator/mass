@@ -3480,7 +3480,7 @@ call_function_overload(
     .capacity = 32,
   );
 
-  // TODO move this calculation to the call setup time as it does not change
+  // FIXME :AllArgsRegisters move this calculation to the call setup time as it does not change
   u64 all_used_arguments_register_bitset = 0;
   DYN_ARRAY_FOREACH(Function_Call_Parameter, target_item, call_setup->parameters) {
     Storage storage = target_item->storage;

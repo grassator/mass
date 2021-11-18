@@ -272,7 +272,6 @@ x86_64_system_v_parameter_for_classification(
       Bits bit_size = classification->descriptor->bit_size;
       Function_Call_Parameter result = {
         .flags = Function_Call_Parameter_Flags_None,
-        .name = name,
         .descriptor = classification->descriptor,
         .storage = storage_stack(u64_to_s32(*stack_offset), bit_size, Stack_Area_Call_Target_Argument),
       };
@@ -292,7 +291,6 @@ x86_64_system_v_parameter_for_classification(
 
   absolute:
   return (Function_Call_Parameter){
-    .name = name,
     .descriptor = classification->descriptor,
     .storage = storage,
   };
@@ -715,7 +713,6 @@ calling_convention_x86_64_system_v_call_setup_proc(
     const Descriptor *descriptor = function->returns.descriptor;
     dyn_array_push(result.parameters, (Function_Call_Parameter) {
       .flags = Function_Call_Parameter_Flags_Uninitialized,
-      .name = {0}, // Defining return value name happens separately
       .descriptor = descriptor,
       .storage = storage_indirect(descriptor->bit_size, Register_DI),
     });
@@ -846,7 +843,6 @@ calling_convention_x86_64_windows_call_setup_proc(
     Function_Call_Parameter item = {
       .flags = Function_Call_Parameter_Flags_None,
       .descriptor = param->declaration.descriptor,
-      .name = param->declaration.symbol->name,
       .source_range = param->declaration.source_range,
     };
 
@@ -882,7 +878,6 @@ calling_convention_x86_64_windows_call_setup_proc(
     const Descriptor *return_descriptor = function->returns.descriptor;
     dyn_array_push(result.parameters, (Function_Call_Parameter) {
       .flags = Function_Call_Parameter_Flags_Uninitialized,
-      .name = {0}, // Defining return value name happens separately
       .descriptor = return_descriptor,
       .storage = storage_indirect(return_descriptor->bit_size, Register_C),
     });

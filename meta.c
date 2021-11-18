@@ -1727,7 +1727,6 @@ main(void) {
     { "u32", "_flags_padding" },
     { "Source_Range", "source_range" },
     { "const Descriptor *", "descriptor" },
-    { "Slice", "name" },
     { "Storage", "storage" },
   }));
 

@@ -1741,7 +1741,6 @@ typedef struct Function_Call_Parameter {
   u32 _flags_padding;
   Source_Range source_range;
   const Descriptor * descriptor;
-  Slice name;
   Storage storage;
 } Function_Call_Parameter;
 typedef dyn_array_type(Function_Call_Parameter) Array_Function_Call_Parameter;
@@ -4918,11 +4917,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_parameter, Function_Call_Parameter,
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("descriptor"),
     .offset = offsetof(Function_Call_Parameter, descriptor),
-  },
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("name"),
-    .offset = offsetof(Function_Call_Parameter, name),
   },
   {
     .descriptor = &descriptor_storage,

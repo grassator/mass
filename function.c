@@ -508,7 +508,6 @@ maybe_constant_fold_internal(
 static void
 mark_occupied_registers(
   Function_Builder *builder,
-  const Storage *stack_argument_base,
   const Descriptor *descriptor,
   Storage *storage
 ) {
@@ -684,23 +683,27 @@ ensure_function_instance(
   };
 
   {
-    Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Received_Argument);
-    DYN_ARRAY_FOREACH(Function_Call_Parameter, param, call_setup.parameters) {
-      Storage storage = param->storage;
+    for (u64 i = 0; i < dyn_array_length(call_setup.parameters); ++i) {
+      const Function_Call_Parameter *call_param = dyn_array_get(call_setup.parameters, i);
+      Storage storage = call_param->storage;
+      // FIXME :AllArgsRegisters
+      mark_occupied_registers(builder, call_param->descriptor, &storage);
+      if (call_param->flags & Function_Call_Parameter_Flags_Uninitialized) {
+        continue;
+      }
       if (
         storage_is_stack(&storage) &&
         storage.Memory.location.Stack.area == Stack_Area_Call_Target_Argument
       ) {
         storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
       }
-      Value *arg_value = value_make(&body_context, param->descriptor, storage, param->source_range);
+      Value *arg_value = value_make(&body_context, call_param->descriptor, storage, call_param->source_range);
       arg_value->flags |= Value_Flags_Constant;
-      if (param->name.length) {
-        // TODO figure out how to avoid this lookup
-        const Symbol *param_symbol = mass_ensure_symbol(compilation, param->name);
-        scope_define_value(body_scope, body_context.epoch, param->source_range, param_symbol, arg_value);
+      const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
+      const Symbol *param_symbol = def_param->declaration.symbol;
+      if (param_symbol) {
+        scope_define_value(body_scope, body_context.epoch, call_param->source_range, param_symbol, arg_value);
       }
-      mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
     }
   }
 
