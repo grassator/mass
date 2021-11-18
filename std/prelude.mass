@@ -103,7 +103,7 @@ context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
   context.result.Error.error = error
 }
 
-static_assert :: fn(condition : bool, message : String) => () intrinsic {
+static_assert :: fn(condition : bool, message : String = "") => () intrinsic {
   meta :: import("std/meta")
   condition := meta.reify(arguments.values.0, bool).*
   message := meta.reify(arguments.values.1, String)
