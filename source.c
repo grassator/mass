@@ -4995,7 +4995,8 @@ mass_type_of(
   Execution_Context *context,
   Value_View args
 ) {
-  assert(args.length == 1 || args.length == 2);
+  assert(value_match_symbol(value_view_get(args, 0), slice_literal("type_of")));
+  assert(args.length == 2);
   Value *expression = token_parse_single(context, value_view_last(args));
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
 
@@ -5012,8 +5013,9 @@ mass_size_of(
   Execution_Context *context,
   Value_View args
 ) {
-  assert(args.length == 1);
-  Value *expression = value_view_get(args, 0);
+  assert(value_match_symbol(value_view_get(args, 0), slice_literal("size_of")));
+  assert(args.length == 2);
+  Value *expression = token_parse_single(context, value_view_last(args));
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 

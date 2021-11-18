@@ -128,6 +128,13 @@ apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) => (MASS.Scope) MASS.in
 apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) => () MASS.exports
 apply :: @fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) MASS.intrinsic
 apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) => (Type) MASS.c_struct
+
+// These need to be an overload of `apply` instead a regular function because
+// it needs to parse the expression inside with the runtime epoch even in the case
+// when it is called from a constant context
+apply :: fn(symbol :: 'type_of, paren : MASS.Group_Paren) => (Type) MASS.type_of
+apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) => (Type) MASS.size_of
+
 apply :: macro(type, tuple : MASS.Group_Square) { cast(type', tuple') }
 apply :: @fn(x, paren : MASS.Group_Paren) MASS.call
 
@@ -162,9 +169,6 @@ operator intrinsic 30 (x ') unquote
 
 quote :: fn(x) => (MASS.Quoted) MASS.quote
 unquote :: @fn(x) MASS.unquote
-
-type_of :: fn(x) => (Type) MASS.type_of
-size_of :: fn(x) => (i64) MASS.size_of
 
 pointer_to :: macro(type : Type) -> (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
