@@ -1,6 +1,8 @@
-exports {reify, same_type, Value}
+exports {reify, static_value, same_type, Value}
 
 Value :: MASS.Value
+Source_Range :: MASS.Source_Range
+Execution_Context :: MASS.Execution_Context
 same_type :: MASS.same_type
 
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
@@ -9,7 +11,7 @@ pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   assert(value.descriptor.bit_size.as_u64 == value.storage.bit_size.as_u64)
   memory := &value.storage.Static.memory
   Tag :: MASS.Static_Memory_Tag
-  memory.Heap.pointer
+
   if memory.tag == Tag.Heap then {
     memory.Heap.pointer
   } else if memory.tag == Tag.U64 then {
@@ -24,6 +26,41 @@ pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
     assert(false, "unreacheable")
     0
   }
+}
+
+static_value :: fn(
+  allocator : &Allocator,
+  pointer,
+  source_range : Source_Range
+) -> (&Value) {
+  type :: type_of(pointer)
+  static_assert(type.tag == MASS.Descriptor_Tag.Pointer_To)
+
+  static_value := allocate(allocator, Value)
+  static_value.source_range = source_range
+  static_value.descriptor = type.Pointer_To.descriptor
+
+  static_value.storage.tag = MASS.Storage_Tag.Static
+  static_value.storage.bit_size = static_value.descriptor.bit_size
+
+  bit_size := type.bit_size.as_u64
+  if bit_size == 8 then {
+    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U8
+    static_value.storage.Static.memory.U8.value = cast(&u8, pointer).*
+  } else if bit_size == 16 then {
+    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U16
+    static_value.storage.Static.memory.U16.value = cast(&u16, pointer).*
+  } else if bit_size == 32 then {
+    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U32
+    static_value.storage.Static.memory.U32.value = cast(&u32, pointer).*
+  } else if bit_size == 64 then {
+    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U64
+    static_value.storage.Static.memory.U64.value = cast(&u64, pointer).*
+  } else {
+    assert(false, "TODO support this")
+  }
+
+  static_value
 }
 
 reify :: macro(value : &Value, type : Type) {
