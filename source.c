@@ -4995,8 +4995,8 @@ mass_type_of(
   Execution_Context *context,
   Value_View args
 ) {
-  assert(args.length == 1);
-  Value *expression = value_view_get(args, 0);
+  assert(args.length == 1 || args.length == 2);
+  Value *expression = token_parse_single(context, value_view_last(args));
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
 
   return value_init(
