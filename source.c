@@ -2693,7 +2693,7 @@ mass_import(
     }
   }
 
-  return value_make(context, &descriptor_scope, storage_static(module->exports.scope), args.source_range);
+  return value_make(context, &descriptor_module, storage_static(module), args.source_range);
 
   parse_err:
   context_error(context, (Mass_Error) {
@@ -4188,6 +4188,7 @@ token_handle_function_call(
   Value_View args_view,
   Source_Range source_range
 ) {
+  // TODO move this to `apply`
   if (value_is_macro_capture(target_expression)) {
     const Macro_Capture *capture = value_as_macro_capture(target_expression);
     Execution_Context capture_context = *context;
@@ -4195,25 +4196,25 @@ token_handle_function_call(
     if (args_view.length == 0) {
       // Nothing to do
     } else if (args_view.length == 1) {
-      Value *scope_arg = value_view_get(args_view, 0);
-      if (scope_arg->descriptor != &descriptor_scope) {
+      Value *module_arg = value_view_get(args_view, 0);
+      if (!value_is_module(module_arg)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = source_range,
-          .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
-          .detailed_message = slice_literal("Macro capture can only accept an optional Scope argument"),
+          .Type_Mismatch = { .expected = &descriptor_module, .actual = module_arg->descriptor },
+          .detailed_message = slice_literal("Macro capture can only accept an optional Module argument"),
         });
         return 0;
       }
-      const Scope *argument_scope = value_as_scope(scope_arg);
-      use_scope(&capture_context, argument_scope);
+      const Module *module = value_as_module(module_arg);
+      use_scope(&capture_context, module->exports.scope);
     } else {
       Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = source_range,
         .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
-        .detailed_message = slice_literal("Macro capture can only accept an optional Scope argument"),
+        .detailed_message = slice_literal("Macro capture can only accept an Module Scope argument"),
       });
       return 0;
     }
@@ -5635,7 +5636,7 @@ mass_handle_dot_operator(
 
   if (
     unwrapped_descriptor->tag == Descriptor_Tag_Struct ||
-    lhs_forced_descriptor == &descriptor_scope
+    lhs->descriptor == &descriptor_module
   ) {
     if (value_is_i64(rhs)) {
       u64 index = value_as_i64(rhs)->bits;
@@ -5665,7 +5666,7 @@ mass_handle_dot_operator(
     const Symbol *field_symbol = value_as_symbol(rhs);
     Slice field_name = field_symbol->name;
 
-    if (lhs_forced_descriptor == &descriptor_scope) {
+    if (lhs_forced_descriptor == &descriptor_module) {
       if (!value_is_non_lazy_static(lhs)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Expected_Static,
@@ -5673,8 +5674,8 @@ mass_handle_dot_operator(
         });
         return 0;
       }
-      const Scope *module_scope = value_as_scope(lhs);
-      Scope_Entry *entry = scope_lookup_shallow(module_scope, field_symbol);
+      const Module *module = value_as_module(lhs);
+      Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, field_symbol);
       if (!entry) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
@@ -6567,11 +6568,11 @@ token_parse_statement_using(
 
   Value *result = compile_time_eval(context, rest);
 
-  if (result->descriptor != &descriptor_scope) {
+  if (result->descriptor != &descriptor_module) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = rest.source_range,
-      .Type_Mismatch = { .expected = &descriptor_scope, .actual = result->descriptor },
+      .Type_Mismatch = { .expected = &descriptor_module, .actual = result->descriptor },
     });
     goto err;
   }
@@ -6584,8 +6585,8 @@ token_parse_statement_using(
     goto err;
   }
 
-  const Scope *using_scope = value_as_scope(result);
-  use_scope(context, using_scope);
+  const Module *module = value_as_module(result);
+  use_scope(context, module->exports.scope);
 
   err:
   return peek_index;
@@ -6887,15 +6888,25 @@ scope_define_enum(
     scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it_symbol, item_value);
   }
 
+  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("_Type"));
+  scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, type_symbol, enum_type_value);
+
+  Module *enum_module = allocator_allocate(allocator, Module);
+  *enum_module = (Module) {
+    .source_range = source_range,
+    .own_scope = enum_scope,
+    .exports = {
+      .tag = Module_Exports_Tag_All,
+      .scope = enum_scope,
+    },
+  };
+
   Value *enum_value = value_init(
     allocator_allocate(allocator, Value),
-    &descriptor_scope, storage_static(enum_scope), source_range
+    &descriptor_module, storage_static(enum_module), source_range
   );
   const Symbol *enum_symbol = mass_ensure_symbol(compilation, enum_name);
   scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_symbol, enum_value);
-
-  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("_Type"));
-  scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, type_symbol, enum_type_value);
 }
 
 static void
@@ -6946,8 +6957,8 @@ scope_define_builtins(
 
   Value *compiler_module_value = value_init(
     allocator_allocate(allocator, Value),
-    &descriptor_scope,
-    storage_static(compilation->compiler_module.exports.scope),
+    &descriptor_module,
+    storage_static(&compilation->compiler_module),
     (Source_Range){0}
   );
   INIT_LITERAL_SOURCE_RANGE(&compiler_module_value->source_range, "MASS");
@@ -7092,7 +7103,7 @@ mass_inline_module(
   value_force_exact(context->compilation, 0, &void_value, block_result);
   module_process_exports(&import_context, module);
 
-  return value_make(context, &descriptor_scope, storage_static(module->exports.scope), args.source_range);
+  return value_make(context, &descriptor_module, storage_static(module), args.source_range);
 }
 
 static inline Mass_Result
