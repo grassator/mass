@@ -3864,6 +3864,7 @@ mass_match_overload_or_error(
   Overload_Match_Found *match_found
 ) {
   Overload_Match match = mass_match_overload(target, args_view);
+  MASS_ON_ERROR(*compilation->result) return 0;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
       Array_Value_Ptr error_args = value_view_to_value_array(compilation->allocator, args_view);
