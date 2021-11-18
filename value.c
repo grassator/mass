@@ -1318,6 +1318,13 @@ compilation_init(
     .prefix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .infix_or_suffix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .jit = {0},
+    .apply_operator = {
+      .precedence = 20,
+      .fixity = Operator_Fixity_Infix,
+      .associativity = Operator_Associativity_Left,
+      .argument_count = 2,
+      .handler = mass_handle_apply_operator,
+    },
   };
 
   void *permanent_arena_address = 0;

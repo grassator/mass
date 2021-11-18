@@ -2019,6 +2019,7 @@ main(void) {
     { "Symbol_Map *", "prefix_operator_symbol_map" },
     { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Common_Symbols", "common_symbols" },
+    { "Operator", "apply_operator" },
   })));
 
   push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){

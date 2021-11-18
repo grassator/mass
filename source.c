@@ -6304,10 +6304,7 @@ token_parse_expression(
     }
 
     if (!is_previous_an_operator) {
-      const Operator *empty_space_operator = scope_lookup_operator(
-        context->compilation, context->scope, slice_literal(" "), Operator_Fixity_Infix
-      );
-      assert(empty_space_operator);
+      const Operator *empty_space_operator = &context->compilation->apply_operator;
       if (!token_handle_operator(
         context, view, &value_stack, &operator_stack, empty_space_operator, value->source_range
       )) goto defer;
@@ -6982,15 +6979,6 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Left,
     .argument_count = 1,
     .handler = mass_handle_dereference_operator,
-  )));
-  Source_Range empty_space_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&empty_space_source_range, " ");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, empty_space_source_range, slice_literal(" "), allocator_make(allocator, Operator,
-    .precedence = 20,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Left,
-    .argument_count = 2,
-    .handler = mass_handle_apply_operator,
   )));
   Source_Range colon_source_range;
   INIT_LITERAL_SOURCE_RANGE(&colon_source_range, ":");
