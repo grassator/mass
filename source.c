@@ -1646,7 +1646,11 @@ value_ensure_type(
     });
     return 0;
   }
-  return *value_as_descriptor_pointer(value);
+  // Can't use `value_as_descriptor_pointer` because it might a user-generated version
+  // of the type that does not pointer compare unless we memoize
+  return *(Descriptor const **)get_static_storage_with_bit_size(
+    &value->storage, value->descriptor->bit_size
+  );
 }
 
 static inline Value_View
