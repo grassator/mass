@@ -5098,20 +5098,12 @@ mass_handle_apply_operator(
   Value_View operands_view,
   const Operator *operator
 ) {
-  Value *lhs_value = value_view_get(operands_view, 0);
-  Value *rhs_value = value_view_get(operands_view, 1);
   Source_Range source_range = operands_view.source_range;
-  if (value_is_group_paren(rhs_value)) {
-    return mass_call(context, operands_view);
-  }
 
-  if (rhs_value->descriptor == &descriptor_value_view) {
-    Value_View args_view = *value_as_value_view(rhs_value);
-    return token_handle_function_call(context, lhs_value, args_view, source_range);
-  }
-
+  // TODO can we cache this somehow
   Scope_Entry *apply_entry = scope_lookup(context->scope, context->compilation->common_symbols.apply);
   if (!apply_entry) {
+    Value *rhs_value = value_view_get(operands_view, 1);
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = rhs_value->source_range,
