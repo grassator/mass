@@ -70,6 +70,20 @@ calling_convention_x86_64_common_end_proc(
 
 #ifdef CALLING_CONVENTION_IMPLEMENTATION
 
+static void
+call_setup_fill_parameter_register_bitset(
+  Function_Call_Setup *setup
+) {
+  DYN_ARRAY_FOREACH(Function_Call_Parameter, param, setup->parameters) {
+    Storage storage = param->storage;
+    u64 target_arg_register_bitset = register_bitset_from_storage(&storage);
+    if(setup->parameter_registers_bitset & target_arg_register_bitset) {
+      panic("Found overlapping register usage in call setup");
+    }
+    setup->parameter_registers_bitset |= target_arg_register_bitset;
+  }
+}
+
 static s32
 calling_convention_x86_64_adjust_stack_offset(
   Stack_Area area,
@@ -717,6 +731,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
       .storage = storage_indirect(descriptor->bit_size, Register_DI),
     });
   }
+  call_setup_fill_parameter_register_bitset(&result);
 
   return result;
 }
@@ -788,6 +803,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
   }
 
   assert(stack_offset == 0);
+  call_setup_fill_parameter_register_bitset(&result);
 
   return result;
 }
@@ -885,6 +901,8 @@ calling_convention_x86_64_windows_call_setup_proc(
 
   // In this calling convention a home area for at least 4 arguments is always reserved
   result.parameters_stack_size = u64_to_u32(u64_max(4, dyn_array_length(function->parameters)) * 8);
+
+  call_setup_fill_parameter_register_bitset(&result);
 
   return result;
 }

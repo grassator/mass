@@ -1725,7 +1725,7 @@ main(void) {
   push_type(type_struct("Function_Call_Parameter", (Struct_Item[]){
     { "Function_Call_Parameter_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Source_Range", "source_range" },
+    { "Source_Range", "source_range" }, // FIXME remove this
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
   }));
@@ -1736,6 +1736,7 @@ main(void) {
     { "Function_Call_Jump", "jump"},
     { "const Calling_Convention *", "calling_convention" },
     { "Array_Function_Call_Parameter", "parameters" },
+    { "u64", "parameter_registers_bitset" },
     { "Storage", "caller_return" },
     { "Storage", "callee_return" },
   }));

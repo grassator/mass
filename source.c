@@ -3229,41 +3229,6 @@ token_parse_constant_definitions(
   return statement_length;
 }
 
-static u64
-register_bitset_from_storage(
-  const Storage *storage
-) {
-  u64 result = 0;
-  switch(storage->tag) {
-    case Storage_Tag_None:
-    case Storage_Tag_Static: {
-      // Nothing to do
-      break;
-    }
-    default:
-    case Storage_Tag_Eflags: {
-      panic("Internal Error: Unexpected storage type for a function argument");
-      break;
-    }
-    case Storage_Tag_Register:
-    case Storage_Tag_Xmm: {
-      Register reg_index = storage->Register.index;
-      register_bitset_set(&result, reg_index);
-    } break;
-    case Storage_Tag_Memory: {
-      if (storage->Memory.location.tag == Memory_Location_Tag_Indirect) {
-        Register reg_index = storage->Memory.location.Indirect.base_register;
-        register_bitset_set(&result, reg_index);
-      }
-    } break;
-    case Storage_Tag_Unpacked: {
-      register_bitset_set(&result, storage->Unpacked.registers[0]);
-      register_bitset_set(&result, storage->Unpacked.registers[1]);
-    } break;
-  }
-  return result;
-}
-
 static Value *
 mass_macro_lazy_proc(
   Compilation *compilation,
@@ -3480,30 +3445,14 @@ call_function_overload(
     .capacity = 32,
   );
 
-  // FIXME :AllArgsRegisters move this calculation to the call setup time as it does not change
-  u64 all_used_arguments_register_bitset = 0;
-  DYN_ARRAY_FOREACH(Function_Call_Parameter, target_item, call_setup->parameters) {
-    Storage storage = target_item->storage;
-    if (storage_is_stack(&storage)) {
-      assert(storage.Memory.location.Stack.area == Stack_Area_Call_Target_Argument);
-    }
-    Value *param = dyn_array_push_uninitialized(target_params);
-    value_init(param, target_item->descriptor, storage, target_item->source_range);
-
-    // TODO avoid doing this twice - here and below
-    u64 target_arg_register_bitset = register_bitset_from_storage(&storage);
-    if(all_used_arguments_register_bitset & target_arg_register_bitset) {
-      panic("Found overlapping register usage in arguments");
-    }
-    all_used_arguments_register_bitset |= target_arg_register_bitset;
-  }
-
+  u64 all_used_arguments_register_bitset = call_setup->parameter_registers_bitset;
   u64 argument_register_bitset = 0;
   u64 copied_straight_to_param_bitset = 0;
   u64 temp_register_argument_bitset = 0;
-  for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
+  for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
     Function_Call_Parameter *target_item = dyn_array_get(call_setup->parameters, i);
-    Value *target_arg = dyn_array_get(target_params, i);
+    Value *target_arg = dyn_array_push_uninitialized(target_params);
+    value_init(target_arg, target_item->descriptor, target_item->storage, target_item->source_range);
     Value *source_arg;
     const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {

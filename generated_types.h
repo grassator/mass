@@ -1751,6 +1751,7 @@ typedef struct Function_Call_Setup {
   Function_Call_Jump jump;
   const Calling_Convention * calling_convention;
   Array_Function_Call_Parameter parameters;
+  u64 parameter_registers_bitset;
   Storage caller_return;
   Storage callee_return;
 } Function_Call_Setup;
@@ -4954,6 +4955,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
     .descriptor = &descriptor_array_function_call_parameter,
     .name = slice_literal_fields("parameters"),
     .offset = offsetof(Function_Call_Setup, parameters),
+  },
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("parameter_registers_bitset"),
+    .offset = offsetof(Function_Call_Setup, parameter_registers_bitset),
   },
   {
     .descriptor = &descriptor_storage,

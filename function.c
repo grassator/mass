@@ -43,6 +43,41 @@ register_find_available(
   return available_index;
 }
 
+static u64
+register_bitset_from_storage(
+  const Storage *storage
+) {
+  u64 result = 0;
+  switch(storage->tag) {
+    case Storage_Tag_None:
+    case Storage_Tag_Static: {
+      // Nothing to do
+      break;
+    }
+    default:
+    case Storage_Tag_Eflags: {
+      panic("Internal Error: Unexpected storage type for a function argument");
+      break;
+    }
+    case Storage_Tag_Register:
+    case Storage_Tag_Xmm: {
+      Register reg_index = storage->Register.index;
+      register_bitset_set(&result, reg_index);
+    } break;
+    case Storage_Tag_Memory: {
+      if (storage->Memory.location.tag == Memory_Location_Tag_Indirect) {
+        Register reg_index = storage->Memory.location.Indirect.base_register;
+        register_bitset_set(&result, reg_index);
+      }
+    } break;
+    case Storage_Tag_Unpacked: {
+      register_bitset_set(&result, storage->Unpacked.registers[0]);
+      register_bitset_set(&result, storage->Unpacked.registers[1]);
+    } break;
+  }
+  return result;
+}
+
 static void
 move_value(
   Function_Builder *builder,
@@ -505,53 +540,6 @@ maybe_constant_fold_internal(
   return expected_result_ensure_value_or_temp(compilation, builder, expected_result, imm_value);
 }
 
-static void
-mark_occupied_registers(
-  Function_Builder *builder,
-  const Descriptor *descriptor,
-  Storage *storage
-) {
-  switch(storage->tag) {
-    case Storage_Tag_None: {
-      // Nothing to do
-      break;
-    }
-    case Storage_Tag_Unpacked: {
-      register_bitset_set(&builder->register_occupied_bitset, storage->Unpacked.registers[0]);
-      register_bitset_set(&builder->register_occupied_bitset, storage->Unpacked.registers[1]);
-      break;
-    }
-    case Storage_Tag_Register:
-    case Storage_Tag_Xmm: {
-      register_bitset_set(&builder->register_occupied_bitset, storage->Register.index);
-      break;
-    }
-    case Storage_Tag_Memory: {
-      switch(storage->Memory.location.tag) {
-        case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          panic("Unsupported argument memory storage");
-          break;
-        }
-        case Memory_Location_Tag_Indirect: {
-          Register reg = storage->Memory.location.Indirect.base_register;
-          register_bitset_set(&builder->register_occupied_bitset, reg);
-          break;
-        }
-        case Memory_Location_Tag_Stack: {
-          // Nothing to do
-          break;
-        }
-      }
-      break;
-    }
-    case Storage_Tag_Static:
-    case Storage_Tag_Eflags: {
-      panic("Unexpected storage tag for an argument");
-      break;
-    }
-  }
-}
-
 static inline Register
 function_return_value_register_from_storage(
   const Storage *storage
@@ -686,8 +674,6 @@ ensure_function_instance(
     for (u64 i = 0; i < dyn_array_length(call_setup.parameters); ++i) {
       const Function_Call_Parameter *call_param = dyn_array_get(call_setup.parameters, i);
       Storage storage = call_param->storage;
-      // FIXME :AllArgsRegisters
-      mark_occupied_registers(builder, call_param->descriptor, &storage);
       if (call_param->flags & Function_Call_Parameter_Flags_Uninitialized) {
         continue;
       }
@@ -706,6 +692,8 @@ ensure_function_instance(
       }
     }
   }
+  assert(!(builder->register_occupied_bitset & call_setup.parameter_registers_bitset));
+  builder->register_occupied_bitset |= call_setup.parameter_registers_bitset;
 
   Value *parse_result = 0;
   if (value_is_group_curly(literal->body)) {

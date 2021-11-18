@@ -148,6 +148,11 @@ register_release(
   register_release_bitset(builder, 1llu << reg_index);
 }
 
+static u64
+register_bitset_from_storage(
+  const Storage *storage
+);
+
 #endif
 
 
