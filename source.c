@@ -1193,12 +1193,14 @@ scope_lookup_force(
     });
     return 0;
   }
-  if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Epoch_Mismatch,
-      .source_range = *lookup_range,
-    });
-    return 0;
+  if (!(context->flags & Execution_Context_Flags_Type_Only)) {
+    if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Epoch_Mismatch,
+        .source_range = *lookup_range,
+      });
+      return 0;
+    }
   }
   return scope_entry_force_value(context, entry);
 }
@@ -4997,7 +4999,11 @@ mass_type_of(
 ) {
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("type_of")));
   assert(args.length == 2);
+  Execution_Context_Flags saved_flags = context->flags;
+  context->flags |= Execution_Context_Flags_Type_Only;
   Value *expression = token_parse_single(context, value_view_last(args));
+  context->flags = saved_flags;
+
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
 
   return value_init(

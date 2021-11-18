@@ -363,11 +363,13 @@ typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
 typedef enum Execution_Context_Flags {
   Execution_Context_Flags_None = 0,
   Execution_Context_Flags_Global = 1,
+  Execution_Context_Flags_Type_Only = 2,
 } Execution_Context_Flags;
 
 const char *execution_context_flags_name(Execution_Context_Flags value) {
   if (value == 0) return "Execution_Context_Flags_None";
   if (value == 1) return "Execution_Context_Flags_Global";
+  if (value == 2) return "Execution_Context_Flags_Type_Only";
   assert(!"Unexpected value for enum Execution_Context_Flags");
   return 0;
 };
@@ -4131,6 +4133,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(execution_context_flags, Execution_Context_Flags)
 static C_Enum_Item execution_context_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Global"), .value = 1 },
+{ .name = slice_literal_fields("Type_Only"), .value = 2 },
 };
 DEFINE_VALUE_IS_AS_HELPERS(Execution_Context_Flags, execution_context_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Execution_Context_Flags *, execution_context_flags_pointer);

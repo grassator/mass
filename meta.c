@@ -1502,6 +1502,7 @@ main(void) {
   push_type(type_enum("Execution_Context_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Global", 1 << 0 },
+    { "Type_Only", 1 << 1 },
   }));
 
   export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
