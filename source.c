@@ -3910,6 +3910,7 @@ mass_intrinsic_call(
   fn_type_opaque jitted_code;
   if (storage_is_label(&instance->storage)) {
     Label *label = instance->storage.Memory.location.Instruction_Pointer_Relative.label;
+    assert(label->program == jit->program);
     if (!label->resolved) {
       Mass_Result jit_result = program_jit(compilation, jit);
       MASS_ON_ERROR(jit_result) {
