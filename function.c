@@ -683,12 +683,12 @@ ensure_function_instance(
       ) {
         storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
       }
-      Value *arg_value = value_make(&body_context, call_param->descriptor, storage, call_param->source_range);
-      arg_value->flags |= Value_Flags_Constant;
       const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
+      Value *arg_value = value_make(&body_context, call_param->descriptor, storage, def_param->declaration.source_range);
+      arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->declaration.symbol;
       if (param_symbol) {
-        scope_define_value(body_scope, body_context.epoch, call_param->source_range, param_symbol, arg_value);
+        scope_define_value(body_scope, body_context.epoch, def_param->declaration.source_range, param_symbol, arg_value);
       }
     }
   }

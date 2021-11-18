@@ -1725,7 +1725,6 @@ main(void) {
   push_type(type_struct("Function_Call_Parameter", (Struct_Item[]){
     { "Function_Call_Parameter_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Source_Range", "source_range" }, // FIXME remove this
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
   }));

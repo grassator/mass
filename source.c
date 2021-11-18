@@ -3451,9 +3451,9 @@ call_function_overload(
   u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
     Function_Call_Parameter *target_item = dyn_array_get(call_setup->parameters, i);
-    Value *target_arg = dyn_array_push_uninitialized(target_params);
-    value_init(target_arg, target_item->descriptor, target_item->storage, target_item->source_range);
     Value *source_arg;
+    Value *target_arg = dyn_array_push_uninitialized(target_params);
+    value_init(target_arg, target_item->descriptor, target_item->storage, *source_range);
     const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
@@ -3557,7 +3557,7 @@ call_function_overload(
           allocator_allocate(compilation->allocator, Value),
           target_item->descriptor,
           storage_register(temp_register, target_item->descriptor->bit_size),
-          target_item->source_range
+          source_arg->source_range
         );
         arg_value->storage.flags |= Storage_Flags_Temporary;
       } else {

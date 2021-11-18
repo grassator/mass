@@ -1739,7 +1739,6 @@ typedef dyn_array_type(Function_Call_Jump) Array_Function_Call_Jump;
 typedef struct Function_Call_Parameter {
   Function_Call_Parameter_Flags flags;
   u32 _flags_padding;
-  Source_Range source_range;
   const Descriptor * descriptor;
   Storage storage;
 } Function_Call_Parameter;
@@ -4908,11 +4907,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_parameter, Function_Call_Parameter,
     .descriptor = &descriptor_u32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Function_Call_Parameter, _flags_padding),
-  },
-  {
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .offset = offsetof(Function_Call_Parameter, source_range),
   },
   {
     .descriptor = &descriptor_descriptor_pointer,

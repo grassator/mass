@@ -859,7 +859,6 @@ calling_convention_x86_64_windows_call_setup_proc(
     Function_Call_Parameter item = {
       .flags = Function_Call_Parameter_Flags_None,
       .descriptor = param->declaration.descriptor,
-      .source_range = param->declaration.source_range,
     };
 
     bool is_large_argument = item.descriptor->bit_size.as_u64 > 64;
