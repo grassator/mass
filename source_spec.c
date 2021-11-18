@@ -1181,6 +1181,21 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
+
+    // FIXME this does not work because of the epoch mismatch
+    //       need to somehow change `type_of` to not do scope force lookup
+    xit("should support static type resolution for generic types in the body") {
+      u64 (*checker)() =
+        (u64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_bit_size :: fn(x) -> (i64) { type :: type_of(x); type.bit_size }\n"
+          "checker :: fn() -> (i64) {\n"
+            "my_bit_size(31)\n"
+          "}"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Assignment") {
