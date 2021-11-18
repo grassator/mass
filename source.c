@@ -419,6 +419,7 @@ value_indirect_from_pointer(
   if (value_is_lazy_or_static(source)) {
     Expected_Result expected_result = expected_result_any(source_descriptor);
     source = value_force(compilation, builder, &expected_result, source);
+    MASS_ON_ERROR(*compilation->result) return 0;
   }
 
   switch(source->storage.tag) {
@@ -2221,6 +2222,7 @@ expected_result_ensure_value_or_temp(
   const Expected_Result *expected_result,
   Value *value
 ) {
+  MASS_ON_ERROR(*compilation->result) return 0;
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_init(
