@@ -15,7 +15,7 @@
     memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_TARGET_));\
   } while(0)
 
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 assign(
   Compilation *compilation,
   Function_Builder *builder,

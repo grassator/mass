@@ -140,7 +140,7 @@ int main(s32 argc, char **argv) {
   }
   context.program->entry_point = main;
   ensure_function_instance(&compilation, context.program, main, (Value_View){0});
-  if(context.result->tag != Mass_Result_Tag_Success) {
+  MASS_ON_ERROR(*context.result) {
     return mass_cli_print_error(&compilation, &context.result->Error.error);
   }
 
@@ -171,8 +171,8 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Run: {
       Jit jit;
       jit_init(&jit, context.program);
-      result = program_jit(context.compilation, &jit);
-      if(result.tag != Mass_Result_Tag_Success) {
+      program_jit(context.compilation, &jit);
+      MASS_ON_ERROR(*context.result) {
         return mass_cli_print_error(&compilation, &result.Error.error);
       }
       fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);

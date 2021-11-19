@@ -509,7 +509,7 @@ static const Native_Library_Load_Callbacks win32_library_load_callbacks = {
   .load_symbol = win32_load_symbol,
 };
 
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 win32_program_jit(
   Compilation *compilation,
   Jit *jit
@@ -554,9 +554,8 @@ win32_program_jit(
     }
   }
 
-  MASS_TRY(program_jit_imports(
-    compilation->temp_allocator, jit, ro_data_buffer, &win32_library_load_callbacks
-  ));
+  program_jit_imports(compilation, jit, ro_data_buffer, &win32_library_load_callbacks);
+  MASS_ON_ERROR(*compilation->result) return;
 
   u64 function_count = dyn_array_length(program->functions);
   if (jit->previous_counts.functions != function_count) {
@@ -645,8 +644,6 @@ win32_program_jit(
 
   program_jit_resolve_relocations(jit);
   program_jit_call_startup_functions(jit);
-
-  return mass_success();
 }
 
 

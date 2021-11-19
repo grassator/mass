@@ -214,9 +214,9 @@ import_symbol(
   return data_label32(symbol->label32, (Bits){64});
 }
 
-static Mass_Result
+static void
 program_jit_imports(
-  const Allocator *temp_allocator,
+  Compilation *compilation,
   Jit *jit,
   Virtual_Memory_Buffer *ro_data_buffer,
   const Native_Library_Load_Callbacks *callbacks
@@ -232,32 +232,38 @@ program_jit_imports(
     if (maybe_handle_pointer) {
       handle = *maybe_handle_pointer;
     } else {
-      char *library_name = slice_to_c_string(temp_allocator, lib->name);
+      char *library_name = slice_to_c_string(compilation->temp_allocator, lib->name);
       handle = callbacks->load_library(library_name);
-      if (!handle) return mass_error((Mass_Error) {
-        .tag = Mass_Error_Tag_Dynamic_Library_Load,
-        .source_range = source_range,
-        .Dynamic_Library_Load = {
-          .library_name = lib->name,
-          //.symbol_name = lib->name,
-        }
-      });
+      if (!handle) {
+        compilation_error(compilation, (Mass_Error) {
+          .tag = Mass_Error_Tag_Dynamic_Library_Load,
+          .source_range = source_range,
+          .Dynamic_Library_Load = {
+            .library_name = lib->name,
+            //.symbol_name = lib->name,
+          }
+        });
+        return;
+      }
       hash_map_set(jit->import_library_handles, lib->name, handle);
     }
 
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       if (!symbol->label32->resolved) {
-        char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
+        char *symbol_name = slice_to_c_string(compilation->temp_allocator, symbol->name);
         fn_type_opaque address = (fn_type_opaque)callbacks->load_symbol(handle, symbol_name);
-        if (!address) return mass_error((Mass_Error) {
-          .tag = Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found,
-          .source_range = source_range,
-          .Dynamic_Library_Symbol_Not_Found = {
-            .library_name = lib->name,
-            .symbol_name = lib->name,
-          }
-        });
+        if (!handle) {
+          compilation_error(compilation, (Mass_Error) {
+            .tag = Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found,
+            .source_range = source_range,
+            .Dynamic_Library_Symbol_Not_Found = {
+              .library_name = lib->name,
+              .symbol_name = lib->name,
+            }
+          });
+          return;
+        }
         u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
         symbol->label32->offset_in_section = u64_to_u32(offset);
         symbol->label32->resolved = true;
@@ -265,7 +271,6 @@ program_jit_imports(
     }
   }
   jit->previous_counts.imports = import_count;
-  return mass_success();
 }
 
 static void
@@ -303,20 +308,18 @@ program_jit_call_startup_functions(
   jit->previous_counts.startup = startup_count;
 }
 
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 program_jit(
   Compilation *compilation,
   Jit *jit
 ) {
   Temp_Mark mark = compilation_temp_mark(compilation);
-  Mass_Result result;
   #if defined(_WIN32)
-  result = win32_program_jit(compilation, jit);
+  win32_program_jit(compilation, jit);
   #elif defined(__linux__) || defined(__MACH__)
-  result = posix_program_jit(compilation, jit);
+  posix_program_jit(compilation, jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif
   compilation_temp_reset_to_mark(compilation, mark);
-  return result;
 }

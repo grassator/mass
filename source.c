@@ -376,9 +376,8 @@ assign_from_static(
 
       // It is important to call assign here to make sure we recursively handle
       // any complex types such as structs and arrays
-      MASS_ON_ERROR(assign(compilation, builder, static_pointer, &static_source_value, source_range)) {
-        return true;
-      }
+      assign(compilation, builder, static_pointer, &static_source_value, source_range);
+      MASS_ON_ERROR(*compilation->result) return true;
     }
     assert(storage_is_label(&static_pointer->storage));
     if (storage_is_label(&target->storage)) {
@@ -711,7 +710,7 @@ large_enough_common_integer_descriptor_for_values(
   }
 }
 
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 assign_integers(
   Compilation *compilation,
   Function_Builder *builder,
@@ -720,7 +719,7 @@ assign_integers(
 ) {
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(compilation, source, target);
-  MASS_TRY(*compilation->result);
+  MASS_ON_ERROR(*compilation->result) return;
 
   if (target->descriptor->bit_size.as_u64 < descriptor->bit_size.as_u64) {
     compilation_error(compilation, (Mass_Error) {
@@ -729,7 +728,7 @@ assign_integers(
       .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
       .detailed_message = slice_literal("Target integer is too small to fit the range of source values"),
     });
-    return *compilation->result;
+    return;
   }
   bool is_temp = false;
   Storage adjusted_source;
@@ -766,12 +765,10 @@ assign_integers(
     assert(adjusted_source.tag == Storage_Tag_Register);
     register_release(builder, adjusted_source.Register.index);
   }
-
-  return *compilation->result;
 }
 
 // TODO :AssignCleanup Merge this with `same_type_or_can_implicitly_move_cast`
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 assign_tuple(
   Compilation *compilation,
   Function_Builder *builder,
@@ -787,7 +784,7 @@ assign_tuple(
       .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
       .detailed_message = slice_literal("Trying to assign a tuple to something that is not a struct"),
     });
-    return *compilation->result;
+    return;
   }
   Array_Struct_Field fields = target->descriptor->Struct.fields;
   if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) {
@@ -800,7 +797,7 @@ assign_tuple(
       .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
       .detailed_message = message,
     });
-    return *compilation->result;
+    return;
   }
 
   u64 index = 0;
@@ -813,10 +810,11 @@ assign_tuple(
       ),
       .source_range = target->source_range,
     };
-    MASS_TRY(assign(compilation, builder, &target_field, tuple_item, source_range));
+    assign(compilation, builder, &target_field, tuple_item, source_range);
+    MASS_ON_ERROR(*compilation->result) return;
     index += 1;
   }
-  return *compilation->result;
+  return;
 }
 
 static inline Storage
@@ -864,7 +862,7 @@ load_address(
   }
 }
 
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 assign(
   Compilation *compilation,
   Function_Builder *builder,
@@ -872,30 +870,28 @@ assign(
   Value *source,
   const Source_Range *source_range
 ) {
-  MASS_TRY(*compilation->result);
-
   if (target->flags & Value_Flags_Constant) {
     compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Assignment_To_Constant,
       .source_range = *source_range,
     });
-    return *compilation->result;
+    return;
   }
 
   if (source->descriptor == &descriptor_lazy_value) {
     value_force_exact(compilation, builder, target, source);
-    return *compilation->result;
+    return;
   }
 
   if (target->descriptor == &descriptor_void) {
-    return *compilation->result;
+    return;
   }
 
   if (descriptor_is_implicit_pointer(source->descriptor)) {
     Value *ref_source = value_indirect_from_pointer(compilation, builder, source);
-    MASS_TRY(assign(compilation, builder, target, ref_source, source_range));
+    assign(compilation, builder, target, ref_source, source_range);
     storage_release_if_temporary(builder, &ref_source->storage);
-    return *compilation->result;
+    return;
   }
 
   if (descriptor_is_implicit_pointer(target->descriptor)) {
@@ -907,15 +903,15 @@ assign(
       source->descriptor == &descriptor_tuple
     ) {
       Value *referenced_target = value_indirect_from_pointer(compilation, builder, target);
-      MASS_TRY(assign(compilation, builder, referenced_target, source, source_range));
+      assign(compilation, builder, referenced_target, source, source_range);
       storage_release_if_temporary(builder, &referenced_target->storage);
-      return *compilation->result;
+      return;
     } else {
       const Descriptor *original_descriptor = target->descriptor->Pointer_To.descriptor;
       if (!same_value_type_or_can_implicitly_move_cast(original_descriptor, source)) goto err;
       load_address(builder, source_range, target, source->storage);
     }
-    return *compilation->result;
+    return;
   }
 
   if (value_is_i64(source)) {
@@ -924,7 +920,7 @@ assign(
       if (literal->bits == 0) {
         Storage zero = imm64(0);
         move_value(builder, source_range, &target->storage, &zero);
-        return *compilation->result;
+        return;
       } else {
         compilation_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
@@ -932,7 +928,7 @@ assign(
           .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
           .detailed_message = slice_literal("Trying to assign a non-zero literal number to a pointer"),
         });
-        return *compilation->result;
+        return;
       }
     } else if (descriptor_is_integer(target->descriptor)) {
       source = token_value_force_immediate_integer(
@@ -945,12 +941,13 @@ assign(
         .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
         .detailed_message = slice_literal("Trying to assign a literal number to a non-integer value"),
       });
-      return *compilation->result;
+      return;
     }
   }
 
   if (source->descriptor == &descriptor_tuple) {
-    return assign_tuple(compilation, builder, target, source, source_range);
+    assign_tuple(compilation, builder, target, source, source_range);
+    return;
   }
 
   if (target->descriptor->tag == Descriptor_Tag_Function_Instance) {
@@ -979,13 +976,11 @@ assign(
 
       Overload_Match_Found match_found;
       if (!mass_match_overload_or_error(compilation, source, args_view, &match_found)) {
-        return *compilation->result;
+        return;
       }
 
-      source = ensure_function_instance(
-        compilation, builder->program, match_found.value, args_view
-      );
-      MASS_TRY(*compilation->result);
+      source = ensure_function_instance(compilation, builder->program, match_found.value, args_view);
+      MASS_ON_ERROR(*compilation->result) return;
       assert(source->descriptor->tag == Descriptor_Tag_Function_Instance);
     }
 
@@ -997,9 +992,9 @@ assign(
         .source_range = *source_range,
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
       });
-      return *compilation->result;
+      return;
     }
-    return *compilation->result;
+    return;
   }
 
   if (source->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
@@ -1027,11 +1022,12 @@ assign(
         ),
         .source_range = target->source_range,
       };
-      MASS_TRY(assign(compilation, builder, &target_field, &source_field, source_range));
+      assign(compilation, builder, &target_field, &source_field, source_range);
+      MASS_ON_ERROR(*compilation->result) return;
     }
     storage_release_if_temporary(builder, &source_array_storage);
     storage_release_if_temporary(builder, &target_array_storage);
-    return *compilation->result;
+    return;
   }
 
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
@@ -1052,25 +1048,27 @@ assign(
         ),
         .source_range = target->source_range,
       };
-      MASS_TRY(assign(compilation, builder, &target_field, &source_field, source_range));
+      assign(compilation, builder, &target_field, &source_field, source_range);
+      MASS_ON_ERROR(*compilation->result) return;
     }
-    return *compilation->result;
+    return;
   }
 
   if (source->storage.tag == Storage_Tag_Static) {
     if (assign_from_static(compilation, builder, target, source, source_range)) {
-      return *compilation->result;
+      return;
     }
   }
 
   if (descriptor_is_integer(source->descriptor) || descriptor_is_integer(target->descriptor)) {
-    return assign_integers(compilation, builder, target, source);
+    assign_integers(compilation, builder, target, source);
+    return;
   }
 
-  MASS_TRY(*compilation->result);
+  MASS_ON_ERROR(*compilation->result) return;
   if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
     move_value(builder, source_range, &target->storage, &source->storage);
-    return *compilation->result;
+    return;
   }
 
   err:
@@ -1082,7 +1080,6 @@ assign(
       .actual = source->descriptor,
     },
   });
-  return *compilation->result;
 }
 
 static inline Value *
@@ -1237,7 +1234,7 @@ scope_define_value(
   }
 }
 
-PRELUDE_NO_DISCARD static inline Mass_Result
+static inline void
 scope_define_operator(
   Compilation *compilation,
   Scope *scope,
@@ -1251,7 +1248,7 @@ scope_define_operator(
   const Symbol *symbol = mass_ensure_symbol_for_map(compilation->allocator, map, name);
 
   if (scope_lookup_shallow(scope, symbol)) {
-    return mass_error((Mass_Error) {
+    compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Operator_Fixity_Conflict,
       .source_range = source_range,
       .Operator_Fixity_Conflict = {
@@ -1259,13 +1256,12 @@ scope_define_operator(
         .symbol = symbol->name,
       },
     });
+    return;
   }
 
   Value *operator_value = allocator_allocate(compilation->allocator, Value);
   value_init(operator_value, &descriptor_operator, storage_static(operator), source_range);
   scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, symbol, operator_value);
-
-  return mass_success();
 }
 
 static inline const Operator *
@@ -2229,7 +2225,8 @@ expected_result_ensure_value_or_temp(
         allocator_allocate(compilation->allocator, Value),
         expected_result->Exact.descriptor, expected_result->Exact.storage, value->source_range
       );
-      MASS_ON_ERROR(assign(compilation, builder, result_value, value, &value->source_range)) return 0;
+      assign(compilation, builder, result_value, value, &value->source_range);
+      MASS_ON_ERROR(*compilation->result) return 0;
       // @Hack there should be a better and more robust way to do this
       if (
         value->storage.tag != Storage_Tag_Static &&
@@ -2292,7 +2289,7 @@ expected_result_ensure_value_or_temp(
           allocator_allocate(compilation->allocator, Value),
           expected_descriptor, temp_storage, value->source_range
         );
-        MASS_ON_ERROR(assign(compilation, builder, temp_result, value, &value->source_range)) return 0;
+        assign(compilation, builder, temp_result, value, &value->source_range);
         storage_release_if_temporary(builder, &value->storage);
         return temp_result;
       }
@@ -2303,7 +2300,7 @@ expected_result_ensure_value_or_temp(
           allocator_allocate(compilation->allocator, Value),
           expected_descriptor, storage, value->source_range
         );
-        MASS_ON_ERROR(assign(compilation, builder, temp_result, value, &value->source_range)) return 0;
+        assign(compilation, builder, temp_result, value, &value->source_range);
         storage_release_if_temporary(builder, &value->storage);
         return temp_result;
       }
@@ -2640,7 +2637,7 @@ token_parse_operator_definition(
     .handler = token_handle_user_defined_operator_proc,
   };
 
-  *context->result = scope_define_operator(
+  scope_define_operator(
     context->compilation,
     context->scope,
     keyword_token->source_range,
@@ -2974,24 +2971,17 @@ compile_time_eval(
   Storage out_storage = storage_indirect(result_descriptor->bit_size, out_register);
   Value *out_value = value_make(&eval_context, result_descriptor, out_storage, *source_range);
 
-  MASS_ON_ERROR(assign(compilation, &eval_builder, &out_value_register, &result_address, source_range)) {
-    context->result = eval_context.result;
-    return 0;
-  }
+  assign(compilation, &eval_builder, &out_value_register, &result_address, source_range);
+  MASS_ON_ERROR(*compilation->result) return 0;
 
-  MASS_ON_ERROR(assign(compilation, &eval_builder, out_value, forced_value, source_range)) {
-    context->result = eval_context.result;
-    return 0;
-  }
+  assign(compilation, &eval_builder, out_value, forced_value, source_range);
+  MASS_ON_ERROR(*compilation->result) return 0;
 
   calling_convention_x86_64_common_end_proc(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
-  Mass_Result jit_result = program_jit(context->compilation, jit);
-  MASS_ON_ERROR(jit_result) {
-    context_error(context, jit_result.Error.error);
-    return 0;
-  }
+  program_jit(context->compilation, jit);
+  MASS_ON_ERROR(*context->result) return 0;
 
   fn_type_opaque jitted_code = (fn_type_opaque)rip_value_pointer_from_label(eval_label);
   jitted_code();
@@ -3101,7 +3091,7 @@ mass_handle_tuple_cast_lazy_proc(
   assert(expected_descriptor == payload->target);
   assert(payload->target->tag == Descriptor_Tag_Struct);
   Value *result = value_from_expected_result(allocator, builder, expected_result, *source_range);
-  MASS_ON_ERROR(assign(compilation, builder, result, payload->expression, source_range)) return 0;
+  assign(compilation, builder, result, payload->expression, source_range);
   return result;
 }
 
@@ -3581,7 +3571,8 @@ call_function_overload(
       }
     };
     if (should_assign) {
-      MASS_ON_ERROR(assign(compilation, builder, arg_value, source_arg, source_range)) return 0;
+      assign(compilation, builder, arg_value, source_arg, source_range);
+      MASS_ON_ERROR(*compilation->result) return 0;
     }
     dyn_array_push(temp_arguments, arg_value);
   }
@@ -3646,7 +3637,8 @@ call_function_overload(
         &(Instruction_Assembly){lea, {target_storage, source_storage}}
       );
     } else {
-      MASS_ON_ERROR(assign(compilation, builder, param, source_arg, source_range)) return 0;
+      assign(compilation, builder, param, source_arg, source_range);
+      MASS_ON_ERROR(*compilation->result) return 0;
     }
   }
 
@@ -3916,11 +3908,8 @@ mass_intrinsic_call(
     Label *label = instance->storage.Memory.location.Instruction_Pointer_Relative.label;
     assert(label->program == jit->program);
     if (!label->resolved) {
-      Mass_Result jit_result = program_jit(compilation, jit);
-      MASS_ON_ERROR(jit_result) {
-        context_error(context, jit_result.Error.error);
-        return 0;
-      }
+      program_jit(compilation, jit);
+      MASS_ON_ERROR(*compilation->result) return 0;
     }
     jitted_code = (fn_type_opaque)rip_value_pointer_from_label(label);
   } else {
@@ -4097,11 +4086,9 @@ mass_ensure_trampoline(
   Value *instance = ensure_function_instance(compilation, program, literal_value, args_view);
   MASS_ON_ERROR(*context->result) return 0;
 
-  Mass_Result jit_result = program_jit(context->compilation, &context->compilation->jit);
-  MASS_ON_ERROR(jit_result) {
-    context_error(context, jit_result.Error.error);
-    return 0;
-  }
+  program_jit(context->compilation, &context->compilation->jit);
+  MASS_ON_ERROR(*context->result) return 0;
+
   Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
@@ -6693,9 +6680,8 @@ mass_handle_explicit_return_lazy_proc(
   const Source_Range *source_range,
   Value *parse_result
 ) {
-  MASS_ON_ERROR(assign(compilation, builder, builder->return_value, parse_result, source_range)) {
-    return 0;
-  }
+  assign(compilation, builder, builder->return_value, parse_result, source_range);
+  MASS_ON_ERROR(*compilation->result) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
 
   push_eagerly_encoded_assembly(
@@ -6753,9 +6739,8 @@ token_define_global_variable(
         .epoch = context->epoch,
         .program = context->compilation->jit.program,
       };
-      MASS_ON_ERROR(assign(
-        context->compilation, &fake_builder, global_value, value, &expression.source_range
-      )) return;
+      assign(context->compilation, &fake_builder, global_value, value, &expression.source_range);
+      MASS_ON_ERROR(*context->result) return;
     } else {
       Mass_Assignment_Lazy_Payload *assignment_payload =
         allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
@@ -6974,58 +6959,58 @@ scope_define_builtins(
 
   Source_Range dot_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_source_range, ".");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, dot_source_range, slice_literal("."), allocator_make(allocator, Operator,
+  scope_define_operator(compilation, scope, dot_source_range, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
-  )));
+  ));
   Source_Range dot_star_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_star_source_range, ".*");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, dot_star_source_range, slice_literal(".*"), allocator_make(allocator, Operator,
+  scope_define_operator(compilation, scope, dot_star_source_range, slice_literal(".*"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 1,
     .handler = mass_handle_dereference_operator,
-  )));
+  ));
   Source_Range colon_source_range;
   INIT_LITERAL_SOURCE_RANGE(&colon_source_range, ":");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, colon_source_range, slice_literal(":"), allocator_make(allocator, Operator,
+  scope_define_operator(compilation, scope, colon_source_range, slice_literal(":"), allocator_make(allocator, Operator,
     .precedence = 2,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_typed_symbol_operator,
-  )));
+  ));
   Source_Range equal_source_range;
   INIT_LITERAL_SOURCE_RANGE(&equal_source_range, "=");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, equal_source_range, slice_literal("="), allocator_make(allocator, Operator,
+  scope_define_operator(compilation, scope, equal_source_range, slice_literal("="), allocator_make(allocator, Operator,
     .precedence = 1,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_assignment_operator,
-  )));
+  ));
   Source_Range return_source_range;
   INIT_LITERAL_SOURCE_RANGE(&return_source_range, "return");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, return_source_range, slice_literal("return"), allocator_make(allocator, Operator,
+  scope_define_operator(compilation, scope, return_source_range, slice_literal("return"), allocator_make(allocator, Operator,
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_return_operator,
-  )));
+  ));
   Source_Range goto_source_range;
   INIT_LITERAL_SOURCE_RANGE(&goto_source_range, "goto");
-  MASS_MUST_SUCCEED(scope_define_operator(compilation, scope, goto_source_range, slice_literal("goto"), allocator_make(allocator, Operator,
+  scope_define_operator(compilation, scope, goto_source_range, slice_literal("goto"), allocator_make(allocator, Operator,
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_goto_operator,
-  )));
+  ));
 
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
@@ -7318,7 +7303,7 @@ mass_run_script(
 
   Jit jit;
   jit_init(&jit, context->program);
-  *context->result = program_jit(compilation, &jit);
+  program_jit(compilation, &jit);
   MASS_ON_ERROR(*context->result) return;
   fn_type_opaque script = value_as_function(jit.program, jit.program->entry_point);
   script();

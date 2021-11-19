@@ -69,7 +69,7 @@ import_symbol(
   const Slice symbol_name
 );
 
-static PRELUDE_NO_DISCARD Mass_Result
+static void
 program_jit(
   Compilation *compilation,
   Jit *jit
@@ -80,9 +80,9 @@ typedef struct {
   void *(*load_symbol)(void *handle, const char *name);
 } Native_Library_Load_Callbacks;
 
-static Mass_Result
+static void
 program_jit_imports(
-  const Allocator *temp_allocator,
+  Compilation *compilation,
   Jit *jit,
   Virtual_Memory_Buffer *ro_data_buffer,
   const Native_Library_Load_Callbacks *callbacks
