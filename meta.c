@@ -1582,14 +1582,9 @@ main(void) {
     { "const Token_Statement_Matcher *", "statement_matcher" },
   })));
 
-  push_type(type_struct("Overload_Set", (Struct_Item[]){
-    { "Array_Value_Ptr", "items" },
-  }));
-
-  push_type(type_struct("Overload_Set_Iterator", (Struct_Item[]){
-    { "const Overload_Set *", "set_stack", 16 },
-    { "s64", "last_stack_index" },
-    { "u64", "index_in_set" },
+  push_type(type_struct("Overload", (Struct_Item[]){
+    { "Value *", "value" },
+    { "Value *", "next" },
   }));
 
   push_type(type_union("Overload_Match", (Struct_Type[]){

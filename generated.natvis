@@ -1294,7 +1294,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Overload_Set">
+<Type Name="Array_Overload">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -1303,7 +1303,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Overload_Set_Ptr">
+<Type Name="Array_Overload_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -1312,34 +1312,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Const_Overload_Set_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Overload_Set_Iterator">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Overload_Set_Iterator_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Overload_Set_Iterator_Ptr">
+<Type Name="Array_Const_Overload_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>

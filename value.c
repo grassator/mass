@@ -44,7 +44,7 @@ source_range_print_start_position(
     printf(":(0:0)\n");
     return;
   }
-  Source_Position from_position = {.line = 1, .column = 0};
+  Source_Position from_position = {.line = 0, .column = 0};
   const Source_File *file = source_range->file;
   Slice source = file->text;
   u64 line_start_offset = 0;
@@ -1521,12 +1521,10 @@ same_value_type_or_can_implicitly_move_cast(
     return true;
   }
   if (target->tag == Descriptor_Tag_Function_Instance) {
-    if (source->descriptor == &descriptor_overload_set) {
-      const Overload_Set *set = value_as_overload_set(source);
-      for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
-        Value *overload = *dyn_array_get(set->items, i);
-        if (same_value_type_or_can_implicitly_move_cast(target, overload)) return true;
-      }
+    if (source->descriptor == &descriptor_overload) {
+      const Overload *overload = value_as_overload(source);
+      if (same_value_type_or_can_implicitly_move_cast(target, overload->value)) return true;
+      if (same_value_type_or_can_implicitly_move_cast(target, overload->next)) return true;
       return false;
     }
     if (source->descriptor == &descriptor_function_literal) {

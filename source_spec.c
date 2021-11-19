@@ -109,15 +109,8 @@ test_program_source_base(
   Value *value = scope_lookup_force(
     context, test_module->own_scope, symbol, &symbol_source_range
   );
-  if (value) {
-    if (value_is_overload_set(value)) {
-      const Overload_Set *set = value_as_overload_set(value);
-      assert(dyn_array_length(set->items) == 1);
-      value = *dyn_array_get(set->items, 0);
-    }
-    if (value->descriptor == &descriptor_function_literal) {
-      ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
-    }
+  if (value && value->descriptor == &descriptor_function_literal) {
+    ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
   }
   return value;
 }

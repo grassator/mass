@@ -954,8 +954,9 @@ assign(
     const Function_Info *target_info = target->descriptor->Function_Instance.info;
     if (
       source->descriptor == &descriptor_function_literal ||
-      source->descriptor == &descriptor_overload_set
+      source->descriptor == &descriptor_overload
     ) {
+      // TODO @Speed use temp allocator here
       Array_Value_Ptr fake_args = dyn_array_make(
         Array_Value_Ptr,
         .allocator = compilation->allocator,
@@ -1083,29 +1084,6 @@ assign(
 }
 
 static inline Value *
-value_wrap_in_overload_set(
-  Scope *scope,
-  Value *value,
-  Slice name,
-  const Source_Range *lookup_range
-) {
-  allocator_allocate_bulk(scope->allocator, combined, {
-    Overload_Set overload_set;
-    Value value;
-  });
-
-  Overload_Set *set = &combined->overload_set;
-  *set = (Overload_Set) {
-    .items = dyn_array_make(Array_Value_Ptr), // @Leak should use proper allocator
-  };
-  dyn_array_push(set->items, value);
-
-  return value_init(
-    &combined->value, &descriptor_overload_set, storage_static(set), value->source_range
-  );
-}
-
-static inline Value *
 value_force_lazy_static(
   Value *value,
   Slice name
@@ -1128,6 +1106,35 @@ value_force_lazy_static(
   return value;
 }
 
+static void
+scope_maybe_force_overload(
+  Execution_Context *context,
+  Value *value,
+  Slice name
+) {
+  if (value_is_overload(value)) {
+    const Overload *overload = value_as_overload(value);
+    scope_maybe_force_overload(context, overload->value, name);
+    scope_maybe_force_overload(context, overload->next, name);
+    return;
+  }
+  MASS_ON_ERROR(*context->result) return;
+  if (value_is_lazy_static_value(value)) {
+    value_force_lazy_static(value, name);
+  }
+  if (
+    value->descriptor->tag != Descriptor_Tag_Function_Instance &&
+    value->descriptor != &descriptor_function_literal &&
+    value->descriptor != &descriptor_overload
+  ) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Non_Function_Overload,
+      .source_range = value->source_range,
+    });
+    return;
+  }
+}
+
 static Value *
 scope_entry_force_value(
   Execution_Context *context,
@@ -1146,29 +1153,8 @@ scope_entry_force_value(
 
   if (!entry->value) return 0;
 
-  if (entry->value->descriptor == &descriptor_overload_set) {
-
-    const Overload_Set *set = value_as_overload_set(entry->value);
-    for (u64 i = 0; i < dyn_array_length(set->items); ++i) {
-      Value **overload_pointer = dyn_array_get(set->items, i);
-      Value *overload = *overload_pointer;
-      if (overload->descriptor == &descriptor_lazy_static_value) {
-        overload = value_force_lazy_static(overload, entry->name);
-        *overload_pointer = overload;
-      }
-      if (!overload) return 0;
-      if (
-        overload->descriptor->tag != Descriptor_Tag_Function_Instance &&
-        overload->descriptor != &descriptor_function_literal &&
-        overload->descriptor != &descriptor_overload_set
-      ) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Non_Function_Overload,
-          .source_range = overload->source_range,
-        });
-        return 0;
-      }
-    }
+  if (value_is_overload(entry->value)) {
+    scope_maybe_force_overload(context, entry->value, entry->name);
   }
 
   return entry->value;
@@ -1216,12 +1202,12 @@ scope_define_value(
   }
   Scope_Entry *it = scope_lookup_shallow(scope, symbol);
   if (it) {
-    if (it->value->descriptor != &descriptor_overload_set) {
-      it->value = value_wrap_in_overload_set(scope, it->value, symbol->name, &source_range);
-    }
-    // TODO avoid this cast
-    Overload_Set *set = (Overload_Set *)value_as_overload_set(it->value);
-    dyn_array_push(set->items, value);
+    Overload *overload = allocator_allocate(scope->allocator, Overload);
+    *overload = (Overload) { .value = value, .next = it->value };
+    it->value = value_init(
+      allocator_allocate(scope->allocator, Value),
+      &descriptor_overload, storage_static(overload), source_range
+    );
   } else {
     Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
     *allocated = (Scope_Entry) {
@@ -3789,12 +3775,10 @@ mass_match_overload_candidate(
   struct Overload_Match_State *match,
   struct Overload_Match_State *best_conflict_match
 ) {
-  if (value_is_overload_set(candidate)) {
-    const Overload_Set *set = value_as_overload_set(candidate);
-    for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
-      Value *overload = *dyn_array_get(set->items, i);
-      mass_match_overload_candidate(overload, args, match, best_conflict_match);
-    }
+  if (value_is_overload(candidate)) {
+    const Overload *overload = value_as_overload(candidate);
+    mass_match_overload_candidate(overload->value, args, match, best_conflict_match);
+    mass_match_overload_candidate(overload->next, args, match, best_conflict_match);
   } else {
     const Function_Info *overload_info = 0;
     s64 score;
