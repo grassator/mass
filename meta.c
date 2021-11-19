@@ -1264,10 +1264,6 @@ main(void) {
     { "16", 16 },
   }));
 
-  export_global(push_type(type_struct("i64", (Struct_Item[]){
-    { "u64", "bits" },
-  })));
-
   push_type(type_struct("Macro_Capture", (Struct_Item[]){
     { "Scope *", "scope" },
     { "Slice", "name" },
@@ -2125,11 +2121,10 @@ main(void) {
   );
 
   // Prelude Types
-  set_flags(
-    export_compiler_custom_name("Allocator",
-      push_type(type_c_opaque("Allocator", Opaque_Numeric_Interpretation_None))),
+  export_compiler(set_flags(
+    push_type(type_c_opaque("Allocator", Opaque_Numeric_Interpretation_None)),
     Meta_Type_Flags_No_C_Type
-  );
+  ));
   set_flags(
     push_type(type_c_opaque("Virtual_Memory_Buffer", Opaque_Numeric_Interpretation_None)),
     Meta_Type_Flags_No_C_Type
@@ -2140,6 +2135,11 @@ main(void) {
       push_type(type_c_opaque("_Bool", Opaque_Numeric_Interpretation_None))),
     Meta_Type_Flags_No_C_Type
   );
+
+  export_global(set_flags(
+    push_type(type_c_opaque("i64", Opaque_Numeric_Interpretation_Twos_Complement)),
+    Meta_Type_Flags_No_C_Type
+  ));
 
   #define PROCESS_INTEGER_TYPES(F)\
     F(u8) F(u16) F(u32) F(u64)\

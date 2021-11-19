@@ -1088,19 +1088,19 @@ global_scope_define_exports(
   const Calling_Convention *calling_convention =
     compilation->jit.program->default_calling_convention;
   (void)calling_convention;
-  Source_Range i64__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&i64__source_range, "i64");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, i64__source_range,
-    mass_ensure_symbol(compilation, slice_literal("i64")),
-    type_i64_value
-  );
   Source_Range bool__source_range;
   INIT_LITERAL_SOURCE_RANGE(&bool__source_range, "bool");
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, bool__source_range,
     mass_ensure_symbol(compilation, slice_literal("bool")),
     type__bool_value
+  );
+  Source_Range i64__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&i64__source_range, "i64");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, i64__source_range,
+    mass_ensure_symbol(compilation, slice_literal("i64")),
+    type_i64_value
   );
   Source_Range u8__source_range;
   INIT_LITERAL_SOURCE_RANGE(&u8__source_range, "u8");

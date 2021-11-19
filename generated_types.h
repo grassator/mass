@@ -182,10 +182,6 @@ const char *number_base_name(Number_Base value) {
 typedef dyn_array_type(Number_Base *) Array_Number_Base_Ptr;
 typedef dyn_array_type(const Number_Base *) Array_Const_Number_Base_Ptr;
 
-typedef struct i64 i64;
-typedef dyn_array_type(i64 *) Array_i64_Ptr;
-typedef dyn_array_type(const i64 *) Array_Const_i64_Ptr;
-
 typedef struct Macro_Capture Macro_Capture;
 typedef dyn_array_type(Macro_Capture *) Array_Macro_Capture_Ptr;
 typedef dyn_array_type(const Macro_Capture *) Array_Const_Macro_Capture_Ptr;
@@ -885,6 +881,9 @@ typedef dyn_array_type(const Virtual_Memory_Buffer *) Array_Const_Virtual_Memory
 typedef dyn_array_type(_Bool *) Array__Bool_Ptr;
 typedef dyn_array_type(const _Bool *) Array_Const__Bool_Ptr;
 
+typedef dyn_array_type(i64 *) Array_i64_Ptr;
+typedef dyn_array_type(const i64 *) Array_Const_i64_Ptr;
+
 typedef dyn_array_type(u8 *) Array_u8_Ptr;
 typedef dyn_array_type(const u8 *) Array_Const_u8_Ptr;
 
@@ -1122,11 +1121,6 @@ typedef struct Label_Location_Diff_Patch_Info {
   s32 * patch_at;
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
-
-typedef struct i64 {
-  u64 bits;
-} i64;
-typedef dyn_array_type(i64) Array_i64;
 
 typedef struct Macro_Capture {
   Scope * scope;
@@ -2183,6 +2177,8 @@ typedef dyn_array_type(Virtual_Memory_Buffer) Array_Virtual_Memory_Buffer;
 
 typedef dyn_array_type(_Bool) Array__Bool;
 
+typedef dyn_array_type(i64) Array_i64;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -2296,11 +2292,6 @@ static Descriptor descriptor_array_number_base_ptr;
 static Descriptor descriptor_array_const_number_base_ptr;
 static Descriptor descriptor_number_base_pointer;
 static Descriptor descriptor_number_base_pointer_pointer;
-static Descriptor descriptor_i64;
-static Descriptor descriptor_array_i64;
-static Descriptor descriptor_array_i64_ptr;
-static Descriptor descriptor_i64_pointer;
-static Descriptor descriptor_i64_pointer_pointer;
 static Descriptor descriptor_macro_capture;
 static Descriptor descriptor_array_macro_capture;
 static Descriptor descriptor_array_macro_capture_ptr;
@@ -2777,6 +2768,12 @@ static Descriptor descriptor_array__bool_ptr;
 static Descriptor descriptor_array_const__bool_ptr;
 static Descriptor descriptor__bool_pointer;
 static Descriptor descriptor__bool_pointer_pointer;
+static Descriptor descriptor_i64;
+static Descriptor descriptor_array_i64;
+static Descriptor descriptor_array_i64_ptr;
+static Descriptor descriptor_array_const_i64_ptr;
+static Descriptor descriptor_i64_pointer;
+static Descriptor descriptor_i64_pointer_pointer;
 static Descriptor descriptor_u8;
 static Descriptor descriptor_array_u8;
 static Descriptor descriptor_array_u8_ptr;
@@ -3360,18 +3357,6 @@ static C_Enum_Item number_base_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Number_Base, number_base);
 DEFINE_VALUE_IS_AS_HELPERS(Number_Base *, number_base_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_i64_ptr, Array_i64_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_i64, Array_i64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(i64, i64,
-  {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("bits"),
-    .offset = offsetof(i64, bits),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(i64);
-DEFINE_VALUE_IS_AS_HELPERS(i64, i64);
-DEFINE_VALUE_IS_AS_HELPERS(i64 *, i64_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture_ptr, Array_Macro_Capture_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture, Array_Macro_Capture)
 MASS_DEFINE_STRUCT_DESCRIPTOR(macro_capture, Macro_Capture,
@@ -6066,6 +6051,10 @@ MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool, .Opaque.numeric_interpretation = Opaque_
 MASS_DEFINE_OPAQUE_C_TYPE(array__bool, Array__Bool)
 DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool);
 DEFINE_VALUE_IS_AS_HELPERS(_Bool *, _bool_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(i64, i64, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_OPAQUE_C_TYPE(array_i64, Array_i64)
+DEFINE_VALUE_IS_AS_HELPERS(i64, i64);
+DEFINE_VALUE_IS_AS_HELPERS(i64 *, i64_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(u8, u8, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
 DEFINE_VALUE_IS_AS_HELPERS(u8, u8);
 DEFINE_VALUE_IS_AS_HELPERS(u8 *, u8_pointer);
