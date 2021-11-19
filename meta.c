@@ -71,11 +71,6 @@ typedef struct {
 } Function_Type;
 
 typedef struct {
-  u64 bits;
-  bool negative;
-} Meta_i64;
-
-typedef struct {
   Opaque_Numeric_Interpretation numeric_interpretation;
 } Meta_C_Opaque;
 
@@ -86,7 +81,6 @@ typedef enum {
   Meta_Type_Tag_Enum,
   Meta_Type_Tag_Function,
   Meta_Type_Tag_Hash_Map,
-  Meta_Type_Tag_i64,
 } Meta_Type_Tag;
 
 typedef enum {
@@ -113,7 +107,6 @@ typedef struct {
     Tagged_Union_Type union_;
     Function_Type function;
     Hash_Map_Type hash_map;
-    Meta_i64 i64;
     Meta_C_Opaque c_opaque;
   };
 } Meta_Type;
@@ -213,21 +206,13 @@ print_c_type_forward_declaration(
       }
       break;
     }
-    case Meta_Type_Tag_i64: {
-      name = 0;
-      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
-        fprintf(file, "#define %s (%s%"PRIu64")\n", type->name,
-          type->i64.negative ? "-" : "", type->i64.bits);
-      }
-      break;
-    }
     case Meta_Type_Tag_C_Opaque: {
       name = type->name;
       break;
     }
     default: {
       name = 0;
-    }
+    } break;
   }
   if (name) {
     fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n", name, name);
@@ -354,7 +339,6 @@ print_c_type(
       }
       break;
     }
-    case Meta_Type_Tag_i64:
     case Meta_Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
       break;
@@ -549,10 +533,6 @@ print_scope_export(
       print_scope_define(file, type->name, type->export_name);
       break;
     }
-    case Meta_Type_Tag_i64: {
-      panic("NOT SUPPORTED");
-      break;
-    }
   }
 }
 
@@ -638,8 +618,7 @@ print_natvis(
     }
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
-    case Meta_Type_Tag_Function:
-    case Meta_Type_Tag_i64: {
+    case Meta_Type_Tag_Function: {
       // Nothing to do
       break;
     }
@@ -698,7 +677,6 @@ print_mass_descriptor_fixed_array_types(
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
-    case Meta_Type_Tag_i64:
     case Meta_Type_Tag_Hash_Map: {
       break;
     }
@@ -758,10 +736,6 @@ print_mass_descriptor_and_type_forward_declaration(
     case Meta_Type_Tag_Hash_Map: {
       char *lowercase_name = strtolower(type->name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s);\n", lowercase_name, type->name);
-      break;
-    }
-    case Meta_Type_Tag_i64: {
-      // TODO define global number literal values
       break;
     }
   }
@@ -967,10 +941,6 @@ print_mass_descriptor_and_type(
       // TODO
       break;
     }
-    case Meta_Type_Tag_i64: {
-      // TODO define global number literal values
-      break;
-    }
   }
 }
 
@@ -1043,13 +1013,6 @@ add_common_fields_internal(
     .tag = Meta_Type_Tag_Hash_Map,\
     .name = (_NAME_STRING_),\
     .hash_map = __VA_ARGS__\
-  }
-
-#define meta_i64(_NAME_STRING_, ...)\
-  (Meta_Type){\
-    .tag = Meta_Type_Tag_i64,\
-    .name = (_NAME_STRING_),\
-    .i64 = __VA_ARGS__\
   }
 
 static inline Meta_Type
