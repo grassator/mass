@@ -240,10 +240,6 @@ allocate :: macro(allocator : &MASS.Allocator, type : Type) {
     type.bit_alignment.as_u64 / 8
   ))
 }
-deallocate :: macro(pointer) {
-  type :: type_of(pointer)
-  MASS.allocator_allocate_bytes(allocator, type.bit_size.as_u64 / 8, type.bit_alignment.as_u64 / 8)
-}
 
 Array :: fn(item : Type, length : i64) => (Type) {
   t := allocate(MASS.allocator, MASS.Descriptor)
