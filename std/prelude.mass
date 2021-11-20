@@ -11,24 +11,6 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_done
 }
 
-syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
-  pre()
-
-  label _loop_start
-  label placeholder _loop_done
-  label placeholder _loop_post
-  if condition() then {
-    body(module {
-      break :: ~> { goto _loop_done }
-      continue :: ~> { goto _loop_post }
-    })
-    label _loop_post
-    post()
-    goto _loop_start
-  } else {}
-  label _loop_done
-}
-
 import :: fn(path : String) => (MASS.Scope) MASS.import
 cast :: @fn(type : Type, value) MASS.cast
 startup :: fn(callback : fn() -> ()) => () MASS.startup
