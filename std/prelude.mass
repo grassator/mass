@@ -49,21 +49,15 @@ debugger :: fn() => () intrinsic {
     value
   }
 
-  value : &MASS.Value = allocate(context.allocator, MASS.Value)
 
-  lazy_value : &MASS.Lazy_Value = allocate(context.allocator, MASS.Lazy_Value)
+  lazy_value := allocate(context.allocator, MASS.Lazy_Value)
   lazy_value.epoch = context.epoch
   lazy_value.descriptor = Void
   lazy_value.proc = lazy_value_proc
   lazy_value.payload = 0
 
-  value.source_range = arguments.source_range
-  value.descriptor = MASS.Lazy_Value
-  value.storage.tag = MASS.Storage_Tag.Static
-  value.storage.bit_size = value.descriptor.bit_size
-  value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap
-  value.storage.Static.memory.Heap.pointer = lazy_value
-  value
+  meta :: import("std/meta")
+  meta.static_value(context.allocator, lazy_value, arguments.source_range)
 }
 
 
