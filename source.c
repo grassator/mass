@@ -401,7 +401,7 @@ assign_from_static(
   return false;
 }
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 value_indirect_from_pointer(
   Compilation *compilation,
   Function_Builder *builder,
@@ -1984,12 +1984,6 @@ token_parse_macro_statement(
   return match_length;
 }
 
-static Value *
-token_parse_block_view(
-  Execution_Context *context,
-  Value_View children_view
-);
-
 static inline const Descriptor *
 token_match_type(
   Execution_Context *context,
@@ -2197,7 +2191,7 @@ storage_occupies_same_memory(
   return false;
 }
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 expected_result_ensure_value_or_temp(
   Compilation *compilation,
   Function_Builder *builder,
@@ -2302,7 +2296,7 @@ expected_result_ensure_value_or_temp(
   }
 }
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 value_force(
   Compilation *compilation,
   Function_Builder *builder,
@@ -6198,7 +6192,7 @@ typedef struct {
   bool matches_end_of_expression;
 } Expression_Matcher;
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,

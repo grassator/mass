@@ -44,7 +44,7 @@ expected_result_descriptor(
   const Expected_Result *expected_result
 );
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 expected_result_ensure_value_or_temp(
   Compilation *compilation,
   Function_Builder *builder,
@@ -127,7 +127,7 @@ compile_time_eval(
   Value_View view
 );
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
@@ -143,7 +143,7 @@ token_handle_function_call(
   Source_Range source_range
 );
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 value_force(
   Compilation *compilation,
   Function_Builder *builder,
@@ -170,19 +170,19 @@ value_or_lazy_value_descriptor(
   const Value *value
 );
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 token_parse_block_view(
   Execution_Context *program,
   Value_View view
 );
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 token_parse_block_no_scope(
   Execution_Context *context,
   const Group_Curly *group
 );
 
-static PRELUDE_NO_DISCARD Value *
+static Value *
 token_parse_block(
   Execution_Context *program,
   const Group_Curly *group
