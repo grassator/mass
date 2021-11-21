@@ -164,10 +164,6 @@ typedef struct {
   s32 value;
 } C_Enum_Item;
 
-typedef struct {
-  u64 bits;
-} i64;
-
 // Need to forward-declare this for the value helpers below
 static const void *
 get_static_storage_with_bit_size();

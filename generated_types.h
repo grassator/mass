@@ -1,7 +1,10 @@
 #ifndef GENERATED_TYPES_H
 #define GENERATED_TYPES_H
+#include "prelude.h"
 _Pragma("warning (push)") _Pragma("warning (default: 4820)")
 typedef void(*fn_type_opaque)();
+
+typedef struct { u64 bits; } i64;
 
 // Forward declarations
 

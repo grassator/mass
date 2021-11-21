@@ -2193,6 +2193,7 @@ main(void) {
 
       fprintf(file, "#ifndef GENERATED_TYPES_H\n");
       fprintf(file, "#define GENERATED_TYPES_H\n");
+      fprintf(file, "#include \"prelude.h\"\n");
 
       // Make sure our generated structs have explicit padding
       fprintf(file, "_Pragma(\"warning (push)\") _Pragma(\"warning (default: 4820)\")\n");
@@ -2200,6 +2201,7 @@ main(void) {
       // Custom forward declarations
       {
         fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
+        fprintf(file, "typedef struct { u64 bits; } i64;\n\n");
       }
 
       fprintf(file, "// Forward declarations\n\n");
