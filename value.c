@@ -311,20 +311,6 @@ same_type(
       return true;
     }
     case Descriptor_Tag_Pointer_To: {
-      if (
-        a->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
-        same_type(a->Pointer_To.descriptor->Fixed_Size_Array.item, b->Pointer_To.descriptor)
-      ) return true;
-      if (
-        b->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
-        same_type(b->Pointer_To.descriptor->Fixed_Size_Array.item, a->Pointer_To.descriptor)
-      ) return true;
-      if (
-        mass_descriptor_is_void(a->Pointer_To.descriptor) ||
-        mass_descriptor_is_void(b->Pointer_To.descriptor)
-      ) {
-        return true;
-      }
       return same_type(a->Pointer_To.descriptor, b->Pointer_To.descriptor);
     }
     case Descriptor_Tag_Fixed_Size_Array: {
@@ -1488,6 +1474,17 @@ same_type_or_can_implicitly_move_cast(
   if (same_type(target, source)) return true;
   if (target->tag == Descriptor_Tag_Void) return true;
   if (target->tag != source->tag) return false;
+  if (target->tag == Descriptor_Tag_Pointer_To) {
+    if (
+      source->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
+      same_type(source->Pointer_To.descriptor->Fixed_Size_Array.item, target->Pointer_To.descriptor)
+    ) {
+      return true;
+    }
+    if (mass_descriptor_is_void(target->Pointer_To.descriptor)) {
+      return true;
+    }
+  }
   if (
     target->tag == Descriptor_Tag_Struct &&
     target->Struct.is_tuple
