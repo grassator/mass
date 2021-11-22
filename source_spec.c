@@ -1129,8 +1129,7 @@ spec("source") {
       checker();
     }
 
-    // FIXME figure out why this fails
-    xit("should be able to allocate and return a static value through an intrinsic") {
+    it("should be able to allocate and return a static value through an intrinsic") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn() => () intrinsic {\n"
