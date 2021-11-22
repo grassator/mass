@@ -684,7 +684,9 @@ ensure_function_instance(
         storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
       }
       const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
-      Value *arg_value = value_make(&body_context, call_param->descriptor, storage, def_param->declaration.source_range);
+      Value *arg_value = value_make(
+        body_context.allocator, call_param->descriptor, storage, def_param->declaration.source_range
+      );
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->declaration.symbol;
       if (param_symbol) {
@@ -819,7 +821,7 @@ program_init_startup_code(
 
   Source_Range source_range;
   INIT_LITERAL_SOURCE_RANGE(&source_range, "__startup");
-  Value *function = value_make(context, descriptor, storage, source_range);
+  Value *function = value_make(context->allocator, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
     .program = program,

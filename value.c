@@ -855,13 +855,13 @@ value_init(
 
 static inline Value *
 value_make(
-  Execution_Context *context,
+  const Allocator *allocator,
   const Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
   return value_init(
-    allocator_allocate(context->allocator, Value),
+    allocator_allocate(allocator, Value),
     descriptor,
     storage,
     source_range
