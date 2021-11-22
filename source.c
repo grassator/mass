@@ -700,63 +700,6 @@ large_enough_common_integer_descriptor_for_values(
   }
 }
 
-static void
-assign_integers(
-  Compilation *compilation,
-  Function_Builder *builder,
-  Value *target,
-  Value *source
-) {
-  const Descriptor *descriptor =
-    large_enough_common_integer_descriptor_for_values(compilation, source, target);
-  MASS_ON_ERROR(*compilation->result) return;
-
-  if (target->descriptor->bit_size.as_u64 < descriptor->bit_size.as_u64) {
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = target->source_range,
-      .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-      .detailed_message = slice_literal("Target integer is too small to fit the range of source values"),
-    });
-    return;
-  }
-  bool is_temp = false;
-  Storage adjusted_source;
-  if (
-    source->descriptor->bit_size.as_u64 == target->descriptor->bit_size.as_u64 ||
-    source->storage.tag == Storage_Tag_Static
-  ) {
-    adjusted_source = source->storage;
-  } else {
-    if (source->storage.tag == Storage_Tag_Register) {
-      adjusted_source = source->storage;
-    } else {
-      is_temp = true;
-      Register reg = register_acquire_temp(builder);
-      adjusted_source = storage_register(reg, target->descriptor->bit_size);
-    }
-
-    if (descriptor_is_signed_integer(source->descriptor)) {
-      assert(!descriptor_is_unsigned_integer(target->descriptor));
-      push_eagerly_encoded_assembly(
-        &builder->code_block, source->source_range,
-        &(Instruction_Assembly){movsx, {adjusted_source, source->storage}}
-      );
-    } else {
-      push_eagerly_encoded_assembly(
-        &builder->code_block, source->source_range,
-        &(Instruction_Assembly){movzx, {adjusted_source, source->storage}}
-      );
-    }
-  }
-  move_value(builder, &target->source_range, &target->storage, &adjusted_source);
-
-  if (is_temp) {
-    assert(adjusted_source.tag == Storage_Tag_Register);
-    register_release(builder, adjusted_source.Register.index);
-  }
-}
-
 // TODO :AssignCleanup Merge this with `same_type_or_can_implicitly_move_cast`
 static void
 assign_tuple(
@@ -1058,11 +1001,6 @@ mass_assign(
     if (assign_from_static(compilation, builder, target, source, source_range)) {
       return;
     }
-  }
-
-  if (descriptor_is_integer(source->descriptor) || descriptor_is_integer(target->descriptor)) {
-    assign_integers(compilation, builder, target, source);
-    return;
   }
 
   MASS_ON_ERROR(*compilation->result) return;
