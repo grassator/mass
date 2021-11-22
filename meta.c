@@ -1273,6 +1273,10 @@ main(void) {
     { "Value *", "value" },
   })));
 
+  export_compiler(push_type(type_struct("Named_Accessor", (Struct_Item[]){
+    { "const Symbol *", "symbol" },
+  })));
+
   export_compiler(push_type(type_struct("External_Symbol", (Struct_Item[]){
     { "Slice", "library_name" },
     { "Slice", "symbol_name" },

@@ -1592,6 +1592,17 @@ spec("source") {
     }
   }
 
+  describe("Accessors") {
+    it("should support parsing named accessors") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> () { .foo }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+  }
+
   describe("Compile Time Execution") {
     it("should correctly detect direct circular dependency in static declarations") {
       test_program_inline_source_base(

@@ -143,6 +143,15 @@ operator intrinsic 25 (~> x) fragment
 operator intrinsic 30 (' x) quote
 operator intrinsic 30 (x ') unquote
 
+make_accessor :: fn(symbol : MASS.Symbol) => (MASS.Named_Accessor) intrinsic {
+  meta :: import("std/meta")
+  accessor := allocate(context.allocator, MASS.Named_Accessor)
+  accessor.symbol = meta.reify(arguments.values.0, MASS.Symbol)
+  meta.static_value(context.allocator, accessor, arguments.source_range)
+}
+
+operator intrinsic 30 (. x) make_accessor
+
 quote :: fn(x) => (MASS.Quoted) MASS.quote
 unquote :: @fn(x) MASS.unquote
 

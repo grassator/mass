@@ -193,6 +193,10 @@ typedef struct Quoted Quoted;
 typedef dyn_array_type(Quoted *) Array_Quoted_Ptr;
 typedef dyn_array_type(const Quoted *) Array_Const_Quoted_Ptr;
 
+typedef struct Named_Accessor Named_Accessor;
+typedef dyn_array_type(Named_Accessor *) Array_Named_Accessor_Ptr;
+typedef dyn_array_type(const Named_Accessor *) Array_Const_Named_Accessor_Ptr;
+
 typedef struct External_Symbol External_Symbol;
 typedef dyn_array_type(External_Symbol *) Array_External_Symbol_Ptr;
 typedef dyn_array_type(const External_Symbol *) Array_Const_External_Symbol_Ptr;
@@ -1118,6 +1122,11 @@ typedef struct Quoted {
   Value * value;
 } Quoted;
 typedef dyn_array_type(Quoted) Array_Quoted;
+
+typedef struct Named_Accessor {
+  const Symbol * symbol;
+} Named_Accessor;
+typedef dyn_array_type(Named_Accessor) Array_Named_Accessor;
 
 typedef struct External_Symbol {
   Slice library_name;
@@ -2283,6 +2292,11 @@ static Descriptor descriptor_array_quoted;
 static Descriptor descriptor_array_quoted_ptr;
 static Descriptor descriptor_quoted_pointer;
 static Descriptor descriptor_quoted_pointer_pointer;
+static Descriptor descriptor_named_accessor;
+static Descriptor descriptor_array_named_accessor;
+static Descriptor descriptor_array_named_accessor_ptr;
+static Descriptor descriptor_named_accessor_pointer;
+static Descriptor descriptor_named_accessor_pointer_pointer;
 static Descriptor descriptor_external_symbol;
 static Descriptor descriptor_array_external_symbol;
 static Descriptor descriptor_array_external_symbol_ptr;
@@ -3366,6 +3380,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(quoted, Quoted,
 MASS_DEFINE_TYPE_VALUE(quoted);
 DEFINE_VALUE_IS_AS_HELPERS(Quoted, quoted);
 DEFINE_VALUE_IS_AS_HELPERS(Quoted *, quoted_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_named_accessor_ptr, Array_Named_Accessor_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_named_accessor, Array_Named_Accessor)
+MASS_DEFINE_STRUCT_DESCRIPTOR(named_accessor, Named_Accessor,
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("symbol"),
+    .offset = offsetof(Named_Accessor, symbol),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(named_accessor);
+DEFINE_VALUE_IS_AS_HELPERS(Named_Accessor, named_accessor);
+DEFINE_VALUE_IS_AS_HELPERS(Named_Accessor *, named_accessor_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol_ptr, Array_External_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol, Array_External_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol, External_Symbol,

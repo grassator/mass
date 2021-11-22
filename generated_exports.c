@@ -59,6 +59,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Quoted")),
     type_quoted_value
   );
+  Source_Range Named_Accessor__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Named_Accessor__source_range, "Named_Accessor");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Named_Accessor__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Named_Accessor")),
+    type_named_accessor_value
+  );
   Source_Range External_Symbol__source_range;
   INIT_LITERAL_SOURCE_RANGE(&External_Symbol__source_range, "External_Symbol");
   scope_define_value(
