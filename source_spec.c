@@ -955,114 +955,6 @@ spec("source") {
       check(checker(spec_callback) == 42);
     }
 
-    it("should be able to have user-defined intrinsics") {
-      s64 (*checker)() =
-        (s64 (*)())test_program_inline_source_function(
-          "checker", &test_context,
-          "intrinsic_id :: fn(x : i64) => (i64) intrinsic { arguments.values.0 }\n"
-          "checker :: fn() -> (s64) { intrinsic_id(42) }"
-        );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    // FIXME :IntrinsicReturnType
-    xit("should validate the return type of the intrinsic when specified") {
-      test_program_inline_source_function(
-        "checker", &test_context,
-        "intrinsic_id :: fn(x : i64, y : String) => (i64) intrinsic { arguments.values.1 }\n"
-        "checker :: fn() -> () { intrinsic_id(42, \"foo\") }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_i64);
-      check(error->Type_Mismatch.actual == &descriptor_slice);
-    }
-
-    it("should be able to have access to arguments view in user-defined intrinsics") {
-      s64 (*checker)() =
-        (s64 (*)())test_program_inline_source_function(
-          "checker", &test_context,
-          "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
-            "intrinsic { arguments.values.1 }\n"
-          "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
-        );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to allocate and return a void value through an intrinsic") {
-      void (*checker)() = test_program_inline_source_function(
-          "checker", &test_context,
-          "my_intrinsic :: fn() => () intrinsic {\n"
-            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
-            "value.source_range = arguments.source_range\n"
-            "value.descriptor = type_of(())\n"
-            "value.storage.tag = MASS.Storage_Tag.None\n"
-            "value"
-          "}\n"
-          "checker :: fn() -> () { my_intrinsic() }\n"
-        );
-      check(spec_check_mass_result(test_context.result));
-      checker();
-    }
-
-    // FIXME figure out why this fails
-    xit("should be able to allocate and return a static value through an intrinsic") {
-      u64(*checker)() = (u64(*)())test_program_inline_source_function(
-          "checker", &test_context,
-          "my_intrinsic :: fn() => () intrinsic {\n"
-            "meta :: import(\"std/meta\")\n"
-            "x := 42\n"
-            "meta.static_value(context.allocator, &x, arguments.source_range)\n"
-          "}\n"
-          "checker :: fn() -> (s64) { my_intrinsic() }\n"
-        );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to allocate and return a lazy void value through an intrinsic") {
-      void (*checker)() = test_program_inline_source_function(
-          "checker", &test_context,
-          "my_intrinsic :: fn() => () intrinsic {\n"
-            "lazy_value_proc :: fn("
-              "compilation : &MASS.Compilation,"
-              "builder : &MASS.Function_Builder,"
-              "expected_result : &MASS.Expected_Result,"
-              "source_range : &MASS.Source_Range,"
-              "payload : &type_of(())"
-            ") -> (&MASS.Value) {\n"
-              "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
-              "value.source_range = source_range.*\n"
-              "value.descriptor = type_of(())\n"
-              "value.storage.tag = MASS.Storage_Tag.None\n"
-              "value.storage.bit_size = value.descriptor.bit_size\n"
-              "value"
-            "}\n"
-            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
-
-            "lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)\n"
-            "lazy_value.epoch = context.epoch\n"
-            "lazy_value.descriptor = type_of(())\n"
-            "lazy_value.proc = lazy_value_proc\n"
-            "lazy_value.payload = 0\n"
-
-            "value.source_range = arguments.source_range\n"
-            "value.descriptor = MASS.Lazy_Value\n"
-            "value.storage.tag = MASS.Storage_Tag.Static\n"
-            "value.storage.bit_size = value.descriptor.bit_size\n"
-            "value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap\n"
-            "value.storage.Static.memory.Heap.pointer = lazy_value\n"
-            "value"
-          "}\n"
-          "checker :: fn() -> () { my_intrinsic() }\n"
-        );
-      check(spec_check_mass_result(test_context.result));
-      checker();
-    }
-
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,
@@ -1180,6 +1072,116 @@ spec("source") {
         );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 32);
+    }
+  }
+
+  describe("Intrinsics") {
+    it("should be able to have user-defined intrinsics") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "intrinsic_id :: fn(x : i64) => (i64) intrinsic { arguments.values.0 }\n"
+          "checker :: fn() -> (s64) { intrinsic_id(42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    // FIXME :IntrinsicReturnType
+    xit("should validate the return type of the intrinsic when specified") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "intrinsic_id :: fn(x : i64, y : String) => (i64) intrinsic { arguments.values.1 }\n"
+        "checker :: fn() -> () { intrinsic_id(42, \"foo\") }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_i64);
+      check(error->Type_Mismatch.actual == &descriptor_slice);
+    }
+
+    it("should be able to have access to arguments view in user-defined intrinsics") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
+            "intrinsic { arguments.values.1 }\n"
+          "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should be able to allocate and return a void value through an intrinsic") {
+      void (*checker)() = test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn() => () intrinsic {\n"
+            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
+            "value.source_range = arguments.source_range\n"
+            "value.descriptor = type_of(())\n"
+            "value.storage.tag = MASS.Storage_Tag.None\n"
+            "value"
+          "}\n"
+          "checker :: fn() -> () { my_intrinsic() }\n"
+        );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+
+    // FIXME figure out why this fails
+    xit("should be able to allocate and return a static value through an intrinsic") {
+      u64(*checker)() = (u64(*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn() => () intrinsic {\n"
+            "meta :: import(\"std/meta\")\n"
+            "x := 42\n"
+            "meta.static_value(context.allocator, &x, arguments.source_range)\n"
+          "}\n"
+          "checker :: fn() -> (s64) { my_intrinsic() }\n"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should be able to allocate and return a lazy void value through an intrinsic") {
+      void (*checker)() = test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn() => () intrinsic {\n"
+            "lazy_value_proc :: fn("
+              "compilation : &MASS.Compilation,"
+              "builder : &MASS.Function_Builder,"
+              "expected_result : &MASS.Expected_Result,"
+              "source_range : &MASS.Source_Range,"
+              "payload : &type_of(())"
+            ") -> (&MASS.Value) {\n"
+              "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
+              "value.source_range = source_range.*\n"
+              "value.descriptor = type_of(())\n"
+              "value.storage.tag = MASS.Storage_Tag.None\n"
+              "value.storage.bit_size = value.descriptor.bit_size\n"
+              "value"
+            "}\n"
+            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
+
+            "lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)\n"
+            "lazy_value.epoch = context.epoch\n"
+            "lazy_value.descriptor = type_of(())\n"
+            "lazy_value.proc = lazy_value_proc\n"
+            "lazy_value.payload = 0\n"
+
+            "value.source_range = arguments.source_range\n"
+            "value.descriptor = MASS.Lazy_Value\n"
+            "value.storage.tag = MASS.Storage_Tag.Static\n"
+            "value.storage.bit_size = value.descriptor.bit_size\n"
+            "value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap\n"
+            "value.storage.Static.memory.Heap.pointer = lazy_value\n"
+            "value"
+          "}\n"
+          "checker :: fn() -> () { my_intrinsic() }\n"
+        );
+      check(spec_check_mass_result(test_context.result));
+      checker();
     }
   }
 
