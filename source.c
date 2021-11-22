@@ -6035,7 +6035,6 @@ token_parse_function_literal(
   }
   if (!keyword) return 0;
 
-  Value *maybe_name = value_view_maybe_match_any_of(view, &peek_index, &descriptor_symbol);
   Value *args = value_view_next(view, &peek_index);
   if (!value_is_group_paren(args)) {
     context_parse_error(context, view, peek_index);
@@ -6106,6 +6105,10 @@ token_parse_function_literal(
     fn_info->flags |= Function_Info_Flags_Compile_Time;
   }
   bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
+
+  // TODO should be extracted from the :: if available or maybe stored separately from Descriptor
+  Slice name = {0};
+
   // TODO support this on non-Linux systems
   if (is_syscall) {
     ensure_parameter_descriptors(context, fn_info, context->scope);
