@@ -19,7 +19,7 @@ mass_value_from_expected_result(
     } break;
     case Expected_Result_Tag_Flexible: {
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
-      if (descriptor == &descriptor_void) return &void_value;
+      if (mass_descriptor_is_void(descriptor)) return &void_value;
       Storage storage;
       if (
         (flexible->storage & Expected_Result_Storage_Register) &&
@@ -883,7 +883,7 @@ mass_assign(
     return;
   }
 
-  if (target->descriptor == &descriptor_void) {
+  if (mass_descriptor_is_void(target->descriptor)) {
     return;
   }
 
@@ -1934,7 +1934,7 @@ mass_handle_statement_lazy_proc(
   const Source_Range *source_range,
   Value *lazy_value
 ) {
-  assert(mass_expected_result_descriptor(expected_result) == &descriptor_void);
+  assert(mass_descriptor_is_void(mass_expected_result_descriptor(expected_result)));
   return value_force(compilation, builder, expected_result, lazy_value);
 }
 
@@ -2221,10 +2221,7 @@ mass_expected_result_ensure_value_or_temp(
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
       const Descriptor *expected_descriptor =
         flexible->descriptor ? flexible->descriptor : value->descriptor;
-      if (
-        expected_descriptor != &descriptor_void &&
-        !same_value_type_or_can_implicitly_move_cast(expected_descriptor, value)
-      ) {
+      if (!same_value_type_or_can_implicitly_move_cast(expected_descriptor, value)) {
         compilation_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = value->source_range,
@@ -2343,7 +2340,7 @@ value_force_exact(
   Value *forced = value_force(compilation, builder, &expected_result, source);
   if (!forced) return;
   assert(forced->descriptor == target->descriptor);
-  if (target->descriptor != &descriptor_void) {
+  if (mass_descriptor_is_void(target->descriptor)) {
     assert(forced->descriptor == target->descriptor);
     assert(storage_equal(&forced->storage, &target->storage));
   }
@@ -3335,7 +3332,6 @@ mass_handle_macro_call(
   const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
   if (
     literal->info->returns.descriptor &&
-    literal->info->returns.descriptor != &descriptor_void &&
     !same_type_or_can_implicitly_move_cast(literal->info->returns.descriptor, return_descriptor)
   ) {
     context_error(context, (Mass_Error) {
@@ -3393,7 +3389,7 @@ call_function_overload(
 
   const Descriptor *return_descriptor = fn_info->returns.descriptor;
   Value *fn_return_value;
-  if (return_descriptor == &descriptor_void) {
+  if (mass_descriptor_is_void(return_descriptor)) {
     fn_return_value = &void_value;
   } else {
     Storage return_storage = instance_descriptor->call_setup.caller_return;
@@ -3479,7 +3475,7 @@ call_function_overload(
     u64 source_registers_bitset = 0;
     if (
       source_arg->descriptor != &descriptor_lazy_value &&
-      source_arg->descriptor != &descriptor_void &&
+      !mass_descriptor_is_void(source_arg->descriptor) &&
       source_arg->storage.tag != Storage_Tag_Static &&
       !descriptor_is_implicit_pointer(target_item->descriptor)
     ) {
@@ -3587,7 +3583,7 @@ call_function_overload(
 
       Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
         .reg = storage_register(reg_index, (Bits){64}),
-        .stack = reserve_stack_storage(builder, descriptor_void_pointer.bit_size),
+        .stack = reserve_stack_storage(builder, (Bits){64}),
       });
 
       push_eagerly_encoded_assembly(
@@ -4113,7 +4109,7 @@ mass_trampoline_call(
 
   trampoline->proc(args_struct_memory);
   Value *result;
-  if (trampoline->original_info->returns.descriptor == &descriptor_void) {
+  if (mass_descriptor_is_void(trampoline->original_info->returns.descriptor)) {
     result = &void_value;
   } else {
     const Struct_Field *return_field = dyn_array_last(fields);
@@ -4222,7 +4218,7 @@ token_handle_function_call(
     Value *result = mass_trampoline_call(context, overload, info, args_view);
     MASS_ON_ERROR(*context->result) return 0;
     const Descriptor *expected_descriptor = info->returns.descriptor;
-    if (expected_descriptor && expected_descriptor != &descriptor_void) {
+    if (expected_descriptor && !mass_descriptor_is_void(expected_descriptor)) {
       const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(result);
       if (!same_type(expected_descriptor, actual_descriptor)) {
         context_error(context, (Mass_Error) {
@@ -4921,7 +4917,7 @@ mass_handle_startup_call_lazy_proc(
   if(startup_function->descriptor != &descriptor_function_literal) goto err;
   const Function_Literal *literal = value_as_function_literal(startup_function);
   if (dyn_array_length(literal->info->parameters)) goto err;
-  if (literal->info->returns.descriptor != &descriptor_void) goto err;
+  if (!mass_descriptor_is_void(literal->info->returns.descriptor)) goto err;
 
   // This call is executed at compile time, but the actual startup function
   // will be run only at runtime so we need to make sure to use the right Program
@@ -5140,7 +5136,7 @@ mass_handle_variable_definition_lazy_proc(
   const Source_Range *source_range,
   Mass_Variable_Definition_Lazy_Payload *payload
 ) {
-  Storage storage = payload->descriptor == &descriptor_void
+  Storage storage = mass_descriptor_is_void(payload->descriptor)
     ? storage_none
     : reserve_stack_storage(builder, payload->descriptor->bit_size);
   return value_init(
@@ -5172,7 +5168,7 @@ mass_handle_assignment_lazy_proc(
   MASS_ON_ERROR(*compilation->result) return 0;
 
   const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
-  if (expected_descriptor != &descriptor_void) {
+  if (!mass_descriptor_is_void(expected_descriptor)) {
     compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = *source_range,

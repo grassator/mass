@@ -644,7 +644,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   bool is_indirect_return = false;
-  if (function->returns.descriptor == &descriptor_void) {
+  if (mass_descriptor_is_void(function->returns.descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
@@ -747,7 +747,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Syscall},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
-  if (function->returns.descriptor == &descriptor_void) {
+  if (mass_descriptor_is_void(function->returns.descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
@@ -820,7 +820,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_windows,
   };
   bool is_indirect_return = false;
-  if (function->returns.descriptor == &descriptor_void) {
+  if (mass_descriptor_is_void(function->returns.descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {

@@ -15,6 +15,13 @@
     memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_TARGET_));\
   } while(0)
 
+static inline bool
+mass_descriptor_is_void(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Void;
+}
+
 static void
 mass_assign(
   Compilation *compilation,

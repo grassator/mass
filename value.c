@@ -320,8 +320,8 @@ same_type(
         same_type(b->Pointer_To.descriptor->Fixed_Size_Array.item, a->Pointer_To.descriptor)
       ) return true;
       if (
-        a->Pointer_To.descriptor == &descriptor_void ||
-        b->Pointer_To.descriptor == &descriptor_void
+        mass_descriptor_is_void(a->Pointer_To.descriptor) ||
+        mass_descriptor_is_void(b->Pointer_To.descriptor)
       ) {
         return true;
       }
@@ -1486,6 +1486,7 @@ same_type_or_can_implicitly_move_cast(
   const Descriptor *source
 ) {
   if (same_type(target, source)) return true;
+  if (target->tag == Descriptor_Tag_Void) return true;
   if (target->tag != source->tag) return false;
   if (
     target->tag == Descriptor_Tag_Struct &&
