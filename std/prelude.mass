@@ -271,8 +271,18 @@ external :: fn(
 
 os :: MASS.Os
 get_target_os :: fn() => (os._Type) intrinsic {
-  meta :: import("std/meta")
-  meta.static_value(context.allocator, &context.program.os, arguments.source_range)
+  // FIXME We should be ble to just do this, but it crashes on Linux
+  //meta :: import("std/meta")
+  //meta.static_value(context.allocator, &context.program.os, arguments.source_range)
+
+  value := allocate(context.allocator, MASS.Value)
+  value.source_range = arguments.source_range
+  value.descriptor = os._Type
+  value.storage.tag = MASS.Storage_Tag.Static
+  value.storage.bit_size = value.descriptor.bit_size
+  value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U32
+  value.storage.Static.memory.U32.value = cast(u32, context.program.os)
+  value
 }
 
 syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
