@@ -1135,7 +1135,7 @@ spec("source") {
           "my_intrinsic :: fn() => () intrinsic {\n"
             "meta :: import(\"std/meta\")\n"
             "x := 42\n"
-            "meta.static_value(context.allocator, &x, arguments.source_range)\n"
+            "meta.static_value(context.compilation, &x, arguments.source_range)\n"
           "}\n"
           "checker :: fn() -> (s64) { my_intrinsic() }\n"
         );

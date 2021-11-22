@@ -57,7 +57,7 @@ debugger :: fn() => () intrinsic {
   lazy_value.payload = 0
 
   meta :: import("std/meta")
-  meta.static_value(context.allocator, lazy_value, arguments.source_range)
+  meta.static_value(context.compilation, lazy_value, arguments.source_range)
 }
 
 
@@ -147,7 +147,7 @@ make_accessor :: fn(symbol : MASS.Symbol) => (MASS.Named_Accessor) intrinsic {
   meta :: import("std/meta")
   accessor := allocate(context.allocator, MASS.Named_Accessor)
   accessor.symbol = meta.reify(arguments.values.0, MASS.Symbol)
-  meta.static_value(context.allocator, accessor, arguments.source_range)
+  meta.static_value(context.compilation, accessor, arguments.source_range)
 }
 
 operator intrinsic 30 (. x) make_accessor
@@ -273,7 +273,7 @@ os :: MASS.Os
 get_target_os :: fn() => (os._Type) intrinsic {
   // FIXME We should be ble to just do this, but it crashes on Linux
   //meta :: import("std/meta")
-  //meta.static_value(context.allocator, &context.program.os, arguments.source_range)
+  //meta.static_value(context.compilation, &context.program.os, arguments.source_range)
 
   value := allocate(context.allocator, MASS.Value)
   value.source_range = arguments.source_range

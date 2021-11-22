@@ -29,7 +29,7 @@ pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
 }
 
 static_value :: fn(
-  allocator : &Allocator,
+  compilation : &MASS.Compilation,
   pointer,
   source_range : Source_Range
 ) -> (&Value) {
@@ -41,7 +41,7 @@ static_value :: fn(
   //static_assert(type.tag == MASS.Descriptor_Tag.Pointer_To)
   //assert(type.tag == MASS.Descriptor_Tag.Pointer_To)
 
-  static_value := allocate(allocator, Value)
+  static_value := allocate(compilation.allocator, Value)
   static_value.source_range = source_range
   static_value.descriptor = type.Pointer_To.descriptor
 
