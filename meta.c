@@ -1434,11 +1434,6 @@ main(void) {
     { "const Function_Info *", "function" },
   })));
 
-  push_type(type_enum("Function_Parameter_Mode", (Enum_Type_Item[]){
-    { "Call", 0 },
-    { "Body", 1 },
-  }));
-
   push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },

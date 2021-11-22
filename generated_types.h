@@ -308,21 +308,6 @@ typedef struct Function_Builder Function_Builder;
 typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
 typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
 
-typedef enum Function_Parameter_Mode {
-  Function_Parameter_Mode_Call = 0,
-  Function_Parameter_Mode_Body = 1,
-} Function_Parameter_Mode;
-
-const char *function_parameter_mode_name(Function_Parameter_Mode value) {
-  if (value == 0) return "Function_Parameter_Mode_Call";
-  if (value == 1) return "Function_Parameter_Mode_Body";
-  assert(!"Unexpected value for enum Function_Parameter_Mode");
-  return 0;
-};
-
-typedef dyn_array_type(Function_Parameter_Mode *) Array_Function_Parameter_Mode_Ptr;
-typedef dyn_array_type(const Function_Parameter_Mode *) Array_Const_Function_Parameter_Mode_Ptr;
-
 typedef enum Operator_Fixity {
   Operator_Fixity_Infix = 1,
   Operator_Fixity_Prefix = 2,
@@ -2385,12 +2370,6 @@ static Descriptor descriptor_array_function_builder;
 static Descriptor descriptor_array_function_builder_ptr;
 static Descriptor descriptor_function_builder_pointer;
 static Descriptor descriptor_function_builder_pointer_pointer;
-static Descriptor descriptor_function_parameter_mode;
-static Descriptor descriptor_array_function_parameter_mode;
-static Descriptor descriptor_array_function_parameter_mode_ptr;
-static Descriptor descriptor_array_const_function_parameter_mode_ptr;
-static Descriptor descriptor_function_parameter_mode_pointer;
-static Descriptor descriptor_function_parameter_mode_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
@@ -4025,13 +4004,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
 MASS_DEFINE_TYPE_VALUE(function_builder);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Builder, function_builder);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Builder *, function_builder_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(function_parameter_mode, Function_Parameter_Mode)
-static C_Enum_Item function_parameter_mode_items[] = {
-{ .name = slice_literal_fields("Call"), .value = 0 },
-{ .name = slice_literal_fields("Body"), .value = 1 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Function_Parameter_Mode, function_parameter_mode);
-DEFINE_VALUE_IS_AS_HELPERS(Function_Parameter_Mode *, function_parameter_mode_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
 static C_Enum_Item operator_fixity_items[] = {
 { .name = slice_literal_fields("Infix"), .value = 1 },
