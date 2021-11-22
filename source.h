@@ -16,7 +16,7 @@
   } while(0)
 
 static void
-assign(
+mass_assign(
   Compilation *compilation,
   Function_Builder *builder,
   Value *target,
@@ -40,12 +40,12 @@ value_maybe_dereference(
 );
 
 static inline const Descriptor *
-expected_result_descriptor(
+mass_expected_result_descriptor(
   const Expected_Result *expected_result
 );
 
 static Value *
-expected_result_ensure_value_or_temp(
+mass_expected_result_ensure_value_or_temp(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
@@ -160,7 +160,7 @@ value_force_exact(
 );
 
 static inline Expected_Result
-expected_result_exact(
+mass_expected_result_exact(
   const Descriptor *descriptor,
   Storage storage
 );

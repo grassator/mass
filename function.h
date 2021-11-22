@@ -12,7 +12,7 @@ program_init_startup_code(
 #define maybe_constant_fold(_compilation_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     const Expected_Result *fold_result = (_result_);\
-    const Descriptor *fold_descriptor = expected_result_descriptor(fold_result);\
+    const Descriptor *fold_descriptor = mass_expected_result_descriptor(fold_result);\
     const Source_Range *fold_range = (_loc_);\
     Compilation *fold_compilation = (_compilation_);\
     Value *fold_a = (_a_);\

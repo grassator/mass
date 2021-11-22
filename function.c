@@ -523,7 +523,7 @@ maybe_constant_fold_internal(
   const Expected_Result *expected_result,
   const Source_Range *source_range
 ) {
-  const Descriptor *descriptor = expected_result_descriptor(expected_result);
+  const Descriptor *descriptor = mass_expected_result_descriptor(expected_result);
   if (!descriptor) descriptor = &descriptor_s64;
   Storage imm_storage;
   switch(descriptor->bit_size.as_u64) {
@@ -537,7 +537,7 @@ maybe_constant_fold_internal(
     allocator_allocate(compilation->allocator, Value),
     descriptor, imm_storage, *source_range
   );
-  return expected_result_ensure_value_or_temp(compilation, builder, expected_result, imm_value);
+  return mass_expected_result_ensure_value_or_temp(compilation, builder, expected_result, imm_value);
 }
 
 static inline Register
