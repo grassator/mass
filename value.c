@@ -307,6 +307,9 @@ same_type(
   }
   if (a->tag != b->tag) return false;
   switch(a->tag) {
+    case Descriptor_Tag_Void: {
+      return true;
+    }
     case Descriptor_Tag_Pointer_To: {
       if (
         a->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
@@ -686,11 +689,14 @@ storage_static_equal_internal(
   }
   u64 byte_size = descriptor_byte_size(a_descriptor);
   switch(a_descriptor->tag) {
+    case Descriptor_Tag_Void: {
+      return true;
+    } break;
     // Opaques, references and pointers can be compared with memcmp
     case Descriptor_Tag_Opaque:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
-    }
+    } break;
     case Descriptor_Tag_Fixed_Size_Array: {
       // compare field by field
       if (a_descriptor->Fixed_Size_Array.length != b_descriptor->Fixed_Size_Array.length) {
@@ -706,8 +712,7 @@ storage_static_equal_internal(
           return false;
         }
       }
-      break;
-    }
+    } break;
     case Descriptor_Tag_Struct: {
       // compare field by field
       u64 a_field_count = dyn_array_length(a_descriptor->Struct.fields);
@@ -725,12 +730,10 @@ storage_static_equal_internal(
           return false;
         }
       }
-      break;
-    }
+    } break;
     case Descriptor_Tag_Function_Instance: {
       panic("Unexpected static storage function");
-      break;
-    }
+    } break;
   }
   return true;
 }

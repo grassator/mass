@@ -190,7 +190,7 @@ get_static_storage_with_bit_size();
 #include "generated_types.h"
 
 static Descriptor descriptor_void = {
-  .tag = Descriptor_Tag_Opaque,
+  .tag = Descriptor_Tag_Void,
   .name = slice_literal_fields("void"),
 };
 MASS_DEFINE_TYPE_VALUE(void);

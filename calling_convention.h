@@ -402,6 +402,9 @@ x86_64_system_v_classify(
 
   System_V_Aggregate_Iterator it;
   switch(descriptor->tag) {
+    case Descriptor_Tag_Void: {
+      return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
+    } break;
     case Descriptor_Tag_Function_Instance:
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Opaque: {
@@ -419,25 +422,23 @@ x86_64_system_v_classify(
       } else {
         return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
       }
-    }
+    } break;
     case Descriptor_Tag_Struct: {
       it = (System_V_Aggregate_Iterator) {
         .tag = System_V_Aggregate_Iterator_Tag_Struct,
         .aggregate = descriptor,
       };
-      break;
-    }
+    } break;
     case Descriptor_Tag_Fixed_Size_Array: {
       it = (System_V_Aggregate_Iterator) {
         .tag = System_V_Aggregate_Iterator_Tag_Array,
         .aggregate = descriptor,
       };
-      break;
-    }
+    } break;
     default: {
       panic("Unexpected descriptor tag");
       return (System_V_Classification){0};
-    }
+    } break;
   }
 
   // 1. If the size of an object is larger than eight eightbytes,
@@ -536,6 +537,7 @@ x86_64_system_v_classify_field_recursively(
     u64 field_offset_in_root_aggregate = parent_offset + it->offset;
 
     switch(it->item->tag) {
+      case Descriptor_Tag_Void:
       case Descriptor_Tag_Function_Instance:
       case Descriptor_Tag_Pointer_To:
       case Descriptor_Tag_Opaque: {

@@ -1867,6 +1867,9 @@
   </Expand>
 </Type>
 <Type Name="Descriptor">
+  <DisplayString Condition="tag == Descriptor_Tag_Void">
+    Void
+  </DisplayString>
   <DisplayString Condition="tag == Descriptor_Tag_Opaque">
     Opaque { Opaque }
   </DisplayString>

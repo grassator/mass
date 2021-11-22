@@ -1728,6 +1728,7 @@ main(void) {
   }));
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
+    struct_empty("Void"),
     struct_fields("Opaque", (Struct_Item[]){
       { "Opaque_Numeric_Interpretation", "numeric_interpretation" },
       { "u32", "_numeric_interpretation_padding" },

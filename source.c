@@ -4782,6 +4782,14 @@ mass_handle_generic_comparison_lazy_proc(
 
   Value *result = 0;
   switch(lhs_descriptor->tag) {
+    // Two void values are always equal to each other
+    case Descriptor_Tag_Void: {
+      bool equal = true;
+      result = value_init(
+        allocator_allocate(compilation->allocator, Value),
+        &descriptor__bool, storage_static_inline(&equal), *source_range
+      );
+    } break;
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Opaque:
     case Descriptor_Tag_Function_Instance: {
