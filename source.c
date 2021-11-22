@@ -831,6 +831,31 @@ storage_adjusted_for_lea(
 }
 
 static void
+mass_storage_load_address(
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  const Storage *target,
+  const Storage *source
+) {
+  bool can_reuse_result_as_temp = target->tag == Storage_Tag_Register;
+  Storage register_storage = can_reuse_result_as_temp
+    ? *target
+    : storage_register_temp(builder, target->bit_size);
+
+  assert(register_storage.bit_size.as_u64 == 64);
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range,
+    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(*source)}}
+  );
+
+  if (!can_reuse_result_as_temp) {
+    assert(register_storage.tag == Storage_Tag_Register);
+    move_value(builder, source_range, target, &register_storage);
+    register_release(builder, register_storage.Register.index);
+  }
+}
+
+static inline void
 load_address(
   Function_Builder *builder,
   const Source_Range *source_range,
@@ -841,23 +866,7 @@ load_address(
     result_value->descriptor->tag == Descriptor_Tag_Pointer_To ||
     result_value->descriptor->tag == Descriptor_Tag_Function_Instance
   );
-
-  bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
-  Storage register_storage = can_reuse_result_as_temp
-    ? result_value->storage
-    : storage_register(register_acquire_temp(builder), result_value->descriptor->bit_size);
-
-  assert(register_storage.bit_size.as_u64 == 64);
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range,
-    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(source)}}
-  );
-
-  if (!can_reuse_result_as_temp) {
-    assert(register_storage.tag == Storage_Tag_Register);
-    move_value(builder, source_range, &result_value->storage, &register_storage);
-    register_release(builder, register_storage.Register.index);
-  }
+  mass_storage_load_address(builder, source_range, &result_value->storage, &source);
 }
 
 static void
@@ -5479,10 +5488,7 @@ mass_handle_array_access_lazy_proc(
       // Load previous address into a temp register
       Register address_register = register_acquire_temp(builder);
       Storage address_storage = storage_register(address_register, (Bits){64});
-      Value *address_value = value_make(
-        compilation->allocator, &descriptor_void_pointer, address_storage, *source_range
-      );
-      load_address(builder, source_range, address_value, array_storage);
+      mass_storage_load_address(builder, source_range, &address_storage, &array_storage);
 
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
