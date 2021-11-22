@@ -240,6 +240,12 @@ mass_error_to_string(
       Slice source = source_from_source_range(compilation, &error->source_range);
       APPEND_SLICE(source);
     } break;
+    case Mass_Error_Tag_Recursive_Intrinsic_Use: {
+      APPEND_LITERAL("Recursive calls to intrinsics are not allowed.\n");
+      APPEND_LITERAL("Since an intrinsic is called during compilation of a fn body\n");
+      APPEND_LITERAL("if it contains a direct or indirect call to itself\n");
+      APPEND_LITERAL("as the body is not read - we can not execute it.");
+    } break;
   }
   #undef APPEND_SLICE
   #undef APPEND_LITERAL

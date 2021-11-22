@@ -3891,6 +3891,15 @@ mass_intrinsic_call(
       program_jit(compilation, jit);
       MASS_ON_ERROR(*compilation->result) return 0;
     }
+    if (!label->resolved) {
+      // Not sure if there are other reasons for the label to not be resolved but that 100%
+      // happens when there is a recursive call to intrinsics
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Recursive_Intrinsic_Use,
+        .source_range = args_view.source_range,
+      });
+      return 0;
+    }
     jitted_code = (fn_type_opaque)rip_value_pointer_from_label(label);
   } else {
     u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);

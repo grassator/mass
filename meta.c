@@ -1813,6 +1813,7 @@ main(void) {
     }),
     struct_empty("Non_Function_Overload"),
     struct_empty("No_Runtime_Use"),
+    struct_empty("Recursive_Intrinsic_Use"),
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },

@@ -1182,6 +1182,31 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       checker();
     }
+
+    it("should report an error when trying to directly recurse into the same intrinsic") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "my_intrinsic :: fn() => () intrinsic {\n"
+          "my_intrinsic()\n"
+        "}\n"
+        "checker :: fn() -> () { my_intrinsic() }\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Recursive_Intrinsic_Use);
+    }
+
+    it("should report an error when trying to indirectly recurse into the same intrinsic") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn() -> () { my_intrinsic() }\n"
+        "my_intrinsic :: fn() => () intrinsic { foo() }\n"
+        "checker :: fn() -> () { my_intrinsic() }\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Recursive_Intrinsic_Use);
+    }
   }
 
   describe("Assignment") {

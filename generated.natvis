@@ -1999,6 +1999,9 @@
   <DisplayString Condition="tag == Mass_Error_Tag_No_Runtime_Use">
     No_Runtime_Use
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Recursive_Intrinsic_Use">
+    Recursive_Intrinsic_Use
+  </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="detailed_message">detailed_message</Item>

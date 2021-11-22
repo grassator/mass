@@ -1849,6 +1849,7 @@ typedef enum {
   Mass_Error_Tag_Undecidable_Overload = 21,
   Mass_Error_Tag_Non_Function_Overload = 22,
   Mass_Error_Tag_No_Runtime_Use = 23,
+  Mass_Error_Tag_Recursive_Intrinsic_Use = 24,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
@@ -5134,6 +5135,7 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Undecidable_Overload"), .value = 21 },
 { .name = slice_literal_fields("Non_Function_Overload"), .value = 22 },
 { .name = slice_literal_fields("No_Runtime_Use"), .value = 23 },
+{ .name = slice_literal_fields("Recursive_Intrinsic_Use"), .value = 24 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {
