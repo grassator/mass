@@ -1946,6 +1946,7 @@ main(void) {
     { "const Symbol *", "placeholder" },
     { "const Symbol *", "statement" },
     { "const Symbol *", "syntax" },
+    { "const Symbol *", "underscore" },
     { "const Symbol *", "using" },
     { "const Symbol *", "_if" },
     { "const Symbol *", "then" },

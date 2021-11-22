@@ -2111,6 +2111,7 @@ typedef struct Common_Symbols {
   const Symbol * placeholder;
   const Symbol * statement;
   const Symbol * syntax;
+  const Symbol * underscore;
   const Symbol * using;
   const Symbol * _if;
   const Symbol * then;
@@ -5743,6 +5744,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("syntax"),
     .offset = offsetof(Common_Symbols, syntax),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("underscore"),
+    .offset = offsetof(Common_Symbols, underscore),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

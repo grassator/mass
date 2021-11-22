@@ -1362,6 +1362,7 @@ compilation_init(
     .statement = mass_ensure_symbol(compilation, slice_literal("statement")),
     .syntax = mass_ensure_symbol(compilation, slice_literal("syntax")),
     .using = mass_ensure_symbol(compilation, slice_literal("using")),
+    .underscore = mass_ensure_symbol(compilation, slice_literal("underscore")),
     ._if = mass_ensure_symbol(compilation, slice_literal("if")),
     .then = mass_ensure_symbol(compilation, slice_literal("then")),
     ._else = mass_ensure_symbol(compilation, slice_literal("else")),
