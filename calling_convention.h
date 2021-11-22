@@ -714,11 +714,11 @@ calling_convention_x86_64_system_v_call_setup_proc(
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     System_V_Classification classification =
-      x86_64_system_v_classify(param->declaration.descriptor);
+      x86_64_system_v_classify(param->descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Function_Call_Parameter struct_item = x86_64_system_v_parameter_for_classification(
-      &registers, &classification, param->declaration.symbol->name, &stack_offset
+      &registers, &classification, param->symbol->name, &stack_offset
     );
 
     dyn_array_push(result.parameters, struct_item);
@@ -784,7 +784,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     assert(param->tag != Function_Parameter_Tag_Exact_Static);
 
     System_V_Classification classification =
-      x86_64_system_v_classify(param->declaration.descriptor);
+      x86_64_system_v_classify(param->descriptor);
     // TODO figure out how item 6. Only values of class INTEGER or class MEMORY are passed to the kernel.
     //      can be understood together with the item 4. System-calls are limited to six arguments,
     //      no argument is passed directly on the stack. While in user space MEMORY class arguments
@@ -798,7 +798,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     }
 
     Function_Call_Parameter parameter = x86_64_system_v_parameter_for_classification(
-      &registers, &classification, param->declaration.symbol->name, &stack_offset
+      &registers, &classification, param->symbol->name, &stack_offset
     );
     // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
     dyn_array_push(result.parameters, parameter);
@@ -860,7 +860,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     Function_Call_Parameter item = {
       .flags = Function_Call_Parameter_Flags_None,
-      .descriptor = param->declaration.descriptor,
+      .descriptor = param->descriptor,
     };
 
     bool is_large_argument = item.descriptor->bit_size.as_u64 > 64;

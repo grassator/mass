@@ -418,10 +418,6 @@ typedef struct Overload_Match Overload_Match;
 typedef dyn_array_type(Overload_Match *) Array_Overload_Match_Ptr;
 typedef dyn_array_type(const Overload_Match *) Array_Const_Overload_Match_Ptr;
 
-typedef struct Declaration Declaration;
-typedef dyn_array_type(Declaration *) Array_Declaration_Ptr;
-typedef dyn_array_type(const Declaration *) Array_Const_Declaration_Ptr;
-
 typedef enum Value_Flags {
   Value_Flags_None = 0,
   Value_Flags_Constant = 1,
@@ -1584,13 +1580,6 @@ overload_match_as_found(Overload_Match *overload_match) {
   return &overload_match->Found;
 }
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
-typedef struct Declaration {
-  const Descriptor * descriptor;
-  const Symbol * symbol;
-  Source_Range source_range;
-} Declaration;
-typedef dyn_array_type(Declaration) Array_Declaration;
-
 typedef struct Value {
   Value_Flags flags;
   u32 _flags_padding;
@@ -1660,7 +1649,9 @@ typedef struct Function_Parameter_Exact_Static {
 typedef struct Function_Parameter {
   Function_Parameter_Tag tag;
   char _tag_padding[4];
-  Declaration declaration;
+  const Descriptor * descriptor;
+  const Symbol * symbol;
+  Source_Range source_range;
   Value_View maybe_type_expression;
   Value * maybe_default_value;
   union {
@@ -2476,11 +2467,6 @@ static Descriptor descriptor_array_overload_match_ptr;
 static Descriptor descriptor_array_const_overload_match_ptr;
 static Descriptor descriptor_overload_match_pointer;
 static Descriptor descriptor_overload_match_pointer_pointer;
-static Descriptor descriptor_declaration;
-static Descriptor descriptor_array_declaration;
-static Descriptor descriptor_array_declaration_ptr;
-static Descriptor descriptor_declaration_pointer;
-static Descriptor descriptor_declaration_pointer_pointer;
 static Descriptor descriptor_value_flags;
 static Descriptor descriptor_array_value_flags;
 static Descriptor descriptor_array_value_flags_ptr;
@@ -4446,28 +4432,6 @@ MASS_DEFINE_TYPE_VALUE(overload_match);
 DEFINE_VALUE_IS_AS_HELPERS(Overload_Match, overload_match);
 DEFINE_VALUE_IS_AS_HELPERS(Overload_Match *, overload_match_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_declaration_ptr, Array_Declaration_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_declaration, Array_Declaration)
-MASS_DEFINE_STRUCT_DESCRIPTOR(declaration, Declaration,
-  {
-    .descriptor = &descriptor_descriptor_pointer,
-    .name = slice_literal_fields("descriptor"),
-    .offset = offsetof(Declaration, descriptor),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("symbol"),
-    .offset = offsetof(Declaration, symbol),
-  },
-  {
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .offset = offsetof(Declaration, source_range),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(declaration);
-DEFINE_VALUE_IS_AS_HELPERS(Declaration, declaration);
-DEFINE_VALUE_IS_AS_HELPERS(Declaration *, declaration_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(value_flags, Value_Flags)
 static C_Enum_Item value_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -4633,21 +4597,15 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_value_pointer,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_execution_context_pointer,
-    },
+    .descriptor = &descriptor_execution_context_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_value_view,
-    },
+    .descriptor = &descriptor_value_view,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_operator_pointer,
-    },
+    .descriptor = &descriptor_operator_pointer,
   }
 )
 /*union struct start */
@@ -4674,9 +4632,19 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
     .offset = offsetof(Function_Parameter, tag),
   },
   {
-    .descriptor = &descriptor_declaration,
-    .name = slice_literal_fields("declaration"),
-    .offset = offsetof(Function_Parameter, declaration),
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .offset = offsetof(Function_Parameter, descriptor),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("symbol"),
+    .offset = offsetof(Function_Parameter, symbol),
+  },
+  {
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .offset = offsetof(Function_Parameter, source_range),
   },
   {
     .descriptor = &descriptor_value_view,
@@ -5545,15 +5513,11 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_function_call_setup,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_allocator_pointer,
-    },
+    .descriptor = &descriptor_allocator_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_function_info_pointer,
-    },
+    .descriptor = &descriptor_function_info_pointer,
   }
 )
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
@@ -5578,27 +5542,19 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_u32,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_execution_context_pointer,
-    },
+    .descriptor = &descriptor_execution_context_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_value_view,
-    },
+    .descriptor = &descriptor_value_view,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_lazy_value_pointer,
-    },
+    .descriptor = &descriptor_lazy_value_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_void_pointer,
-    },
+    .descriptor = &descriptor_void_pointer,
   }
 )
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
@@ -5606,9 +5562,7 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_void,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_void_pointer,
-    },
+    .descriptor = &descriptor_void_pointer,
   }
 )
 MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline_ptr, Array_Mass_Trampoline_Ptr)
@@ -5921,33 +5875,23 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_value_pointer,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_compilation_pointer,
-    },
+    .descriptor = &descriptor_compilation_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_function_builder_pointer,
-    },
+    .descriptor = &descriptor_function_builder_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_expected_result_pointer,
-    },
+    .descriptor = &descriptor_expected_result_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_source_range_pointer,
-    },
+    .descriptor = &descriptor_source_range_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .descriptor = &descriptor_void_pointer,
-    },
+    .descriptor = &descriptor_void_pointer,
   }
 )
 MASS_DEFINE_OPAQUE_C_TYPE(instruction_extension_type, Instruction_Extension_Type)

@@ -685,12 +685,12 @@ ensure_function_instance(
       }
       const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
       Value *arg_value = value_make(
-        body_context.allocator, call_param->descriptor, storage, def_param->declaration.source_range
+        body_context.allocator, call_param->descriptor, storage, def_param->source_range
       );
       arg_value->flags |= Value_Flags_Constant;
-      const Symbol *param_symbol = def_param->declaration.symbol;
+      const Symbol *param_symbol = def_param->symbol;
       if (param_symbol) {
-        scope_define_value(body_scope, body_context.epoch, def_param->declaration.source_range, param_symbol, arg_value);
+        scope_define_value(body_scope, body_context.epoch, def_param->source_range, param_symbol, arg_value);
       }
     }
   }
@@ -758,7 +758,7 @@ calculate_arguments_match_score(
     !(descriptor->flags & Function_Info_Flags_Intrinsic);
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
-    const Descriptor *target_descriptor = param->declaration.descriptor;
+    const Descriptor *target_descriptor = param->descriptor;
     Value *source_arg = 0;
     const Descriptor *source_descriptor;
     if (arg_index >= args_view.length) {

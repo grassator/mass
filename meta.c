@@ -924,13 +924,11 @@ print_mass_descriptor_and_type(
           Argument_Type *arg = &function->arguments[i];
           fprintf(file, ",\n  {\n");
           fprintf(file, "    .tag = Function_Parameter_Tag_Runtime,\n");
-          fprintf(file, "    .declaration = {\n");
           {
-            fprintf(file, "      .descriptor = &");
+            fprintf(file, "    .descriptor = &");
             print_mass_struct_descriptor_type(file, arg->type);
             fprintf(file, ",\n");
           }
-          fprintf(file, "    },\n");
           fprintf(file, "  }");
         }
         fprintf(file, "\n)\n");
@@ -1558,12 +1556,6 @@ main(void) {
     }),
   }));
 
-  export_compiler(push_type(type_struct("Declaration", (Struct_Item[]){
-    { "const Descriptor *", "descriptor" },
-    { "const Symbol *", "symbol" },
-    { "Source_Range", "source_range" },
-  })));
-
   push_type(type_enum("Value_Flags", (Enum_Type_Item[]){
     { "None",  0 },
     { "Constant", 1 << 0 },
@@ -1625,7 +1617,9 @@ main(void) {
       { "Storage", "storage" },
     }),
   }), (Struct_Item[]){
-    { "Declaration", "declaration" },
+    { "const Descriptor *", "descriptor" },
+    { "const Symbol *", "symbol" },
+    { "Source_Range", "source_range" },
     { "Value_View", "maybe_type_expression" },
     { "Value *", "maybe_default_value" },
   }));

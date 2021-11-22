@@ -971,12 +971,12 @@ mass_assign(
       );
       DYN_ARRAY_FOREACH(Function_Parameter, param, target_info->parameters) {
         assert(param->tag == Function_Parameter_Tag_Runtime);
-        assert(param->declaration.descriptor);
+        assert(param->descriptor);
         Value *fake_value = value_make(
           compilation->allocator,
-          param->declaration.descriptor,
+          param->descriptor,
           storage_none,
-          param->declaration.source_range
+          param->source_range
         );
         dyn_array_push(fake_args, fake_value);
       }
@@ -2073,11 +2073,9 @@ token_match_argument(
       .Exact_Static = {
         .storage = static_value->storage,
       },
-      .declaration = {
-        .symbol = value_as_symbol(name_token),
-        .descriptor = static_value->descriptor,
-        .source_range = definition.source_range,
-      },
+      .symbol = value_as_symbol(name_token),
+      .descriptor = static_value->descriptor,
+      .source_range = definition.source_range,
     };
   }
 
@@ -2162,11 +2160,9 @@ token_match_argument(
     .tag = generic ? Function_Parameter_Tag_Generic : Function_Parameter_Tag_Runtime,
     .maybe_default_value = maybe_default_value,
     .maybe_type_expression = maybe_type_expression,
-    .declaration = {
-      .symbol = value_as_symbol(name_token),
-      .descriptor = descriptor,
-      .source_range = definition.source_range,
-    },
+    .symbol = value_as_symbol(name_token),
+    .descriptor = descriptor,
+    .source_range = definition.source_range,
   };
 
   err:
@@ -3287,7 +3283,7 @@ mass_handle_macro_call(
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) goto err;
     Function_Parameter *param = dyn_array_get(literal->info->parameters, i);
-    if (param->declaration.symbol) {
+    if (param->symbol) {
       Value *arg_value;
       if (i >= args_view.length) {
         arg_value = param->maybe_default_value;
@@ -3296,14 +3292,14 @@ mass_handle_macro_call(
       }
 
       arg_value = maybe_coerce_i64_to_integer(
-        context->compilation, arg_value, param->declaration.descriptor, &source_range
+        context->compilation, arg_value, param->descriptor, &source_range
       );
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
 
       bool needs_casting = (
         // FIXME pass in resolved Function_Info from call and remove a guard on the next line
-        param->declaration.descriptor &&
-        !same_type(param->declaration.descriptor, arg_value->descriptor)
+        param->descriptor &&
+        !same_type(param->descriptor, arg_value->descriptor)
       );
 
       // Macro parameters, like function ones are expected to be non-lazy values
@@ -3318,14 +3314,14 @@ mass_handle_macro_call(
         // Otherwise we will create a temp copy
         // TODO should this be forced or is first access ok?
         param_value = mass_make_lazy_value(
-          context, param->declaration.source_range,
-          arg_value, param->declaration.descriptor,
+          context, param->source_range,
+          arg_value, param->descriptor,
           mass_macro_temp_param_lazy_proc
         );
       }
 
       scope_define_value(
-        body_scope, arg_epoch, param->declaration.source_range, param->declaration.symbol, param_value
+        body_scope, arg_epoch, param->source_range, param->symbol, param_value
       );
     }
   }
@@ -3448,7 +3444,7 @@ call_function_overload(
       }
     } else {
       Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
-      arg_symbol = declared_argument->declaration.symbol;
+      arg_symbol = declared_argument->symbol;
       source_arg = *dyn_array_get(arguments, i);
     }
     source_arg = maybe_coerce_i64_to_integer(
@@ -3706,14 +3702,14 @@ ensure_parameter_descriptors(
   temp_context.scope = scope_make(temp_context.temp_allocator, arguments_scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
-    Source_Range source_range = param->declaration.source_range;
+    Source_Range source_range = param->source_range;
     Value_View lazy_expr;
-    if (param->declaration.descriptor) {
+    if (param->descriptor) {
       Value **param_value_pointer = allocator_allocate(temp_context.temp_allocator, Value *);
       *param_value_pointer = value_init(
         allocator_allocate(temp_context.temp_allocator, Value),
         &descriptor_descriptor_pointer,
-        storage_static(&param->declaration.descriptor),
+        storage_static(&param->descriptor),
         source_range
       );
       lazy_expr = value_view_single(param_value_pointer);
@@ -3722,20 +3718,20 @@ ensure_parameter_descriptors(
     }
 
     scope_define_lazy_compile_time_expression(
-      &temp_context, temp_context.scope, param->declaration.symbol, lazy_expr
+      &temp_context, temp_context.scope, param->symbol, lazy_expr
     );
   }
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
-    if (param->declaration.descriptor) continue;
-    const Symbol *symbol = param->declaration.symbol;
-    Source_Range source_range = param->declaration.source_range;
+    if (param->descriptor) continue;
+    const Symbol *symbol = param->symbol;
+    Source_Range source_range = param->source_range;
     Value *type_value =
       scope_lookup_force(&temp_context, temp_context.scope, symbol, &source_range);
     MASS_ON_ERROR(*temp_context.result) goto err;
-    param->declaration.descriptor = value_ensure_type(&temp_context, type_value, source_range);
+    param->descriptor = value_ensure_type(&temp_context, type_value, source_range);
     MASS_ON_ERROR(*temp_context.result) goto err;
-    assert(param->declaration.descriptor);
+    assert(param->descriptor);
   }
 
   if (!info->returns.descriptor) {
@@ -4016,11 +4012,9 @@ mass_ensure_trampoline(
   INIT_LITERAL_SOURCE_RANGE(&args_source_range, "args");
   dyn_array_push(trampoline_info->parameters, (Function_Parameter) {
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
-      .descriptor = descriptor_pointer_to(context->allocator, args_struct_descriptor),
-      .source_range = args_source_range,
-    },
+    .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
+    .descriptor = descriptor_pointer_to(context->allocator, args_struct_descriptor),
+    .source_range = args_source_range,
   });
 
   Source_Range proxy_source_range;
@@ -4152,8 +4146,7 @@ mass_can_trampoline_call(
     // there will be a way to compile-time cast without generating instructions
     // maybe also with trampolines or something similar.
     const Function_Parameter *param = dyn_array_get(info->parameters, i);
-    const Descriptor *expected_descriptor = param->declaration.descriptor;
-    if (!same_type(expected_descriptor, arg->descriptor)) return false;
+    if (!same_type(param->descriptor, arg->descriptor)) return false;
   }
   return true;
 }
@@ -5931,20 +5924,16 @@ mass_intrinsic(
     .capacity = 2
   );
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
-    .declaration = {
-      // TODO make a common symbol for this
-      .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
-      .descriptor = &descriptor_execution_context_pointer,
-      .source_range = *source_range,
-    },
+    // TODO make a common symbol for this
+    .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
+    .descriptor = &descriptor_execution_context_pointer,
+    .source_range = *source_range,
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
-    .declaration = {
-      // TODO make a common symbol for this
-      .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
-      .descriptor = &descriptor_value_view,
-      .source_range = *source_range,
-    },
+    // TODO make a common symbol for this
+    .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
+    .descriptor = &descriptor_value_view,
+    .source_range = *source_range,
   });
   literal->info->flags |= Function_Info_Flags_Compile_Time;
   literal->info->flags |= Function_Info_Flags_Intrinsic;

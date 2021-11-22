@@ -12,11 +12,9 @@ function_parameter_with_default(
 ) {
    return (Function_Parameter){
     .tag = Function_Parameter_Tag_Runtime,
-    .declaration = {
-      .symbol = symbol,
-      .descriptor = descriptor,
-      .source_range = {0}, // FIXME provide this
-    },
+    .symbol = symbol,
+    .descriptor = descriptor,
+    .source_range = {0}, // FIXME provide this
     .maybe_default_value = default_value,
   };
 }

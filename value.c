@@ -88,9 +88,9 @@ mass_error_append_function_signature_string(
   DYN_ARRAY_FOREACH(Function_Parameter, arg, info->parameters) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
-    APPEND_SLICE(arg->declaration.symbol->name);
+    APPEND_SLICE(arg->symbol->name);
     APPEND_LITERAL(" : ");
-    mass_error_append_descriptor(result, arg->declaration.descriptor);
+    mass_error_append_descriptor(result, arg->descriptor);
   }
   APPEND_LITERAL(") -> (");
   mass_error_append_descriptor(result, info->returns.descriptor);
@@ -289,7 +289,7 @@ same_function_signature(
   for (u64 i = 0; i < dyn_array_length(a_info->parameters); ++i) {
     Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
     Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
-    if(!same_type(a_arg->declaration.descriptor, b_arg->declaration.descriptor)) return false;
+    if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
   }
   return true;
 }
@@ -1169,7 +1169,7 @@ function_literal_info_for_args(
     dyn_array_push(cache_descriptors, actual_descriptor);
     if(param->tag == Function_Parameter_Tag_Generic) {
       //specialized_param->tag = Function_Parameter_Tag_Runtime;
-      specialized_param->declaration.descriptor = actual_descriptor;
+      specialized_param->descriptor = actual_descriptor;
     }
   }
 

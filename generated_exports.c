@@ -248,13 +248,6 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Scope")),
     type_scope_value
   );
-  Source_Range Declaration__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Declaration__source_range, "Declaration");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Declaration__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Declaration")),
-    type_declaration_value
-  );
   Source_Range Value__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Value__source_range, "Value");
   scope_define_value(
