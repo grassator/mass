@@ -73,32 +73,7 @@ assert :: fn(condition : bool, message := "Assertion failed\n") {
   }
 }
 
-context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
-  assert(context.result.tag == MASS.Result_Tag.Success)
-  context.result.tag = MASS.Result_Tag.Error
-  context.result.Error.error = error
-}
-
-static_assert :: fn(condition : bool, message : String = "") => () intrinsic {
-  meta :: import("std/meta")
-  condition := meta.reify(arguments.values.0, bool).*
-  message := meta.reify(arguments.values.1, String)
-
-  if condition then {} else {
-    error : MASS.Error
-    error.tag = MASS.Error_Tag.User_Defined
-    error.source_range = arguments.source_range
-    error.detailed_message = message.*
-    error.User_Defined.name = "Static Assert Failed"
-    context_error(context, error)
-  }
-
-  void := allocate(context.allocator, MASS.Value)
-  void.descriptor = type_of(())
-  void.storage.tag = MASS.Storage_Tag.None
-  void.source_range = arguments.source_range
-  void
-}
+static_assert :: fn(condition : bool, message : String = "") => () MASS.static_assert
 
 apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) => (MASS.Scope) MASS.inline_module
 apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) => () MASS.exports
@@ -271,18 +246,8 @@ external :: fn(
 
 os :: MASS.Os
 get_target_os :: fn() => (os._Type) intrinsic {
-  // FIXME We should be ble to just do this, but it crashes on Linux
-  //meta :: import("std/meta")
-  //meta.static_value(context.compilation, &context.program.os, arguments.source_range)
-
-  value := allocate(context.allocator, MASS.Value)
-  value.source_range = arguments.source_range
-  value.descriptor = os._Type
-  value.storage.tag = MASS.Storage_Tag.Static
-  value.storage.bit_size = value.descriptor.bit_size
-  value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U32
-  value.storage.Static.memory.U32.value = cast(u32, context.program.os)
-  value
+  meta :: import("std/meta")
+  meta.static_value(context.compilation, &context.program.os, arguments.source_range)
 }
 
 syscall :: fn(number : i64) => (MASS.Syscall) { [number] }

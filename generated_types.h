@@ -766,6 +766,9 @@ static Value * mass_size_of
 static Value * mass_startup
   (Execution_Context * context, Value_View args);
 
+static Value * mass_static_assert
+  (Execution_Context * context, Value_View args);
+
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
@@ -2679,6 +2682,7 @@ static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_startup;
+static Descriptor descriptor_mass_static_assert;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_same_type;

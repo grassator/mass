@@ -4980,6 +4980,39 @@ mass_pointer_to_lazy_proc(
   );
 }
 
+// Static assert is implemented in the core as it is really handy to have
+// when implementing meta features. Moving it to userland constantly
+// creates weird circular dependencies of static_assert on itself.
+static Value *
+mass_static_assert(
+  Execution_Context *context,
+  Value_View args
+) {
+  // TODO Resolve optional arguments before calling the intrinsic
+  assert(args.length == 1 || args.length == 2);
+  Value *condition_value = value_view_get(args, 0);
+
+  bool condition = *value_as__bool(condition_value);
+  if (!condition) {
+    Slice detailed_message;
+    if (args.length == 2) {
+      detailed_message = *value_as_slice(value_view_get(args, 1));
+    } else {
+      detailed_message = (Slice){0};
+    }
+
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_User_Defined,
+      .source_range = args.source_range,
+      .detailed_message = detailed_message,
+      .User_Defined = {
+        .name = slice_literal("Static Assert Failed"),
+      },
+    });
+  }
+  return &void_value;
+}
+
 static Value *
 mass_pointer_to(
   Execution_Context *context,
