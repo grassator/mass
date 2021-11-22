@@ -3191,6 +3191,10 @@ token_parse_constant_definitions(
     goto err;
   }
   Value *symbol = value_view_get(view, 0);
+  if (value_is_group_paren(symbol)) {
+    symbol = compile_time_eval(context, value_as_group_paren(symbol)->children);
+    MASS_ON_ERROR(*context->result) goto err;
+  }
 
   if (!value_is_symbol(symbol)) {
     context_error(context, (Mass_Error) {

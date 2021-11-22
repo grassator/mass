@@ -1580,6 +1580,16 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+    it("should be possible to use non-lexical symbol definition") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "foo_symbol :: 'foo\n"
+        "(foo_symbol) :: 42\n"
+        "checker :: fn() -> (s64) { foo }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Compile Time Execution") {
