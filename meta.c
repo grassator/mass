@@ -1525,15 +1525,9 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
-  push_type(type_struct("Scope_Using", (Struct_Item[]){
-    { "const Scope_Using *", "next" },
-    { "const Scope *", "scope" },
-  }));
-
   export_compiler(push_type(type_struct("Scope", (Struct_Item[]){
     { "const Allocator *", "allocator" },
     { "const Scope *", "parent" },
-    { "const Scope_Using *", "maybe_using" },
     { "Scope_Map *", "map" },
     { "const Token_Statement_Matcher *", "statement_matcher" },
   })));

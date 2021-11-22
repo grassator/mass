@@ -189,11 +189,6 @@ token_statement_matcher_in_scopes(
   const Scope *scope
 ) {
   for (; scope; scope = scope->parent) {
-    const Scope_Using *using = scope->maybe_using;
-    for (; using; using = using->next) {
-      u32 match_length = scope_statement_matcher_shallow(context, view, out_lazy_value, scope);
-      if (match_length) return match_length;
-    }
     // Do a reverse iteration because we want statements that are defined later
     // to have higher precedence when parsing
     u32 match_length = scope_statement_matcher_shallow(context, view, out_lazy_value, scope);
@@ -207,12 +202,14 @@ use_scope(
   Execution_Context *context,
   const Scope *scope_to_use
 ) {
-  Scope_Using *using_entry = allocator_allocate(context->allocator, Scope_Using);
-  *using_entry = (Scope_Using) {
-    .scope = scope_to_use,
-    .next = context->scope->maybe_using,
-  };
-  context->scope->maybe_using = using_entry;
+  // TODO also deal with statement matchers here
+  for (u64 i = 0; i < scope_to_use->map->capacity; ++i) {
+    Scope_Map__Entry *map_entry = &scope_to_use->map->entries[i];
+    if (!map_entry->occupied) continue;
+    Scope_Entry *entry = map_entry->value;
+    const Symbol *symbol = map_entry->key;
+    scope_define_value(context->scope, entry->epoch, entry->source_range, symbol, entry->value);
+  }
 }
 
 static void
@@ -249,11 +246,6 @@ scope_lookup(
   const Symbol *symbol
 ) {
   for (; scope; scope = scope->parent) {
-    const Scope_Using *using = scope->maybe_using;
-    for (; using; using = using->next) {
-      Scope_Entry *entry = scope_lookup_shallow(using->scope, symbol);
-      if (entry) return entry;
-    }
     Scope_Entry *entry = scope_lookup_shallow(scope, symbol);
     if (entry) return entry;
   }

@@ -391,10 +391,6 @@ typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
 
 typedef struct Operator_Map Operator_Map;
 
-typedef struct Scope_Using Scope_Using;
-typedef dyn_array_type(Scope_Using *) Array_Scope_Using_Ptr;
-typedef dyn_array_type(const Scope_Using *) Array_Const_Scope_Using_Ptr;
-
 typedef struct Scope Scope;
 typedef dyn_array_type(Scope *) Array_Scope_Ptr;
 typedef dyn_array_type(const Scope *) Array_Const_Scope_Ptr;
@@ -1520,16 +1516,9 @@ typedef struct Scope_Entry {
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
 hash_map_template(Operator_Map, const Symbol *, Operator *, hash_pointer, const_void_pointer_equal)
-typedef struct Scope_Using {
-  const Scope_Using * next;
-  const Scope * scope;
-} Scope_Using;
-typedef dyn_array_type(Scope_Using) Array_Scope_Using;
-
 typedef struct Scope {
   const Allocator * allocator;
   const Scope * parent;
-  const Scope_Using * maybe_using;
   Scope_Map * map;
   const Token_Statement_Matcher * statement_matcher;
 } Scope;
@@ -2440,11 +2429,6 @@ static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(operator_map, Operator_Map);
-static Descriptor descriptor_scope_using;
-static Descriptor descriptor_array_scope_using;
-static Descriptor descriptor_array_scope_using_ptr;
-static Descriptor descriptor_scope_using_pointer;
-static Descriptor descriptor_scope_using_pointer_pointer;
 static Descriptor descriptor_scope;
 static Descriptor descriptor_array_scope;
 static Descriptor descriptor_array_scope_ptr;
@@ -4309,23 +4293,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
 MASS_DEFINE_TYPE_VALUE(scope_entry);
 DEFINE_VALUE_IS_AS_HELPERS(Scope_Entry, scope_entry);
 DEFINE_VALUE_IS_AS_HELPERS(Scope_Entry *, scope_entry_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_scope_using_ptr, Array_Scope_Using_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_scope_using, Array_Scope_Using)
-MASS_DEFINE_STRUCT_DESCRIPTOR(scope_using, Scope_Using,
-  {
-    .descriptor = &descriptor_scope_using_pointer,
-    .name = slice_literal_fields("next"),
-    .offset = offsetof(Scope_Using, next),
-  },
-  {
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .offset = offsetof(Scope_Using, scope),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(scope_using);
-DEFINE_VALUE_IS_AS_HELPERS(Scope_Using, scope_using);
-DEFINE_VALUE_IS_AS_HELPERS(Scope_Using *, scope_using_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope_ptr, Array_Scope_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope, Array_Scope)
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
@@ -4338,11 +4305,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
     .descriptor = &descriptor_scope_pointer,
     .name = slice_literal_fields("parent"),
     .offset = offsetof(Scope, parent),
-  },
-  {
-    .descriptor = &descriptor_scope_using_pointer,
-    .name = slice_literal_fields("maybe_using"),
-    .offset = offsetof(Scope, maybe_using),
   },
   {
     .descriptor = &descriptor_scope_map_pointer,
