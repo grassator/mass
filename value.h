@@ -76,7 +76,7 @@ context_temp_reset(
 }
 
 static const Function_Info *
-maybe_function_info_from_value(
+maybe_function_info_for_args(
   Value *value,
   Value_View args
 );

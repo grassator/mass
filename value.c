@@ -1202,7 +1202,7 @@ function_literal_info_for_args(
 }
 
 static const Function_Info *
-maybe_function_info_from_value(
+maybe_function_info_for_args(
   Value *value,
   Value_View args
 ) {
@@ -1224,7 +1224,7 @@ value_as_function(
   Program *program,
   Value *value
 ) {
-  const Function_Info *info = maybe_function_info_from_value(value, (Value_View){0});
+  const Function_Info *info = maybe_function_info_for_args(value, (Value_View){0});
   assert(info);
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);

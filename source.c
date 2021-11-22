@@ -3750,14 +3750,16 @@ ensure_parameter_descriptors(
   context_temp_reset_to_mark(&temp_context, temp_mark);
 }
 
-static bool
+static inline bool
 match_overload_argument_count(
-  const Function_Info *descriptor,
+  const Function_Info *info,
   u64 actual_count
 ) {
-  if (actual_count > dyn_array_length(descriptor->parameters)) return false;
-  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
-    Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
+  if (actual_count > dyn_array_length(info->parameters)) return false;
+  if (actual_count == dyn_array_length(info->parameters)) return true;
+  // FIXME @Speed cache this as a range
+  for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
+    Function_Parameter *param = dyn_array_get(info->parameters, arg_index);
     if (arg_index < actual_count) continue;
     if (!param->maybe_default_value) return false;
   }
@@ -3776,21 +3778,23 @@ mass_match_overload_candidate(
     mass_match_overload_candidate(overload->value, args, match, best_conflict_match);
     mass_match_overload_candidate(overload->next, args, match, best_conflict_match);
   } else {
-    const Function_Info *overload_info = 0;
-    s64 score;
-
-    // If the literal wouldn't match based on the number of arguments
-    // then there is no point to try to specialize it
-    if (
-      value_is_function_literal(candidate) &&
-      !match_overload_argument_count(value_as_function_literal(candidate)->info, args.length)
-    ) {
-      score = -1;
+    const Function_Info *overload_info;
+    if (value_is_function_literal(candidate)) {
+      const Function_Literal *literal = value_as_function_literal(candidate);
+      if (literal->flags & Function_Literal_Flags_Generic) {
+        if (!match_overload_argument_count(literal->info, args.length)) return;
+        overload_info = maybe_function_info_for_args(candidate, args);
+        if (!overload_info) return;
+      } else {
+        overload_info = literal->info;
+      }
     } else {
-      overload_info = maybe_function_info_from_value(candidate, args);
-      if (!overload_info) return;
-      score = calculate_arguments_match_score(overload_info, args);
+      const Descriptor *descriptor = value_or_lazy_value_descriptor(candidate);
+      assert(descriptor->tag == Descriptor_Tag_Function_Instance);
+      overload_info = descriptor->Function_Instance.info;
     }
+
+    s64 score = calculate_arguments_match_score(overload_info, args);
     if (score > match->score) {
       match->info = overload_info;
       match->value = candidate;
@@ -3918,8 +3922,15 @@ static bool
 value_is_intrinsic(
   Value *value
 ) {
-  const Function_Info *info = maybe_function_info_from_value(value, (Value_View){0});
-  return !!(info && info->flags & Function_Info_Flags_Intrinsic);
+  const Function_Info *info;
+  if (value_is_function_literal(value)) {
+    info = value_as_function_literal(value)->info;
+  } else if (value->descriptor->tag == Descriptor_Tag_Function_Instance) {
+    info = value->descriptor->Function_Instance.info;
+  } else {
+    return false;
+  }
+  return !!(info->flags & Function_Info_Flags_Intrinsic);
 }
 
 static const Mass_Trampoline *
