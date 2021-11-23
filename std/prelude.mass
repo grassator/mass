@@ -130,7 +130,7 @@ operator intrinsic 30 (. x) make_accessor
 quote :: fn(x) => (MASS.Quoted) MASS.quote
 unquote :: @fn(x) MASS.unquote
 
-pointer_to :: macro(type : Type) -> (Type) {
+pointer_to :: fn(type : Type) => (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
 }
 pointer_to :: fn(x) => (pointer_to(x)) MASS.pointer_to
@@ -255,7 +255,7 @@ syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {
   macro(x : type) { 0 - x }
 }, ())
-negate :: macro(literal : i64) -> (s64) {
+negate :: fn(literal : i64) => (s64) {
   -cast(s64, literal)
 }
 

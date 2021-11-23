@@ -758,7 +758,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     descriptor_pointer_to, "descriptor_pointer_to", &descriptor_descriptor_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("allocator")),

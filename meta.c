@@ -2052,7 +2052,7 @@ main(void) {
   ));
 
   export_compiler(push_type(
-    type_function(Compile_Time, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
+    type_function(Default, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
       { "const Allocator *", "allocator" },
       { "const Descriptor *", "descriptor" },
     })
