@@ -2040,6 +2040,18 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support initializing a fixed-size array from a tuple") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+          "foo : i64 * 3 = [11, 42, 600]\n"
+          "foo.1"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when fixed size array size does not resolve to an integer") {
       test_program_inline_source_base(
         "test", &test_context,

@@ -710,42 +710,71 @@ assign_tuple(
   const Source_Range *source_range
 ) {
   const Tuple *tuple = value_as_tuple(source);
-  if (target->descriptor->tag != Descriptor_Tag_Struct) {
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = *source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
-      .detailed_message = slice_literal("Trying to assign a tuple to something that is not a struct"),
-    });
-    return;
-  }
-  Array_Struct_Field fields = target->descriptor->Struct.fields;
-  if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) {
-    Slice message = dyn_array_length(fields) > dyn_array_length(tuple->items)
-      ? slice_literal("Tuple does not have enough fields to match the struct it is assigned to")
-      : slice_literal("Tuple has too many fields for the struct it is assigned to");
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = *source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
-      .detailed_message = message,
-    });
-    return;
-  }
+  if (target->descriptor->tag == Descriptor_Tag_Struct) {
+    Array_Struct_Field fields = target->descriptor->Struct.fields;
+    if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) {
+      Slice message = dyn_array_length(fields) > dyn_array_length(tuple->items)
+        ? slice_literal("Tuple does not have enough items to match the struct it is assigned to")
+        : slice_literal("Tuple has too many items for the struct it is assigned to");
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+        .detailed_message = message,
+      });
+      return;
+    }
 
-  u64 index = 0;
-  DYN_ARRAY_FOREACH(Struct_Field, field, fields) {
-    Value *tuple_item = *dyn_array_get(tuple->items, index);
-    Value target_field = {
-      .descriptor = field->descriptor,
-      .storage = storage_with_offset_and_bit_size(
-        &target->storage, u64_to_s32(field->offset), field->descriptor->bit_size
-      ),
-      .source_range = target->source_range,
-    };
-    mass_assign(compilation, builder, &target_field, tuple_item, source_range);
-    MASS_ON_ERROR(*compilation->result) return;
-    index += 1;
+    u64 index = 0;
+    DYN_ARRAY_FOREACH(Struct_Field, field, fields) {
+      Value *tuple_item = *dyn_array_get(tuple->items, index);
+      Value target_field = {
+        .descriptor = field->descriptor,
+        .storage = storage_with_offset_and_bit_size(
+          &target->storage, u64_to_s32(field->offset), field->descriptor->bit_size
+        ),
+        .source_range = target->source_range,
+      };
+      mass_assign(compilation, builder, &target_field, tuple_item, source_range);
+      MASS_ON_ERROR(*compilation->result) return;
+      index += 1;
+    }
+  } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+    u64 length = target->descriptor->Fixed_Size_Array.length;
+    if ((length != dyn_array_length(tuple->items))) {
+      Slice message = length > dyn_array_length(tuple->items)
+        ? slice_literal("Tuple does not have enough items to match the array it is assigned to")
+        : slice_literal("Tuple has too many items for the struct it is assigned to");
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+        .detailed_message = message,
+      });
+      return;
+    }
+
+    const Descriptor *item_descriptor = target->descriptor->Fixed_Size_Array.item;
+    u64 item_byte_size = descriptor_byte_size(item_descriptor);
+    for (u64 index = 0; index < length; ++index) {
+      Value *tuple_item = *dyn_array_get(tuple->items, index);
+      s32 byte_offset = u64_to_s32(item_byte_size * index);
+      Value target_field = {
+        .descriptor = item_descriptor,
+        .storage = storage_with_offset_and_bit_size(
+          &target->storage, byte_offset, item_descriptor->bit_size
+        ),
+        .source_range = target->source_range,
+      };
+      mass_assign(compilation, builder, &target_field, tuple_item, source_range);
+      MASS_ON_ERROR(*compilation->result) return;
+    }
+  } else {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = *source_range,
+      .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+    });
   }
   return;
 }
