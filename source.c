@@ -3407,9 +3407,6 @@ call_function_overload(
       arg_symbol = declared_argument->symbol;
       source_arg = *dyn_array_get(arguments, i);
     }
-    source_arg = maybe_coerce_i64_to_integer(
-      compilation, source_arg, target_item->descriptor, source_range
-    );
     const Descriptor *stack_descriptor = target_item->descriptor;
     if (descriptor_is_implicit_pointer(stack_descriptor)) {
       stack_descriptor = stack_descriptor->Pointer_To.descriptor;
