@@ -5438,9 +5438,6 @@ mass_handle_array_access_lazy_proc(
 
   MASS_ON_ERROR(*compilation->result) return 0;
 
-  index = maybe_coerce_i64_to_integer(
-    compilation, index, &descriptor_u64, &index->source_range
-  );
   Value *array_element_value;
 
   const Descriptor *array_descriptor = value_or_lazy_value_descriptor(array);
@@ -5457,9 +5454,9 @@ mass_handle_array_access_lazy_proc(
   u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
   Storage element_storage;
-  if (index->storage.tag == Storage_Tag_Static) {
-    s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
-    s32 offset = index_number * u64_to_s32(item_byte_size);
+  if (value_is_i64(index)) {
+    u64 index_bits = value_as_i64(index)->bits;
+    s32 offset = u64_to_s32(index_bits * item_byte_size);
     Storage array_storage = value_maybe_dereference(compilation, builder, array);
     element_storage = storage_with_offset_and_bit_size(&array_storage, offset, item_descriptor->bit_size);
     element_storage.flags = array_storage.flags;
