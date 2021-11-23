@@ -3254,9 +3254,6 @@ mass_handle_macro_call(
         arg_value = value_view_get(args_view, i);
       }
 
-      arg_value = maybe_coerce_i64_to_integer(
-        context->compilation, arg_value, param->descriptor, &source_range
-      );
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
 
       bool needs_casting = (

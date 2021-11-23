@@ -1769,13 +1769,13 @@ spec("source") {
     }
 
     it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "id :: macro(x : s64) -> (s64) { if x > 0 then { return 20 } else {}; x }\n"
-        "checker :: fn() -> (s64) { id(42) + 1 }"
+        "id :: macro(x : i64) -> (i64) { if x == 3 then { return 42 } else {}; x }\n"
+        "checker :: fn() -> (i64) { id(3) }"
       );
       check(spec_check_mass_result(test_context.result));
-      check(checker() == 21);
+      check(checker() == 42);
     }
 
     it("should type check macro return value if it is defined") {
