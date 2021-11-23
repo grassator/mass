@@ -3891,6 +3891,7 @@ mass_ensure_trampoline(
   Value *proxy_value;
   {
     Value *runtime_instance = ensure_function_instance(compilation, program, original, args_view);
+    MASS_ON_ERROR(*compilation->result) return 0;
     assert(runtime_instance->descriptor->tag == Descriptor_Tag_Function_Instance);
     Function_Info *proxy_info = allocator_allocate(context->allocator, Function_Info);
     *proxy_info = *original_info;
@@ -5580,8 +5581,6 @@ mass_handle_dot_operator(
   Value *rhs = value_view_get(args_view, 1);
   MASS_ON_ERROR(*context->result) return 0;
 
-  Source_Range rhs_range = rhs->source_range;
-  Source_Range lhs_range = lhs->source_range;
   const Descriptor *lhs_forced_descriptor = value_or_lazy_value_descriptor(lhs);
   const Descriptor *unwrapped_descriptor =
     maybe_unwrap_pointer_descriptor(lhs_forced_descriptor);
@@ -5596,9 +5595,9 @@ mass_handle_dot_operator(
       if (index >= dyn_array_length(unwrapped_descriptor->Struct.fields)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs_range,
+          .source_range = rhs->source_range,
           .Unknown_Field = {
-            .name = source_from_source_range(context->compilation, &rhs_range),
+            .name = source_from_source_range(context->compilation, &rhs->source_range),
             .type = unwrapped_descriptor,
           },
         });
@@ -5610,7 +5609,7 @@ mass_handle_dot_operator(
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
-        .source_range = rhs_range,
+        .source_range = rhs->source_range,
         .detailed_message = slice_literal("Right hand side of the . operator on structs must be an identifier"),
       });
       return 0;
@@ -5622,7 +5621,7 @@ mass_handle_dot_operator(
       if (!value_is_non_lazy_static(lhs)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Expected_Static,
-          .source_range = lhs_range,
+          .source_range = lhs->source_range,
         });
         return 0;
       }
@@ -5631,18 +5630,20 @@ mass_handle_dot_operator(
       if (!entry) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs_range,
+          .source_range = rhs->source_range,
           .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
         });
         return 0;
       }
+      // FIXME when looking up values from a different file, need to either adjust source
+      //       range or have some other mechanism to track it.
       return scope_entry_force_value(context, entry);
     } else {
       const Struct_Field *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
       if (!field) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs_range,
+          .source_range = rhs->source_range,
           .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
         });
         return 0;
@@ -5666,12 +5667,12 @@ mass_handle_dot_operator(
       *lazy_payload = (Mass_Array_Access_Lazy_Payload) { .array = lhs, .index = rhs };
 
       return mass_make_lazy_value(
-        context, lhs_range, lazy_payload, descriptor, mass_handle_array_access_lazy_proc
+        context, args_view.source_range, lazy_payload, descriptor, mass_handle_array_access_lazy_proc
       );
     } else {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
-        .source_range = rhs_range,
+        .source_range = rhs->source_range,
         .detailed_message =
           slice_literal("Right hand side of the . operator for an array must be an (expr) or a literal number")
       });
@@ -5681,7 +5682,7 @@ mass_handle_dot_operator(
   err:
   context_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
-    .source_range = lhs_range,
+    .source_range = lhs->source_range,
     .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
   });
   return 0;
@@ -5711,8 +5712,13 @@ token_dispatch_operator(
   u64 start_index = dyn_array_length(*stack) - argument_count;
   Value *first_arg = *dyn_array_get(*stack, start_index);
   Value *last_arg = *dyn_array_last(*stack);
-  Source_Range source_range = last_arg->source_range;
-  source_range.offsets.from = first_arg->source_range.offsets.from;
+  Source_Range source_range;
+  if(first_arg->source_range.file == last_arg->source_range.file) {
+    source_range = last_arg->source_range;
+    source_range.offsets.from = first_arg->source_range.offsets.from;
+  } else {
+    source_range = stack_entry->source_range;
+  }
   Value_View args_view = {
     .values = dyn_array_get(*stack, start_index),
     .length = argument_count,
