@@ -135,11 +135,26 @@ pointer_to :: fn(type : Type) => (Type) {
 }
 pointer_to :: fn(x) => (pointer_to(x)) MASS.pointer_to
 
+
+add :: fn(x : s8, y : s8) => (s8) MASS.integer_add
+subtract :: fn(x : s8, y : s8) => (s8) MASS.integer_subtract
+multiply :: fn(x : s8, y : s8) => (s8) MASS.integer_multiply
+divide :: fn(x : s8, y : s8) => (s8) MASS.integer_divide
+remainder :: fn(x : s8, y : s8) => (s8) MASS.integer_remainder
+negate :: fn(x : s8) -> (s8) { 0 - x }
+
+less :: fn(x : s8, y : s8) => (bool) MASS.integer_less
+less_equal :: fn(x : s8, y : s8) => (bool) MASS.integer_less_equal
+greater :: fn(x : s8, y : s8) => (bool) MASS.integer_greater
+greater_equal :: fn(x : s8, y : s8) => (bool) MASS.integer_greater_equal
+equal :: fn(x : s8, y : s8) => (bool) MASS.integer_equal
+not_equal :: fn(x : s8, y : s8) => (bool) MASS.integer_not_equal
+
+
 template_signed_integer_overloads :: macro(template, impl) {
   f :: template(impl, s64)
   f :: template(impl, s32)
   f :: template(impl, s16)
-  f :: template(impl, s8)
   f
 }
 
