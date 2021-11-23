@@ -323,7 +323,7 @@ maybe_coerce_i64_to_integer(
   const Source_Range *source_range
 ) {
   if (!descriptor_is_integer(target_descriptor)) return value;
-  if (value->descriptor != &descriptor_i64) return value;
+  if (!value_is_i64(value)) return value;
   return token_value_force_immediate_integer(
     compilation, value, target_descriptor, source_range
   );

@@ -2040,6 +2040,22 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to use a dynamic i64 variable to index an array") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "helper :: fn(x : i64) -> (i64) {\n"
+          "foo : i64 * 64;\n"
+          "foo.(x) = 42\n"
+          "foo.(x)\n"
+        "}\n"
+        "test :: fn() -> (i64) {\n"
+          "helper(2)"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should support initializing a fixed-size array from a tuple") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "test", &test_context,
