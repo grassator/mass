@@ -2015,17 +2015,29 @@ spec("source") {
 
   describe("Fixed Size Arrays") {
     it("should be able to define a variable with a fixed size array type") {
-      s8(*checker)(void) = (s8(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "test :: fn() -> (s8) {"
-          "foo : s8 * 64;"
-          "foo.0 = 42;"
-          "foo.0"
+        "test :: fn() -> (i64) {"
+          "foo : i64 * 64;"
+          "foo.1 = 42;"
+          "foo.1"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
-      u8 actual = checker();
-      check(actual == 42);
+      check(checker() == 42);
+    }
+
+    it("should be able to use multidimensional arrays") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+          "foo : i64 * 4 * 4;"
+          "foo.1.1 = 42;"
+          "foo.1.1"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
     }
 
     it("should report an error when fixed size array size does not resolve to an integer") {
