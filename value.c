@@ -751,6 +751,20 @@ storage_static_equal_internal(
   return true;
 }
 
+static inline const void *
+storage_static_memory(
+  const Storage *storage
+) {
+  if (storage->tag == Storage_Tag_Static) {
+    return get_static_storage_with_bit_size(storage, storage->bit_size);
+  } else if (storage->tag == Storage_Tag_Immediate) {
+    return &storage->Immediate.bits;
+  } else {
+    panic("Unexpected static storage tag");
+  }
+  return 0;
+}
+
 static bool
 storage_static_equal(
   const Descriptor *a_descriptor,
@@ -759,35 +773,11 @@ storage_static_equal(
   const Storage *b_storage
 ) {
   if (!same_type(a_descriptor, b_descriptor)) return false;
-  assert(a_storage->tag == Storage_Tag_Static);
-  assert(b_storage->tag == Storage_Tag_Static);
   assert(a_storage->bit_size.as_u64 == b_storage->bit_size.as_u64);
   assert(a_descriptor->bit_size.as_u64 == a_storage->bit_size.as_u64);
-  assert(a_storage->Static.memory.tag == b_storage->Static.memory.tag);
-  switch(a_storage->Static.memory.tag) {
-    case Static_Memory_Tag_U8: {
-      return a_storage->Static.memory.U8.value == b_storage->Static.memory.U8.value;
-    }
-    case Static_Memory_Tag_U16: {
-      return a_storage->Static.memory.U16.value == b_storage->Static.memory.U16.value;
-    }
-    case Static_Memory_Tag_U32: {
-      return a_storage->Static.memory.U32.value == b_storage->Static.memory.U32.value;
-    }
-    case Static_Memory_Tag_U64: {
-      return a_storage->Static.memory.U64.value == b_storage->Static.memory.U64.value;
-    }
-    case Static_Memory_Tag_Heap: {
-      return storage_static_equal_internal(
-        a_descriptor, a_storage->Static.memory.Heap.pointer,
-        b_descriptor, b_storage->Static.memory.Heap.pointer
-      );
-    }
-    default: {
-      panic("Unexpected Static_Memory_Tag");
-      return false;
-    }
-  }
+  const void *a_memory = storage_static_memory(a_storage);
+  const void *b_memory = storage_static_memory(b_storage);
+  return storage_static_equal_internal(a_descriptor, a_memory, b_descriptor, b_memory);
 }
 
 static bool
