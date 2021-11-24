@@ -66,9 +66,12 @@ true :: cast(bool, 1)
 false :: cast(bool, 0)
 
 assert :: fn(condition : bool, message := "Assertion failed\n") {
-  io :: import("std/io")
+  // TODO add something like MASS.intrinsic_assert or MASS.intrinsic_print
+  //      that would be safe to call without a risk or circular dependencies
+  // TODO also detect these kind of dependencies better
+  //io :: import("std/io")
   if condition then {} else {
-    io.print(message)
+    //io.print(message)
     debugger()
   }
 }
