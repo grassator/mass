@@ -905,6 +905,7 @@ mass_assign(
       source = token_value_force_immediate_integer(
         compilation, source, target->descriptor, source_range
       );
+      MASS_ON_ERROR(*compilation->result) return;
     } else if (source->descriptor != target->descriptor) {
       compilation_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
@@ -5986,7 +5987,7 @@ token_parse_function_literal(
   if (is_macro && is_compile_time) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
-      .source_range = at->source_range,
+      .source_range = keyword->source_range,
       .detailed_message = slice_literal("Function-like macro can not be marked compile time"),
     });
     return 0;
