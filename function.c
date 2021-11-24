@@ -515,31 +515,6 @@ encode_inverted_conditional_jump(
   }
 }
 
-static Value *
-maybe_constant_fold_internal(
-  Compilation *compilation,
-  Function_Builder *builder,
-  s64 constant_result,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range
-) {
-  const Descriptor *descriptor = mass_expected_result_descriptor(expected_result);
-  if (!descriptor) descriptor = &descriptor_s64;
-  Storage imm_storage;
-  switch(descriptor->bit_size.as_u64) {
-    case 8: imm_storage = imm8(s64_to_s8(constant_result)); break;
-    case 16: imm_storage = imm16(s64_to_s16(constant_result)); break;
-    case 32: imm_storage = imm32(s64_to_s32(constant_result)); break;
-    case 64: imm_storage = imm64(s64_to_s64(constant_result)); break;
-    default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
-  }
-  Value *imm_value = value_init(
-    allocator_allocate(compilation->allocator, Value),
-    descriptor, imm_storage, *source_range
-  );
-  return mass_expected_result_ensure_value_or_temp(compilation, builder, expected_result, imm_value);
-}
-
 static inline Register
 function_return_value_register_from_storage(
   const Storage *storage

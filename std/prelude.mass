@@ -195,6 +195,8 @@ not_equal :: template_integer_overloads(comparison_template, MASS.integer_not_eq
 
 equal :: fn(x, y : x) => (bool) MASS.generic_equal
 not_equal :: fn(x, y : x) => (bool) MASS.generic_not_equal
+equal :: fn(x, y : x) => (bool) { equal(x, y) }
+not_equal :: fn(x, y : x) => (bool) { not_equal(x, y) }
 
 add :: MASS.i64_add
 subtract :: MASS.i64_subtract

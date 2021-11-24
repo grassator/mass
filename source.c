@@ -4299,18 +4299,10 @@ mass_handle_arithmetic_operation_lazy_proc(
   assert(descriptor_is_integer(descriptor));
 
   const Source_Range result_range = payload->source_range;
-  Value *lhs = payload->lhs;
-  Value *rhs = payload->rhs;
 
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
-      if (payload->operator == Mass_Arithmetic_Operator_Add) {
-        maybe_constant_fold(compilation, builder, &result_range, expected_result, lhs, rhs, +);
-      } else {
-        maybe_constant_fold(compilation, builder, &result_range, expected_result, lhs, rhs, -);
-      }
-
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
       Storage temp_lhs_storage = storage_register_temp(builder, descriptor->bit_size);
@@ -4338,8 +4330,6 @@ mass_handle_arithmetic_operation_lazy_proc(
       );
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      maybe_constant_fold(compilation, builder, &result_range, expected_result, lhs, rhs, *);
-
       // Save RDX as it will be used for the result overflow
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
@@ -4398,12 +4388,6 @@ mass_handle_arithmetic_operation_lazy_proc(
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
       u64 bit_size = descriptor->bit_size.as_u64;
-
-      if (payload->operator == Mass_Arithmetic_Operator_Divide) {
-        maybe_constant_fold(compilation, builder, &result_range, expected_result, lhs, rhs, /);
-      } else {
-        maybe_constant_fold(compilation, builder, &result_range, expected_result, lhs, rhs, %);
-      }
 
       // We need both D and A for this operation so using either as temp will not work
       u64 disallowed_temp_registers = 0;
@@ -4529,19 +4513,12 @@ mass_handle_arithmetic_operation(
 
   Mass_Arithmetic_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range };
-  if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
-    Expected_Result expected_result = expected_result_static(descriptor);
-    return mass_handle_arithmetic_operation_lazy_proc(
-      context->compilation, 0, &expected_result, &arguments.source_range, &stack_lazy_payload
-    );
-  } else {
-    Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
-      allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
-    *lazy_payload = stack_lazy_payload;
-    return mass_make_lazy_value(
-      context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
-    );
-  }
+  Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
+    allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
+  *lazy_payload = stack_lazy_payload;
+  return mass_make_lazy_value(
+    context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
+  );
 }
 
 static inline Value *mass_integer_add(Execution_Context *context, Value_View arguments) {
@@ -4615,54 +4592,6 @@ mass_handle_integer_comparison_lazy_proc(
         assert(!"Unsupported comparison");
         break;
       }
-    }
-  }
-
-  switch(compare_type) {
-    case Compare_Type_Equal: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, ==);
-      break;
-    }
-    case Compare_Type_Not_Equal: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, !=);
-      break;
-    }
-
-    case Compare_Type_Unsigned_Below: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, <);
-      break;
-    }
-    case Compare_Type_Unsigned_Below_Equal: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, <=);
-      break;
-    }
-    case Compare_Type_Unsigned_Above: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, >);
-      break;
-    }
-    case Compare_Type_Unsigned_Above_Equal: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, >=);
-      break;
-    }
-
-    case Compare_Type_Signed_Less: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, <);
-      break;
-    }
-    case Compare_Type_Signed_Less_Equal: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, <=);
-      break;
-    }
-    case Compare_Type_Signed_Greater: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, >);
-      break;
-    }
-    case Compare_Type_Signed_Greater_Equal: {
-      maybe_constant_fold(compilation, builder, source_range, expected_result, payload->lhs, payload->rhs, >=);
-      break;
-    }
-    default: {
-      assert(!"Unsupported comparison");
     }
   }
 
@@ -4822,19 +4751,12 @@ mass_handle_comparison(
 
   Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
-  if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
-    Expected_Result expected_result = expected_result_static(&descriptor__bool);
-    return lazy_value_proc(
-      context->compilation, 0, &expected_result, &arguments.source_range, &stack_lazy_payload
-    );
-  } else {
-    Mass_Comparison_Operator_Lazy_Payload *payload =
-      allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
-    *payload = stack_lazy_payload;
-    return mass_make_lazy_value(
-      context, arguments.source_range, payload, &descriptor__bool, lazy_value_proc
-    );
-  }
+  Mass_Comparison_Operator_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
+  *payload = stack_lazy_payload;
+  return mass_make_lazy_value(
+    context, arguments.source_range, payload, &descriptor__bool, lazy_value_proc
+  );
 }
 
 static inline Value *mass_integer_less(Execution_Context *context, Value_View arguments) {

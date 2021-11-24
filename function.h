@@ -9,38 +9,6 @@ program_init_startup_code(
   Execution_Context *context
 );
 
-#define maybe_constant_fold(_compilation_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
-  do {\
-    const Expected_Result *fold_result = (_result_);\
-    const Descriptor *fold_descriptor = mass_expected_result_descriptor(fold_result);\
-    const Source_Range *fold_range = (_loc_);\
-    Compilation *fold_compilation = (_compilation_);\
-    Value *fold_a = (_a_);\
-    Value *fold_b = (_b_);\
-    if (\
-      fold_a->descriptor != &descriptor_lazy_value &&\
-      fold_b->descriptor != &descriptor_lazy_value &&\
-      fold_a->storage.tag == Storage_Tag_Static &&\
-      fold_b->storage.tag == Storage_Tag_Static\
-    ) {\
-      if (descriptor_is_signed_integer(fold_descriptor)) {\
-        fold_a = maybe_coerce_i64_to_integer(fold_compilation, fold_a, &descriptor_s64, fold_range);\
-        fold_b = maybe_coerce_i64_to_integer(fold_compilation, fold_b, &descriptor_s64, fold_range);\
-        s64 a_s64 = storage_static_value_up_to_s64(&fold_a->storage);\
-        s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
-        s64 constant_result = a_s64 _operator_ b_s64;\
-        return maybe_constant_fold_internal(fold_compilation, (_builder_), constant_result, fold_result, fold_range);\
-      } else {\
-        fold_a = maybe_coerce_i64_to_integer(fold_compilation, fold_a, &descriptor_u64, fold_range);\
-        fold_b = maybe_coerce_i64_to_integer(fold_compilation, fold_b, &descriptor_u64, fold_range);\
-        u64 a_u64 = storage_static_value_up_to_u64(&fold_a->storage);\
-        u64 b_u64 = storage_static_value_up_to_u64(&fold_b->storage);\
-        u64 constant_result = a_u64 _operator_ b_u64;\
-        return maybe_constant_fold_internal(fold_compilation, (_builder_), constant_result, fold_result, fold_range);\
-      }\
-    }\
-  } while(0)
-
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
 
 static u32
