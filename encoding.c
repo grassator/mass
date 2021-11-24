@@ -306,9 +306,6 @@ eager_encode_instruction_assembly(
       };
       u8 empty_patch_bytes[4] = {0};
       instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
-    } else if (storage->tag == Storage_Tag_Static) {
-      const u8 *bytes = get_static_storage_with_bit_size(storage, storage->bit_size);
-      instruction_bytes_append_bytes(&result.bytes, bytes, storage->bit_size.as_u64 / 8);
     } else if (storage->tag == Storage_Tag_Immediate) {
       instruction_bytes_append_bytes(&result.bytes, (u8 const *)&storage->Immediate.bits, storage->bit_size.as_u64 / 8);
     } else {
@@ -385,7 +382,7 @@ encoding_match(
         continue;
       }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
-        if (storage->tag == Storage_Tag_Static || storage->tag == Storage_Tag_Immediate) {
+        if (storage->tag == Storage_Tag_Immediate) {
           assert(operand_encoding->bit_size == storage_bit_size);
           continue;
         } else if (storage_is_label(storage)) {

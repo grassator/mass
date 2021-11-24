@@ -3595,10 +3595,7 @@ call_function_overload(
       if (instance->storage.tag == Storage_Tag_Static || instance->storage.tag == Storage_Tag_Immediate) {
         Register temp_reg = register_acquire_temp(builder);
         Storage reg = storage_register(temp_reg, (Bits){64});
-        push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range,
-          &(Instruction_Assembly){mov, {reg, instance->storage}}
-        );
+        move_value(builder, source_range, &reg, &instance->storage);
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
           &(Instruction_Assembly){call, {reg}}
