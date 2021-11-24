@@ -352,38 +352,6 @@ descriptor_byte_alignment(
   return byte_alignment;
 }
 
-static inline s64
-storage_static_value_up_to_s64(
-  const Storage *operand
-) {
-  switch(operand->bit_size.as_u64) {
-    case 8: return *(s8*)get_static_storage_with_bit_size(operand, (Bits){8});
-    case 16: return *(s16*)get_static_storage_with_bit_size(operand, (Bits){16});
-    case 32: return *(s32*)get_static_storage_with_bit_size(operand, (Bits){32});
-    case 64: return *(s64*)get_static_storage_with_bit_size(operand, (Bits){64});
-    default: {
-      panic("Unsupported integer immediate size");
-      return 0;
-    }
-  }
-}
-
-static inline u64
-storage_static_value_up_to_u64(
-  const Storage *operand
-) {
-  switch(operand->bit_size.as_u64) {
-    case 8: return *(u8*)get_static_storage_with_bit_size(operand, (Bits){8});
-    case 16: return *(u16*)get_static_storage_with_bit_size(operand, (Bits){16});
-    case 32: return *(u32*)get_static_storage_with_bit_size(operand, (Bits){32});
-    case 64: return *(u64*)get_static_storage_with_bit_size(operand, (Bits){64});
-    default: {
-      panic("Unsupported integer immediate size");
-      return 0;
-    }
-  }
-}
-
 static inline Label *
 make_label(
   const Allocator *allocator,
