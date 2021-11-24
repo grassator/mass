@@ -1,4 +1,4 @@
-exports { reify, static_value, same_type, compilation_error, context_error, Value }
+exports { reify, static_value, immediate, same_type, compilation_error, context_error, Value }
 
 Value :: MASS.Value
 Source_Range :: MASS.Source_Range
@@ -70,6 +70,26 @@ static_value :: fn(
     static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap
     static_value.storage.Static.memory.Heap.pointer = pointer
   }
+
+  static_value
+}
+
+immediate :: fn(
+  compilation : &MASS.Compilation,
+  source,
+  source_range : Source_Range
+) -> (&Value) {
+  type :: type_of(source)
+  // TODO this is quite awkward. Probably bit_size should be i64 and use unsigned compare
+  static_assert(@{type.bit_size.as_u64 <= 64}, "Type is too large to fit into an immediate")
+
+  static_value := allocate(compilation.allocator, Value)
+  static_value.source_range = source_range
+  static_value.descriptor = type
+
+  static_value.storage.tag = MASS.Storage_Tag.Immediate
+  static_value.storage.bit_size = type.bit_size
+  cast(type, static_value.storage.Immediate.bits) = source
 
   static_value
 }

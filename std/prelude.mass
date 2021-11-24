@@ -120,9 +120,9 @@ operator intrinsic 30 (x ') unquote
 
 make_accessor :: fn(symbol : MASS.Symbol) => (MASS.Named_Accessor) intrinsic {
   meta :: import("std/meta")
-  accessor := allocate(context.allocator, MASS.Named_Accessor)
+  accessor : MASS.Named_Accessor
   accessor.symbol = meta.reify(arguments.values.0, MASS.Symbol)
-  meta.static_value(context.compilation, accessor, arguments.source_range)
+  meta.immediate(context.compilation, accessor, arguments.source_range)
 }
 
 operator intrinsic 30 (. x) make_accessor
@@ -264,7 +264,7 @@ external :: fn(
 os :: MASS.Os
 get_target_os :: fn() => (os._Type) intrinsic {
   meta :: import("std/meta")
-  meta.static_value(context.compilation, &context.program.os, arguments.source_range)
+  meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }
 
 syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
