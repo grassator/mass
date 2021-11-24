@@ -882,10 +882,7 @@ value_i64(
     }
     literal = (i64){ bits };
   }
-  return value_init(
-    allocator_allocate(allocator, Value),
-    &descriptor_i64, storage_static_inline(&literal), source_range
-  );
+  return value_make(allocator, &descriptor_i64, storage_immediate(&literal), source_range);
 }
 
 static inline Label *

@@ -273,8 +273,7 @@ spec("source") {
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0xCAFE"));
-      check(token->descriptor == &descriptor_i64);
-      check(token->storage.tag == Storage_Tag_Static);
+      check(value_is_i64(token));
       const i64 *literal = value_as_i64(token);
       check(literal->bits == 0xCAFE);
     }
@@ -287,8 +286,7 @@ spec("source") {
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0b100"));
-      check(token->descriptor == &descriptor_i64);
-      check(token->storage.tag == Storage_Tag_Static);
+      check(value_is_i64(token));
       const i64 *literal = value_as_i64(token);
       check(literal->bits == 0b100);
     }
@@ -1705,9 +1703,7 @@ spec("source") {
         "TEST :: if true then 42 else 1000\n"
       );
 
-      check(value);
-      check(value->descriptor == &descriptor_i64);
-      check(value->storage.tag == Storage_Tag_Static);
+      check(value_is_i64(value));
       const i64 *literal = value_as_i64(value);
       check(literal->bits == 42);
     }
@@ -1718,9 +1714,7 @@ spec("source") {
         "using if true then module { TEST :: 42 } else module { TEST :: 1000 }\n"
       );
 
-      check(value);
-      check(value->descriptor == &descriptor_i64);
-      check(value->storage.tag == Storage_Tag_Static);
+      check(value_is_i64(value));
       const i64 *literal = value_as_i64(value);
       check(literal->bits == 42);
     }
