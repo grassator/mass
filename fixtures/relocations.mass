@@ -1,6 +1,4 @@
-global_char := "a".bytes.0
-global_char_pointer := &global_char
-
+global_char_pointer :: &"a".bytes.0
 global_static_string :: "b"
 
 test :: fn() -> (String) { [global_char_pointer, 1] }

@@ -4957,18 +4957,16 @@ mass_pointer_to(
   Value *pointee = value_view_get(args, 0);
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
-  // TODO Not sure if this is required
-  //if (mass_value_is_compile_time_known(pointee)) {
-    //if (context_is_compile_time_eval(context)) {
-      //const void *source_memory =
-        //get_static_storage_with_bit_size(&pointee->storage, pointee_descriptor->bit_size);
-      //Value *result = value_init(
-        //allocator_allocate(context->allocator, Value),
-        //descriptor, storage_immediate(&source_memory), args.source_range
-      //);
-      //return result;
-    //}
-  //}
+  if (mass_value_is_compile_time_known(pointee)) {
+    if (context_is_compile_time_eval(context)) {
+      const void *source_memory =
+        get_static_storage_with_bit_size(&pointee->storage, pointee_descriptor->bit_size);
+      Value *result = value_make(
+        context->allocator, descriptor, storage_immediate(&source_memory), args.source_range
+      );
+      return result;
+    }
+  }
 
   return mass_make_lazy_value(
     context, args.source_range, pointee, descriptor, mass_pointer_to_lazy_proc
