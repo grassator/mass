@@ -245,14 +245,18 @@ allocate :: macro(allocator : &MASS.Allocator, type : Type) {
   ))
 }
 
-Array :: fn(item : Type, length : i64) => (Type) {
-  t := allocate(MASS.allocator, MASS.Descriptor)
+Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
+  meta :: import("std/meta")
+  item_type := meta.reify(arguments.values.0, Type).*
+  length := meta.reify(arguments.values.1, i64).*
+  t := allocate(context.allocator, MASS.Descriptor)
 
   t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
-  t.bit_size = [item.bit_size.as_u64 * cast(u64, length)]
-  t.bit_alignment = item.bit_alignment
-  t.Fixed_Size_Array = [item, cast(u64, length)]
-  t
+  t.bit_size = [item_type.bit_size.as_u64 * cast(u64, length)]
+  t.bit_alignment = item_type.bit_alignment
+  t.Fixed_Size_Array = [item_type, cast(u64, length)]
+
+  meta.immediate(context.compilation, t, arguments.source_range)
 }
 
 multiply :: Array
