@@ -268,12 +268,8 @@ token_value_force_immediate_integer(
       value_i64_cast_to(value, target_descriptor, &bits, &bit_size);
     switch(cast_result) {
       case Literal_Cast_Result_Success: {
-        return value_make(
-          compilation->allocator,
-          target_descriptor,
-          storage_static_internal(&bits, (Bits){bit_size}),
-          *source_range
-        );
+        Storage imm = storage_immediate_with_bit_size(&bits, (Bits){bit_size});
+        return value_make(compilation->allocator, target_descriptor, imm, *source_range);
       }
       case Literal_Cast_Result_Target_Not_An_Integer: {
         panic("We already checked that target is an integer");
@@ -345,7 +341,7 @@ assign_from_static(
     // If a static value contains a pointer, we expect an entry in a special map used to track
     // whether the target memory is also already copied to the compiled binary.
     // This is done to only include static values actually used at runtime.
-    void *source_memory = *(void **)get_static_storage_with_bit_size(&source->storage, (Bits){64});
+    void *source_memory = *(void **)storage_static_memory_with_bit_size(&source->storage, (Bits){64});
     Value *static_pointer = *hash_map_get(compilation->static_pointer_map, source_memory);
     if (static_pointer->storage.tag == Storage_Tag_None) {
       Section *section = (static_pointer->flags & Value_Flags_Constant)
@@ -386,7 +382,7 @@ assign_from_static(
       target->storage.Memory.location.Instruction_Pointer_Relative.label
     );
     const void *source_memory =
-      get_static_storage_with_bit_size(&source->storage, source->storage.bit_size);
+      storage_static_memory_with_bit_size(&source->storage, source->storage.bit_size);
     memcpy(section_memory, source_memory, source->storage.bit_size.as_u64 / 8);
     return true;
   }
@@ -1727,9 +1723,8 @@ token_parse_tuple(
   });
   Tuple *tuple = &combined->tuple;
   *tuple = (Tuple) { .items = items, };
-  result_value = value_init(
-    &combined->value, &descriptor_tuple, storage_static(tuple), view.source_range
-  );
+  Storage result_storage = storage_static_heap(tuple, descriptor_tuple.bit_size);
+  result_value = value_init(&combined->value, &descriptor_tuple, result_storage, view.source_range);
   err:
   return result_value;
 }
@@ -2996,7 +2991,7 @@ mass_handle_cast_lazy_proc(
       if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
         if (result_storage.tag == Storage_Tag_Static) {
           const void *memory = get_static_storage_with_bit_size(&value->storage, original_bit_size);
-          result_storage = storage_static_internal(memory, cast_to_bit_size);
+          result_storage = storage_static_heap(memory, cast_to_bit_size);
         } else {
           result_storage.bit_size = cast_to_bit_size;
         }
@@ -4098,7 +4093,7 @@ mass_trampoline_call(
     );
     memcpy(return_memory, temp_return_memory, return_byte_size);
 
-    Storage return_storage = storage_static_internal(return_memory, return_field->descriptor->bit_size);
+    Storage return_storage = storage_static_heap(return_memory, return_field->descriptor->bit_size);
 
     result = value_make(context->allocator, return_field->descriptor, return_storage, args_view.source_range);
   }
@@ -4890,16 +4885,12 @@ mass_size_of(
   u64 byte_size = descriptor_byte_size(descriptor);
 
   allocator_allocate_bulk(context->allocator, combined, {
-    i64 i64;
     Value value;
   });
 
-  i64 *literal = &combined->i64;
-  *literal = (i64) {
-    .bits = byte_size,
-  };
+  i64 literal = { .bits = byte_size };
   return value_init(
-    &combined->value, &descriptor_i64, storage_static(literal), args.source_range
+    &combined->value, &descriptor_i64, storage_immediate(&literal), args.source_range
   );
 }
 
@@ -5270,7 +5261,7 @@ value_maybe_dereference(
     if (mass_value_is_compile_time_known(value)) {
       const void *pointed_memory =
         *(void **)storage_static_memory_with_bit_size(&value->storage, (Bits){64});
-      return storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
+      return storage_static_heap(pointed_memory, unwrapped_descriptor->bit_size);
     } else if (value->storage.tag == Storage_Tag_Register) {
       Register reg = value->storage.Register.index;
       return storage_indirect(unwrapped_descriptor->bit_size, reg);
@@ -6769,7 +6760,7 @@ scope_define_enum(
     C_Enum_Item *it = &items[i];
     const Descriptor *enum_descriptor = *value_as_descriptor_pointer(enum_type_value);
     Value *item_value = value_make(
-      allocator, enum_descriptor, storage_static(&it->value), source_range
+      allocator, enum_descriptor, storage_immediate(&it->value), source_range
     );
     const Symbol *it_symbol = mass_ensure_symbol(compilation, it->name);
     scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it_symbol, item_value);

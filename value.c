@@ -400,48 +400,6 @@ code_label32(
 }
 
 static inline Storage
-storage_static_inline_internal(
-  const void *value,
-  Bits bit_size
-) {
-  Storage result = {
-    .tag = Storage_Tag_Static,
-    .bit_size = bit_size,
-  };
-  switch(bit_size.as_u64) {
-    case 0: {
-      result.Static.memory.tag = Static_Memory_Tag_U64;
-      break;
-    }
-    case 8: {
-      result.Static.memory.tag = Static_Memory_Tag_U8;
-      result.Static.memory.U8.value = *(u8 *)value;
-      break;
-    }
-    case 16: {
-      result.Static.memory.tag = Static_Memory_Tag_U16;
-      result.Static.memory.U16.value = *(u16 *)value;
-      break;
-    }
-    case 32: {
-      result.Static.memory.tag = Static_Memory_Tag_U32;
-      result.Static.memory.U32.value = *(u32 *)value;
-      break;
-    }
-    case 64: {
-      result.Static.memory.tag = Static_Memory_Tag_U64;
-      result.Static.memory.U64.value = *(u64 *)value;
-      break;
-    }
-    default: {
-      panic("Type is too large for inline storage");
-      break;
-    }
-  }
-  return result;
-}
-
-static inline Storage
 storage_static_heap(
   const void *value,
   Bits bit_size
@@ -463,10 +421,6 @@ storage_static_internal(
   const void *value,
   Bits bit_size
 ) {
-  if (bit_size.as_u64 <= 64) {
-    return storage_static_inline_internal(value, bit_size);
-  }
-
   return storage_static_heap(value, bit_size);
 }
 
@@ -551,16 +505,19 @@ storage_with_offset_and_bit_size(
     default:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:
-    case Storage_Tag_None:
-    case Storage_Tag_Immediate: {
+    case Storage_Tag_None: {
       panic("Internal Error: Unexpected storage type for structs");
-      break;
-    }
+    } break;
+    case Storage_Tag_Immediate: {
+      u64 offset_in_bits = s32_to_u64(diff) * 8;
+      assert(offset_in_bits + bit_size.as_u64 <= base->bit_size.as_u64);
+      result.Immediate.bits >>= offset_in_bits;
+      return result;
+    } break;
     case Storage_Tag_Register: {
       result.Register.packed = byte_size != 8;
       result.Register.offset_in_bits = s32_to_u16(diff * 8);
-      break;
-    }
+    } break;
     case Storage_Tag_Unpacked: {
       // TODO Consider making this generic and providing to users
       //      (instead of it being a side effect of System V ABI)
@@ -584,30 +541,24 @@ storage_with_offset_and_bit_size(
           .offset_in_bits = s32_to_u16((diff % 8) * 8),
         },
       };
-      break;
-    }
+    } break;
     case Storage_Tag_Static: {
       const s8 *pointer = get_static_storage_with_bit_size(base, base->bit_size);
-      result = storage_static_internal(pointer + diff, bit_size);
-      break;
-    }
+      result = storage_static_heap(pointer + diff, bit_size);
+    } break;
     case Storage_Tag_Memory: {
       switch(result.Memory.location.tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
           panic("TODO support offset for instruction-pointer relative addresses");
-          break;
-        }
+        } break;
         case Memory_Location_Tag_Indirect: {
           result.Memory.location.Indirect.offset += diff;
-          break;
-        }
+        } break;
         case Memory_Location_Tag_Stack: {
           result.Memory.location.Stack.offset += diff;
-          break;
-        }
+        } break;
       }
-      break;
-    }
+    } break;
   }
   return result;
 }
