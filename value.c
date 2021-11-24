@@ -1453,19 +1453,25 @@ value_i64_cast_to(
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  const i64 *literal = value_as_i64(value);
-
-  u64 bits = literal->bits;
-  u64 max = UINT64_MAX;
   u64 bit_size = target_descriptor->bit_size.as_u64;
   if (bit_size > 64) {
     return Literal_Cast_Result_Target_Too_Big;
   }
-  u64 shift = 64 - bit_size;
-  max >>= shift;
 
-  if (bits > max) {
-    return Literal_Cast_Result_Target_Too_Small;
+  u64 bits = value_as_i64(value)->bits;
+
+  if (bit_size != 64) {
+    if (descriptor_is_signed_integer(target_descriptor)) {
+      u64 shifted = (s64)bits >> bit_size;
+      if (shifted != 0 && ~shifted != 0) {
+        return Literal_Cast_Result_Target_Too_Small;
+      }
+    } else {
+      u64 shifted = bits >> bit_size;
+      if (shifted != 0) {
+        return Literal_Cast_Result_Target_Too_Small;
+      }
+    }
   }
 
   *out_bits = bits;
