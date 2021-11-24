@@ -4,17 +4,6 @@
 #include "calling_convention.h"
 
 static inline bool
-value_is_lazy_or_static(
-  const Value *value
-) {
-  if (value->descriptor == &descriptor_lazy_value) return true;
-  if (value->storage.tag == Storage_Tag_Immediate) return true;
-  if (value->storage.tag == Storage_Tag_Static) return true;
-  if (value->storage.tag == Storage_Tag_None) return true;
-  return false;
-}
-
-static inline bool
 mass_value_is_compile_time_known(
   const Value *value
 ) {

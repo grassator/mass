@@ -407,7 +407,7 @@ value_indirect_from_pointer(
     panic("Unexpected descriptor tag for an indirect value");
     return 0;
   }
-  if (value_is_lazy_or_static(source)) {
+  if (source->descriptor == &descriptor_lazy_value) {
     Expected_Result expected_result = expected_result_any(source_descriptor);
     source = value_force(compilation, builder, &expected_result, source);
     MASS_ON_ERROR(*compilation->result) return 0;
@@ -1947,8 +1947,6 @@ token_parse_macro_statement(
   Value_View match_view = value_view_slice(&value_view, 0, match_length);
   Value *expansion_value = token_apply_macro_syntax(context, match, macro, match_view.source_range);
   if (expansion_value) {
-    assert(value_is_lazy_or_static(expansion_value));
-
     out_lazy_value->payload = expansion_value;
     out_lazy_value->proc = mass_handle_statement_lazy_proc;
   }
