@@ -869,7 +869,7 @@ mass_assign(
   if (descriptor_is_implicit_pointer(target->descriptor)) {
     if (
       (
-        source->storage.tag == Storage_Tag_Static &&
+        value_is_non_lazy_static(source) &&
         !assign_from_static(compilation, builder, target, source, source_range)
       ) ||
       source->descriptor == &descriptor_tuple
@@ -1032,7 +1032,7 @@ mass_assign(
     return;
   }
 
-  if (source->storage.tag == Storage_Tag_Static) {
+  if (value_is_non_lazy_static(source)) {
     if (assign_from_static(compilation, builder, target, source, source_range)) {
       return;
     }
@@ -2179,7 +2179,7 @@ mass_expected_result_ensure_value_or_temp(
       MASS_ON_ERROR(*compilation->result) return 0;
       // @Hack there should be a better and more robust way to do this
       if (
-        value->storage.tag != Storage_Tag_Static &&
+        !value_is_non_lazy_static(value) &&
         !storage_occupies_same_memory(&result_value->storage, &value->storage)
       ) {
         storage_release_if_temporary(builder, &value->storage);
@@ -3055,7 +3055,7 @@ mass_cast_helper(
 
   if (
     expression->descriptor == &descriptor_tuple &&
-    expression->storage.tag == Storage_Tag_Static
+    value_is_non_lazy_static(expression)
   ) {
     Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
     *heap_payload = lazy_payload;
@@ -3444,6 +3444,7 @@ call_function_overload(
       source_arg->descriptor != &descriptor_lazy_value &&
       !mass_descriptor_is_void(source_arg->descriptor) &&
       source_arg->storage.tag != Storage_Tag_Static &&
+      source_arg->storage.tag != Storage_Tag_Immediate &&
       !descriptor_is_implicit_pointer(target_item->descriptor)
     ) {
       source_registers_bitset = register_bitset_from_storage(&source_arg->storage);
@@ -5278,6 +5279,9 @@ value_maybe_dereference(
       const void *pointed_memory =
         *(void **)get_static_storage_with_bit_size(&value->storage, (Bits){64});
       return storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
+    } else if (value->storage.tag == Storage_Tag_Immediate) {
+      panic("TODO");
+      return storage_none;
     } else if (value->storage.tag == Storage_Tag_Register) {
       Register reg = value->storage.Register.index;
       return storage_indirect(unwrapped_descriptor->bit_size, reg);
@@ -6357,7 +6361,7 @@ token_parse_block_view(
     );
     MASS_ON_ERROR(*context->result) goto defer;
 
-    if (parse_result->storage.tag == Storage_Tag_Static) {
+    if (value_is_non_lazy_static(parse_result)) {
       if (value_is_code_fragment(parse_result)) {
         const Code_Fragment *fragment = value_as_code_fragment(parse_result);
         Scope *saved_scope = context->scope;
@@ -6475,7 +6479,7 @@ token_parse_statement_using(
     goto err;
   }
 
-  if (result->storage.tag != Storage_Tag_Static) {
+  if (!value_is_non_lazy_static(result)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Expected_Static,
       .source_range = rest.source_range,
