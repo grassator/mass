@@ -8,6 +8,7 @@ value_is_lazy_or_static(
   const Value *value
 ) {
   if (value->descriptor == &descriptor_lazy_value) return true;
+  if (value->storage.tag == Storage_Tag_Immediate) return true;
   if (value->storage.tag == Storage_Tag_Static) return true;
   if (value->storage.tag == Storage_Tag_None) return true;
   return false;
@@ -19,6 +20,7 @@ value_is_non_lazy_static(
 ) {
   if (!value) return false;
   if (value->descriptor != &descriptor_lazy_value) {
+    if (value->storage.tag == Storage_Tag_Immediate) return true;
     if (value->storage.tag == Storage_Tag_Static) return true;
     if (value->storage.tag == Storage_Tag_None) return true;
   }
@@ -517,12 +519,30 @@ storage_static_internal(
 #define storage_static(_VALUE_)\
   storage_static_internal((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
 
+static inline Storage
+storage_immediate_with_bit_size(
+  const void *source,
+  Bits bit_size
+) {
+  Storage result = {
+    .tag = Storage_Tag_Immediate,
+    .bit_size = bit_size,
+  };
+  assert(bit_size.as_u64 <= sizeof(result.Immediate.bits) * CHAR_BIT);
+  result.Immediate.bits = 0;
+  memcpy(&result.Immediate.bits, source, bit_size.as_u64 / CHAR_BIT);
+  return result;
+}
+
+#define storage_immediate(_VALUE_)\
+  storage_immediate_with_bit_size((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
+
 #define DEFINE_IMM_X(_BIT_SIZE_)\
   static inline Storage\
   imm##_BIT_SIZE_(\
     u##_BIT_SIZE_ value\
   ) {\
-    return storage_static_internal(&value, (Bits){_BIT_SIZE_});\
+    return storage_immediate_with_bit_size(&value, (Bits){_BIT_SIZE_});\
   }
 
 DEFINE_IMM_X(8)
@@ -577,7 +597,8 @@ storage_with_offset_and_bit_size(
     default:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:
-    case Storage_Tag_None: {
+    case Storage_Tag_None:
+    case Storage_Tag_Immediate: {
       panic("Internal Error: Unexpected storage type for structs");
       break;
     }
@@ -824,6 +845,9 @@ storage_equal(
     case Storage_Tag_Unpacked: {
       return memcmp(a->Unpacked.registers, b->Unpacked.registers, sizeof(a->Unpacked.registers)) == 0;
     }
+    case Storage_Tag_Immediate: {
+      return memcmp(&a->Immediate.bits, &b->Immediate.bits, a->bit_size.as_u64 / 8) == 0;
+    }
     case Storage_Tag_Xmm: {
       return a->Xmm.index == b->Xmm.index;
     }
@@ -1031,6 +1055,7 @@ storage_release_if_temporary(
     }
     case Storage_Tag_None:
     case Storage_Tag_Eflags:
+    case Storage_Tag_Immediate:
     case Storage_Tag_Static: {
       panic("Unexpected temporary storage tag");
       break;

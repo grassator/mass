@@ -1258,8 +1258,9 @@ typedef enum {
   Storage_Tag_Register = 2,
   Storage_Tag_Xmm = 3,
   Storage_Tag_Static = 4,
-  Storage_Tag_Memory = 5,
-  Storage_Tag_Unpacked = 6,
+  Storage_Tag_Immediate = 5,
+  Storage_Tag_Memory = 6,
+  Storage_Tag_Unpacked = 7,
 } Storage_Tag;
 
 typedef struct Storage_Eflags {
@@ -1277,6 +1278,9 @@ typedef struct Storage_Xmm {
 typedef struct Storage_Static {
   Static_Memory memory;
 } Storage_Static;
+typedef struct Storage_Immediate {
+  u64 bits;
+} Storage_Immediate;
 typedef struct Storage_Memory {
   Memory_Location location;
 } Storage_Memory;
@@ -1294,6 +1298,7 @@ typedef struct Storage {
     Storage_Register Register;
     Storage_Xmm Xmm;
     Storage_Static Static;
+    Storage_Immediate Immediate;
     Storage_Memory Memory;
     Storage_Unpacked Unpacked;
   };
@@ -1317,6 +1322,11 @@ static inline Storage_Static *
 storage_as_static(Storage *storage) {
   assert(storage->tag == Storage_Tag_Static);
   return &storage->Static;
+}
+static inline Storage_Immediate *
+storage_as_immediate(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Immediate);
+  return &storage->Immediate;
 }
 static inline Storage_Memory *
 storage_as_memory(Storage *storage) {
@@ -3640,8 +3650,9 @@ static C_Enum_Item storage_tag_items[] = {
 { .name = slice_literal_fields("Register"), .value = 2 },
 { .name = slice_literal_fields("Xmm"), .value = 3 },
 { .name = slice_literal_fields("Static"), .value = 4 },
-{ .name = slice_literal_fields("Memory"), .value = 5 },
-{ .name = slice_literal_fields("Unpacked"), .value = 6 },
+{ .name = slice_literal_fields("Immediate"), .value = 5 },
+{ .name = slice_literal_fields("Memory"), .value = 6 },
+{ .name = slice_literal_fields("Unpacked"), .value = 7 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_eflags, Storage_Eflags,
   {
@@ -3690,6 +3701,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_static, Storage_Static,
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_static);
+MASS_DEFINE_STRUCT_DESCRIPTOR(storage_immediate, Storage_Immediate,
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("bits"),
+    .offset = offsetof(Storage_Immediate, bits),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(storage_immediate);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_memory, Storage_Memory,
   {
     .descriptor = &descriptor_memory_location,
@@ -3746,6 +3765,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
     .name = slice_literal_fields("Static"),
     .descriptor = &descriptor_storage_static,
     .offset = offsetof(Storage, Static),
+  },
+  {
+    .name = slice_literal_fields("Immediate"),
+    .descriptor = &descriptor_storage_immediate,
+    .offset = offsetof(Storage, Immediate),
   },
   {
     .name = slice_literal_fields("Memory"),

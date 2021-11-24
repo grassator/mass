@@ -171,6 +171,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Storage_Static")),
     type_storage_static_value
   );
+  Source_Range Storage_Immediate__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Storage_Immediate__source_range, "Storage_Immediate");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Storage_Immediate__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Immediate")),
+    type_storage_immediate_value
+  );
   Source_Range Storage_Memory__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Storage_Memory__source_range, "Storage_Memory");
   scope_define_value(

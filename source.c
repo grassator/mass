@@ -128,7 +128,8 @@ expected_result_validate(
           assert(flexible->storage & Expected_Result_Storage_Xmm);
           break;
         }
-        case Storage_Tag_Static: {
+        case Storage_Tag_Static:
+        case Storage_Tag_Immediate: {
           assert(flexible->storage & Expected_Result_Storage_Static);
           break;
         }
@@ -436,6 +437,7 @@ value_indirect_from_pointer(
     }
     default:
     case Storage_Tag_Unpacked:
+    case Storage_Tag_Immediate:
     case Storage_Tag_Static:
     case Storage_Tag_None:
     case Storage_Tag_Eflags:
@@ -957,7 +959,11 @@ mass_assign(
     }
 
     if (same_type(target->descriptor, source->descriptor)) {
-      load_address(builder, source_range, target, source->storage);
+      if (source->storage.tag == Storage_Tag_Memory) {
+        load_address(builder, source_range, target, source->storage);
+      } else {
+        move_value(builder, source_range, &target->storage, &source->storage);
+      }
     } else {
       compilation_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
@@ -1088,6 +1094,7 @@ scope_maybe_force_overload(
   if (value_is_lazy_static_value(value)) {
     value_force_lazy_static(value, name);
   }
+  MASS_ON_ERROR(*context->result) return;
   if (
     value->descriptor->tag != Descriptor_Tag_Function_Instance &&
     value->descriptor != &descriptor_function_literal &&
@@ -2225,9 +2232,8 @@ mass_expected_result_ensure_value_or_temp(
         }
         Register temp_register = register_acquire_temp(builder);
         Storage temp_storage = storage_register(temp_register, expected_descriptor->bit_size);
-        Value *temp_result = value_init(
-          allocator_allocate(compilation->allocator, Value),
-          expected_descriptor, temp_storage, value->source_range
+        Value *temp_result = value_make(
+          compilation->allocator, expected_descriptor, temp_storage, value->source_range
         );
         mass_assign(compilation, builder, temp_result, value, &value->source_range);
         storage_release_if_temporary(builder, &value->storage);
@@ -3586,7 +3592,7 @@ call_function_overload(
 
   switch(call_setup->jump.tag) {
     case Function_Call_Jump_Tag_Call: {
-      if (instance->storage.tag == Storage_Tag_Static) {
+      if (instance->storage.tag == Storage_Tag_Static || instance->storage.tag == Storage_Tag_Immediate) {
         Register temp_reg = register_acquire_temp(builder);
         Storage reg = storage_register(temp_reg, (Bits){64});
         push_eagerly_encoded_assembly(

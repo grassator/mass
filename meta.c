@@ -1365,6 +1365,9 @@ main(void) {
     struct_fields("Static", (Struct_Item[]){
       { "Static_Memory", "memory" },
     }),
+    struct_fields("Immediate", (Struct_Item[]){
+      { "u64", "bits" },
+    }),
     struct_fields("Memory", (Struct_Item[]){
       { "Memory_Location", "location" },
     }),

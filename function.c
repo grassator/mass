@@ -50,7 +50,8 @@ register_bitset_from_storage(
   u64 result = 0;
   switch(storage->tag) {
     case Storage_Tag_None:
-    case Storage_Tag_Static: {
+    case Storage_Tag_Static:
+    case Storage_Tag_Immediate: {
       // Nothing to do
       break;
     }
@@ -292,6 +293,7 @@ move_value(
     return;
   }
 
+  // FIXME this should probable not happen
   if (source->tag == Storage_Tag_Static) {
     assert(source->bit_size.as_u64 <= 64);
     s64 immediate = storage_static_value_up_to_s64(source);
@@ -339,6 +341,38 @@ move_value(
         .bit_size = adjusted_source.bit_size,
         .Register.index = register_acquire_temp(builder),
       };
+      push_eagerly_encoded_assembly_no_source_range(
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {temp, adjusted_source}}
+      );
+      push_eagerly_encoded_assembly_no_source_range(
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, temp}}
+      );
+      register_release(builder, temp.Register.index);
+    } else {
+      push_eagerly_encoded_assembly_no_source_range(
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, adjusted_source}}
+      );
+    }
+    return;
+  }
+
+  if (source->tag == Storage_Tag_Immediate) {
+    assert(source->bit_size.as_u64 <= 64);
+    bool is_zero = memcmp(&source->Immediate.bits, &(u64){0}, source_bit_size) == 0;
+    if (is_zero && target->tag == Storage_Tag_Register) {
+      // This messes up flags register so comparisons need to be aware of this optimization
+      push_eagerly_encoded_assembly_no_source_range(
+        &builder->code_block, *source_range, &(Instruction_Assembly){xor, {*target, *target}}
+      );
+      return;
+    }
+    Storage adjusted_source = *source;
+    adjusted_source.bit_size = target->bit_size;
+    // Because of 15 byte instruction limit on x86 there is no way to move 64bit immediate
+    // to a memory location. In which case we do a move through a temp register
+    bool is_64bit_immediate = adjusted_source.bit_size.as_u64 == 64;
+    if (is_64bit_immediate && target->tag != Storage_Tag_Register) {
+      Storage temp = storage_register_temp(builder, adjusted_source.bit_size);
       push_eagerly_encoded_assembly_no_source_range(
         &builder->code_block, *source_range, &(Instruction_Assembly){mov, {temp, adjusted_source}}
       );
@@ -540,6 +574,7 @@ function_return_value_register_from_storage(
     }
     case Storage_Tag_None:
     case Storage_Tag_Unpacked:
+    case Storage_Tag_Immediate:
     case Storage_Tag_Static:
     case Storage_Tag_Eflags: {
       break;

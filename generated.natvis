@@ -828,6 +828,9 @@
   <DisplayString Condition="tag == Storage_Tag_Static">
     Static { Static }
   </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Immediate">
+    Immediate { Immediate }
+  </DisplayString>
   <DisplayString Condition="tag == Storage_Tag_Memory">
     Memory { Memory }
   </DisplayString>
@@ -843,6 +846,7 @@
     <Item Name="Register" Condition="tag == Storage_Tag_Register">Register</Item>
     <Item Name="Xmm" Condition="tag == Storage_Tag_Xmm">Xmm</Item>
     <Item Name="Static" Condition="tag == Storage_Tag_Static">Static</Item>
+    <Item Name="Immediate" Condition="tag == Storage_Tag_Immediate">Immediate</Item>
     <Item Name="Memory" Condition="tag == Storage_Tag_Memory">Memory</Item>
     <Item Name="Unpacked" Condition="tag == Storage_Tag_Unpacked">Unpacked</Item>
   </Expand>
