@@ -306,7 +306,7 @@ move_value(
 
   if (source->tag == Storage_Tag_Immediate) {
     assert(source->bit_size.as_u64 <= 64);
-    bool is_zero = memcmp(&source->Immediate.bits, &(u64){0}, source_bit_size) == 0;
+    bool is_zero = memcmp(&source->Immediate.bits, &(u64){0}, source_bit_size / 8) == 0;
     if (is_zero && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_eagerly_encoded_assembly_no_source_range(
