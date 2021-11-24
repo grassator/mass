@@ -1333,16 +1333,6 @@ main(void) {
     }),
   }));
 
-  export_compiler(push_type(type_union("Static_Memory", (Struct_Type[]){
-    struct_fields("U8", (Struct_Item[]){{ "u8", "value" }}),
-    struct_fields("U16", (Struct_Item[]){{ "u16", "value" }}),
-    struct_fields("U32", (Struct_Item[]){{ "u32", "value" }}),
-    struct_fields("U64", (Struct_Item[]){{ "u64", "value" }}),
-    struct_fields("Heap", (Struct_Item[]){
-      { "const void *", "pointer" },
-    }),
-  })));
-
   push_type(type_enum("Storage_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Temporary", 1 << 0 },
@@ -1363,7 +1353,7 @@ main(void) {
       { "u32", "offset" },
     }),
     struct_fields("Static", (Struct_Item[]){
-      { "Static_Memory", "memory" },
+      { "const void *", "pointer" },
     }),
     struct_fields("Immediate", (Struct_Item[]){
       { "u64", "bits" },

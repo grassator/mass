@@ -250,26 +250,7 @@ get_static_storage_with_bit_size(
 ) {
   assert(storage->bit_size.as_u64 == bit_size.as_u64);
   assert(storage->tag == Storage_Tag_Static);
-
-  switch(storage->Static.memory.tag) {
-    case Static_Memory_Tag_U8: {
-      return &storage->Static.memory.U8.value;
-    }
-    case Static_Memory_Tag_U16: {
-      return &storage->Static.memory.U16.value;
-    }
-    case Static_Memory_Tag_U32: {
-      return &storage->Static.memory.U32.value;
-    }
-    case Static_Memory_Tag_U64: {
-      return &storage->Static.memory.U64.value;
-    }
-    case Static_Memory_Tag_Heap: {
-      return storage->Static.memory.Heap.pointer;
-    }
-  }
-  panic("UNREACHED");
-  return 0;
+  return storage->Static.pointer;
 }
 
 static bool
@@ -407,25 +388,12 @@ storage_static_heap(
   return (Storage){
     .tag = Storage_Tag_Static,
     .bit_size = bit_size,
-    .Static = {
-      .memory = {
-        .tag = Static_Memory_Tag_Heap,
-        .Heap.pointer = value,
-      },
-    },
+    .Static.pointer = value,
   };
 }
 
-static inline Storage
-storage_static_internal(
-  const void *value,
-  Bits bit_size
-) {
-  return storage_static_heap(value, bit_size);
-}
-
 #define storage_static(_VALUE_)\
-  storage_static_internal((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
+  storage_static_heap((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
 
 static inline Storage
 storage_immediate_with_bit_size(

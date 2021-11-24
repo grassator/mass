@@ -733,58 +733,6 @@
     <Item Name="Stack" Condition="tag == Memory_Location_Tag_Stack">Stack</Item>
   </Expand>
 </Type>
-<Type Name="Array_Static_Memory">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Static_Memory_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Static_Memory_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Static_Memory">
-  <DisplayString Condition="tag == Static_Memory_Tag_U8">
-    U8 { U8 }
-  </DisplayString>
-  <DisplayString Condition="tag == Static_Memory_Tag_U16">
-    U16 { U16 }
-  </DisplayString>
-  <DisplayString Condition="tag == Static_Memory_Tag_U32">
-    U32 { U32 }
-  </DisplayString>
-  <DisplayString Condition="tag == Static_Memory_Tag_U64">
-    U64 { U64 }
-  </DisplayString>
-  <DisplayString Condition="tag == Static_Memory_Tag_Heap">
-    Heap { Heap }
-  </DisplayString>
-  <Expand>
-    <Item Name="tag">tag</Item>
-    <Item Name="U8" Condition="tag == Static_Memory_Tag_U8">U8</Item>
-    <Item Name="U16" Condition="tag == Static_Memory_Tag_U16">U16</Item>
-    <Item Name="U32" Condition="tag == Static_Memory_Tag_U32">U32</Item>
-    <Item Name="U64" Condition="tag == Static_Memory_Tag_U64">U64</Item>
-    <Item Name="Heap" Condition="tag == Static_Memory_Tag_Heap">Heap</Item>
-  </Expand>
-</Type>
 <Type Name="Array_Storage">
   <Expand>
     <Item Name="[length]">data->length</Item>

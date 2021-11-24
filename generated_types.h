@@ -265,10 +265,6 @@ typedef struct Memory_Location Memory_Location;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
 typedef dyn_array_type(const Memory_Location *) Array_Const_Memory_Location_Ptr;
 
-typedef struct Static_Memory Static_Memory;
-typedef dyn_array_type(Static_Memory *) Array_Static_Memory_Ptr;
-typedef dyn_array_type(const Static_Memory *) Array_Const_Static_Memory_Ptr;
-
 typedef enum Storage_Flags {
   Storage_Flags_None = 0,
   Storage_Flags_Temporary = 1,
@@ -1193,66 +1189,6 @@ memory_location_as_stack(Memory_Location *memory_location) {
 }
 typedef dyn_array_type(Memory_Location) Array_Memory_Location;
 typedef enum {
-  Static_Memory_Tag_U8 = 0,
-  Static_Memory_Tag_U16 = 1,
-  Static_Memory_Tag_U32 = 2,
-  Static_Memory_Tag_U64 = 3,
-  Static_Memory_Tag_Heap = 4,
-} Static_Memory_Tag;
-
-typedef struct Static_Memory_U8 {
-  u8 value;
-} Static_Memory_U8;
-typedef struct Static_Memory_U16 {
-  u16 value;
-} Static_Memory_U16;
-typedef struct Static_Memory_U32 {
-  u32 value;
-} Static_Memory_U32;
-typedef struct Static_Memory_U64 {
-  u64 value;
-} Static_Memory_U64;
-typedef struct Static_Memory_Heap {
-  const void * pointer;
-} Static_Memory_Heap;
-typedef struct Static_Memory {
-  Static_Memory_Tag tag;
-  char _tag_padding[4];
-  union {
-    Static_Memory_U8 U8;
-    Static_Memory_U16 U16;
-    Static_Memory_U32 U32;
-    Static_Memory_U64 U64;
-    Static_Memory_Heap Heap;
-  };
-} Static_Memory;
-static inline Static_Memory_U8 *
-static_memory_as_u8(Static_Memory *static_memory) {
-  assert(static_memory->tag == Static_Memory_Tag_U8);
-  return &static_memory->U8;
-}
-static inline Static_Memory_U16 *
-static_memory_as_u16(Static_Memory *static_memory) {
-  assert(static_memory->tag == Static_Memory_Tag_U16);
-  return &static_memory->U16;
-}
-static inline Static_Memory_U32 *
-static_memory_as_u32(Static_Memory *static_memory) {
-  assert(static_memory->tag == Static_Memory_Tag_U32);
-  return &static_memory->U32;
-}
-static inline Static_Memory_U64 *
-static_memory_as_u64(Static_Memory *static_memory) {
-  assert(static_memory->tag == Static_Memory_Tag_U64);
-  return &static_memory->U64;
-}
-static inline Static_Memory_Heap *
-static_memory_as_heap(Static_Memory *static_memory) {
-  assert(static_memory->tag == Static_Memory_Tag_Heap);
-  return &static_memory->Heap;
-}
-typedef dyn_array_type(Static_Memory) Array_Static_Memory;
-typedef enum {
   Storage_Tag_None = 0,
   Storage_Tag_Eflags = 1,
   Storage_Tag_Register = 2,
@@ -1276,7 +1212,7 @@ typedef struct Storage_Xmm {
   u32 offset;
 } Storage_Xmm;
 typedef struct Storage_Static {
-  Static_Memory memory;
+  const void * pointer;
 } Storage_Static;
 typedef struct Storage_Immediate {
   u64 bits;
@@ -2338,12 +2274,6 @@ static Descriptor descriptor_array_memory_location_ptr;
 static Descriptor descriptor_array_const_memory_location_ptr;
 static Descriptor descriptor_memory_location_pointer;
 static Descriptor descriptor_memory_location_pointer_pointer;
-static Descriptor descriptor_static_memory;
-static Descriptor descriptor_array_static_memory;
-static Descriptor descriptor_array_static_memory_ptr;
-static Descriptor descriptor_array_const_static_memory_ptr;
-static Descriptor descriptor_static_memory_pointer;
-static Descriptor descriptor_static_memory_pointer_pointer;
 static Descriptor descriptor_storage_flags;
 static Descriptor descriptor_array_storage_flags;
 static Descriptor descriptor_array_storage_flags_ptr;
@@ -3546,93 +3476,6 @@ MASS_DEFINE_TYPE_VALUE(memory_location);
 DEFINE_VALUE_IS_AS_HELPERS(Memory_Location, memory_location);
 DEFINE_VALUE_IS_AS_HELPERS(Memory_Location *, memory_location_pointer);
 /*union struct end*/
-/*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_static_memory_ptr, Array_Static_Memory_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_static_memory, Array_Static_Memory)
-MASS_DEFINE_OPAQUE_C_TYPE(static_memory_tag, Static_Memory_Tag)
-static C_Enum_Item static_memory_tag_items[] = {
-{ .name = slice_literal_fields("U8"), .value = 0 },
-{ .name = slice_literal_fields("U16"), .value = 1 },
-{ .name = slice_literal_fields("U32"), .value = 2 },
-{ .name = slice_literal_fields("U64"), .value = 3 },
-{ .name = slice_literal_fields("Heap"), .value = 4 },
-};
-MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory_u8, Static_Memory_U8,
-  {
-    .descriptor = &descriptor_u8,
-    .name = slice_literal_fields("value"),
-    .offset = offsetof(Static_Memory_U8, value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(static_memory_u8);
-MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory_u16, Static_Memory_U16,
-  {
-    .descriptor = &descriptor_u16,
-    .name = slice_literal_fields("value"),
-    .offset = offsetof(Static_Memory_U16, value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(static_memory_u16);
-MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory_u32, Static_Memory_U32,
-  {
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("value"),
-    .offset = offsetof(Static_Memory_U32, value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(static_memory_u32);
-MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory_u64, Static_Memory_U64,
-  {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("value"),
-    .offset = offsetof(Static_Memory_U64, value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(static_memory_u64);
-MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory_heap, Static_Memory_Heap,
-  {
-    .descriptor = &descriptor_void_pointer,
-    .name = slice_literal_fields("pointer"),
-    .offset = offsetof(Static_Memory_Heap, pointer),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(static_memory_heap);
-MASS_DEFINE_STRUCT_DESCRIPTOR(static_memory, Static_Memory,
-  {
-    .name = slice_literal_fields("tag"),
-    .descriptor = &descriptor_static_memory_tag,
-    .offset = offsetof(Static_Memory, tag),
-  },
-  {
-    .name = slice_literal_fields("U8"),
-    .descriptor = &descriptor_static_memory_u8,
-    .offset = offsetof(Static_Memory, U8),
-  },
-  {
-    .name = slice_literal_fields("U16"),
-    .descriptor = &descriptor_static_memory_u16,
-    .offset = offsetof(Static_Memory, U16),
-  },
-  {
-    .name = slice_literal_fields("U32"),
-    .descriptor = &descriptor_static_memory_u32,
-    .offset = offsetof(Static_Memory, U32),
-  },
-  {
-    .name = slice_literal_fields("U64"),
-    .descriptor = &descriptor_static_memory_u64,
-    .offset = offsetof(Static_Memory, U64),
-  },
-  {
-    .name = slice_literal_fields("Heap"),
-    .descriptor = &descriptor_static_memory_heap,
-    .offset = offsetof(Static_Memory, Heap),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(static_memory);
-DEFINE_VALUE_IS_AS_HELPERS(Static_Memory, static_memory);
-DEFINE_VALUE_IS_AS_HELPERS(Static_Memory *, static_memory_pointer);
-/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(storage_flags, Storage_Flags)
 static C_Enum_Item storage_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -3695,9 +3538,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_xmm, Storage_Xmm,
 MASS_DEFINE_TYPE_VALUE(storage_xmm);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_static, Storage_Static,
   {
-    .descriptor = &descriptor_static_memory,
-    .name = slice_literal_fields("memory"),
-    .offset = offsetof(Storage_Static, memory),
+    .descriptor = &descriptor_void_pointer,
+    .name = slice_literal_fields("pointer"),
+    .offset = offsetof(Storage_Static, pointer),
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_static);
