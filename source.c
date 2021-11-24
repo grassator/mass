@@ -3912,12 +3912,9 @@ mass_ensure_trampoline(
     *proxy_info = *original_info;
     proxy_info->flags &= ~Function_Info_Flags_Compile_Time;
 
-    const Descriptor *proxy_descriptor = descriptor_function_instance(
-      context->allocator,
-      runtime_instance->descriptor->name,
-      proxy_info,
-      runtime_instance->descriptor->Function_Instance.call_setup
-    );
+    Descriptor *proxy_descriptor = allocator_allocate(context->allocator, Descriptor);
+    *proxy_descriptor = *runtime_instance->descriptor;
+    proxy_descriptor->Function_Instance.info = proxy_info;
     proxy_value = value_make(
       context->allocator,
       proxy_descriptor,
