@@ -16,10 +16,17 @@ context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
 }
 
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
-  assert(value.storage.tag == MASS.Storage_Tag.Static)
   assert(same_type(value.descriptor, type))
   assert(value.descriptor.bit_size.as_u64 == value.storage.bit_size.as_u64)
-  value.storage.Static.pointer
+
+  if value.storage.tag == MASS.Storage_Tag.Static then {
+    value.storage.Static.pointer
+  } else if value.storage.tag == MASS.Storage_Tag.Immediate then {
+    &value.storage.Immediate.bits
+  } else {
+    assert(value.storage.tag == MASS.Storage_Tag.Static)
+    0
+  }
 }
 
 static_value :: fn(
