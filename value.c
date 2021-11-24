@@ -441,9 +441,6 @@ storage_static_inline_internal(
   return result;
 }
 
-#define storage_static_inline(_VALUE_)\
-  storage_static_inline_internal((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
-
 static inline Storage
 storage_static_heap(
   const void *value,

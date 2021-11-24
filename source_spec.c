@@ -1656,9 +1656,6 @@ spec("source") {
       );
 
       check(status);
-      check(descriptor_is_integer(status->descriptor));
-      check(status->storage.tag == Storage_Tag_Static);
-      check(status->storage.bit_size.as_u64 == 8);
       check(*value_as_s8(status) == 42);
     }
 
@@ -1673,8 +1670,6 @@ spec("source") {
 
       check(result);
       check(descriptor_is_integer(result->descriptor));
-      check(result->storage.tag == Storage_Tag_Static);
-      check(result->storage.bit_size.as_u64 == 8);
       check(*value_as_s8(result) == 42);
     }
 

@@ -1765,7 +1765,7 @@ mass_quote(
   Quoted quoted = {.value = value};
   Value *result = value_init(
     allocator_allocate(context->allocator, Value),
-    &descriptor_quoted, storage_static_inline(&quoted), args.source_range
+    &descriptor_quoted, storage_immediate(&quoted), args.source_range
   );
   return result;
 }
@@ -2930,12 +2930,8 @@ compile_time_eval(
   fn_type_opaque jitted_code = (fn_type_opaque)rip_value_pointer_from_label(eval_label);
   jitted_code();
 
-  return value_init(
-    allocator_allocate(context->allocator, Value),
-    out_value->descriptor,
-    storage_static_internal(result, result_descriptor->bit_size),
-    *source_range
-  );
+  Storage result_storage = storage_immediate_with_bit_size(result, result_descriptor->bit_size);
+  return value_make(context->allocator, out_value->descriptor, result_storage, *source_range);
 }
 
 typedef struct {
@@ -3667,11 +3663,9 @@ ensure_parameter_descriptors(
     Value_View lazy_expr;
     if (param->descriptor) {
       Value **param_value_pointer = allocator_allocate(temp_context.temp_allocator, Value *);
-      *param_value_pointer = value_init(
-        allocator_allocate(temp_context.temp_allocator, Value),
-        &descriptor_descriptor_pointer,
-        storage_static(&param->descriptor),
-        source_range
+      Storage storage = storage_immediate(&param->descriptor);
+      *param_value_pointer = value_make(
+        temp_context.temp_allocator, &descriptor_descriptor_pointer, storage, source_range
       );
       lazy_expr = value_view_single(param_value_pointer);
     } else {
@@ -4680,7 +4674,7 @@ mass_handle_generic_comparison_lazy_proc(
     bool equal = storage_static_equal(lhs->descriptor, &lhs->storage, rhs->descriptor, &rhs->storage);
     if (negated) equal = !equal;
     return value_make(
-      compilation->allocator, &descriptor__bool, storage_static_inline(&equal), *source_range
+      compilation->allocator, &descriptor__bool, storage_immediate(&equal), *source_range
     );
   }
 
@@ -4690,7 +4684,7 @@ mass_handle_generic_comparison_lazy_proc(
     case Descriptor_Tag_Void: {
       bool equal = true;
       result = value_make(
-        compilation->allocator, &descriptor__bool, storage_static_inline(&equal), *source_range
+        compilation->allocator, &descriptor__bool, storage_immediate(&equal), *source_range
       );
     } break;
     case Descriptor_Tag_Pointer_To:
@@ -4879,7 +4873,7 @@ mass_type_of(
   return value_make(
     context->allocator,
     &descriptor_descriptor_pointer,
-    storage_static_inline(&descriptor),
+    storage_immediate(&descriptor),
     args.source_range
   );
 }
@@ -4979,7 +4973,7 @@ mass_pointer_to(
         //get_static_storage_with_bit_size(&pointee->storage, pointee_descriptor->bit_size);
       //Value *result = value_init(
         //allocator_allocate(context->allocator, Value),
-        //descriptor, storage_static_inline(&source_memory), args.source_range
+        //descriptor, storage_immediate(&source_memory), args.source_range
       //);
       //return result;
     //}
@@ -6102,7 +6096,7 @@ token_parse_function_literal(
       calling_convention->call_setup_proc(context->allocator, fn_info);
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, call_setup);
-    Storage fn_storage = storage_static_inline(&fn_descriptor);
+    Storage fn_storage = storage_immediate(&fn_descriptor);
     return value_make(context->allocator, &descriptor_descriptor_pointer, fn_storage, view.source_range);
   }
 }
@@ -6561,7 +6555,7 @@ token_parse_statement_label(
       context->allocator, context->program, &context->program->memory.code, name
     );
     value = value_make(
-      context->allocator, &descriptor_label_pointer, storage_static_inline(&label), source_range
+      context->allocator, &descriptor_label_pointer, storage_immediate(&label), source_range
     );
     scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, symbol, value);
     if (placeholder) {
@@ -6820,7 +6814,7 @@ module_compiler_init(
 
   compiler_scope_define_exports(compilation, scope);
   Value *allocator_value = value_make(
-    allocator, &descriptor_allocator_pointer, storage_static_inline(&allocator), (Source_Range){0}
+    allocator, &descriptor_allocator_pointer, storage_immediate(&allocator), (Source_Range){0}
   );
   INIT_LITERAL_SOURCE_RANGE(&allocator_value->source_range, "allocator");
   scope_define_value(
