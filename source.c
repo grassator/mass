@@ -2946,9 +2946,6 @@ static i64 mass_i64_unsigned_divide(i64 a, i64 b) { return (i64){a.bits / b.bits
 static i64 mass_i64_signed_remainder(i64 a, i64 b) { return (i64){(u64)((s64)a.bits % (s64)b.bits)}; }
 static i64 mass_i64_unsigned_remainder(i64 a, i64 b) { return (i64){a.bits % b.bits}; }
 
-static i64 mass_i64_equal(i64 a, i64 b) { return (i64){a.bits == b.bits}; }
-static i64 mass_i64_not_equal(i64 a, i64 b) { return (i64){a.bits != b.bits}; }
-
 static i64 mass_i64_logical_shift_left(i64 num, i64 shift) { return (i64){num.bits << shift.bits};}
 static i64 mass_i64_logical_shift_right(i64 num, i64 shift) { return (i64){num.bits >> shift.bits};}
 
