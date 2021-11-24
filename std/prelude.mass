@@ -209,6 +209,10 @@ signed_divide :: MASS.i64_signed_divide
 unsigned_divide :: MASS.i64_unsigned_divide
 signed_remainder :: MASS.i64_signed_remainder
 unsigned_remainder :: MASS.i64_unsigned_remainder
+// TODO this should return twos complement and still `i64`
+negate :: fn(literal : i64) => (s64) {
+  -cast(s64, literal)
+}
 
 i64_is_compile_positive :: macro(x : i64) {
   static_assert(x & 0x8000_0000_0000_0000 == 0, "i64 value must be positive for this operation")
@@ -279,7 +283,4 @@ syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
 negate :: template_signed_integer_overloads(macro(impl, type : Type) {
   macro(x : type) { 0 - x }
 }, ())
-negate :: fn(literal : i64) => (s64) {
-  -cast(s64, literal)
-}
 
