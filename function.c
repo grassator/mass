@@ -254,7 +254,7 @@ move_value(
     if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
       panic("Expected unpacking to be handled by the recursion above");
     }
-    s64 clear_mask = ~(((1ll << source_bit_size) - 1) << target->Register.offset_in_bits);
+    u64 clear_mask = ~(((UINT64_C(1) << source_bit_size) - 1) << target->Register.offset_in_bits);
     Storage temp_full_register = {
       .tag = Storage_Tag_Register,
       .bit_size = {64},

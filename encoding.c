@@ -498,15 +498,15 @@ encode_instruction(
     case Instruction_Tag_Label_Patch: {
       Instruction_Label_Patch *label_patch = &instruction->Label_Patch;
       u64 patch_offset_in_buffer = buffer->occupied + label_patch->offset;
-      s32 *patch_at = (s32 *)(buffer->memory + patch_offset_in_buffer);
-      assert(*patch_at == 0);
+      void *patch32_at = buffer->memory + patch_offset_in_buffer;
+      assert(memcmp(patch32_at, &(u32){0}, sizeof(u32)) == 0);
       dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
         .target = instruction->Label_Patch.label,
         .from = {
           .section = &program->memory.code,
           .offset_in_section = u64_to_u32(buffer->occupied),
         },
-        .patch_at = patch_at,
+        .patch32_at = patch32_at,
       });
       return;
     }

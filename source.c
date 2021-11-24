@@ -2925,7 +2925,9 @@ compile_time_eval(
   fn_type_opaque jitted_code = (fn_type_opaque)rip_value_pointer_from_label(eval_label);
   jitted_code();
 
-  Storage result_storage = storage_immediate_with_bit_size(result, result_descriptor->bit_size);
+  Storage result_storage = mass_descriptor_is_void(result_descriptor)
+    ? storage_none
+    : storage_immediate_with_bit_size(result, result_descriptor->bit_size);
   return value_make(context->allocator, out_value->descriptor, result_storage, *source_range);
 }
 

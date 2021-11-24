@@ -9,7 +9,7 @@ FLAGS="-std=c11 -g -O0 -pthread -Wno-incompatible-pointer-types "
 
 if [[ $($CC -v 2>&1) == *"clang version"* ]]
 then
-  SANITIZE="-fsanitize=address -fno-omit-frame-pointer -fno-common"
+  SANITIZE="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-common"
   FLAGS="$FLAGS $SANITIZE -Wno-tautological-constant-out-of-range-compare -Wno-initializer-overrides"
 fi
 

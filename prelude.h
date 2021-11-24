@@ -1598,6 +1598,7 @@ slice_starts_with(
 ) {
   if (haystack.bytes == needle.bytes) return true;
   if (needle.length > haystack.length) return false;
+  if (needle.length == 0) return true;
   return memcmp(
     haystack.bytes,
     needle.bytes,
@@ -1612,6 +1613,7 @@ slice_ends_with(
 ) {
   if (haystack.bytes == needle.bytes) return true;
   if (needle.length > haystack.length) return false;
+  if (needle.length == 0) return true;
   return memcmp(
     haystack.bytes + (haystack.length - needle.length),
     needle.bytes,
@@ -1801,8 +1803,10 @@ slice_sub(
 ) {
   if (to > slice.length) to = slice.length;
   if (from > to) from = to;
+  const char *bytes = slice.bytes;
+  if (from) bytes += from;
   return (Slice){
-    .bytes = slice.bytes + from,
+    .bytes = bytes,
     .length = to - from,
   };
 }
@@ -2828,8 +2832,8 @@ virtual_memory_buffer_allocate_bytes(
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline u64 virtual_memory_buffer_append_##_type_(Virtual_Memory_Buffer *buffer, _type_ value) {\
-    _type_ *result = virtual_memory_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
-    *result = value;\
+    void *result = virtual_memory_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    memcpy(result, &value, sizeof(value));\
     return (s8 *)result - buffer->memory;\
   }
 PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
@@ -3061,14 +3065,14 @@ fixed_buffer_resizing_ensure_capacity(
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline u64 fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
-    _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
-    *result = value;\
+    void *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    memcpy(result, &value, sizeof(value));\
     return (s8 *)result - buffer->memory;\
   }\
   static inline u64 fixed_buffer_resizing_append_##_type_(Fixed_Buffer **buffer_pointer, _type_ value) {\
     Fixed_Buffer *buffer = fixed_buffer_resizing_ensure_capacity(buffer_pointer, sizeof(_type_));\
-    _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
-    *result = value;\
+    void *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    memcpy(result, &value, sizeof(value));\
     return (s8 *)result - buffer->memory;\
   }
 PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
@@ -3452,8 +3456,8 @@ bucket_buffer_allocate_bytes(
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline u64 bucket_buffer_append_##_type_(Bucket_Buffer *buffer, _type_ value) {\
-    _type_ *temp = bucket_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
-    *temp = value;\
+    void *temp = bucket_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    memcpy(temp, &value, sizeof(value));\
     u64 offset = buffer->occupied - sizeof(_type_);\
     return offset;\
   }
@@ -3630,7 +3634,7 @@ hash_byte(
   s32 previous,
   s8 byte
 ) {
-  return previous * 31 + byte;
+  return (u32)previous * 31 + byte;
 }
 
 static inline s32

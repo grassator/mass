@@ -406,6 +406,7 @@ storage_immediate_with_bit_size(
   };
   assert(bit_size.as_u64 <= sizeof(result.Immediate.bits) * CHAR_BIT);
   result.Immediate.bits = 0;
+  assert(source);
   memcpy(&result.Immediate.bits, source, bit_size.as_u64 / CHAR_BIT);
   return result;
 }

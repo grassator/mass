@@ -1253,7 +1253,7 @@ main(void) {
   push_type(type_struct("Label_Location_Diff_Patch_Info", (Struct_Item[]){
     { "Label *", "target" },
     { "Label", "from" },
-    { "s32 *", "patch_at" },
+    { "void *", "patch32_at" },
   }));
 
   push_type(type_enum("Number_Base", (Enum_Type_Item[]){
