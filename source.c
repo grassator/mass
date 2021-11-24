@@ -565,7 +565,7 @@ deduce_runtime_descriptor_for_value(
   Execution_Context *context,
   Value *value
 ) {
-  if (value_is_non_lazy_static(value)) {
+  if (mass_value_is_compile_time_known(value)) {
     if (value->descriptor == &descriptor_i64) {
       return &descriptor_s64;
     }
@@ -869,7 +869,7 @@ mass_assign(
   if (descriptor_is_implicit_pointer(target->descriptor)) {
     if (
       (
-        value_is_non_lazy_static(source) &&
+        mass_value_is_compile_time_known(source) &&
         !assign_from_static(compilation, builder, target, source, source_range)
       ) ||
       source->descriptor == &descriptor_tuple
@@ -1032,7 +1032,7 @@ mass_assign(
     return;
   }
 
-  if (value_is_non_lazy_static(source)) {
+  if (mass_value_is_compile_time_known(source)) {
     if (assign_from_static(compilation, builder, target, source, source_range)) {
       return;
     }
@@ -2179,7 +2179,7 @@ mass_expected_result_ensure_value_or_temp(
       MASS_ON_ERROR(*compilation->result) return 0;
       // @Hack there should be a better and more robust way to do this
       if (
-        !value_is_non_lazy_static(value) &&
+        !mass_value_is_compile_time_known(value) &&
         !storage_occupies_same_memory(&result_value->storage, &value->storage)
       ) {
         storage_release_if_temporary(builder, &value->storage);
@@ -3055,7 +3055,7 @@ mass_cast_helper(
 
   if (
     expression->descriptor == &descriptor_tuple &&
-    value_is_non_lazy_static(expression)
+    mass_value_is_compile_time_known(expression)
   ) {
     Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
     *heap_payload = lazy_payload;
@@ -3065,7 +3065,7 @@ mass_cast_helper(
     );
   }
 
-  if (value_is_non_lazy_static(expression)) {
+  if (mass_value_is_compile_time_known(expression)) {
     Expected_Result expected_result = expected_result_static(target_descriptor);
     return mass_handle_cast_lazy_proc(context->compilation, 0, &expected_result, &source_range, &lazy_payload);
   }
@@ -3262,7 +3262,7 @@ mass_handle_macro_call(
         arg_value = value_view_get(args_view, i);
       }
 
-      u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
+      u64 arg_epoch = mass_value_is_compile_time_known(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
 
       bool needs_casting = (
         // FIXME pass in resolved Function_Info from call and remove a guard on the next line
@@ -3276,7 +3276,7 @@ mass_handle_macro_call(
       //
       // This assumption holds if the argument is exactly the right type and is statically known
       Value *param_value;
-      if (value_is_non_lazy_static(arg_value) && !needs_casting) {
+      if (mass_value_is_compile_time_known(arg_value) && !needs_casting) {
         param_value = arg_value;
       } else {
         // Otherwise we will create a temp copy
@@ -3315,7 +3315,7 @@ mass_handle_macro_call(
     goto err;
   }
 
-  if (value_is_non_lazy_static(body_value)) {
+  if (mass_value_is_compile_time_known(body_value)) {
     return body_value;
   }
 
@@ -3469,7 +3469,7 @@ call_function_overload(
       should_assign = false;
       register_acquire_bitset(builder, source_registers_bitset);
     } else if (
-      value_is_non_lazy_static(source_arg) &&
+      mass_value_is_compile_time_known(source_arg) &&
       !descriptor_is_implicit_pointer(target_item->descriptor)
     ) {
       arg_value = source_arg;
@@ -4081,7 +4081,7 @@ mass_trampoline_call(
   assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < args_view.length; ++i) {
     Value *item = value_view_get(args_view, i);
-    assert(value_is_non_lazy_static(item));
+    assert(mass_value_is_compile_time_known(item));
     const Struct_Field *field = dyn_array_get(fields, i);
     u64 offset = field->offset;
     void *arg_memory = args_struct_memory + offset;
@@ -4123,7 +4123,7 @@ mass_can_trampoline_call(
   for (u64 i = 0; i < args_view.length; ++i) {
     Value *arg = value_view_get(args_view, i);
 
-    if (!value_is_non_lazy_static(arg)) return false;
+    if (!mass_value_is_compile_time_known(arg)) return false;
 
     // The check here is required because casts may generate extra instructions.
     // This can be removed if the casts are not a thing for fn calls or if
@@ -4253,7 +4253,7 @@ token_handle_parsed_function_call(
     MASS_ON_ERROR(*context->result) goto defer;
     args_view = value_view_from_value_array(temp_args, &source_range);
   } else if (args_token->descriptor == &descriptor_value_view) {
-    if (!value_is_non_lazy_static(args_token)) {
+    if (!mass_value_is_compile_time_known(args_token)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Expected_Static,
         .source_range = source_range,
@@ -4678,7 +4678,7 @@ mass_handle_generic_comparison_lazy_proc(
     } break;
   }
 
-  if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
+  if (mass_value_is_compile_time_known(lhs) && mass_value_is_compile_time_known(rhs)) {
     bool equal = storage_static_equal(lhs->descriptor, &lhs->storage, rhs->descriptor, &rhs->storage);
     if (negated) equal = !equal;
     return value_make(
@@ -4975,7 +4975,7 @@ mass_pointer_to(
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
   // TODO Not sure if this is required
-  //if (value_is_non_lazy_static(pointee)) {
+  //if (mass_value_is_compile_time_known(pointee)) {
     //if (context_is_compile_time_eval(context)) {
       //const void *source_memory =
         //get_static_storage_with_bit_size(&pointee->storage, pointee_descriptor->bit_size);
@@ -5460,7 +5460,7 @@ mass_struct_field_access(
     .field = field,
   };
 
-  if (value_is_non_lazy_static(struct_)) {
+  if (mass_value_is_compile_time_known(struct_)) {
     Expected_Result expected_result = expected_result_static(field->descriptor);
     return mass_handle_field_access_lazy_proc(
       context->compilation, 0, &expected_result, source_range, &stack_lazy_payload
@@ -5569,7 +5569,7 @@ mass_handle_dot_operator(
     Slice field_name = field_symbol->name;
 
     if (lhs_forced_descriptor == &descriptor_module) {
-      if (!value_is_non_lazy_static(lhs)) {
+      if (!mass_value_is_compile_time_known(lhs)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Expected_Static,
           .source_range = lhs->source_range,
@@ -5783,7 +5783,7 @@ token_parse_if_expression(
 
   *matched_length = peek_index;
 
-  if (value_is_non_lazy_static(value_condition)) {
+  if (mass_value_is_compile_time_known(value_condition)) {
     const Descriptor *descriptor = value_condition->descriptor;
     if (descriptor != &descriptor__bool) {
       context_error(context, (Mass_Error) {
@@ -6361,7 +6361,7 @@ token_parse_block_view(
     );
     MASS_ON_ERROR(*context->result) goto defer;
 
-    if (value_is_non_lazy_static(parse_result)) {
+    if (mass_value_is_compile_time_known(parse_result)) {
       if (value_is_code_fragment(parse_result)) {
         const Code_Fragment *fragment = value_as_code_fragment(parse_result);
         Scope *saved_scope = context->scope;
@@ -6479,7 +6479,7 @@ token_parse_statement_using(
     goto err;
   }
 
-  if (!value_is_non_lazy_static(result)) {
+  if (!mass_value_is_compile_time_known(result)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Expected_Static,
       .source_range = rest.source_range,
@@ -6642,7 +6642,7 @@ token_define_global_variable(
     Storage global_storage = data_label32(label, descriptor->bit_size);
     global_value = value_make(context->allocator, descriptor, global_storage, expression.source_range);
 
-    if (value_is_non_lazy_static(value)) {
+    if (mass_value_is_compile_time_known(value)) {
       // TODO this is a bit awkward but
       Function_Builder fake_builder = {
         .epoch = context->epoch,

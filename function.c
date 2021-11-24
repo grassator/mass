@@ -778,7 +778,7 @@ calculate_arguments_match_score(
       source_arg = value_view_get(args_view, arg_index);
     }
     if (fn_is_compile_time) {
-      if (!value_is_non_lazy_static(source_arg)) return -1;
+      if (!mass_value_is_compile_time_known(source_arg)) return -1;
     }
     source_descriptor = value_or_lazy_value_descriptor(source_arg);
     switch(param->tag) {
@@ -795,7 +795,7 @@ calculate_arguments_match_score(
         }
       } break;
       case Function_Parameter_Tag_Exact_Static: {
-        if (!value_is_non_lazy_static(source_arg)) return -1;
+        if (!mass_value_is_compile_time_known(source_arg)) return -1;
         if (!storage_static_equal(
           target_descriptor, &param->Exact_Static.storage,
           source_arg->descriptor, &source_arg->storage

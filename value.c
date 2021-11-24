@@ -15,7 +15,7 @@ value_is_lazy_or_static(
 }
 
 static inline bool
-value_is_non_lazy_static(
+mass_value_is_compile_time_known(
   const Value *value
 ) {
   if (!value) return false;
