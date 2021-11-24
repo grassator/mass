@@ -45,31 +45,18 @@ static_value :: fn(
 ) -> (&Value) {
   type :: type_of(pointer)
   static_assert(type.tag == MASS.Descriptor_Tag.Pointer_To)
+  pointee_type :: type.Pointer_To.descriptor
 
   static_value := allocate(compilation.allocator, Value)
   static_value.source_range = source_range
-  static_value.descriptor = type.Pointer_To.descriptor
+  static_value.descriptor = pointee_type
 
   static_value.storage.tag = MASS.Storage_Tag.Static
-  static_value.storage.bit_size = static_value.descriptor.bit_size
+  static_value.storage.bit_size = pointee_type.bit_size
 
-  bit_size := static_value.descriptor.bit_size.as_u64
-  if bit_size == 8 then {
-    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U8
-    static_value.storage.Static.memory.U8.value = cast(&u8, pointer).*
-  } else if bit_size == 16 then {
-    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U16
-    static_value.storage.Static.memory.U16.value = cast(&u16, pointer).*
-  } else if bit_size == 32 then {
-    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U32
-    static_value.storage.Static.memory.U32.value = cast(&u32, pointer).*
-  } else if bit_size == 64 then {
-    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.U64
-    static_value.storage.Static.memory.U64.value = cast(&u64, pointer).*
-  } else {
-    static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap
-    static_value.storage.Static.memory.Heap.pointer = pointer
-  }
+  static_assert(@{pointee_type.bit_size.as_u64 > 64})
+  static_value.storage.Static.memory.tag = MASS.Static_Memory_Tag.Heap
+  static_value.storage.Static.memory.Heap.pointer = pointer
 
   static_value
 }
