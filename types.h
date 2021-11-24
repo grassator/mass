@@ -164,9 +164,11 @@ typedef struct {
   s32 value;
 } C_Enum_Item;
 
+
 // Need to forward-declare this for the value helpers below
+typedef struct Storage Storage;
 static const void *
-get_static_storage_with_bit_size();
+storage_static_memory(const Storage *);
 
 #define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
   static inline bool\
@@ -174,7 +176,7 @@ get_static_storage_with_bit_size();
     const Value *value\
   ) {\
     if (!value) return false;\
-    if (value->storage.tag != Storage_Tag_Static) return false;\
+    if (value->storage.tag != Storage_Tag_Static && value->storage.tag != Storage_Tag_Immediate) return false;\
     return value->descriptor == &descriptor_##_SUFFIX_;\
   }\
   static inline  _C_TYPE_ const *\
@@ -182,9 +184,8 @@ get_static_storage_with_bit_size();
     const Value *value\
   ) {\
     assert(value_is_##_SUFFIX_(value));\
-    return (_C_TYPE_ const *)get_static_storage_with_bit_size(\
-      &value->storage, value->descriptor->bit_size\
-    );\
+    assert(value->storage.bit_size.as_u64 == value->descriptor->bit_size.as_u64);\
+    return (_C_TYPE_ const *)storage_static_memory(&value->storage);\
   }
 
 #include "generated_types.h"
