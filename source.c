@@ -5593,12 +5593,18 @@ mass_handle_dot_operator(
         descriptor = descriptor->Pointer_To.descriptor;
       }
       rhs = token_parse_single(context, rhs);
-      Mass_Array_Access_Lazy_Payload *lazy_payload =
+      Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
+      if (mass_value_is_compile_time_known(lhs)) {
+        Expected_Result expected_result = expected_result_static(descriptor);
+        return mass_handle_array_access_lazy_proc(
+          context->compilation, 0, &expected_result, &args_view.source_range, &lazy_payload
+        );
+      }
+      Mass_Array_Access_Lazy_Payload *heap_payload =
         allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
-      *lazy_payload = (Mass_Array_Access_Lazy_Payload) { .array = lhs, .index = rhs };
-
+      *heap_payload = lazy_payload;
       return mass_make_lazy_value(
-        context, args_view.source_range, lazy_payload, descriptor, mass_handle_array_access_lazy_proc
+        context, args_view.source_range, heap_payload, descriptor, mass_handle_array_access_lazy_proc
       );
     } else {
       context_error(context, (Mass_Error) {
