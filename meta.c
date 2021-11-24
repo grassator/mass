@@ -1919,7 +1919,7 @@ main(void) {
 
   push_type(type_hash_map("Static_Pointer_Map", {
     .key_type = "const void *",
-    .value_type = "Value",
+    .value_type = "Value *",
     .hash_function = "hash_pointer",
     .equal_function = "const_void_pointer_equal",
   }));

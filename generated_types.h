@@ -2078,7 +2078,7 @@ typedef struct Jit {
 } Jit;
 typedef dyn_array_type(Jit) Array_Jit;
 
-hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
+hash_map_template(Static_Pointer_Map, const void *, Value *, hash_pointer, const_void_pointer_equal)
 typedef struct Common_Symbols {
   const Symbol * apply;
   const Symbol * fn;

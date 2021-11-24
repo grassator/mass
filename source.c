@@ -345,8 +345,7 @@ assign_from_static(
     // whether the target memory is also already copied to the compiled binary.
     // This is done to only include static values actually used at runtime.
     void *source_memory = *(void **)get_static_storage_with_bit_size(&source->storage, (Bits){64});
-    Value *static_pointer = hash_map_get(compilation->static_pointer_map, source_memory);
-    assert(static_pointer);
+    Value *static_pointer = *hash_map_get(compilation->static_pointer_map, source_memory);
     if (static_pointer->storage.tag == Storage_Tag_None) {
       Section *section = (static_pointer->flags & Value_Flags_Constant)
        ? &builder->program->memory.ro_data
@@ -1505,27 +1504,29 @@ tokenizer_push_string_literal(
   u64 length = (*string_buffer)->occupied;
   char *bytes = allocator_allocate_bytes(compilation->allocator, length, 1);
   memcpy(bytes, (*string_buffer)->memory, length);
+
+  allocator_allocate_bulk(compilation->allocator, combined, {
+    Descriptor bits_descriptor;
+    Slice slice;
+    Value string_value;
+    Value static_pointer_value;
+  });
   {
-    Descriptor *bits_descriptor = allocator_allocate(compilation->allocator, Descriptor);
+    Descriptor *bits_descriptor = &combined->bits_descriptor;
     *bits_descriptor = (Descriptor) {
       .tag = Descriptor_Tag_Opaque,
       .bit_size = {length * CHAR_BIT},
       .bit_alignment = { CHAR_BIT },
       .Opaque = { .numeric_interpretation = Opaque_Numeric_Interpretation_None },
     };
-    Value *pointer_value = hash_map_set(compilation->static_pointer_map, bytes, (Value){0});
-    value_init(pointer_value, bits_descriptor, storage_none, source_range);
+    hash_map_set(compilation->static_pointer_map, bytes, &combined->static_pointer_value);
+    value_init(&combined->static_pointer_value, bits_descriptor, storage_none, source_range);
   }
 
-  allocator_allocate_bulk(compilation->allocator, combined, {
-    Slice slice;
-    Value value;
-  });
-
   Slice *string = &combined->slice;
-  *string = (Slice){bytes, (*string_buffer)->occupied};
+  *string = (Slice){bytes, length};
   Value *string_value = value_init(
-    &combined->value,
+    &combined->string_value,
     &descriptor_slice, storage_static(string), source_range
   );
   dyn_array_push(*stack, string_value);
