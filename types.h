@@ -89,9 +89,9 @@
   (Value) {\
     .descriptor = &descriptor_descriptor_pointer,\
     .storage = {\
-      .tag = Storage_Tag_Static,\
+      .tag = Storage_Tag_Immediate,\
       .bit_size = {sizeof(Descriptor *) * CHAR_BIT},\
-      .Static.memory = {.tag = Static_Memory_Tag_U64, .U64 = {(u64)(_DESCRIPTOR_)}},\
+      .Immediate.bits = (u64)(_DESCRIPTOR_),\
     },\
   }
 

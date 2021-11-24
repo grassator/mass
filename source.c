@@ -1607,7 +1607,7 @@ value_ensure_type(
   }
   // Can't use `value_as_descriptor_pointer` because it might a user-generated version
   // of the type that does not pointer compare unless we memoize
-  return *(Descriptor const **)get_static_storage_with_bit_size(
+  return *(Descriptor const **)storage_static_memory_with_bit_size(
     &value->storage, value->descriptor->bit_size
   );
 }
@@ -2201,7 +2201,7 @@ mass_expected_result_ensure_value_or_temp(
         return value;
       }
       if (
-        value->storage.tag == Storage_Tag_Static &&
+        (value->storage.tag == Storage_Tag_Static || value->storage.tag == Storage_Tag_Immediate) &&
         (flexible->storage & Expected_Result_Storage_Static)
       ) {
         return value;
@@ -3863,8 +3863,8 @@ mass_intrinsic_call(
     }
     jitted_code = (fn_type_opaque)rip_value_pointer_from_label(label);
   } else {
-    u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);
-    jitted_code = (fn_type_opaque)absolute_address;
+    void const * const *address_memory = storage_static_memory_with_bit_size(&instance->storage, (Bits){64});
+    jitted_code = (fn_type_opaque)*address_memory;
   }
 
   // @Volatile :IntrinsicFunctionSignature
@@ -4083,7 +4083,7 @@ mass_trampoline_call(
     const Struct_Field *field = dyn_array_get(fields, i);
     u64 offset = field->offset;
     void *arg_memory = args_struct_memory + offset;
-    const void *source_memory = get_static_storage_with_bit_size(
+    const void *source_memory = storage_static_memory_with_bit_size(
       &item->storage, item->descriptor->bit_size
     );
     memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
@@ -5273,13 +5273,10 @@ value_maybe_dereference(
   if (!is_pointer) {
     return value->storage;
   } else {
-    if (value->storage.tag == Storage_Tag_Static) {
+    if (mass_value_is_compile_time_known(value)) {
       const void *pointed_memory =
-        *(void **)get_static_storage_with_bit_size(&value->storage, (Bits){64});
+        *(void **)storage_static_memory_with_bit_size(&value->storage, (Bits){64});
       return storage_static_internal(pointed_memory, unwrapped_descriptor->bit_size);
-    } else if (value->storage.tag == Storage_Tag_Immediate) {
-      panic("TODO");
-      return storage_none;
     } else if (value->storage.tag == Storage_Tag_Register) {
       Register reg = value->storage.Register.index;
       return storage_indirect(unwrapped_descriptor->bit_size, reg);

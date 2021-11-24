@@ -741,17 +741,26 @@ storage_static_equal_internal(
 }
 
 static inline const void *
-storage_static_memory(
-  const Storage *storage
+storage_static_memory_with_bit_size(
+  const Storage *storage,
+  Bits bit_size
 ) {
+  assert(storage->bit_size.as_u64 == bit_size.as_u64);
   if (storage->tag == Storage_Tag_Static) {
-    return get_static_storage_with_bit_size(storage, storage->bit_size);
+    return get_static_storage_with_bit_size(storage, bit_size);
   } else if (storage->tag == Storage_Tag_Immediate) {
     return &storage->Immediate.bits;
   } else {
     panic("Unexpected static storage tag");
   }
   return 0;
+}
+
+static inline const void *
+storage_static_memory(
+  const Storage *storage
+) {
+  return storage_static_memory_with_bit_size(storage, storage->bit_size);
 }
 
 static bool
@@ -763,9 +772,8 @@ storage_static_equal(
 ) {
   if (!same_type(a_descriptor, b_descriptor)) return false;
   assert(a_storage->bit_size.as_u64 == b_storage->bit_size.as_u64);
-  assert(a_descriptor->bit_size.as_u64 == a_storage->bit_size.as_u64);
-  const void *a_memory = storage_static_memory(a_storage);
-  const void *b_memory = storage_static_memory(b_storage);
+  const void *a_memory = storage_static_memory_with_bit_size(a_storage, a_descriptor->bit_size);
+  const void *b_memory = storage_static_memory_with_bit_size(b_storage, b_descriptor->bit_size);
   return storage_static_equal_internal(a_descriptor, a_memory, b_descriptor, b_memory);
 }
 
