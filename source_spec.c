@@ -2154,7 +2154,7 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should allow a tuple with a mix of named an unnamed fields to a struct") {
+    it("should allow a tuple with a mix of named and unnamed fields to a struct") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
@@ -2165,6 +2165,20 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
+    }
+
+    it("should report an error when assigned tuple has duplicate fields") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "Point :: c_struct [x : s32, y : s32]\n"
+        "test :: fn() -> (s32) {"
+          "p : Point = [.x = 20, .x = 22]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Redefinition);
     }
 
     it("should allow assigning a tuple with anonymous fields to a struct") {

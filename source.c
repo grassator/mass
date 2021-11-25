@@ -726,6 +726,7 @@ assign_tuple(
   const Source_Range *source_range
 ) {
   const Tuple *tuple = value_as_tuple(source);
+  Temp_Mark temp_mark = compilation_temp_mark(compilation);
   if (target->descriptor->tag == Descriptor_Tag_Struct) {
     Array_Struct_Field fields = target->descriptor->Struct.fields;
     if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) {
@@ -738,10 +739,15 @@ assign_tuple(
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
         .detailed_message = message,
       });
-      return;
+      goto err;
     }
 
-    // FIXME detect unassigned and duplicate assigned fields
+    Struct_Field_Set *assigned_set = hash_map_make(
+      Struct_Field_Set,
+      .initial_capacity = dyn_array_length(fields) * 2,
+      .allocator = compilation->temp_allocator,
+    );
+
     u64 field_index = 0;
     for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
       Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
@@ -760,7 +766,7 @@ assign_tuple(
               .actual = assignment->target->descriptor,
             },
           });
-          return;
+          goto err;
         }
         const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
         field = 0;
@@ -781,13 +787,23 @@ assign_tuple(
             .source_range = tuple_item->source_range,
             .Unknown_Field = { .name = accessor->symbol->name, .type = target->descriptor },
           });
-          return;
+          goto err;
         }
       } else {
         field_source = tuple_item;
         field = dyn_array_get(fields, field_index);
         field_index += 1;
       }
+      if (hash_map_has(assigned_set, field)) {
+        compilation_error(compilation, (Mass_Error) {
+          .tag = Mass_Error_Tag_Redefinition,
+          .source_range = tuple_item->source_range,
+          .Redefinition = { .name = field->name },
+        });
+        goto err;
+      }
+      hash_map_set(assigned_set, field, 1);
+
       Value target_field = {
         .descriptor = field->descriptor,
         .storage = storage_with_offset_and_bit_size(
@@ -796,7 +812,7 @@ assign_tuple(
         .source_range = target->source_range,
       };
       mass_assign(compilation, builder, &target_field, field_source, source_range);
-      MASS_ON_ERROR(*compilation->result) return;
+      MASS_ON_ERROR(*compilation->result) goto err;
     }
   } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
     u64 length = target->descriptor->Fixed_Size_Array.length;
@@ -810,7 +826,7 @@ assign_tuple(
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
         .detailed_message = message,
       });
-      return;
+      goto err;
     }
 
     const Descriptor *item_descriptor = target->descriptor->Fixed_Size_Array.item;
@@ -826,7 +842,7 @@ assign_tuple(
         .source_range = target->source_range,
       };
       mass_assign(compilation, builder, &target_field, tuple_item, source_range);
-      MASS_ON_ERROR(*compilation->result) return;
+      MASS_ON_ERROR(*compilation->result) goto err;
     }
   } else {
     compilation_error(compilation, (Mass_Error) {
@@ -835,7 +851,9 @@ assign_tuple(
       .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
     });
   }
-  return;
+
+  err:
+  compilation_temp_reset_to_mark(compilation, temp_mark);
 }
 
 static inline Storage

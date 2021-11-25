@@ -1863,6 +1863,13 @@ main(void) {
     { "Mass_Trampoline_Proc", "proc"},
   }));
 
+  push_type(type_hash_map("Struct_Field_Set", {
+    .key_type = "const Struct_Field *",
+    .value_type = "u64",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
+  }));
+
   push_type(type_hash_map("Symbol_Map", {
     .key_type = "Slice",
     .value_type = "Symbol *",
