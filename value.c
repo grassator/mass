@@ -1113,20 +1113,23 @@ maybe_function_info_for_args(
   return 0;
 }
 
-static fn_type_opaque
+static inline fn_type_opaque
 value_as_function(
   Program *program,
   Value *value
 ) {
-  const Function_Info *info = maybe_function_info_for_args(value, (Value_View){0});
-  assert(info);
-  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (builder->function != info) continue;
-    return (fn_type_opaque)rip_value_pointer_from_label(builder->code_block.start_label);
+  assert(value->descriptor->tag == Descriptor_Tag_Function_Instance);
+  if(mass_value_is_compile_time_known(value)) {
+    void const * const *address_pointer = storage_static_memory_with_bit_size(&value->storage, (Bits){64});
+    return (fn_type_opaque)*address_pointer;
+  } else if (storage_is_label(&value->storage)) {
+    Label *label = value->storage.Memory.location.Instruction_Pointer_Relative.label;
+    assert(label->program == program);
+    return (fn_type_opaque)rip_value_pointer_from_label(label);
+  } else {
+    panic("Could not find resolve runtime function for value");
+    return 0;
   }
-  panic("Could not find resolve runtime function for value");
-  return 0;
 }
 
 static const Os

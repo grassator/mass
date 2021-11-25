@@ -7396,18 +7396,17 @@ mass_run_script(
   *context->result = tokenize(compilation, source_range, tokens);
   MASS_ON_ERROR(*context->result) return;
 
-  Value *tokens_value = value_make(
+  Value *fake_function_body = value_make(
     context->allocator, &descriptor_value_view, storage_static(tokens), source_range
   );
-
   Function_Literal *literal = mass_make_fake_function_literal(
-    context, tokens_value, &descriptor_void, &source_range
+    context, fake_function_body, &descriptor_void, &source_range
   );
-  Value *literal_value =
+  Value *entry =
     value_make(context->allocator, &descriptor_function_literal, storage_static(literal), source_range);
+  entry = ensure_function_instance(compilation, context->program, entry, (Value_View){0});
 
-  context->program->entry_point = literal_value;
-  ensure_function_instance(compilation, context->program, literal_value, (Value_View){0});
+  context->program->entry_point = entry;
   MASS_ON_ERROR(*context->result) return;
 
   Jit jit;

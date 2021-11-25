@@ -110,7 +110,7 @@ test_program_source_base(
     context, test_module->own_scope, symbol, &symbol_source_range
   );
   if (value && value->descriptor == &descriptor_function_literal) {
-    ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
+    return ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
   }
   return value;
 }
