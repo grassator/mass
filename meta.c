@@ -1870,6 +1870,11 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
+  push_type(type_hash_map("Slice_Set", {
+    .key_type = "Slice",
+    .value_type = "u64",
+  }));
+
   push_type(type_hash_map("Symbol_Map", {
     .key_type = "Slice",
     .value_type = "Symbol *",

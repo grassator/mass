@@ -2104,7 +2104,7 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_Assignment_To_Constant);
     }
 
-    it("should be able to parse tuples and access their elements") {
+    it("should be able to parse unnamed tuple structs and access their elements") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "test :: fn() -> (s64) {"
@@ -2174,6 +2174,32 @@ spec("source") {
         "test :: fn() -> (s32) {"
           "p : Point = [.x = 20, .x = 22]\n"
           "p.x + p.y"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Redefinition);
+    }
+
+    it("should be able to handle named fields in inferred tuple structs") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (s64) {"
+          "p := [.x = 20, .y = 22]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should report an error when inferred struct tuple type has duplicate fields") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "Point :: c_struct [x : s32, y : s32]\n"
+        "test :: fn() -> (s32) {"
+          "p := [.x = 20, .x = 22]\n"
+          "p.x"
         "}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -2272,6 +2298,19 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
+    }
+
+    it("should report an error when encountering duplicate fields in a tuple as a type") {
+      test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (s64) {"
+          "tuple : [foo : s64, foo : s64] = [42, 42]\n"
+          "tuple.foo"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Redefinition);
     }
 
     it("should report an error when tuple is assigned to something that is not a struct") {

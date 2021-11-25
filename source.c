@@ -502,12 +502,22 @@ anonymous_struct_descriptor_from_tuple(
   const Tuple *tuple,
   Tuple_Eval_Mode tuple_eval_mode
 ) {
+  Descriptor *tuple_descriptor = 0;
+  Temp_Mark temp_mark = context_temp_mark(context);
+
   C_Struct_Aligner struct_aligner = {0};
   Array_Struct_Field fields = dyn_array_make(
     Array_Struct_Field,
     .allocator = context->allocator,
     .capacity = dyn_array_length(tuple->items),
   );
+
+  Slice_Set *field_name_set = hash_map_make(
+    Slice_Set,
+    .initial_capacity = dyn_array_length(tuple->items) * 2,
+    .allocator = context->temp_allocator,
+  );
+
   for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
     Value *item = *dyn_array_get(tuple->items, i);
     Slice name = {0};
@@ -527,7 +537,7 @@ anonymous_struct_descriptor_from_tuple(
                 .actual = assignment->target->descriptor,
               },
             });
-            return 0;
+            goto err;
           }
           const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
           name = accessor->symbol->name;
@@ -551,6 +561,18 @@ anonymous_struct_descriptor_from_tuple(
       } break;
     }
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
+    if (name.length) {
+      if (hash_map_has(field_name_set, name)) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Redefinition,
+          .source_range = item->source_range,
+          .Redefinition = { .name = name },
+        });
+        goto err;
+      } else {
+        hash_map_set(field_name_set, name, 1);
+      }
+    }
 
     dyn_array_push(fields, (Struct_Field) {
       .name = name,
@@ -561,7 +583,7 @@ anonymous_struct_descriptor_from_tuple(
   }
   c_struct_aligner_end(&struct_aligner);
 
-  Descriptor *tuple_descriptor = allocator_allocate(context->allocator, Descriptor);
+  tuple_descriptor = allocator_allocate(context->allocator, Descriptor);
   *tuple_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
     .bit_size = {struct_aligner.bit_size},
@@ -571,6 +593,9 @@ anonymous_struct_descriptor_from_tuple(
       .fields = fields,
     },
   };
+
+  err:
+  context_temp_reset_to_mark(context, temp_mark);
 
   return tuple_descriptor;
 }

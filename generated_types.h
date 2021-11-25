@@ -628,6 +628,8 @@ typedef dyn_array_type(const Mass_Trampoline *) Array_Const_Mass_Trampoline_Ptr;
 
 typedef struct Struct_Field_Set Struct_Field_Set;
 
+typedef struct Slice_Set Slice_Set;
+
 typedef struct Symbol_Map Symbol_Map;
 
 typedef struct Trampoline_Map Trampoline_Map;
@@ -2006,6 +2008,7 @@ typedef struct Mass_Trampoline {
 typedef dyn_array_type(Mass_Trampoline) Array_Mass_Trampoline;
 
 hash_map_template(Struct_Field_Set, const Struct_Field *, u64, hash_pointer, const_void_pointer_equal)
+hash_map_slice_template(Slice_Set, u64)
 hash_map_slice_template(Symbol_Map, Symbol *)
 hash_map_template(Trampoline_Map, const Value *, const Mass_Trampoline *, hash_pointer, const_void_pointer_equal)
 hash_map_template(Scope_Map, const Symbol *, Scope_Entry *, hash_pointer, const_void_pointer_equal)
@@ -2562,6 +2565,7 @@ static Descriptor descriptor_array_mass_trampoline_ptr;
 static Descriptor descriptor_mass_trampoline_pointer;
 static Descriptor descriptor_mass_trampoline_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(struct_field_set, Struct_Field_Set);
+MASS_DEFINE_OPAQUE_C_TYPE(slice_set, Slice_Set);
 MASS_DEFINE_OPAQUE_C_TYPE(symbol_map, Symbol_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(trampoline_map, Trampoline_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(scope_map, Scope_Map);
