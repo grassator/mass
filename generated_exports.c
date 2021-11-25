@@ -508,7 +508,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_intrinsic, "intrinsic", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -520,7 +520,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_call, "call", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -532,7 +532,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_import, "import", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -544,7 +544,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_pointer_to, "pointer_to", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -556,7 +556,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_eval, "eval", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -568,7 +568,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_fragment, "fragment", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -580,7 +580,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_inline_module, "inline_module", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -592,7 +592,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_quote, "quote", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -604,7 +604,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_unquote, "unquote", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -616,7 +616,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_c_struct, "c_struct", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -628,7 +628,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_exports, "exports", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -640,7 +640,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_cast, "cast", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -652,7 +652,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_type_of, "type_of", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -664,7 +664,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_size_of, "size_of", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -676,7 +676,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_startup, "startup", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -688,7 +688,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_static_assert, "static_assert", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -884,7 +884,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_add, "integer_add", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -896,7 +896,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_subtract, "integer_subtract", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -908,7 +908,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_multiply, "integer_multiply", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -920,7 +920,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_divide, "integer_divide", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -932,7 +932,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_remainder, "integer_remainder", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -944,7 +944,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_less, "integer_less", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -956,7 +956,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_greater, "integer_greater", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -968,7 +968,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_less_equal, "integer_less_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -980,7 +980,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_greater_equal, "integer_greater_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -992,7 +992,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_equal, "integer_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -1004,7 +1004,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_not_equal, "integer_not_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -1016,7 +1016,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_generic_equal, "generic_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -1028,7 +1028,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_generic_not_equal, "generic_not_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),

@@ -953,17 +953,6 @@ spec("source") {
       check(checker(spec_callback) == 42);
     }
 
-    it("should report an error when a non-compile-time fn has an intrinsic body") {
-      test_program_inline_source_base(
-        "checker", &test_context,
-        "my_intrinsic :: fn() -> () intrinsic { 0 }\n"
-        "checker :: fn() -> () { my_intrinsic() }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Parse);
-    }
-
     it("should support referencing the type of one argument in the return type") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
@@ -1078,7 +1067,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "intrinsic_id :: fn(x : i64) => (i64) intrinsic { arguments.values.0 }\n"
+          "intrinsic_id :: fn(x : i64) -> (i64) intrinsic { arguments.values.0 }\n"
           "checker :: fn() -> (s64) { intrinsic_id(42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -1089,7 +1078,7 @@ spec("source") {
     xit("should validate the return type of the intrinsic when specified") {
       test_program_inline_source_function(
         "checker", &test_context,
-        "intrinsic_id :: fn(x : i64, y : String) => (i64) intrinsic { arguments.values.1 }\n"
+        "intrinsic_id :: fn(x : i64, y : String) -> (i64) intrinsic { arguments.values.1 }\n"
         "checker :: fn() -> () { intrinsic_id(42, \"foo\") }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1103,7 +1092,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: fn(a : i64, b : i64) => (i64)"
+          "my_intrinsic :: fn(a : i64, b : i64) -> (i64)"
             "intrinsic { arguments.values.1 }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
@@ -1114,7 +1103,7 @@ spec("source") {
     it("should be able to allocate and return a void value through an intrinsic") {
       void (*checker)() = test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: fn() => () intrinsic {\n"
+          "my_intrinsic :: fn() -> () intrinsic {\n"
             "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
             "value.source_range = arguments.source_range\n"
             "value.descriptor = type_of(())\n"
@@ -1130,7 +1119,7 @@ spec("source") {
     it("should be able to allocate and return an immediate value through an intrinsic") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: fn() => () intrinsic {\n"
+          "my_intrinsic :: fn() -> () intrinsic {\n"
             "meta :: import(\"std/meta\")\n"
             "x := 42\n"
             "meta.immediate(context.compilation, x, arguments.source_range)\n"
@@ -1144,7 +1133,7 @@ spec("source") {
     it("should be able to allocate and return a lazy void value through an intrinsic") {
       void (*checker)() = test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: fn() => () intrinsic {\n"
+          "my_intrinsic :: fn() intrinsic {\n"
             "lazy_value_proc :: fn("
               "compilation : &MASS.Compilation,"
               "builder : &MASS.Function_Builder,"
@@ -1183,7 +1172,7 @@ spec("source") {
     it("should report an error when trying to directly recurse into the same intrinsic") {
       test_program_inline_source_function(
         "checker", &test_context,
-        "my_intrinsic :: fn() => () intrinsic {\n"
+        "my_intrinsic :: fn() -> () intrinsic {\n"
           "my_intrinsic()\n"
         "}\n"
         "checker :: fn() -> () { my_intrinsic() }\n"
@@ -1197,7 +1186,7 @@ spec("source") {
       test_program_inline_source_function(
         "checker", &test_context,
         "foo :: fn() -> () { my_intrinsic() }\n"
-        "my_intrinsic :: fn() => () intrinsic { foo() }\n"
+        "my_intrinsic :: fn() -> () intrinsic { foo() }\n"
         "checker :: fn() -> () { my_intrinsic() }\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);

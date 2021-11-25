@@ -436,7 +436,6 @@ print_scope_define_function(
       fprintf(file, " | Function_Info_Flags_Compile_Time");
     } break;
     case Function_Kind_Intrinsic: {
-      fprintf(file, " | Function_Info_Flags_Compile_Time");
       fprintf(file, " | Function_Info_Flags_Intrinsic");
 
       if (function->argument_count != 2) {

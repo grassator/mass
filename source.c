@@ -3747,9 +3747,7 @@ calculate_arguments_match_score(
   assert(args_view.length < MAX_ARG_COUNT);
   s64 score = 0;
   if (args_view.length > dyn_array_length(descriptor->parameters)) return -1;
-  bool fn_is_compile_time =
-    (descriptor->flags & Function_Info_Flags_Compile_Time) &&
-    !(descriptor->flags & Function_Info_Flags_Intrinsic);
+  bool fn_is_compile_time = !!(descriptor->flags & Function_Info_Flags_Compile_Time);
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     const Descriptor *target_descriptor = param->descriptor;
@@ -5958,7 +5956,6 @@ mass_intrinsic(
     .descriptor = &descriptor_value_view,
     .source_range = *source_range,
   });
-  literal->info->flags |= Function_Info_Flags_Compile_Time;
   literal->info->flags |= Function_Info_Flags_Intrinsic;
 
   return value_make(context->allocator, &descriptor_function_literal, storage_static(literal), *source_range);
@@ -6144,14 +6141,6 @@ token_parse_function_literal(
       context->allocator, fn_descriptor, storage_none, view.source_range
     );
   } else if (body_value) {
-    if (value_is_intrinsic(body_value) && !(fn_info->flags & Function_Info_Flags_Compile_Time)) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = body_value->source_range,
-        .detailed_message = slice_literal("A function literal with the intrinsic body must be marked compile time"),
-      });
-      return 0;
-    }
     Function_Literal_Flags flags = Function_Literal_Flags_None;
     if (value_is_intrinsic(body_value)) {
       fn_info->flags |= Function_Info_Flags_Intrinsic;

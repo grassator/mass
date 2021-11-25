@@ -11,15 +11,15 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_done
 }
 
-import :: fn(path : String) => (MASS.Scope) MASS.import
-cast :: @fn(type : Type, value) MASS.cast
-startup :: fn(callback : fn() -> ()) => () MASS.startup
-eval :: @fn(curly : MASS.Group_Curly) MASS.eval
-eval :: @fn(paren : MASS.Group_Paren) MASS.eval
-fragment :: fn(curly : MASS.Group_Curly) => (MASS.Code_Fragment) MASS.fragment
+import :: fn(path : String) -> (MASS.Scope) MASS.import
+cast :: fn(type : Type, value) MASS.cast
+startup :: fn(callback : fn() -> ()) -> () MASS.startup
+eval :: fn(curly : MASS.Group_Curly) MASS.eval
+eval :: fn(paren : MASS.Group_Paren) MASS.eval
+fragment :: fn(curly : MASS.Group_Curly) -> (MASS.Code_Fragment) MASS.fragment
 
 Void :: type_of(())
-debugger :: fn() => () intrinsic {
+debugger :: fn() -> () intrinsic {
   lazy_value_proc :: fn(
     compilation : &MASS.Compilation,
     builder : &MASS.Function_Builder,
@@ -76,21 +76,21 @@ assert :: fn(condition : bool, message := "Assertion failed\n") {
   }
 }
 
-static_assert :: fn(condition : bool, message : String = "") => () MASS.static_assert
+static_assert :: fn(condition : bool, message : String = "") MASS.static_assert
 
-apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) => (MASS.Scope) MASS.inline_module
-apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) => () MASS.exports
-apply :: @fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) MASS.intrinsic
-apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) => (Type) MASS.c_struct
+apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) -> (MASS.Scope) MASS.inline_module
+apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) -> () MASS.exports
+apply :: fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) MASS.intrinsic
+apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) -> (Type) MASS.c_struct
 
 // These need to be an overload of `apply` instead a regular function because
 // it needs to parse the expression inside with the runtime epoch even in the case
 // when it is called from a constant context
-apply :: fn(symbol :: 'type_of, paren : MASS.Group_Paren) => (Type) MASS.type_of
-apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) => (Type) MASS.size_of
+apply :: fn(symbol :: 'type_of, paren : MASS.Group_Paren) -> (Type) MASS.type_of
+apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) -> (Type) MASS.size_of
 
 apply :: macro(type, tuple : MASS.Group_Square) { cast(type', tuple') }
-apply :: @fn(x, paren : MASS.Group_Paren) MASS.call
+apply :: fn(x, paren : MASS.Group_Paren) MASS.call
 
 operator 7 (x == y) equal
 operator 7 (x != y) not_equal
@@ -121,7 +121,7 @@ operator intrinsic 25 (~> x) fragment
 operator intrinsic 30 (' x) quote
 operator intrinsic 30 (x ') unquote
 
-make_accessor :: fn(symbol : MASS.Symbol) => (MASS.Named_Accessor) intrinsic {
+make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
   meta :: import("std/meta")
   accessor : MASS.Named_Accessor
   accessor.symbol = meta.reify(arguments.values.0, MASS.Symbol)
@@ -130,28 +130,28 @@ make_accessor :: fn(symbol : MASS.Symbol) => (MASS.Named_Accessor) intrinsic {
 
 operator intrinsic 30 (. x) make_accessor
 
-quote :: fn(x) => (MASS.Quoted) MASS.quote
-unquote :: @fn(x) MASS.unquote
+quote :: fn(x) -> (MASS.Quoted) MASS.quote
+unquote :: fn(x) MASS.unquote
 
 pointer_to :: fn(type : Type) => (Type) {
   MASS.descriptor_pointer_to(MASS.allocator, type)
 }
-pointer_to :: fn(x) => (pointer_to(x)) MASS.pointer_to
+pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
 
 
-add :: fn(x : s8, y : s8) => (s8) MASS.integer_add
-subtract :: fn(x : s8, y : s8) => (s8) MASS.integer_subtract
-multiply :: fn(x : s8, y : s8) => (s8) MASS.integer_multiply
-divide :: fn(x : s8, y : s8) => (s8) MASS.integer_divide
-remainder :: fn(x : s8, y : s8) => (s8) MASS.integer_remainder
+add :: fn(x : s8, y : s8) -> (s8) MASS.integer_add
+subtract :: fn(x : s8, y : s8) -> (s8) MASS.integer_subtract
+multiply :: fn(x : s8, y : s8) -> (s8) MASS.integer_multiply
+divide :: fn(x : s8, y : s8) -> (s8) MASS.integer_divide
+remainder :: fn(x : s8, y : s8) -> (s8) MASS.integer_remainder
 negate :: fn(x : s8) -> (s8) { 0 - x }
 
-less :: fn(x : s8, y : s8) => (bool) MASS.integer_less
-less_equal :: fn(x : s8, y : s8) => (bool) MASS.integer_less_equal
-greater :: fn(x : s8, y : s8) => (bool) MASS.integer_greater
-greater_equal :: fn(x : s8, y : s8) => (bool) MASS.integer_greater_equal
-equal :: fn(x : s8, y : s8) => (bool) MASS.integer_equal
-not_equal :: fn(x : s8, y : s8) => (bool) MASS.integer_not_equal
+less :: fn(x : s8, y : s8) -> (bool) MASS.integer_less
+less_equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_less_equal
+greater :: fn(x : s8, y : s8) -> (bool) MASS.integer_greater
+greater_equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_greater_equal
+equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_equal
+not_equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_not_equal
 
 
 template_signed_integer_overloads :: macro(template, impl) {
@@ -176,7 +176,7 @@ template_integer_overloads :: macro(template, impl) {
 }
 
 arithmetic_template :: macro(impl, type : Type) {
-  fn(x : type, y : type) => (type) impl
+  fn(x : type, y : type) -> (type) impl
 }
 
 add :: template_integer_overloads(arithmetic_template, MASS.integer_add)
@@ -186,7 +186,7 @@ divide :: template_integer_overloads(arithmetic_template, MASS.integer_divide)
 remainder :: template_integer_overloads(arithmetic_template, MASS.integer_remainder)
 
 comparison_template :: macro(impl, type : Type) {
-  fn(x : type, y : type) => (bool) impl
+  fn(x : type, y : type) -> (bool) impl
 }
 
 less :: template_integer_overloads(comparison_template, MASS.integer_less)
@@ -196,8 +196,8 @@ greater_equal :: template_integer_overloads(comparison_template, MASS.integer_gr
 equal :: template_integer_overloads(comparison_template, MASS.integer_equal)
 not_equal :: template_integer_overloads(comparison_template, MASS.integer_not_equal)
 
-equal :: fn(x, y : x) => (bool) MASS.generic_equal
-not_equal :: fn(x, y : x) => (bool) MASS.generic_not_equal
+equal :: fn(x, y : x) -> (bool) MASS.generic_equal
+not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
 equal :: fn(x, y : x) => (bool) { equal(x, y) }
 not_equal :: fn(x, y : x) => (bool) { not_equal(x, y) }
 
@@ -249,7 +249,7 @@ allocate :: macro(allocator : &MASS.Allocator, type : Type) {
   ))
 }
 
-Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
+Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
   meta :: import("std/meta")
   item_type := meta.reify(arguments.values.0, Type).*
   length := meta.reify(arguments.values.1, i64).*
@@ -273,7 +273,7 @@ external :: fn(
 }
 
 os :: MASS.Os
-get_target_os :: fn() => (os._Type) intrinsic {
+get_target_os :: fn() -> (os._Type) intrinsic {
   meta :: import("std/meta")
   meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }
