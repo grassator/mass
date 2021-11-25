@@ -3880,11 +3880,21 @@ ensure_parameter_descriptors(
   context_temp_reset_to_mark(&temp_context, temp_mark);
 }
 
+typedef struct {
+  Value_View view;
+  bool all_arguments_are_compile_time_known;
+} Mass_Overload_Match_Args;
+
+typedef enum {
+  Mass_Argument_Scoring_Flags_None = 0 << 0,
+  Mass_Argument_Scoring_Flags_Prefer_Compile_Time = 1 << 0,
+} Mass_Argument_Scoring_Flags;
 
 static s64
 calculate_arguments_match_score(
   const Function_Info *descriptor,
-  Value_View args_view
+  Value_View args_view,
+  Mass_Argument_Scoring_Flags scoring_flags
 ) {
   enum {MAX_ARG_COUNT = 500};
   enum {
@@ -3897,7 +3907,6 @@ calculate_arguments_match_score(
   assert(args_view.length < MAX_ARG_COUNT);
   s64 score = 0;
   if (args_view.length > dyn_array_length(descriptor->parameters)) return -1;
-  bool fn_is_compile_time = !!(descriptor->flags & Function_Info_Flags_Compile_Time);
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     const Descriptor *target_descriptor = param->descriptor;
@@ -3909,14 +3918,19 @@ calculate_arguments_match_score(
     } else {
       source_arg = value_view_get(args_view, arg_index);
     }
-    if (fn_is_compile_time) {
+    // TODO move this check outside
+    if (scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time) {
       if (!mass_value_is_compile_time_known(source_arg)) return -1;
     }
     source_descriptor = value_or_lazy_value_descriptor(source_arg);
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
         if (same_type(target_descriptor, source_descriptor)) {
-          score += fn_is_compile_time ? Score_Exact_Type_Static : Score_Exact_Type;
+          if (scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time) {
+            score += Score_Exact_Type_Static;
+          } else {
+            score += Score_Exact_Type;
+          }
         } else if (
           source_arg &&
           same_value_type_or_can_implicitly_move_cast(target_descriptor, source_arg)
@@ -3961,7 +3975,7 @@ match_overload_argument_count(
 static void
 mass_match_overload_candidate(
   Value *candidate,
-  Value_View args,
+  const Mass_Overload_Match_Args *args,
   struct Overload_Match_State *match,
   struct Overload_Match_State *best_conflict_match
 ) {
@@ -3974,8 +3988,11 @@ mass_match_overload_candidate(
     if (value_is_function_literal(candidate)) {
       const Function_Literal *literal = value_as_function_literal(candidate);
       if (literal->flags & Function_Literal_Flags_Generic) {
-        if (!match_overload_argument_count(literal->info, args.length)) return;
-        overload_info = maybe_function_info_for_args(candidate, args);
+        if (!match_overload_argument_count(literal->info, args->view.length)) return;
+        if (literal->info->flags & Function_Info_Flags_Compile_Time) {
+          if (!args->all_arguments_are_compile_time_known) return;
+        }
+        overload_info = maybe_function_info_for_args(candidate, args->view);
         if (!overload_info) return;
       } else {
         overload_info = literal->info;
@@ -3985,8 +4002,13 @@ mass_match_overload_candidate(
       assert(descriptor->tag == Descriptor_Tag_Function_Instance);
       overload_info = descriptor->Function_Instance.info;
     }
+    Mass_Argument_Scoring_Flags scoring_flags = 0;
+    if (overload_info->flags & Function_Info_Flags_Compile_Time) {
+      if (!args->all_arguments_are_compile_time_known) return;
+      scoring_flags |= Mass_Argument_Scoring_Flags_Prefer_Compile_Time;
+    }
 
-    s64 score = calculate_arguments_match_score(overload_info, args);
+    s64 score = calculate_arguments_match_score(overload_info, args->view, scoring_flags);
     if (score > match->score) {
       match->info = overload_info;
       match->value = candidate;
@@ -4004,11 +4026,21 @@ mass_match_overload_candidate(
 static Overload_Match
 mass_match_overload(
   Value *value,
-  Value_View args
+  Value_View args_view
 ) {
   struct Overload_Match_State match = { .score = -1 };
   struct Overload_Match_State best_conflict_match = match;
-  mass_match_overload_candidate(value, args, &match, &best_conflict_match);
+  Mass_Overload_Match_Args args = {
+    .view = args_view,
+    .all_arguments_are_compile_time_known = true,
+  };
+  for (u64 i = 0; i < args_view.length; ++i) {
+    if (!mass_value_is_compile_time_known(value_view_get(args_view, i))) {
+      args.all_arguments_are_compile_time_known = false;
+      break;
+    }
+  }
+  mass_match_overload_candidate(value, &args, &match, &best_conflict_match);
 
   if (match.score == -1) {
     return (Overload_Match){.tag = Overload_Match_Tag_No_Match};
