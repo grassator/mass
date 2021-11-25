@@ -1235,7 +1235,7 @@ scope_entry_force_value(
 }
 
 static inline Value *
-scope_lookup_force(
+mass_context_force_lookup(
   Execution_Context *context,
   const Scope *scope,
   const Symbol *symbol,
@@ -1849,7 +1849,7 @@ token_parse_single(
     const Quoted *quoted = value_as_quoted(value);
     return quoted->value;
   } else if (value_is_symbol(value)) {
-    return scope_lookup_force(context, context->scope, value_as_symbol(value), &value->source_range);
+    return mass_context_force_lookup(context, context->scope, value_as_symbol(value), &value->source_range);
   } else {
     return value;
   }
@@ -2447,7 +2447,7 @@ token_handle_user_defined_operator_proc(
   u64 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
   assert(argument_count == args.length);
 
-  Value *fn = scope_lookup_force(context, context->scope, operator->alias, &args.source_range);
+  Value *fn = mass_context_force_lookup(context, context->scope, operator->alias, &args.source_range);
   MASS_ON_ERROR(*context->result) return 0;
 
   if (!operator->is_intrinsic) {
@@ -3824,7 +3824,7 @@ ensure_parameter_descriptors(
     const Symbol *symbol = param->symbol;
     Source_Range source_range = param->source_range;
     Value *type_value =
-      scope_lookup_force(&temp_context, temp_context.scope, symbol, &source_range);
+      mass_context_force_lookup(&temp_context, temp_context.scope, symbol, &source_range);
     MASS_ON_ERROR(*temp_context.result) goto err;
     param->descriptor = value_ensure_type(&temp_context, type_value, source_range);
     MASS_ON_ERROR(*temp_context.result) goto err;
@@ -6737,7 +6737,7 @@ token_parse_statement_label(
   // First try to lookup a label that might have been declared by `goto`
   Value *value;
   if (scope_lookup(context->scope, symbol)) {
-    value = scope_lookup_force(context, context->scope, symbol, &source_range);
+    value = mass_context_force_lookup(context, context->scope, symbol, &source_range);
   } else {
     Scope *label_scope = context->scope;
 

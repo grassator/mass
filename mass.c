@@ -133,7 +133,7 @@ int main(s32 argc, char **argv) {
   const Symbol *main_symbol = mass_ensure_symbol(&compilation, slice_literal("main"));
   Source_Range entry_source_range;
   INIT_LITERAL_SOURCE_RANGE(&entry_source_range, "__entry");
-  Value *main = scope_lookup_force(&context, root_module->exports.scope, main_symbol, &entry_source_range);
+  Value *main = mass_context_force_lookup(&context, root_module->exports.scope, main_symbol, &entry_source_range);
   if (!main) {
     printf("Could not find entry point function `main`");
     return -1;

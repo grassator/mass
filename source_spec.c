@@ -106,7 +106,7 @@ test_program_source_base(
   Source_Range symbol_source_range;
   INIT_LITERAL_SOURCE_RANGE(&symbol_source_range, "__test_symbol__");
   const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice);
-  Value *value = scope_lookup_force(
+  Value *value = mass_context_force_lookup(
     context, test_module->own_scope, symbol, &symbol_source_range
   );
   if (value && value->descriptor == &descriptor_function_literal) {
@@ -2147,6 +2147,20 @@ spec("source") {
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p : Point = [.y = 22, .x = 20]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    fit("should allow assigning a tuple with shorthand named fields") {
+      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "Point :: c_struct [x : s32, y : s32]\n"
+        "test :: fn() -> (s32) {\n"
+          "x := 20\n"
+          "p : Point = [.x, .y = 22]\n"
           "p.x + p.y"
         "}"
       );
