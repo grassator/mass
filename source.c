@@ -3571,7 +3571,6 @@ call_function_overload(
     Value *source_arg;
     Value *target_arg = dyn_array_push_uninitialized(target_params);
     value_init(target_arg, target_item->descriptor, target_item->storage, *source_range);
-    const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
         Storage source_storage = reserve_stack_storage(builder, target_arg->descriptor->bit_size);
@@ -3584,8 +3583,6 @@ call_function_overload(
         source_arg = declared_argument->maybe_default_value;
       }
     } else {
-      Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
-      arg_symbol = declared_argument->symbol;
       source_arg = *dyn_array_get(arguments, i);
     }
     const Descriptor *stack_descriptor = target_item->descriptor;
