@@ -5160,25 +5160,20 @@ mass_handle_variable_definition_lazy_proc(
   );
 }
 
-typedef struct {
-  Value *target;
-  Value *expression;
-} Mass_Assignment_Lazy_Payload;
-
 static Value *
 mass_handle_assignment_lazy_proc(
   Compilation *compilation,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Assignment_Lazy_Payload *payload
+  const Assignment *payload
 ) {
   const Descriptor *target_descriptor = value_or_lazy_value_descriptor(payload->target);
   Expected_Result expected_target = expected_result_any(target_descriptor);
   Value *target = value_force(compilation, builder, &expected_target, payload->target);
   MASS_ON_ERROR(*compilation->result) return 0;
 
-  value_force_exact(compilation, builder, target, payload->expression);
+  value_force_exact(compilation, builder, target, payload->source);
   storage_release_if_temporary(builder, &target->storage);
   MASS_ON_ERROR(*compilation->result) return 0;
 
@@ -5223,8 +5218,6 @@ mass_handle_assignment_operator(
   Value *target = token_parse_single(context, value_view_get(operands, 0));
   Value *source = token_parse_single(context, value_view_get(operands, 1));
 
-  Mass_Assignment_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
 
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -5233,14 +5226,13 @@ mass_handle_assignment_operator(
     target = mass_define_stack_value_from_typed_symbol(context, typed_symbol, target->source_range);
   }
 
-  *payload = (Mass_Assignment_Lazy_Payload) {
+  Assignment *assignment = allocator_allocate(context->allocator, Assignment);
+  *assignment = (Assignment) {
     .target = target,
-    .expression = source,
+    .source = source,
   };
-
-  return mass_make_lazy_value(
-    context, operands.source_range, payload,
-    &descriptor_void, mass_handle_assignment_lazy_proc
+  return value_make(
+    context->allocator, &descriptor_assignment, storage_static(assignment), operands.source_range
   );
 }
 
@@ -6437,7 +6429,14 @@ token_parse_block_view(
     MASS_ON_ERROR(*context->result) goto defer;
 
     if (mass_value_is_compile_time_known(parse_result)) {
-      if (value_is_code_fragment(parse_result)) {
+      if (value_is_assignment(parse_result)) {
+        // TODO make lazy value accept const payload
+        Assignment *assignment = (Assignment *)value_as_assignment(parse_result);
+        parse_result = mass_make_lazy_value(
+          context, parse_result->source_range, assignment,
+          &descriptor_void, mass_handle_assignment_lazy_proc
+        );
+      } else if (value_is_code_fragment(parse_result)) {
         const Code_Fragment *fragment = value_as_code_fragment(parse_result);
         Scope *saved_scope = context->scope;
         context->scope = fragment->scope;
@@ -6726,11 +6725,10 @@ token_define_global_variable(
       mass_assign(context->compilation, &fake_builder, global_value, value, &expression.source_range);
       MASS_ON_ERROR(*context->result) return;
     } else {
-      Mass_Assignment_Lazy_Payload *assignment_payload =
-        allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
-      *assignment_payload = (Mass_Assignment_Lazy_Payload) {
+      Assignment *assignment_payload = allocator_allocate(context->allocator, Assignment);
+      *assignment_payload = (Assignment) {
         .target = global_value,
-        .expression = value,
+        .source = value,
       };
 
       Value *body_value = mass_make_lazy_value(
@@ -6783,11 +6781,10 @@ token_define_local_variable(
 
   scope_define_value(context->scope, context->epoch, *source_range, value_as_symbol(symbol), variable_value);
 
-  Mass_Assignment_Lazy_Payload *assignment_payload =
-    allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
-  *assignment_payload = (Mass_Assignment_Lazy_Payload) {
+  Assignment *assignment_payload = allocator_allocate(context->allocator, Assignment);
+  *assignment_payload = (Assignment) {
     .target = variable_value,
-    .expression = value,
+    .source = value,
   };
 
   out_lazy_value->proc = mass_handle_assignment_lazy_proc;

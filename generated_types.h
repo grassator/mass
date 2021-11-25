@@ -24,6 +24,10 @@ typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
 
+typedef struct Assignment Assignment;
+typedef dyn_array_type(Assignment *) Array_Assignment_Ptr;
+typedef dyn_array_type(const Assignment *) Array_Const_Assignment_Ptr;
+
 typedef struct Module_Exports Module_Exports;
 typedef dyn_array_type(Module_Exports *) Array_Module_Exports_Ptr;
 typedef dyn_array_type(const Module_Exports *) Array_Const_Module_Exports_Ptr;
@@ -949,6 +953,12 @@ typedef struct Source_Range {
   Range_u32 offsets;
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
+
+typedef struct Assignment {
+  Value * target;
+  Value * source;
+} Assignment;
+typedef dyn_array_type(Assignment) Array_Assignment;
 
 typedef enum {
   Module_Exports_Tag_Not_Specified = 0,
@@ -2129,6 +2139,11 @@ static Descriptor descriptor_array_source_range;
 static Descriptor descriptor_array_source_range_ptr;
 static Descriptor descriptor_source_range_pointer;
 static Descriptor descriptor_source_range_pointer_pointer;
+static Descriptor descriptor_assignment;
+static Descriptor descriptor_array_assignment;
+static Descriptor descriptor_array_assignment_ptr;
+static Descriptor descriptor_assignment_pointer;
+static Descriptor descriptor_assignment_pointer_pointer;
 static Descriptor descriptor_module_exports;
 static Descriptor descriptor_array_module_exports;
 static Descriptor descriptor_array_module_exports_ptr;
@@ -2864,6 +2879,23 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range, Source_Range,
 MASS_DEFINE_TYPE_VALUE(source_range);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Range, source_range);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Range *, source_range_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_assignment_ptr, Array_Assignment_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_assignment, Array_Assignment)
+MASS_DEFINE_STRUCT_DESCRIPTOR(assignment, Assignment,
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("target"),
+    .offset = offsetof(Assignment, target),
+  },
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("source"),
+    .offset = offsetof(Assignment, source),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(assignment);
+DEFINE_VALUE_IS_AS_HELPERS(Assignment, assignment);
+DEFINE_VALUE_IS_AS_HELPERS(Assignment *, assignment_pointer);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports_ptr, Array_Module_Exports_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports, Array_Module_Exports)

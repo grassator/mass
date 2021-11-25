@@ -1121,6 +1121,11 @@ main(void) {
     { "Range_u32", "offsets" },
   })));
 
+  push_type(type_struct("Assignment", (Struct_Item[]){
+    { "Value *", "target" },
+    { "Value *", "source" },
+  }));
+
   push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
     struct_empty("Not_Specified"),
     struct_empty("All"),
