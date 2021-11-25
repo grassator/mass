@@ -626,6 +626,8 @@ typedef struct Mass_Trampoline Mass_Trampoline;
 typedef dyn_array_type(Mass_Trampoline *) Array_Mass_Trampoline_Ptr;
 typedef dyn_array_type(const Mass_Trampoline *) Array_Const_Mass_Trampoline_Ptr;
 
+typedef struct Struct_Field_Set Struct_Field_Set;
+
 typedef struct Symbol_Map Symbol_Map;
 
 typedef struct Trampoline_Map Trampoline_Map;
@@ -1781,7 +1783,7 @@ typedef enum {
   Mass_Error_Tag_Unexpected_Token = 12,
   Mass_Error_Tag_Operator_Fixity_Conflict = 13,
   Mass_Error_Tag_Undefined_Variable = 14,
-  Mass_Error_Tag_Redifinition = 15,
+  Mass_Error_Tag_Redefinition = 15,
   Mass_Error_Tag_Unknown_Field = 16,
   Mass_Error_Tag_Invalid_Identifier = 17,
   Mass_Error_Tag_Type_Mismatch = 18,
@@ -1827,9 +1829,9 @@ typedef struct Mass_Error_Undefined_Variable {
   Slice name;
   u64 is_operator;
 } Mass_Error_Undefined_Variable;
-typedef struct Mass_Error_Redifinition {
+typedef struct Mass_Error_Redefinition {
   Slice name;
-} Mass_Error_Redifinition;
+} Mass_Error_Redefinition;
 typedef struct Mass_Error_Unknown_Field {
   const Descriptor * type;
   Slice name;
@@ -1866,7 +1868,7 @@ typedef struct Mass_Error {
     Mass_Error_Unexpected_Token Unexpected_Token;
     Mass_Error_Operator_Fixity_Conflict Operator_Fixity_Conflict;
     Mass_Error_Undefined_Variable Undefined_Variable;
-    Mass_Error_Redifinition Redifinition;
+    Mass_Error_Redefinition Redefinition;
     Mass_Error_Unknown_Field Unknown_Field;
     Mass_Error_Invalid_Identifier Invalid_Identifier;
     Mass_Error_Type_Mismatch Type_Mismatch;
@@ -1924,10 +1926,10 @@ mass_error_as_undefined_variable(Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Undefined_Variable);
   return &mass_error->Undefined_Variable;
 }
-static inline Mass_Error_Redifinition *
-mass_error_as_redifinition(Mass_Error *mass_error) {
-  assert(mass_error->tag == Mass_Error_Tag_Redifinition);
-  return &mass_error->Redifinition;
+static inline Mass_Error_Redefinition *
+mass_error_as_redefinition(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Redefinition);
+  return &mass_error->Redefinition;
 }
 static inline Mass_Error_Unknown_Field *
 mass_error_as_unknown_field(Mass_Error *mass_error) {
@@ -2003,6 +2005,7 @@ typedef struct Mass_Trampoline {
 } Mass_Trampoline;
 typedef dyn_array_type(Mass_Trampoline) Array_Mass_Trampoline;
 
+hash_map_template(Struct_Field_Set, const Struct_Field *, u64, hash_pointer, const_void_pointer_equal)
 hash_map_slice_template(Symbol_Map, Symbol *)
 hash_map_template(Trampoline_Map, const Value *, const Mass_Trampoline *, hash_pointer, const_void_pointer_equal)
 hash_map_template(Scope_Map, const Symbol *, Scope_Entry *, hash_pointer, const_void_pointer_equal)
@@ -2558,6 +2561,7 @@ static Descriptor descriptor_array_mass_trampoline;
 static Descriptor descriptor_array_mass_trampoline_ptr;
 static Descriptor descriptor_mass_trampoline_pointer;
 static Descriptor descriptor_mass_trampoline_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(struct_field_set, Struct_Field_Set);
 MASS_DEFINE_OPAQUE_C_TYPE(symbol_map, Symbol_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(trampoline_map, Trampoline_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(scope_map, Scope_Map);
@@ -4977,7 +4981,7 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Unexpected_Token"), .value = 12 },
 { .name = slice_literal_fields("Operator_Fixity_Conflict"), .value = 13 },
 { .name = slice_literal_fields("Undefined_Variable"), .value = 14 },
-{ .name = slice_literal_fields("Redifinition"), .value = 15 },
+{ .name = slice_literal_fields("Redefinition"), .value = 15 },
 { .name = slice_literal_fields("Unknown_Field"), .value = 16 },
 { .name = slice_literal_fields("Invalid_Identifier"), .value = 17 },
 { .name = slice_literal_fields("Type_Mismatch"), .value = 18 },
@@ -5088,14 +5092,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undefined_variable, Mass_Error_Undefine
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undefined_variable);
-MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_redifinition, Mass_Error_Redifinition,
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_redefinition, Mass_Error_Redefinition,
   {
     .descriptor = &descriptor_slice,
     .name = slice_literal_fields("name"),
-    .offset = offsetof(Mass_Error_Redifinition, name),
+    .offset = offsetof(Mass_Error_Redefinition, name),
   },
 );
-MASS_DEFINE_TYPE_VALUE(mass_error_redifinition);
+MASS_DEFINE_TYPE_VALUE(mass_error_redefinition);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_unknown_field, Mass_Error_Unknown_Field,
   {
     .descriptor = &descriptor_descriptor_pointer,
@@ -5228,9 +5232,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .offset = offsetof(Mass_Error, Undefined_Variable),
   },
   {
-    .name = slice_literal_fields("Redifinition"),
-    .descriptor = &descriptor_mass_error_redifinition,
-    .offset = offsetof(Mass_Error, Redifinition),
+    .name = slice_literal_fields("Redefinition"),
+    .descriptor = &descriptor_mass_error_redefinition,
+    .offset = offsetof(Mass_Error, Redefinition),
   },
   {
     .name = slice_literal_fields("Unknown_Field"),

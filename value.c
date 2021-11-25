@@ -130,10 +130,10 @@ mass_error_to_string(
       APPEND_SLICE(error->Undefined_Variable.name);
       APPEND_LITERAL("'");
     } break;
-    case Mass_Error_Tag_Redifinition: {
+    case Mass_Error_Tag_Redefinition: {
       // TODO report original location somehow
       APPEND_LITERAL("Redefinition of binding ");
-      APPEND_SLICE(error->Redifinition.name);
+      APPEND_SLICE(error->Redefinition.name);
     } break;
     case Mass_Error_Tag_Circular_Dependency: {
       APPEND_LITERAL("Circular dependency when resolving ");

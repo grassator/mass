@@ -1924,8 +1924,8 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Undefined_Variable">
     Undefined_Variable { Undefined_Variable }
   </DisplayString>
-  <DisplayString Condition="tag == Mass_Error_Tag_Redifinition">
-    Redifinition { Redifinition }
+  <DisplayString Condition="tag == Mass_Error_Tag_Redefinition">
+    Redefinition { Redefinition }
   </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Unknown_Field">
     Unknown_Field { Unknown_Field }
@@ -1969,7 +1969,7 @@
     <Item Name="Unexpected_Token" Condition="tag == Mass_Error_Tag_Unexpected_Token">Unexpected_Token</Item>
     <Item Name="Operator_Fixity_Conflict" Condition="tag == Mass_Error_Tag_Operator_Fixity_Conflict">Operator_Fixity_Conflict</Item>
     <Item Name="Undefined_Variable" Condition="tag == Mass_Error_Tag_Undefined_Variable">Undefined_Variable</Item>
-    <Item Name="Redifinition" Condition="tag == Mass_Error_Tag_Redifinition">Redifinition</Item>
+    <Item Name="Redefinition" Condition="tag == Mass_Error_Tag_Redefinition">Redefinition</Item>
     <Item Name="Unknown_Field" Condition="tag == Mass_Error_Tag_Unknown_Field">Unknown_Field</Item>
     <Item Name="Invalid_Identifier" Condition="tag == Mass_Error_Tag_Invalid_Identifier">Invalid_Identifier</Item>
     <Item Name="Type_Mismatch" Condition="tag == Mass_Error_Tag_Type_Mismatch">Type_Mismatch</Item>

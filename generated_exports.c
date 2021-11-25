@@ -402,12 +402,12 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Error_Undefined_Variable")),
     type_mass_error_undefined_variable_value
   );
-  Source_Range Error_Redifinition__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Error_Redifinition__source_range, "Error_Redifinition");
+  Source_Range Error_Redefinition__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Error_Redefinition__source_range, "Error_Redefinition");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Error_Redifinition__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Error_Redifinition")),
-    type_mass_error_redifinition_value
+    scope, VALUE_STATIC_EPOCH, Error_Redefinition__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Error_Redefinition")),
+    type_mass_error_redefinition_value
   );
   Source_Range Error_Unknown_Field__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Error_Unknown_Field__source_range, "Error_Unknown_Field");

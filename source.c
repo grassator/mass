@@ -6641,10 +6641,10 @@ mass_handle_label_lazy_proc(
   if (label_value->descriptor != &descriptor_label_pointer) {
     Slice source = source_from_source_range(compilation, source_range);
     compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Redifinition,
+      .tag = Mass_Error_Tag_Redefinition,
       .source_range = *source_range,
       .other_source_range = label_value->source_range,
-      .Redifinition = { .name = source, },
+      .Redefinition = { .name = source, },
       .detailed_message = slice_literal("Trying to redefine a non-label variable as a label"),
     });
     return 0;

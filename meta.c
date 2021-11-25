@@ -1778,7 +1778,7 @@ main(void) {
       { "Slice", "name" },
       { "u64", "is_operator" },
     }),
-    struct_fields("Redifinition", (Struct_Item[]){
+    struct_fields("Redefinition", (Struct_Item[]){
       { "Slice", "name" },
     }),
     struct_fields("Unknown_Field", (Struct_Item[]){
