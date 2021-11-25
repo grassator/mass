@@ -515,7 +515,26 @@ anonymous_struct_descriptor_from_tuple(
     const Descriptor *field_descriptor;
     switch(tuple_eval_mode) {
       case Tuple_Eval_Mode_Value: {
-        field_descriptor = deduce_runtime_descriptor_for_value(context, item);
+        if (value_is_assignment(item)) {
+          const Assignment *assignment = value_as_assignment(item);
+          // :ValueEnsure
+          if (!value_is_named_accessor(assignment->target)) {
+            context_error(context, (Mass_Error) {
+              .tag = Mass_Error_Tag_Type_Mismatch,
+              .source_range = assignment->target->source_range,
+              .Type_Mismatch = {
+                .expected = &descriptor_named_accessor,
+                .actual = assignment->target->descriptor,
+              },
+            });
+            return 0;
+          }
+          const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
+          name = accessor->symbol->name;
+          field_descriptor = deduce_runtime_descriptor_for_value(context, assignment->source);
+        } else {
+          field_descriptor = deduce_runtime_descriptor_for_value(context, item);
+        }
       } break;
       case Tuple_Eval_Mode_Type: {
         if (value_is_typed_symbol(item)) {
@@ -722,9 +741,53 @@ assign_tuple(
       return;
     }
 
-    u64 index = 0;
-    DYN_ARRAY_FOREACH(Struct_Field, field, fields) {
-      Value *tuple_item = *dyn_array_get(tuple->items, index);
+    // FIXME detect unassigned and duplicate assigned fields
+    u64 field_index = 0;
+    for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
+      Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+      const Struct_Field *field;
+      Value *field_source;
+      if (value_is_assignment(tuple_item)) {
+        const Assignment *assignment = value_as_assignment(tuple_item);
+        field_source = assignment->source;
+        // :ValueEnsure
+        if (!value_is_named_accessor(assignment->target)) {
+          compilation_error(compilation, (Mass_Error) {
+            .tag = Mass_Error_Tag_Type_Mismatch,
+            .source_range = assignment->target->source_range,
+            .Type_Mismatch = {
+              .expected = &descriptor_named_accessor,
+              .actual = assignment->target->descriptor,
+            },
+          });
+          return;
+        }
+        const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
+        field = 0;
+        // Use `field_index` here instead of a new iteration var to make sure
+        // that the next unnamed field will be looked up at the right index
+        for (field_index = 0; field_index < dyn_array_length(fields); ++field_index) {
+          field = dyn_array_get(fields, field_index);
+          if (slice_equal(field->name, accessor->symbol->name)) {
+            field_index += 1;
+            break;
+          } else {
+            field = 0;
+          }
+        }
+        if (!field) {
+          compilation_error(compilation, (Mass_Error) {
+            .tag = Mass_Error_Tag_Unknown_Field,
+            .source_range = tuple_item->source_range,
+            .Unknown_Field = { .name = accessor->symbol->name, .type = target->descriptor },
+          });
+          return;
+        }
+      } else {
+        field_source = tuple_item;
+        field = dyn_array_get(fields, field_index);
+        field_index += 1;
+      }
       Value target_field = {
         .descriptor = field->descriptor,
         .storage = storage_with_offset_and_bit_size(
@@ -732,9 +795,8 @@ assign_tuple(
         ),
         .source_range = target->source_range,
       };
-      mass_assign(compilation, builder, &target_field, tuple_item, source_range);
+      mass_assign(compilation, builder, &target_field, field_source, source_range);
       MASS_ON_ERROR(*compilation->result) return;
-      index += 1;
     }
   } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
     u64 length = target->descriptor->Fixed_Size_Array.length;
