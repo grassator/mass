@@ -3825,32 +3825,30 @@ struct Overload_Match_State {
 
 static void
 ensure_parameter_descriptors(
-  const Execution_Context *context,
+  Compilation *compilation,
   Function_Info *info,
   Scope *arguments_scope
 ) {
-  Execution_Context temp_context = *context;
+  Execution_Context temp_context = execution_context_from_compilation(compilation);
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
 
   temp_context.scope = scope_make(temp_context.temp_allocator, arguments_scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     Source_Range source_range = param->source_range;
-    Value_View lazy_expr;
     if (param->descriptor) {
-      Value **param_value_pointer = allocator_allocate(temp_context.temp_allocator, Value *);
       Storage storage = storage_immediate(&param->descriptor);
-      *param_value_pointer = value_make(
+      Value *param_value = value_make(
         temp_context.temp_allocator, &descriptor_descriptor_pointer, storage, source_range
       );
-      lazy_expr = value_view_single(param_value_pointer);
+      scope_define_value(
+        temp_context.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value
+      );
     } else {
-      lazy_expr = param->maybe_type_expression;
+      scope_define_lazy_compile_time_expression(
+        &temp_context, temp_context.scope, param->symbol, param->maybe_type_expression
+      );
     }
-
-    scope_define_lazy_compile_time_expression(
-      &temp_context, temp_context.scope, param->symbol, lazy_expr
-    );
   }
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
@@ -6264,7 +6262,7 @@ token_parse_function_literal(
 
   // TODO support this on non-Linux systems
   if (is_syscall) {
-    ensure_parameter_descriptors(context, fn_info, context->scope);
+    ensure_parameter_descriptors(context->compilation, fn_info, context->scope);
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
@@ -6292,7 +6290,7 @@ token_parse_function_literal(
     }
     if (is_macro) flags |= Function_Literal_Flags_Macro;
     if (!(flags & Function_Literal_Flags_Generic)) {
-      ensure_parameter_descriptors(context, fn_info, context->scope);
+      ensure_parameter_descriptors(context->compilation, fn_info, context->scope);
       MASS_ON_ERROR(*context->result) return 0;
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
@@ -6304,7 +6302,7 @@ token_parse_function_literal(
     };
     return value_make(context->allocator, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    ensure_parameter_descriptors(context, fn_info, context->scope);
+    ensure_parameter_descriptors(context->compilation, fn_info, context->scope);
     MASS_ON_ERROR(*context->result) return 0;
 
     const Calling_Convention *calling_convention =

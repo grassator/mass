@@ -64,7 +64,7 @@ get_new_epoch();
 
 static void
 ensure_parameter_descriptors(
-  const Execution_Context *context,
+  Compilation *compilation,
   Function_Info *info,
   Scope *arguments_scope
 );

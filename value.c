@@ -1057,8 +1057,8 @@ function_literal_info_for_args(
     .allocator = context->allocator,
   );
 
-  for (u64 arg_index = 0; arg_index < dyn_array_length(mutable_literal->info->parameters); ++arg_index) {
-    const Function_Parameter *param = dyn_array_get(mutable_literal->info->parameters, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->info->parameters); ++arg_index) {
+    const Function_Parameter *param = dyn_array_get(literal->info->parameters, arg_index);
     Function_Parameter *specialized_param =
       dyn_array_push(specialized_info->parameters, *param);
     const Descriptor *actual_descriptor =
@@ -1083,9 +1083,7 @@ function_literal_info_for_args(
       .info = 0,
     });
 
-  ensure_parameter_descriptors(
-    &mutable_literal->context, specialized_info, mutable_literal->context.scope
-  );
+  ensure_parameter_descriptors(context->compilation, specialized_info, context->scope);
 
   // :SpecializationInfiniteLoop
   added_specialization->info = specialized_info;
