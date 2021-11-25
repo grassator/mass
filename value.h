@@ -75,12 +75,6 @@ context_temp_reset(
   compilation_temp_reset(context->compilation);
 }
 
-static const Function_Info *
-maybe_function_info_for_args(
-  Value *value,
-  Value_View args
-);
-
 static inline Value_View
 value_view_single(
   Value **value

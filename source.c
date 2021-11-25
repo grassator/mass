@@ -3987,7 +3987,7 @@ mass_match_overload_candidate(
         if (literal->info->flags & Function_Info_Flags_Compile_Time) {
           if (!args->all_arguments_are_compile_time_known) return;
         }
-        overload_info = maybe_function_info_for_args(candidate, args->view);
+        overload_info = function_literal_info_for_args(literal, args->view);
         if (!overload_info) return;
       } else {
         overload_info = literal->info;

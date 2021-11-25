@@ -1093,24 +1093,6 @@ function_literal_info_for_args(
   return specialized_info;
 }
 
-static const Function_Info *
-maybe_function_info_for_args(
-  Value *value,
-  Value_View args
-) {
-  if (value_is_function_literal(value)) {
-    const Function_Literal *literal = value_as_function_literal(value);
-    return function_literal_info_for_args(literal, args);
-  } else {
-    const Descriptor *descriptor =
-      maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(value));
-    if (descriptor->tag == Descriptor_Tag_Function_Instance) {
-      return descriptor->Function_Instance.info;
-    }
-  }
-  return 0;
-}
-
 static inline fn_type_opaque
 value_as_function(
   Program *program,
