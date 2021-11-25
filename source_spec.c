@@ -2154,12 +2154,12 @@ spec("source") {
       check(checker() == 42);
     }
 
-    fit("should allow assigning a tuple with shorthand named fields") {
+    it("should allow assigning a tuple with shorthand named fields") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {\n"
-          "x := 20\n"
+          "x : s32 = 20\n"
           "p : Point = [.x, .y = 22]\n"
           "p.x + p.y"
         "}"

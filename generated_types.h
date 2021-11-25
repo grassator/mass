@@ -1676,6 +1676,8 @@ typedef struct Function_Call_Setup {
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
 typedef struct Tuple {
+  u64 epoch;
+  const Scope * scope_where_it_was_created;
   Array_Value_Ptr items;
 } Tuple;
 typedef dyn_array_type(Tuple) Array_Tuple;
@@ -4759,6 +4761,16 @@ DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup *, function_call_setup_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_tuple_ptr, Array_Tuple_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_tuple, Array_Tuple)
 MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("epoch"),
+    .offset = offsetof(Tuple, epoch),
+  },
+  {
+    .descriptor = &descriptor_scope_pointer,
+    .name = slice_literal_fields("scope_where_it_was_created"),
+    .offset = offsetof(Tuple, scope_where_it_was_created),
+  },
   {
     .descriptor = &descriptor_array_value_ptr,
     .name = slice_literal_fields("items"),

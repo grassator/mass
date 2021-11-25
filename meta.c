@@ -1683,6 +1683,8 @@ main(void) {
   }));
 
   export_compiler(push_type(type_struct("Tuple", (Struct_Item[]){
+    { "u64", "epoch" },
+    { "const Scope *", "scope_where_it_was_created" },
     { "Array_Value_Ptr", "items"},
   })));
 

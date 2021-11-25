@@ -741,6 +741,26 @@ large_enough_common_integer_descriptor_for_values(
   }
 }
 
+
+static inline bool
+struct_find_field_by_name(
+  const Descriptor *descriptor,
+  Slice field_name,
+  const Struct_Field **out_field,
+  u64 *out_index
+) {
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  for(u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
+    const Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+    if (slice_equal(field->name, field_name)) {
+      *out_field = field;
+      *out_index = i;
+      return true;
+    }
+  }
+  return false;
+}
+
 // TODO :AssignCleanup Merge this with `same_type_or_can_implicitly_move_cast`
 static void
 assign_tuple(
@@ -778,7 +798,34 @@ assign_tuple(
       Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
       const Struct_Field *field;
       Value *field_source;
-      if (value_is_assignment(tuple_item)) {
+      if (value_is_named_accessor(tuple_item)) {
+        const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
+        Scope_Entry *entry = scope_lookup(tuple->scope_where_it_was_created, symbol);
+        if (!entry) {
+          compilation_error(compilation, (Mass_Error) {
+            .tag = Mass_Error_Tag_Undefined_Variable,
+            .Undefined_Variable = { .name = symbol->name },
+            .source_range = tuple_item->source_range,
+          });
+          goto err;
+        }
+        if (entry->epoch != tuple->epoch) {
+          compilation_error(compilation, (Mass_Error) {
+            .tag = Mass_Error_Tag_Epoch_Mismatch,
+            .source_range = source->source_range,
+          });
+          goto err;
+        }
+        field_source = scope_entry_force_value(compilation, entry);
+        if (!struct_find_field_by_name(target->descriptor, symbol->name, &field, &field_index)) {
+          compilation_error(compilation, (Mass_Error) {
+            .tag = Mass_Error_Tag_Unknown_Field,
+            .source_range = tuple_item->source_range,
+            .Unknown_Field = { .name = symbol->name, .type = target->descriptor },
+          });
+          goto err;
+        }
+      } else if (value_is_assignment(tuple_item)) {
         const Assignment *assignment = value_as_assignment(tuple_item);
         field_source = assignment->source;
         // :ValueEnsure
@@ -794,19 +841,7 @@ assign_tuple(
           goto err;
         }
         const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
-        field = 0;
-        // Use `field_index` here instead of a new iteration var to make sure
-        // that the next unnamed field will be looked up at the right index
-        for (field_index = 0; field_index < dyn_array_length(fields); ++field_index) {
-          field = dyn_array_get(fields, field_index);
-          if (slice_equal(field->name, accessor->symbol->name)) {
-            field_index += 1;
-            break;
-          } else {
-            field = 0;
-          }
-        }
-        if (!field) {
+        if (!struct_find_field_by_name(target->descriptor, accessor->symbol->name, &field, &field_index)) {
           compilation_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Unknown_Field,
             .source_range = tuple_item->source_range,
@@ -817,8 +852,8 @@ assign_tuple(
       } else {
         field_source = tuple_item;
         field = dyn_array_get(fields, field_index);
-        field_index += 1;
       }
+      field_index += 1;
       if (hash_map_has(assigned_set, field)) {
         compilation_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
@@ -1827,7 +1862,11 @@ token_parse_tuple(
     Value value;
   });
   Tuple *tuple = &combined->tuple;
-  *tuple = (Tuple) { .items = items, };
+  *tuple = (Tuple) {
+    .epoch = context->epoch,
+    .items = items,
+    .scope_where_it_was_created = context->scope,
+  };
   Storage result_storage = storage_static_heap(tuple, descriptor_tuple.bit_size);
   result_value = value_init(&combined->value, &descriptor_tuple, result_storage, view.source_range);
   err:
@@ -5422,20 +5461,6 @@ mass_eval(
   }
 }
 
-static inline const Struct_Field *
-struct_find_field_by_name(
-  const Descriptor *descriptor,
-  Slice field_name
-) {
-  assert(descriptor->tag == Descriptor_Tag_Struct);
-  DYN_ARRAY_FOREACH(Struct_Field, field, descriptor->Struct.fields) {
-    if (slice_equal(field->name, field_name)) {
-      return field;
-    }
-  }
-  return 0;
-}
-
 typedef struct {
   Value *struct_;
   const Struct_Field *field;
@@ -5766,8 +5791,8 @@ mass_handle_dot_operator(
       //       range or have some other mechanism to track it.
       return scope_entry_force_value(context->compilation, entry);
     } else {
-      const Struct_Field *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
-      if (!field) {
+      const Struct_Field *field;
+      if (!struct_find_field_by_name(unwrapped_descriptor, field_name, &field, &(u64){0})) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs->source_range,
