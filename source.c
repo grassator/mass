@@ -4,6 +4,30 @@
 
 #include "generated_exports.c"
 
+static inline bool
+mass_value_ensure_static_of(
+  Compilation *compilation,
+  Value *value,
+  const Descriptor *expected_descriptor
+) {
+  if (!mass_value_is_compile_time_known(value)) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Expected_Static,
+      .source_range = value->source_range,
+    });
+    return false;
+  }
+  if (!same_type(value->descriptor, expected_descriptor)) {
+    compilation_error(compilation, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = value->source_range,
+      .Type_Mismatch = { .expected = expected_descriptor, .actual = value->descriptor },
+    });
+    return false;
+  }
+  return true;
+}
+
 static inline Value *
 mass_value_from_expected_result(
   const Allocator *allocator,
@@ -527,16 +551,7 @@ anonymous_struct_descriptor_from_tuple(
       case Tuple_Eval_Mode_Value: {
         if (value_is_assignment(item)) {
           const Assignment *assignment = value_as_assignment(item);
-          // :ValueEnsure
-          if (!value_is_named_accessor(assignment->target)) {
-            context_error(context, (Mass_Error) {
-              .tag = Mass_Error_Tag_Type_Mismatch,
-              .source_range = assignment->target->source_range,
-              .Type_Mismatch = {
-                .expected = &descriptor_named_accessor,
-                .actual = assignment->target->descriptor,
-              },
-            });
+          if (!mass_value_ensure_static_of(context->compilation, assignment->target, &descriptor_named_accessor)) {
             goto err;
           }
           const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
@@ -828,16 +843,7 @@ assign_tuple(
       } else if (value_is_assignment(tuple_item)) {
         const Assignment *assignment = value_as_assignment(tuple_item);
         field_source = assignment->source;
-        // :ValueEnsure
-        if (!value_is_named_accessor(assignment->target)) {
-          compilation_error(compilation, (Mass_Error) {
-            .tag = Mass_Error_Tag_Type_Mismatch,
-            .source_range = assignment->target->source_range,
-            .Type_Mismatch = {
-              .expected = &descriptor_named_accessor,
-              .actual = assignment->target->descriptor,
-            },
-          });
+        if (!mass_value_ensure_static_of(compilation, assignment->target, &descriptor_named_accessor)) {
           goto err;
         }
         const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
@@ -1047,7 +1053,7 @@ mass_assign(
       compilation_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
-        .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
+        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
         .detailed_message = slice_literal("Trying to assign a literal number to a non-integer value"),
       });
       return;
@@ -1730,15 +1736,7 @@ value_ensure_type(
     const Tuple *tuple = value_as_tuple(value);
     return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
   }
-  if (!same_type(value->descriptor, &descriptor_descriptor_pointer)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = source_range,
-      .Type_Mismatch = {
-        .expected = &descriptor_descriptor_pointer,
-        .actual = value->descriptor,
-      },
-    });
+  if (!mass_value_ensure_static_of(context->compilation, value, &descriptor_descriptor_pointer)) {
     return 0;
   }
   // Can't use `value_as_descriptor_pointer` because it might a user-generated version
@@ -4383,13 +4381,7 @@ token_handle_function_call(
       // Nothing to do
     } else if (args_view.length == 1) {
       Value *module_arg = value_view_get(args_view, 0);
-      if (!value_is_module(module_arg)) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = source_range,
-          .Type_Mismatch = { .expected = &descriptor_module, .actual = module_arg->descriptor },
-          .detailed_message = slice_literal("Macro capture can only accept an optional Module argument"),
-        });
+      if (!mass_value_ensure_static_of(context->compilation, module_arg, &descriptor_module)) {
         return 0;
       }
       const Module *module = value_as_module(module_arg);
@@ -5391,13 +5383,7 @@ mass_goto_lazy_proc(
   Expected_Result expected_target = expected_result_any(&descriptor_label_pointer);
   Value *target = value_force(compilation, builder, &expected_target, payload_target);
   MASS_ON_ERROR(*compilation->result) return 0;
-  // TODO :ExpectedResultCheck
-  if (target->descriptor != &descriptor_label_pointer) {
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = *source_range,
-      .Type_Mismatch = { .expected = &descriptor_label_pointer, .actual = target->descriptor },
-    });
+  if (!mass_value_ensure_static_of(compilation, target, &descriptor_label_pointer)) {
     return 0;
   }
 
@@ -5990,13 +5976,7 @@ token_parse_if_expression(
   *matched_length = peek_index;
 
   if (mass_value_is_compile_time_known(value_condition)) {
-    const Descriptor *descriptor = value_condition->descriptor;
-    if (descriptor != &descriptor__bool) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = value_condition->source_range,
-        .Type_Mismatch = { .expected = &descriptor__bool, .actual = value_condition->descriptor },
-      });
+    if (!mass_value_ensure_static_of(context->compilation, value_condition, &descriptor__bool)) {
       return 0;
     }
     bool condition = *value_as__bool(value_condition);
@@ -6673,21 +6653,7 @@ token_parse_statement_using(
   Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
 
   Value *result = compile_time_eval(context, rest);
-
-  if (result->descriptor != &descriptor_module) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = rest.source_range,
-      .Type_Mismatch = { .expected = &descriptor_module, .actual = result->descriptor },
-    });
-    goto err;
-  }
-
-  if (!mass_value_is_compile_time_known(result)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Expected_Static,
-      .source_range = rest.source_range,
-    });
+  if (!mass_value_ensure_static_of(context->compilation, result, &descriptor_module)) {
     goto err;
   }
 
