@@ -118,9 +118,6 @@ operator 16 (& x) pointer_to
 operator intrinsic 20 (@ x) eval
 operator intrinsic 25 (~> x) fragment
 
-operator intrinsic 30 (' x) quote
-operator intrinsic 30 (x ') unquote
-
 make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
   meta :: import("std/meta")
   accessor : MASS.Named_Accessor

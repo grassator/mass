@@ -593,30 +593,6 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_quote, "quote", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_unquote, "unquote", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_c_struct, "c_struct", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),

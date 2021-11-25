@@ -2025,8 +2025,6 @@ main(void) {
   export_compiler_custom_name("eval", push_type(type_intrinsic("mass_eval")));
   export_compiler_custom_name("fragment", push_type(type_intrinsic("mass_fragment")));
   export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));
-  export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
-  export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
   export_compiler_custom_name("c_struct", push_type(type_intrinsic("mass_c_struct")));
   export_compiler_custom_name("exports", push_type(type_intrinsic("mass_exports")));
   export_compiler_custom_name("cast", push_type(type_intrinsic("mass_cast")));

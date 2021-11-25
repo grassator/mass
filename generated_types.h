@@ -738,12 +738,6 @@ static Value * mass_fragment
 static Value * mass_inline_module
   (Execution_Context * context, Value_View args);
 
-static Value * mass_quote
-  (Execution_Context * context, Value_View args);
-
-static Value * mass_unquote
-  (Execution_Context * context, Value_View args);
-
 static Value * mass_c_struct
   (Execution_Context * context, Value_View args);
 
@@ -2614,8 +2608,6 @@ static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_eval;
 static Descriptor descriptor_mass_fragment;
 static Descriptor descriptor_mass_inline_module;
-static Descriptor descriptor_mass_quote;
-static Descriptor descriptor_mass_unquote;
 static Descriptor descriptor_mass_c_struct;
 static Descriptor descriptor_mass_exports;
 static Descriptor descriptor_mass_cast;

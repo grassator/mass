@@ -1753,7 +1753,8 @@ token_parse_single(
 static Value *
 mass_quote(
   Execution_Context *context,
-  Value_View args
+  Value_View args,
+  const void *payload
 ) {
   assert(args.length == 1);
   Value *value = value_view_get(args, 0);
@@ -1768,7 +1769,8 @@ mass_quote(
 static Value *
 mass_unquote(
   Execution_Context *context,
-  Value_View args
+  Value_View args,
+  const void *payload
 ) {
   assert(args.length == 1);
   return token_parse_single(context, value_view_get(args, 0));
@@ -6935,6 +6937,24 @@ scope_define_builtins(
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
   ));
+  {
+    Source_Range quote_source_range;
+    INIT_LITERAL_SOURCE_RANGE(&quote_source_range, "'");
+    scope_define_operator(compilation, scope, quote_source_range, slice_literal("'"), allocator_make(allocator, Operator,
+      .precedence = 30,
+      .fixity = Operator_Fixity_Prefix,
+      .associativity = Operator_Associativity_Right,
+      .argument_count = 1,
+      .handler = mass_quote,
+    ));
+    scope_define_operator(compilation, scope, quote_source_range, slice_literal("'"), allocator_make(allocator, Operator,
+      .precedence = 30,
+      .fixity = Operator_Fixity_Postfix,
+      .associativity = Operator_Associativity_Right,
+      .argument_count = 1,
+      .handler = mass_unquote,
+    ));
+  }
   Source_Range dot_star_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_star_source_range, ".*");
   scope_define_operator(compilation, scope, dot_star_source_range, slice_literal(".*"), allocator_make(allocator, Operator,
