@@ -2495,18 +2495,25 @@ token_parse_operator_definition(
   if (!precedence_token) { context_parse_error(context, view, peek_index); goto err; }
   Value *pattern_token = value_view_next(view, &peek_index);
   if (!value_is_group_paren(pattern_token)) { context_parse_error(context, view, peek_index); goto err; }
-  Value *alias_token = value_view_next(view, &peek_index);
-  if (!alias_token) { context_parse_error(context, view, peek_index); goto err; }
 
-  if (!value_is_symbol(alias_token)) {
+  Value_View rest = value_view_rest(&view, peek_index);
+  u32 body_length;
+  Value *body = token_parse_expression(
+    context, rest, &body_length, context->compilation->common_symbols.operator_semicolon
+  );
+
+  if (!body_length) { context_parse_error(context, view, peek_index); goto err; }
+  peek_index += body_length;
+
+  if (!value_is_symbol(body)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
-      .source_range = alias_token->source_range,
+      .source_range = body->source_range,
       .detailed_message ="Expected a symbol to alias operator to",
     });
     goto err;
   }
-  const Symbol *alias = value_as_symbol(alias_token);
+  const Symbol *alias = value_as_symbol(body);
 
   Value *precedence_value = token_parse_single(context, precedence_token);
   if (!value_is_i64(precedence_value)) {

@@ -92,31 +92,32 @@ apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) -> (Type) MASS.size_of
 apply :: macro(type, tuple : MASS.Group_Square) { cast(type', tuple') }
 apply :: fn(x, paren : MASS.Group_Paren) MASS.call
 
-operator 7 (x == y) equal
-operator 7 (x != y) not_equal
+operator 7 (x == y) 'equal
+operator 7 (x != y) 'not_equal
 
-operator 8 (x < y) less
-operator 8 (x > y) greater
-operator 8 (x <= y) less_equal
-operator 8 (x >= y) greater_equal
+operator 8 (x < y) 'less
+operator 8 (x > y) 'greater
+operator 8 (x <= y) 'less_equal
+operator 8 (x >= y) 'greater_equal
 
-operator 10 (x + y) add
-operator 10 (x - y) subtract
+operator 10 (x + y) 'add
+operator 10 (x - y) 'subtract
 
-operator 15 (x * y) multiply
-operator 15 (x / y) divide
-operator 15 (x % y) remainder
+operator 15 (x * y) 'multiply
+operator 15 (x / y) 'divide
+operator 15 (x % y) 'remainder
 
-operator 15 (x << y) logical_shift_left
-operator 15 (x >> y) logical_shift_right
-operator 15 (x | y) bitwise_or
-operator 15 (x & y) bitwise_and
+operator 15 (x << y) 'logical_shift_left
+operator 15 (x >> y) 'logical_shift_right
+operator 15 (x | y) 'bitwise_or
+operator 15 (x & y) 'bitwise_and
 
-operator 16 (- x) negate
-operator 16 (& x) pointer_to
+operator 16 (- x) 'negate
+operator 16 (& x) 'pointer_to
 
-operator intrinsic 20 (@ x) eval
-operator intrinsic 25 (~> x) fragment
+operator intrinsic 20 (@ x) 'eval
+operator intrinsic 25 (~> x) 'fragment
+operator intrinsic 30 (. x) 'make_accessor
 
 make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
   meta :: import("std/meta")
@@ -125,7 +126,6 @@ make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
   meta.immediate(context.compilation, accessor, arguments.source_range)
 }
 
-operator intrinsic 30 (. x) make_accessor
 
 quote :: fn(x) -> (MASS.Quoted) MASS.quote
 unquote :: fn(x) MASS.unquote
