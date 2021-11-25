@@ -1405,8 +1405,7 @@ typedef struct Operator {
   Operator_Fixity fixity;
   Operator_Associativity associativity;
   u32 precedence;
-  u16 argument_count;
-  u16 is_intrinsic;
+  u32 is_intrinsic;
   const Symbol * alias;
   Mass_Handle_Operator_Proc handler;
 } Operator;
@@ -4019,12 +4018,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
     .offset = offsetof(Operator, precedence),
   },
   {
-    .descriptor = &descriptor_u16,
-    .name = slice_literal_fields("argument_count"),
-    .offset = offsetof(Operator, argument_count),
-  },
-  {
-    .descriptor = &descriptor_u16,
+    .descriptor = &descriptor_u32,
     .name = slice_literal_fields("is_intrinsic"),
     .offset = offsetof(Operator, is_intrinsic),
   },

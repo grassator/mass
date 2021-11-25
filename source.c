@@ -2339,8 +2339,8 @@ token_handle_user_defined_operator_proc(
   const Operator *operator
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  assert(operator->argument_count == args.length);
+  u64 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
+  assert(argument_count == args.length);
 
   Value *fn = scope_lookup_force(context, context->scope, operator->alias, &args.source_range);
   MASS_ON_ERROR(*context->result) return 0;
@@ -2577,7 +2577,6 @@ token_parse_operator_definition(
 
   Operator *operator = allocator_allocate(context->allocator, Operator);
   *operator = (Operator){
-    .argument_count = argument_count,
     .is_intrinsic = !!intrinsic_token,
     .alias = alias,
     .fixity = fixity,
@@ -5735,7 +5734,7 @@ token_dispatch_operator(
 
   const Operator *operator = stack_entry->operator;
 
-  u32 argument_count = operator->argument_count;
+  u32 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
 
   if (dyn_array_length(*stack) < argument_count) {
     context_error(context, (Mass_Error) {
@@ -5745,7 +5744,6 @@ token_dispatch_operator(
     });
     return;
   }
-  assert(argument_count);
   u64 start_index = dyn_array_length(*stack) - argument_count;
   Value *first_arg = *dyn_array_get(*stack, start_index);
   Value *last_arg = *dyn_array_last(*stack);
@@ -6941,7 +6939,6 @@ scope_define_builtins(
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
-    .argument_count = 2,
     .handler = mass_handle_dot_operator,
   ));
   {
@@ -6951,14 +6948,12 @@ scope_define_builtins(
       .precedence = 30,
       .fixity = Operator_Fixity_Prefix,
       .associativity = Operator_Associativity_Right,
-      .argument_count = 1,
       .handler = mass_quote,
     ));
     scope_define_operator(compilation, scope, quote_source_range, slice_literal("'"), allocator_make(allocator, Operator,
       .precedence = 30,
       .fixity = Operator_Fixity_Postfix,
       .associativity = Operator_Associativity_Right,
-      .argument_count = 1,
       .handler = mass_unquote,
     ));
   }
@@ -6968,7 +6963,6 @@ scope_define_builtins(
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,
     .associativity = Operator_Associativity_Left,
-    .argument_count = 1,
     .handler = mass_handle_dereference_operator,
   ));
   Source_Range colon_source_range;
@@ -6977,7 +6971,6 @@ scope_define_builtins(
     .precedence = 2,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
-    .argument_count = 2,
     .handler = mass_handle_typed_symbol_operator,
   ));
   Source_Range equal_source_range;
@@ -6986,7 +6979,6 @@ scope_define_builtins(
     .precedence = 1,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
-    .argument_count = 2,
     .handler = mass_handle_assignment_operator,
   ));
   Source_Range return_source_range;
@@ -6995,7 +6987,6 @@ scope_define_builtins(
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
-    .argument_count = 1,
     .handler = mass_handle_return_operator,
   ));
   Source_Range goto_source_range;
@@ -7004,7 +6995,6 @@ scope_define_builtins(
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
-    .argument_count = 1,
     .handler = mass_handle_goto_operator,
   ));
 

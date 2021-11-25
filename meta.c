@@ -1474,8 +1474,7 @@ main(void) {
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
     { "u32", "precedence" },
-    { "u16", "argument_count" },
-    { "u16", "is_intrinsic" },
+    { "u32", "is_intrinsic" },
     { "const Symbol *", "alias" },
     { "Mass_Handle_Operator_Proc", "handler" },
   }));

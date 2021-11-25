@@ -1211,7 +1211,6 @@ compilation_init(
       .precedence = 20,
       .fixity = Operator_Fixity_Infix,
       .associativity = Operator_Associativity_Left,
-      .argument_count = 2,
       .handler = mass_handle_apply_operator,
     },
   };
