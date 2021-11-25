@@ -1181,27 +1181,27 @@ value_force_lazy_static(
 
 static void
 scope_maybe_force_overload(
-  Execution_Context *context,
+  Compilation *compilation,
   Value *value,
   Slice name
 ) {
   if (value_is_overload(value)) {
     const Overload *overload = value_as_overload(value);
-    scope_maybe_force_overload(context, overload->value, name);
-    scope_maybe_force_overload(context, overload->next, name);
+    scope_maybe_force_overload(compilation, overload->value, name);
+    scope_maybe_force_overload(compilation, overload->next, name);
     return;
   }
-  MASS_ON_ERROR(*context->result) return;
+  MASS_ON_ERROR(*compilation->result) return;
   if (value_is_lazy_static_value(value)) {
     value_force_lazy_static(value, name);
   }
-  MASS_ON_ERROR(*context->result) return;
+  MASS_ON_ERROR(*compilation->result) return;
   if (
     value->descriptor->tag != Descriptor_Tag_Function_Instance &&
     value->descriptor != &descriptor_function_literal &&
     value->descriptor != &descriptor_overload
   ) {
-    context_error(context, (Mass_Error) {
+    compilation_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Non_Function_Overload,
       .source_range = value->source_range,
     });
@@ -1211,7 +1211,7 @@ scope_maybe_force_overload(
 
 static Value *
 scope_entry_force_value(
-  Execution_Context *context,
+  Compilation *compilation,
   Scope_Entry *entry
 ) {
   if (entry->forced) {
@@ -1228,7 +1228,7 @@ scope_entry_force_value(
   if (!entry->value) return 0;
 
   if (value_is_overload(entry->value)) {
-    scope_maybe_force_overload(context, entry->value, entry->name);
+    scope_maybe_force_overload(compilation, entry->value, entry->name);
   }
 
   return entry->value;
@@ -1260,7 +1260,7 @@ mass_context_force_lookup(
       return 0;
     }
   }
-  return scope_entry_force_value(context, entry);
+  return scope_entry_force_value(context->compilation, entry);
 }
 
 static inline void
@@ -5212,7 +5212,7 @@ mass_handle_apply_operator(
     return 0;
   }
 
-  Value *apply_function = scope_entry_force_value(context, apply_entry);
+  Value *apply_function = scope_entry_force_value(context->compilation, apply_entry);
   return token_handle_function_call(context, apply_function, operands_view, source_range);
 }
 
@@ -5764,7 +5764,7 @@ mass_handle_dot_operator(
       }
       // FIXME when looking up values from a different file, need to either adjust source
       //       range or have some other mechanism to track it.
-      return scope_entry_force_value(context, entry);
+      return scope_entry_force_value(context->compilation, entry);
     } else {
       const Struct_Field *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
       if (!field) {

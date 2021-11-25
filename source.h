@@ -166,6 +166,12 @@ value_force_exact(
   Value *source
 );
 
+static Value *
+scope_entry_force_value(
+  Compilation *compilation,
+  Scope_Entry *entry
+);
+
 static inline Expected_Result
 mass_expected_result_exact(
   const Descriptor *descriptor,
