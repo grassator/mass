@@ -707,8 +707,8 @@ compiler_scope_define_exports(
     Function_Info_Flags_None,
     descriptor_pointer_to, "descriptor_pointer_to", &descriptor_descriptor_pointer,
     function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("allocator")),
-&descriptor_allocator_pointer
+      mass_ensure_symbol(compilation, slice_literal("compilation")),
+&descriptor_compilation_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("descriptor")),

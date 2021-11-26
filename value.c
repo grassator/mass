@@ -1001,18 +1001,24 @@ descriptor_function_instance(
   return result;
 }
 
-static inline Descriptor *
+static inline const Descriptor *
 descriptor_pointer_to(
-  const Allocator *allocator,
+  Compilation *compilation,
   const Descriptor *descriptor
 ) {
-  Descriptor *result = allocator_allocate(allocator, Descriptor);
+  const Descriptor **maybe_cached_descriptor_pointer =
+    hash_map_get(compilation->descriptor_pointer_to_cache_map, descriptor);
+  if (maybe_cached_descriptor_pointer) {
+    return *maybe_cached_descriptor_pointer;
+  }
+  Descriptor *result = allocator_allocate(compilation->allocator, Descriptor);
   *result = (const Descriptor) {
     .tag = Descriptor_Tag_Pointer_To,
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Pointer_To.descriptor = descriptor,
   };
+  hash_map_set(compilation->descriptor_pointer_to_cache_map, descriptor, result);
   return result;
 }
 
@@ -1190,6 +1196,7 @@ compilation_init(
     .trampoline_map = hash_map_make(Trampoline_Map, .initial_capacity = 256),
     .prefix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .infix_or_suffix_operator_symbol_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
+    .descriptor_pointer_to_cache_map = hash_map_make(Descriptor_Pointer_To_Cache_Map, .initial_capacity = 256),
     .jit = {0},
     .apply_operator = {
       .precedence = 20,
@@ -1274,6 +1281,7 @@ compilation_deinit(
   hash_map_destroy(compilation->prefix_operator_symbol_map);
   hash_map_destroy(compilation->infix_or_suffix_operator_symbol_map);
   hash_map_destroy(compilation->trampoline_map);
+  hash_map_destroy(compilation->descriptor_pointer_to_cache_map);
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);

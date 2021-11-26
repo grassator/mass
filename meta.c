@@ -1939,6 +1939,13 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
+  push_type(type_hash_map("Descriptor_Pointer_To_Cache_Map", {
+    .key_type = "const Descriptor *",
+    .value_type = "const Descriptor *",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
+  }));
+
   push_type(type_struct("Common_Symbols", (Struct_Item[]){
     { "const Symbol *", "apply" },
     { "const Symbol *", "fn" },
@@ -1982,6 +1989,7 @@ main(void) {
     { "Symbol_Map *", "symbol_cache_map" },
     { "Symbol_Map *", "prefix_operator_symbol_map" },
     { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
+    { "Descriptor_Pointer_To_Cache_Map *", "descriptor_pointer_to_cache_map"},
     { "Common_Symbols", "common_symbols" },
     { "Operator", "apply_operator" },
   })));
@@ -2066,8 +2074,8 @@ main(void) {
   ));
 
   export_compiler(push_type(
-    type_function(Default, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
-      { "const Allocator *", "allocator" },
+    type_function(Default, "descriptor_pointer_to", "const Descriptor *", (Argument_Type[]){
+      { "Compilation *", "compilation" },
       { "const Descriptor *", "descriptor" },
     })
   ));

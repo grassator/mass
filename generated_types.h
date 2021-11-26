@@ -656,6 +656,8 @@ typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
 
 typedef struct Static_Pointer_Map Static_Pointer_Map;
 
+typedef struct Descriptor_Pointer_To_Cache_Map Descriptor_Pointer_To_Cache_Map;
+
 typedef struct Common_Symbols Common_Symbols;
 typedef dyn_array_type(Common_Symbols *) Array_Common_Symbols_Ptr;
 typedef dyn_array_type(const Common_Symbols *) Array_Const_Common_Symbols_Ptr;
@@ -777,8 +779,8 @@ static Value * mass_static_assert
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
-static Descriptor * descriptor_pointer_to
-  (const Allocator * allocator, const Descriptor * descriptor);
+static const Descriptor * descriptor_pointer_to
+  (Compilation * compilation, const Descriptor * descriptor);
 
 static _Bool same_type
   (const Descriptor * a, const Descriptor * b);
@@ -2048,6 +2050,7 @@ typedef struct Jit {
 typedef dyn_array_type(Jit) Array_Jit;
 
 hash_map_template(Static_Pointer_Map, const void *, Value *, hash_pointer, const_void_pointer_equal)
+hash_map_template(Descriptor_Pointer_To_Cache_Map, const Descriptor *, const Descriptor *, hash_pointer, const_void_pointer_equal)
 typedef struct Common_Symbols {
   const Symbol * apply;
   const Symbol * fn;
@@ -2092,6 +2095,7 @@ typedef struct Compilation {
   Symbol_Map * symbol_cache_map;
   Symbol_Map * prefix_operator_symbol_map;
   Symbol_Map * infix_or_suffix_operator_symbol_map;
+  Descriptor_Pointer_To_Cache_Map * descriptor_pointer_to_cache_map;
   Common_Symbols common_symbols;
   Operator apply_operator;
 } Compilation;
@@ -2602,6 +2606,7 @@ static Descriptor descriptor_array_jit_ptr;
 static Descriptor descriptor_jit_pointer;
 static Descriptor descriptor_jit_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_map, Static_Pointer_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(descriptor_pointer_to_cache_map, Descriptor_Pointer_To_Cache_Map);
 static Descriptor descriptor_common_symbols;
 static Descriptor descriptor_array_common_symbols;
 static Descriptor descriptor_array_common_symbols_ptr;
@@ -5756,6 +5761,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_symbol_map_pointer,
     .name = slice_literal_fields("infix_or_suffix_operator_symbol_map"),
     .offset = offsetof(Compilation, infix_or_suffix_operator_symbol_map),
+  },
+  {
+    .descriptor = &descriptor_descriptor_pointer_to_cache_map_pointer,
+    .name = slice_literal_fields("descriptor_pointer_to_cache_map"),
+    .offset = offsetof(Compilation, descriptor_pointer_to_cache_map),
   },
   {
     .descriptor = &descriptor_common_symbols,

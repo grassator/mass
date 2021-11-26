@@ -4242,7 +4242,7 @@ mass_ensure_trampoline(
   dyn_array_push(trampoline_info->parameters, (Function_Parameter) {
     .tag = Function_Parameter_Tag_Runtime,
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
-    .descriptor = descriptor_pointer_to(context->allocator, args_struct_descriptor),
+    .descriptor = descriptor_pointer_to(context->compilation, args_struct_descriptor),
     .source_range = args_source_range,
   });
 
@@ -5208,7 +5208,7 @@ mass_pointer_to(
   assert(args.length == 1);
   Value *pointee = value_view_get(args, 0);
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
-  const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
+  const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee_descriptor);
   if (mass_value_is_compile_time_known(pointee)) {
     if (context_is_compile_time_eval(context)) {
       const void *source_memory =
@@ -5234,7 +5234,7 @@ mass_pointer_to_type(
   Value *type_value = value_view_get(args_view, 0);
   const Descriptor *descriptor = value_ensure_type(context, type_value, args_view.source_range);
   MASS_ON_ERROR(*context->result) return 0;
-  const Descriptor *pointer_descriptor = descriptor_pointer_to(context->allocator, descriptor);
+  const Descriptor *pointer_descriptor = descriptor_pointer_to(context->compilation, descriptor);
   Storage storage = storage_immediate(&pointer_descriptor);
   return value_make(
     context->allocator, &descriptor_descriptor_pointer, storage, args_view.source_range
@@ -5724,7 +5724,7 @@ mass_handle_dereference_operator(
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
       .Type_Mismatch = {
-        .expected = descriptor_pointer_to(context->allocator, descriptor),
+        .expected = descriptor_pointer_to(context->compilation, descriptor),
         .actual = descriptor,
       },
     });
