@@ -1104,7 +1104,7 @@ spec("source") {
       void (*checker)() = test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn() -> () intrinsic {\n"
-            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
+            "value : &MASS.Value = allocate(context.allocator, MASS.Value)\n"
             "value.source_range = arguments.source_range\n"
             "value.descriptor = type_of(())\n"
             "value.storage.tag = MASS.Storage_Tag.None\n"
@@ -1141,16 +1141,16 @@ spec("source") {
               "source_range : &MASS.Source_Range,"
               "payload : &type_of(())"
             ") -> (&MASS.Value) {\n"
-              "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
+              "value : &MASS.Value = allocate(compilation.allocator, MASS.Value)\n"
               "value.source_range = source_range.*\n"
               "value.descriptor = type_of(())\n"
               "value.storage.tag = MASS.Storage_Tag.None\n"
               "value.storage.bit_size = value.descriptor.bit_size\n"
               "value"
             "}\n"
-            "value : &MASS.Value = allocate(MASS.allocator, MASS.Value)\n"
+            "value : &MASS.Value = allocate(context.allocator, MASS.Value)\n"
 
-            "lazy_value : &MASS.Lazy_Value = allocate(MASS.allocator, MASS.Lazy_Value)\n"
+            "lazy_value : &MASS.Lazy_Value = allocate(context.allocator, MASS.Lazy_Value)\n"
             "lazy_value.epoch = context.epoch\n"
             "lazy_value.descriptor = type_of(())\n"
             "lazy_value.proc = lazy_value_proc\n"

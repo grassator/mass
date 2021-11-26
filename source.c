@@ -7021,16 +7021,7 @@ module_compiler_init(
     },
   };
   INIT_LITERAL_SOURCE_RANGE(&out_module->source_range, "MASS");
-
   compiler_scope_define_exports(compilation, scope);
-  Value *allocator_value = value_make(
-    allocator, &descriptor_allocator_pointer, storage_immediate(&allocator), (Source_Range){0}
-  );
-  INIT_LITERAL_SOURCE_RANGE(&allocator_value->source_range, "allocator");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, allocator_value->source_range,
-    mass_ensure_symbol(compilation, slice_literal("allocator")), allocator_value
-  );
 }
 
 static void
