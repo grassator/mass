@@ -323,14 +323,8 @@ token_value_force_immediate_integer(
       }
     }
     panic("Unexpected literal cast result");
-  }
-  if (!same_value_type_or_can_implicitly_move_cast(target_descriptor, value)) {
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = *source_range,
-      .Type_Mismatch = { .expected = target_descriptor, .actual = value->descriptor },
-    });
-    return 0;
+  } else {
+    panic("Trying to force non-literal immediate");
   }
 
   return value;
@@ -996,6 +990,7 @@ mass_assign(
     value_force_exact(compilation, builder, target, source);
     return;
   }
+  assert(target->descriptor != &descriptor_lazy_value);
 
   if (mass_descriptor_is_void(target->descriptor)) {
     return;
@@ -1022,7 +1017,7 @@ mass_assign(
       return;
     } else {
       const Descriptor *original_descriptor = target->descriptor->Pointer_To.descriptor;
-      if (!same_value_type_or_can_implicitly_move_cast(original_descriptor, source)) goto err;
+      if (!same_type(original_descriptor, source->descriptor)) goto err;
       load_address(builder, source_range, target, source->storage);
     }
     return;
@@ -1151,7 +1146,7 @@ mass_assign(
   }
 
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
-    if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
+    if (!same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) goto err;
 
     DYN_ARRAY_FOREACH(Struct_Field, field, source->descriptor->Struct.fields) {
       Value source_field = {
@@ -1181,7 +1176,7 @@ mass_assign(
   }
 
   MASS_ON_ERROR(*compilation->result) return;
-  if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
+  if (same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) {
     move_value(builder, source_range, &target->storage, &source->storage);
     return;
   }
@@ -2328,7 +2323,7 @@ mass_expected_result_ensure_value_or_temp(
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
       const Descriptor *expected_descriptor =
         flexible->descriptor ? flexible->descriptor : value->descriptor;
-      if (!same_value_type_or_can_implicitly_move_cast(expected_descriptor, value)) {
+      if (!same_type(expected_descriptor, value->descriptor)) {
         compilation_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = value->source_range,
