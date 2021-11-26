@@ -2408,20 +2408,22 @@ token_handle_user_defined_operator_proc(
   const Operator *operator
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  assert(operator->tag == Operator_Tag_Alias);
   u64 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
   assert(argument_count == args.length);
 
-  Value *fn = mass_context_force_lookup(context, context->scope, operator->alias, &args.source_range);
+  Value *fn = mass_context_force_lookup(
+    context, context->scope, operator->Alias.symbol, &args.source_range
+  );
   MASS_ON_ERROR(*context->result) return 0;
 
-  if (!operator->is_intrinsic) {
-    Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
-    for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
-      *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
-      MASS_ON_ERROR(*context->result) return 0;
-    }
-    args = value_view_from_value_array(args_array, &args.source_range);
+  Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
+  for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
+    *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
+    MASS_ON_ERROR(*context->result) return 0;
   }
+  args = value_view_from_value_array(args_array, &args.source_range);
+
   return token_handle_function_call(context, fn, args, args.source_range);
 }
 
@@ -2557,9 +2559,6 @@ token_parse_operator_definition(
     view, &peek_index, context->compilation->common_symbols.operator
   );
   if (!keyword_token) return 0;
-  Value *intrinsic_token = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.intrinsic
-  );
   Value *precedence_token = value_view_next(view, &peek_index);
   if (!precedence_token) { context_parse_error(context, view, peek_index); goto err; }
   Value *pattern_token = value_view_next(view, &peek_index);
@@ -2573,16 +2572,6 @@ token_parse_operator_definition(
 
   if (!body_length) { context_parse_error(context, view, peek_index); goto err; }
   peek_index += body_length;
-
-  if (!value_is_symbol(body)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = body->source_range,
-      .detailed_message ="Expected a symbol to alias operator to",
-    });
-    goto err;
-  }
-  const Symbol *alias = value_as_symbol(body);
 
   Value *precedence_value = token_parse_single(context, precedence_token);
   if (!value_is_i64(precedence_value)) {
@@ -2645,13 +2634,33 @@ token_parse_operator_definition(
   }
 
   Operator *operator = allocator_allocate(context->allocator, Operator);
-  *operator = (Operator){
-    .is_intrinsic = !!intrinsic_token,
-    .alias = alias,
-    .fixity = fixity,
-    .precedence = precendence,
-    .handler = token_handle_user_defined_operator_proc,
-  };
+
+  if (value_is_symbol(body)) {
+    const Symbol *alias = value_as_symbol(body);
+    *operator = (Operator){
+      .tag = Operator_Tag_Alias,
+      .fixity = fixity,
+      .precedence = precendence,
+      .Alias = {
+        .symbol = alias,
+        .handler = token_handle_user_defined_operator_proc,
+      },
+    };
+  } else if (value_is_intrinsic(body)) {
+    *operator = (Operator){
+      .tag = Operator_Tag_Intrinsic,
+      .fixity = fixity,
+      .precedence = precendence,
+      .Intrinsic = { .body = body },
+    };
+  } else {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = body->source_range,
+      .detailed_message = slice_literal("Expected a valid operator body"),
+    });
+    goto err;
+  }
 
   scope_define_operator(
     context->compilation,
@@ -4021,16 +4030,13 @@ mass_intrinsic_call(
   Value *overload,
   Value_View args_view
 ) {
-  fn_type_opaque jitted_code =
-    mass_ensure_jit_function_for_value(context->compilation, overload, &args_view.source_range);
+  // @Volatile :IntrinsicFunctionSignature
+  Mass_Intrinsic_Proc jitted_code = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
+    context->compilation, overload, &args_view.source_range
+  );
   MASS_ON_ERROR(*context->result) return 0;
 
-  // @Volatile :IntrinsicFunctionSignature
-  Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
-    (Value *(*)(Execution_Context *, Value_View))jitted_code;
-  Value *result = jitted_intrinsic(context, args_view);
-
-  return result;
+  return jitted_code(context, args_view);
 }
 
 static inline bool
@@ -5802,8 +5808,18 @@ token_dispatch_operator(
     .length = argument_count,
     .source_range = source_range,
   };
-
-  Value *result_value = operator->handler(context, args_view, operator);
+  Value *result_value = 0;
+  switch(operator->tag) {
+    case Operator_Tag_Alias: {
+      result_value = operator->Alias.handler(context, args_view, operator);
+    } break;
+    case Operator_Tag_Intrinsic: {
+      Mass_Intrinsic_Proc proc = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
+        context->compilation, operator->Intrinsic.body, &source_range
+      );
+      result_value = proc(context, args_view);
+    } break;
+  }
   MASS_ON_ERROR(*context->result) return;
 
   // Pop off current arguments and push a new one
@@ -6958,7 +6974,8 @@ scope_define_builtins(
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
-    .handler = mass_handle_dot_operator,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_dot_operator,
   ));
   {
     Source_Range quote_source_range;
@@ -6967,13 +6984,15 @@ scope_define_builtins(
       .precedence = 30,
       .fixity = Operator_Fixity_Prefix,
       .associativity = Operator_Associativity_Right,
-      .handler = mass_quote,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_quote,
     ));
     scope_define_operator(compilation, scope, quote_source_range, slice_literal("'"), allocator_make(allocator, Operator,
       .precedence = 30,
       .fixity = Operator_Fixity_Postfix,
       .associativity = Operator_Associativity_Right,
-      .handler = mass_unquote,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_unquote,
     ));
   }
   Source_Range dot_star_source_range;
@@ -6982,7 +7001,8 @@ scope_define_builtins(
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,
     .associativity = Operator_Associativity_Left,
-    .handler = mass_handle_dereference_operator,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_dereference_operator,
   ));
   Source_Range colon_source_range;
   INIT_LITERAL_SOURCE_RANGE(&colon_source_range, ":");
@@ -6990,7 +7010,8 @@ scope_define_builtins(
     .precedence = 2,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
-    .handler = mass_handle_typed_symbol_operator,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_typed_symbol_operator,
   ));
   Source_Range equal_source_range;
   INIT_LITERAL_SOURCE_RANGE(&equal_source_range, "=");
@@ -6998,7 +7019,8 @@ scope_define_builtins(
     .precedence = 1,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
-    .handler = mass_handle_assignment_operator,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_assignment_operator,
   ));
   Source_Range return_source_range;
   INIT_LITERAL_SOURCE_RANGE(&return_source_range, "return");
@@ -7006,7 +7028,8 @@ scope_define_builtins(
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
-    .handler = mass_handle_return_operator,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_return_operator,
   ));
   Source_Range goto_source_range;
   INIT_LITERAL_SOURCE_RANGE(&goto_source_range, "goto");
@@ -7014,7 +7037,8 @@ scope_define_builtins(
     .precedence = 0,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
-    .handler = mass_handle_goto_operator,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_goto_operator,
   ));
 
   {

@@ -438,6 +438,9 @@ typedef struct Lazy_Static_Value Lazy_Static_Value;
 typedef dyn_array_type(Lazy_Static_Value *) Array_Lazy_Static_Value_Ptr;
 typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_Ptr;
 
+typedef Value * (*Mass_Intrinsic_Proc)
+  (Execution_Context * context, Value_View view);
+
 typedef Value * (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, const Operator * operator);
 
@@ -1407,16 +1410,40 @@ typedef struct Execution_Context {
 } Execution_Context;
 typedef dyn_array_type(Execution_Context) Array_Execution_Context;
 
+typedef enum {
+  Operator_Tag_Alias = 0,
+  Operator_Tag_Intrinsic = 1,
+} Operator_Tag;
+
+typedef struct Operator_Alias {
+  const Symbol * symbol;
+  Mass_Handle_Operator_Proc handler;
+} Operator_Alias;
+typedef struct Operator_Intrinsic {
+  Value * body;
+} Operator_Intrinsic;
 typedef struct Operator {
+  Operator_Tag tag;
+  char _tag_padding[4];
   Operator_Fixity fixity;
   Operator_Associativity associativity;
-  u32 precedence;
-  u32 is_intrinsic;
-  const Symbol * alias;
-  Mass_Handle_Operator_Proc handler;
+  u64 precedence;
+  union {
+    Operator_Alias Alias;
+    Operator_Intrinsic Intrinsic;
+  };
 } Operator;
+static inline Operator_Alias *
+operator_as_alias(Operator *operator) {
+  assert(operator->tag == Operator_Tag_Alias);
+  return &operator->Alias;
+}
+static inline Operator_Intrinsic *
+operator_as_intrinsic(Operator *operator) {
+  assert(operator->tag == Operator_Tag_Intrinsic);
+  return &operator->Intrinsic;
+}
 typedef dyn_array_type(Operator) Array_Operator;
-
 typedef enum {
   Macro_Pattern_Tag_Any_Token_Single = 0,
   Macro_Pattern_Tag_Any_Token_Sequence = 1,
@@ -2362,6 +2389,7 @@ static Descriptor descriptor_execution_context_pointer_pointer;
 static Descriptor descriptor_operator;
 static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
+static Descriptor descriptor_array_const_operator_ptr;
 static Descriptor descriptor_operator_pointer;
 static Descriptor descriptor_operator_pointer_pointer;
 static Descriptor descriptor_macro_pattern;
@@ -2429,6 +2457,7 @@ static Descriptor descriptor_array_lazy_static_value;
 static Descriptor descriptor_array_lazy_static_value_ptr;
 static Descriptor descriptor_lazy_static_value_pointer;
 static Descriptor descriptor_lazy_static_value_pointer_pointer;
+static Descriptor descriptor_mass_intrinsic_proc;
 static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_function_parameter;
 static Descriptor descriptor_array_function_parameter;
@@ -4048,9 +4077,41 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
 MASS_DEFINE_TYPE_VALUE(execution_context);
 DEFINE_VALUE_IS_AS_HELPERS(Execution_Context, execution_context);
 DEFINE_VALUE_IS_AS_HELPERS(Execution_Context *, execution_context_pointer);
+/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator_ptr, Array_Operator_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator, Array_Operator)
+MASS_DEFINE_OPAQUE_C_TYPE(operator_tag, Operator_Tag)
+static C_Enum_Item operator_tag_items[] = {
+{ .name = slice_literal_fields("Alias"), .value = 0 },
+{ .name = slice_literal_fields("Intrinsic"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(operator_alias, Operator_Alias,
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("symbol"),
+    .offset = offsetof(Operator_Alias, symbol),
+  },
+  {
+    .descriptor = &descriptor_mass_handle_operator_proc,
+    .name = slice_literal_fields("handler"),
+    .offset = offsetof(Operator_Alias, handler),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(operator_alias);
+MASS_DEFINE_STRUCT_DESCRIPTOR(operator_intrinsic, Operator_Intrinsic,
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("body"),
+    .offset = offsetof(Operator_Intrinsic, body),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(operator_intrinsic);
 MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
+  {
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_operator_tag,
+    .offset = offsetof(Operator, tag),
+  },
   {
     .descriptor = &descriptor_operator_fixity,
     .name = slice_literal_fields("fixity"),
@@ -4062,29 +4123,25 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
     .offset = offsetof(Operator, associativity),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_u64,
     .name = slice_literal_fields("precedence"),
     .offset = offsetof(Operator, precedence),
   },
   {
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("is_intrinsic"),
-    .offset = offsetof(Operator, is_intrinsic),
+    .name = slice_literal_fields("Alias"),
+    .descriptor = &descriptor_operator_alias,
+    .offset = offsetof(Operator, Alias),
   },
   {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("alias"),
-    .offset = offsetof(Operator, alias),
-  },
-  {
-    .descriptor = &descriptor_mass_handle_operator_proc,
-    .name = slice_literal_fields("handler"),
-    .offset = offsetof(Operator, handler),
+    .name = slice_literal_fields("Intrinsic"),
+    .descriptor = &descriptor_operator_intrinsic,
+    .offset = offsetof(Operator, Intrinsic),
   },
 );
 MASS_DEFINE_TYPE_VALUE(operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator, operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator *, operator_pointer);
+/*union struct end*/
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern_ptr, Array_Macro_Pattern_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern, Array_Macro_Pattern)
@@ -4437,6 +4494,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
 MASS_DEFINE_TYPE_VALUE(lazy_static_value);
 DEFINE_VALUE_IS_AS_HELPERS(Lazy_Static_Value, lazy_static_value);
 DEFINE_VALUE_IS_AS_HELPERS(Lazy_Static_Value *, lazy_static_value_pointer);
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  mass_intrinsic_proc,
+  &descriptor_value_pointer,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_execution_context_pointer,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_value_view,
+  }
+)
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_handle_operator_proc,
   &descriptor_value_pointer,

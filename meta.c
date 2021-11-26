@@ -1480,13 +1480,18 @@ main(void) {
     { "Mass_Result *", "result" },
   })));
 
-  push_type(type_struct("Operator", (Struct_Item[]){
+  push_type(add_common_fields(type_union("Operator", (Struct_Type[]){
+    struct_fields("Alias", (Struct_Item[]){
+      { "const Symbol *", "symbol" },
+      { "Mass_Handle_Operator_Proc", "handler" },
+    }),
+    struct_fields("Intrinsic", (Struct_Item[]){
+      { "Value *", "body" },
+    }),
+  }), (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
-    { "u32", "precedence" },
-    { "u32", "is_intrinsic" },
-    { "const Symbol *", "alias" },
-    { "Mass_Handle_Operator_Proc", "handler" },
+    { "u64", "precedence" },
   }));
 
   push_type(add_common_fields(type_union("Macro_Pattern", (Struct_Type[]){
@@ -1584,6 +1589,11 @@ main(void) {
     { "Execution_Context", "context" },
     { "Value_View", "expression" },
     { "u64", "resolving" },
+  }));
+
+  push_type(type_function(Typedef, "Mass_Intrinsic_Proc", "Value *", (Argument_Type[]){
+    { "Execution_Context *", "context" },
+    { "Value_View", "view" },
   }));
 
   push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){

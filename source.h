@@ -99,6 +99,11 @@ scope_make(
   const Scope *parent
 );
 
+static inline bool
+value_is_intrinsic(
+  Value *value
+);
+
 static inline void
 scope_define_value(
   Scope *scope,

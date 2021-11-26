@@ -1122,6 +1122,22 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Operator">
+  <DisplayString Condition="tag == Operator_Tag_Alias">
+    Alias { Alias }
+  </DisplayString>
+  <DisplayString Condition="tag == Operator_Tag_Intrinsic">
+    Intrinsic { Intrinsic }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="fixity">fixity</Item>
+    <Item Name="associativity">associativity</Item>
+    <Item Name="precedence">precedence</Item>
+    <Item Name="Alias" Condition="tag == Operator_Tag_Alias">Alias</Item>
+    <Item Name="Intrinsic" Condition="tag == Operator_Tag_Intrinsic">Intrinsic</Item>
+  </Expand>
+</Type>
 <Type Name="Array_Macro_Pattern">
   <Expand>
     <Item Name="[length]">data->length</Item>

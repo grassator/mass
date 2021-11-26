@@ -1208,7 +1208,8 @@ compilation_init(
       .precedence = 20,
       .fixity = Operator_Fixity_Infix,
       .associativity = Operator_Associativity_Left,
-      .handler = mass_handle_apply_operator,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_apply_operator,
     },
   };
 

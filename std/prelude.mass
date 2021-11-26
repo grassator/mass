@@ -14,9 +14,6 @@ syntax statement("while" ..@condition {}@body) {
 import :: fn(path : String) -> (MASS.Scope) MASS.import
 cast :: fn(type : Type, value) MASS.cast
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
-eval :: fn(curly : MASS.Group_Curly) MASS.eval
-eval :: fn(paren : MASS.Group_Paren) MASS.eval
-fragment :: fn(curly : MASS.Group_Curly) -> (MASS.Code_Fragment) MASS.fragment
 
 Void :: type_of(())
 debugger :: fn() -> () intrinsic {
@@ -115,11 +112,9 @@ operator 15 (x & y) 'bitwise_and
 operator 16 (- x) 'negate
 operator 16 (& x) 'pointer_to
 
-operator intrinsic 20 (@ x) 'eval
-operator intrinsic 25 (~> x) 'fragment
-operator intrinsic 30 (. x) 'make_accessor
-
-make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
+operator 20 (@ x) MASS.eval
+operator 25 (~> x) MASS.fragment
+operator 30 (. x) intrinsic {
   meta :: import("std/meta")
   accessor : MASS.Named_Accessor
   accessor.symbol = meta.reify(arguments.values.0, MASS.Symbol)
