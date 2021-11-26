@@ -572,9 +572,6 @@ storage_static_equal_internal(
   const void *b_memory
 ) {
   if (!same_type(a_descriptor, b_descriptor)) return false;
-  if (a_descriptor == &descriptor_slice) {
-    return slice_equal(*(Slice *)a_memory, *(Slice *)b_memory);
-  }
   u64 byte_size = descriptor_byte_size(a_descriptor);
   switch(a_descriptor->tag) {
     case Descriptor_Tag_Void: {
