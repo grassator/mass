@@ -2066,6 +2066,41 @@ token_maybe_split_on_operator(
   return true;
 }
 
+static fn_type_opaque
+mass_ensure_jit_function_for_value(
+  Compilation *compilation,
+  Value *value,
+  const Source_Range *source_range
+) {
+  Jit *jit = &compilation->jit;
+
+  // TODO check function signature
+  Value *instance = ensure_function_instance(compilation, jit->program, value, (Value_View){0});
+  MASS_ON_ERROR(*compilation->result) return 0;
+
+  if (storage_is_label(&instance->storage)) {
+    Label *label = instance->storage.Memory.location.Instruction_Pointer_Relative.label;
+    assert(label->program == jit->program);
+    if (!label->resolved) {
+      program_jit(compilation, jit);
+      MASS_ON_ERROR(*compilation->result) return 0;
+    }
+    if (!label->resolved) {
+      // Not sure if there are other reasons for the label to not be resolved but that 100%
+      // happens when there is a recursive call to intrinsics
+      compilation_error(compilation, (Mass_Error) {
+        .tag = Mass_Error_Tag_Recursive_Intrinsic_Use,
+        .source_range = *source_range,
+      });
+      return 0;
+    }
+    return (fn_type_opaque)rip_value_pointer_from_label(label);
+  } else {
+    void const * const *address_memory = storage_static_memory_with_bit_size(&instance->storage, (Bits){64});
+    return (fn_type_opaque)*address_memory;
+  }
+}
+
 static Function_Parameter
 token_match_argument(
   Execution_Context *context,
@@ -2168,17 +2203,12 @@ token_match_argument(
       if (token_maybe_split_on_operator(
         definition, slice_literal("~"), &name_tokens, &maybe_type_expression, &operator
       )) {
-        // TODO do this lazily?
         Value *constraint = compile_time_eval(context, maybe_type_expression);
         MASS_ON_ERROR(*context->result) goto err;
-        Compilation *compilation = context->compilation;
-        Program *program = compilation->jit.program;
-        // TODO check function signature
-        Value *instance = ensure_function_instance(compilation, program, constraint, (Value_View){0});
+        maybe_type_constraint = (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(
+          context->compilation, constraint, &maybe_type_expression.source_range
+        );
         MASS_ON_ERROR(*context->result) goto err;
-        program_jit(compilation, &compilation->jit);
-        MASS_ON_ERROR(*context->result) goto err;
-        maybe_type_constraint = (Mass_Type_Constraint_Proc)value_as_function(program, instance);
       } else {
         name_tokens = definition;
       }
@@ -3983,40 +4013,15 @@ mass_match_overload_or_error(
   return false;
 }
 
-static Value *
+static inline Value *
 mass_intrinsic_call(
   Execution_Context *context,
   Value *overload,
   Value_View args_view
 ) {
-  Compilation *compilation = context->compilation;
-  Jit *jit = &context->compilation->jit;
-
-  Value *instance = ensure_function_instance(compilation, jit->program, overload, (Value_View){0});
-  MASS_ON_ERROR(*compilation->result) return 0;
-
-  fn_type_opaque jitted_code;
-  if (storage_is_label(&instance->storage)) {
-    Label *label = instance->storage.Memory.location.Instruction_Pointer_Relative.label;
-    assert(label->program == jit->program);
-    if (!label->resolved) {
-      program_jit(compilation, jit);
-      MASS_ON_ERROR(*compilation->result) return 0;
-    }
-    if (!label->resolved) {
-      // Not sure if there are other reasons for the label to not be resolved but that 100%
-      // happens when there is a recursive call to intrinsics
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Recursive_Intrinsic_Use,
-        .source_range = args_view.source_range,
-      });
-      return 0;
-    }
-    jitted_code = (fn_type_opaque)rip_value_pointer_from_label(label);
-  } else {
-    void const * const *address_memory = storage_static_memory_with_bit_size(&instance->storage, (Bits){64});
-    jitted_code = (fn_type_opaque)*address_memory;
-  }
+  fn_type_opaque jitted_code =
+    mass_ensure_jit_function_for_value(context->compilation, overload, &args_view.source_range);
+  MASS_ON_ERROR(*context->result) return 0;
 
   // @Volatile :IntrinsicFunctionSignature
   Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
@@ -4026,7 +4031,7 @@ mass_intrinsic_call(
   return result;
 }
 
-static bool
+static inline bool
 value_is_intrinsic(
   Value *value
 ) {
@@ -4187,16 +4192,12 @@ mass_ensure_trampoline(
     context->allocator, &descriptor_function_literal, storage_static(trampoline_literal), body_range
   );
 
-  Value *instance = ensure_function_instance(compilation, program, literal_value, args_view);
-  MASS_ON_ERROR(*context->result) return 0;
-
-  program_jit(context->compilation, &context->compilation->jit);
-  MASS_ON_ERROR(*context->result) return 0;
-
   Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
-    .proc = (Mass_Trampoline_Proc)value_as_function(program, instance),
+    .proc = (Mass_Trampoline_Proc)mass_ensure_jit_function_for_value(
+      compilation, literal_value, &args_view.source_range
+    ),
     .original_info = original_info,
   };
   hash_map_set(context->compilation->trampoline_map, original, trampoline);
