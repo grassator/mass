@@ -3802,10 +3802,6 @@ calculate_arguments_match_score(
     } else {
       source_arg = value_view_get(args_view, arg_index);
     }
-    // TODO move this check outside
-    if (scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time) {
-      if (!mass_value_is_compile_time_known(source_arg)) return -1;
-    }
     source_descriptor = value_or_lazy_value_descriptor(source_arg);
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
