@@ -5226,6 +5226,22 @@ mass_pointer_to(
 }
 
 static Value *
+mass_pointer_to_type(
+  Execution_Context *context,
+  Value_View args_view
+) {
+  assert(args_view.length == 1);
+  Value *type_value = value_view_get(args_view, 0);
+  const Descriptor *descriptor = value_ensure_type(context, type_value, args_view.source_range);
+  MASS_ON_ERROR(*context->result) return 0;
+  const Descriptor *pointer_descriptor = descriptor_pointer_to(context->allocator, descriptor);
+  Storage storage = storage_immediate(&pointer_descriptor);
+  return value_make(
+    context->allocator, &descriptor_descriptor_pointer, storage, args_view.source_range
+  );
+}
+
+static Value *
 mass_call(
   Execution_Context *context,
   Value_View args_view

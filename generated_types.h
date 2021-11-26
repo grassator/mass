@@ -741,6 +741,9 @@ static Value * mass_import
 static Value * mass_pointer_to
   (Execution_Context * context, Value_View args);
 
+static Value * mass_pointer_to_type
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_eval
   (Execution_Context * context, Value_View args);
 
@@ -2643,6 +2646,7 @@ static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_pointer_to;
+static Descriptor descriptor_mass_pointer_to_type;
 static Descriptor descriptor_mass_eval;
 static Descriptor descriptor_mass_fragment;
 static Descriptor descriptor_mass_inline_module;

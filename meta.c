@@ -2045,6 +2045,7 @@ main(void) {
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
   export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
   export_compiler_custom_name("pointer_to", push_type(type_intrinsic("mass_pointer_to")));
+  export_compiler_custom_name("pointer_to_type", push_type(type_intrinsic("mass_pointer_to_type")));
   export_compiler_custom_name("eval", push_type(type_intrinsic("mass_eval")));
   export_compiler_custom_name("fragment", push_type(type_intrinsic("mass_fragment")));
   export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));

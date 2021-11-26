@@ -130,9 +130,7 @@ make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
 quote :: fn(x) -> (MASS.Quoted) MASS.quote
 unquote :: fn(x) MASS.unquote
 
-pointer_to :: fn(type : Type) => (Type) {
-  MASS.descriptor_pointer_to(MASS.allocator, type)
-}
+pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
 pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
 
 
