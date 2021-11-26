@@ -817,7 +817,7 @@ assign_tuple(
           });
           goto err;
         }
-        if (entry->epoch != tuple->epoch) {
+        if (entry->epoch.as_u64 != tuple->epoch.as_u64) {
           compilation_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Epoch_Mismatch,
             .source_range = source->source_range,
@@ -1287,7 +1287,7 @@ mass_context_force_lookup(
     return 0;
   }
   if (!(context->flags & Execution_Context_Flags_Type_Only)) {
-    if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
+    if (entry->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && entry->epoch.as_u64 != context->epoch.as_u64) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = *lookup_range,
@@ -1301,7 +1301,7 @@ mass_context_force_lookup(
 static inline void
 scope_define_value(
   Scope *scope,
-  u64 epoch,
+  Epoch epoch,
   Source_Range source_range,
   const Symbol *symbol,
   Value *value
@@ -2405,7 +2405,7 @@ value_force(
   if (value_is_lazy_value(value)) {
     const Lazy_Value *lazy = value_as_lazy_value(value);
 
-    if (lazy->epoch != VALUE_STATIC_EPOCH && lazy->epoch != builder->epoch) {
+    if (lazy->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && lazy->epoch.as_u64 != builder->epoch.as_u64) {
       compilation_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = value->source_range,
@@ -2498,7 +2498,7 @@ mass_make_lazy_value_with_epoch(
   Source_Range source_range,
   void *payload,
   const Descriptor *descriptor,
-  u64 epoch,
+  Epoch epoch,
   Lazy_Value_Proc proc
 ) {
   allocator_allocate_bulk(context->allocator, combined, {
@@ -2953,13 +2953,6 @@ mass_c_struct(
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
-static inline u64
-get_new_epoch() {
-  static Atomic_u64 next_epoch = {0};
-  u64 epoch = atomic_u64_increment(&next_epoch);
-  return epoch;
-}
-
 static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value
@@ -3394,7 +3387,8 @@ mass_handle_macro_call(
         arg_value = value_view_get(args_view, i);
       }
 
-      u64 arg_epoch = mass_value_is_compile_time_known(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
+      Epoch arg_epoch =
+        mass_value_is_compile_time_known(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
 
       bool needs_casting = (
         // FIXME pass in resolved Function_Info from call and remove a guard on the next line
@@ -6097,7 +6091,7 @@ function_info_from_parameters_and_return_type(
   Value_View args_view,
   Value *return_types
 ) {
-  u64 function_epoch = get_new_epoch();
+  Epoch function_epoch = get_new_epoch();
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
   Execution_Context arg_context = *context;

@@ -87,7 +87,7 @@
     .Function_Instance = { .info = &descriptor_##_NAME_##__info, .call_setup = 0/*FIXME*/, },\
   };
 
-#define VALUE_STATIC_EPOCH 0
+#define VALUE_STATIC_EPOCH (const Epoch){0}
 
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\
   (Value) {\

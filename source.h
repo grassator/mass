@@ -59,8 +59,12 @@ mass_expected_result_ensure_value_or_temp(
   Value *value
 );
 
-static inline u64
-get_new_epoch();
+static inline Epoch
+get_new_epoch() {
+  static Atomic_u64 next_epoch = {0};
+  Epoch epoch = {atomic_u64_increment(&next_epoch)};
+  return epoch;
+}
 
 static void
 ensure_parameter_descriptors(
@@ -98,7 +102,7 @@ scope_make(
 static inline void
 scope_define_value(
   Scope *scope,
-  u64 epoch,
+  Epoch epoch,
   Source_Range source_range,
   const Symbol *symbol,
   Value *value

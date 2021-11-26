@@ -1421,9 +1421,14 @@ main(void) {
     { "Instruction_Bucket *", "last_bucket" },
   }));
 
+  push_type(type_struct("Epoch", (Struct_Item[]){
+    { "u64", "as_u64" },
+  }));
+
+
   export_compiler(push_type(type_struct("Function_Builder", (Struct_Item[]){
     { "Program *", "program" },
-    { "u64", "epoch" },
+    { "Epoch", "epoch" },
     { "s32", "stack_reserve" },
     { "u32", "max_call_parameters_stack_size" },
     { "Value *", "return_value" },
@@ -1468,7 +1473,7 @@ main(void) {
     { "Execution_Context_Flags", "flags" },
     { "s32", "_flags_padding" },
     { "Compilation *", "compilation" },
-    { "u64", "epoch" },
+    { "Epoch", "epoch" },
     { "Program *", "program" },
     { "Scope *", "scope" },
     { "Module *", "module" },
@@ -1509,7 +1514,7 @@ main(void) {
   push_type(type_struct("Scope_Entry", (Struct_Item[]){
     { "Value *", "value" },
     { "Slice", "name" },
-    { "u64", "epoch" },
+    { "Epoch", "epoch" },
     { "u64", "forced" },
     { "Source_Range", "source_range" },
   }));
@@ -1581,7 +1586,7 @@ main(void) {
   })));
 
   export_compiler(push_type(type_struct("Lazy_Value", (Struct_Item[]){
-    { "u64", "epoch" },
+    { "Epoch", "epoch" },
     { "const Descriptor *", "descriptor" },
     { "Lazy_Value_Proc", "proc" },
     { "void *", "payload" },
@@ -1683,7 +1688,7 @@ main(void) {
   }));
 
   export_compiler(push_type(type_struct("Tuple", (Struct_Item[]){
-    { "u64", "epoch" },
+    { "Epoch", "epoch" },
     { "const Scope *", "scope_where_it_was_created" },
     { "Array_Value_Ptr", "items"},
   })));

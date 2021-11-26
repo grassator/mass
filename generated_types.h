@@ -308,6 +308,10 @@ typedef struct Code_Block Code_Block;
 typedef dyn_array_type(Code_Block *) Array_Code_Block_Ptr;
 typedef dyn_array_type(const Code_Block *) Array_Const_Code_Block_Ptr;
 
+typedef struct Epoch Epoch;
+typedef dyn_array_type(Epoch *) Array_Epoch_Ptr;
+typedef dyn_array_type(const Epoch *) Array_Const_Epoch_Ptr;
+
 typedef struct Function_Builder Function_Builder;
 typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
 typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
@@ -1375,9 +1379,14 @@ typedef struct Code_Block {
 } Code_Block;
 typedef dyn_array_type(Code_Block) Array_Code_Block;
 
+typedef struct Epoch {
+  u64 as_u64;
+} Epoch;
+typedef dyn_array_type(Epoch) Array_Epoch;
+
 typedef struct Function_Builder {
   Program * program;
-  u64 epoch;
+  Epoch epoch;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   Value * return_value;
@@ -1407,7 +1416,7 @@ typedef struct Execution_Context {
   Execution_Context_Flags flags;
   s32 _flags_padding;
   Compilation * compilation;
-  u64 epoch;
+  Epoch epoch;
   Program * program;
   Scope * scope;
   Module * module;
@@ -1465,7 +1474,7 @@ typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 typedef struct Scope_Entry {
   Value * value;
   Slice name;
-  u64 epoch;
+  Epoch epoch;
   u64 forced;
   Source_Range source_range;
 } Scope_Entry;
@@ -1562,7 +1571,7 @@ expected_result_as_flexible(Expected_Result *expected_result) {
 }
 typedef dyn_array_type(Expected_Result) Array_Expected_Result;
 typedef struct Lazy_Value {
-  u64 epoch;
+  Epoch epoch;
   const Descriptor * descriptor;
   Lazy_Value_Proc proc;
   void * payload;
@@ -1676,7 +1685,7 @@ typedef struct Function_Call_Setup {
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
 typedef struct Tuple {
-  u64 epoch;
+  Epoch epoch;
   const Scope * scope_where_it_was_created;
   Array_Value_Ptr items;
 } Tuple;
@@ -2328,6 +2337,11 @@ static Descriptor descriptor_array_code_block;
 static Descriptor descriptor_array_code_block_ptr;
 static Descriptor descriptor_code_block_pointer;
 static Descriptor descriptor_code_block_pointer_pointer;
+static Descriptor descriptor_epoch;
+static Descriptor descriptor_array_epoch;
+static Descriptor descriptor_array_epoch_ptr;
+static Descriptor descriptor_epoch_pointer;
+static Descriptor descriptor_epoch_pointer_pointer;
 static Descriptor descriptor_function_builder;
 static Descriptor descriptor_array_function_builder;
 static Descriptor descriptor_array_function_builder_ptr;
@@ -3857,6 +3871,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
 MASS_DEFINE_TYPE_VALUE(code_block);
 DEFINE_VALUE_IS_AS_HELPERS(Code_Block, code_block);
 DEFINE_VALUE_IS_AS_HELPERS(Code_Block *, code_block_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_epoch_ptr, Array_Epoch_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_epoch, Array_Epoch)
+MASS_DEFINE_STRUCT_DESCRIPTOR(epoch, Epoch,
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("as_u64"),
+    .offset = offsetof(Epoch, as_u64),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(epoch);
+DEFINE_VALUE_IS_AS_HELPERS(Epoch, epoch);
+DEFINE_VALUE_IS_AS_HELPERS(Epoch *, epoch_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
@@ -3866,7 +3892,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .offset = offsetof(Function_Builder, program),
   },
   {
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),
     .offset = offsetof(Function_Builder, epoch),
   },
@@ -4013,7 +4039,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
     .offset = offsetof(Execution_Context, compilation),
   },
   {
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),
     .offset = offsetof(Execution_Context, epoch),
   },
@@ -4174,7 +4200,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
     .offset = offsetof(Scope_Entry, name),
   },
   {
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),
     .offset = offsetof(Scope_Entry, epoch),
   },
@@ -4407,7 +4433,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
   {
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),
     .offset = offsetof(Lazy_Value, epoch),
   },
@@ -4762,7 +4788,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_tuple_ptr, Array_Tuple_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_tuple, Array_Tuple)
 MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
   {
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),
     .offset = offsetof(Tuple, epoch),
   },
