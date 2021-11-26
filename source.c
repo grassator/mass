@@ -1186,7 +1186,10 @@ scope_entry_force_value(
   Compilation *compilation,
   Scope_Entry *entry
 ) {
-  if (entry->forced) {
+  // Because of overloads we might end up updating the value that is stored
+  // in a scope entry. I'm not in love with this design, but it is still possible
+  // to cache "forcing" step by remembering which exact value was forced.
+  if (entry->latest_forced_value == entry->value) {
     return entry->value;
   }
 
@@ -1194,8 +1197,7 @@ scope_entry_force_value(
     entry->value = value_force_lazy_static(entry->value, entry->name);
   }
 
-  // mark the entry as "forced" and avoid extra checks and overload set iteration on each lookup
-  entry->forced = true;
+  entry->latest_forced_value = entry->value;
 
   if (!entry->value) return 0;
 

@@ -1458,7 +1458,7 @@ typedef struct Scope_Entry {
   Value * value;
   Slice name;
   Epoch epoch;
-  u64 forced;
+  const Value * latest_forced_value;
   Source_Range source_range;
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
@@ -4186,9 +4186,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
     .offset = offsetof(Scope_Entry, epoch),
   },
   {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("forced"),
-    .offset = offsetof(Scope_Entry, forced),
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("latest_forced_value"),
+    .offset = offsetof(Scope_Entry, latest_forced_value),
   },
   {
     .descriptor = &descriptor_source_range,

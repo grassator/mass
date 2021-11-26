@@ -1515,7 +1515,7 @@ main(void) {
     { "Value *", "value" },
     { "Slice", "name" },
     { "Epoch", "epoch" },
-    { "u64", "forced" },
+    { "const Value *", "latest_forced_value" },
     { "Source_Range", "source_range" },
   }));
 
