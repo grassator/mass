@@ -126,10 +126,6 @@ make_accessor :: fn(symbol : MASS.Symbol) -> (MASS.Named_Accessor) intrinsic {
   meta.immediate(context.compilation, accessor, arguments.source_range)
 }
 
-
-quote :: fn(x) -> (MASS.Quoted) MASS.quote
-unquote :: fn(x) MASS.unquote
-
 pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
 pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
 
