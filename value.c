@@ -1075,7 +1075,13 @@ function_literal_info_for_args(
     // searching for a match becomes faster. Do not know what is better.
     dyn_array_push(cache_descriptors, actual_descriptor);
     if(param->tag == Function_Parameter_Tag_Generic) {
-      //specialized_param->tag = Function_Parameter_Tag_Runtime;
+      if (param->maybe_type_constraint) {
+        actual_descriptor = param->maybe_type_constraint(actual_descriptor);
+        if (!actual_descriptor) {
+          // TODO cleanup memory?
+          return 0;
+        }
+      }
       specialized_param->descriptor = actual_descriptor;
     }
   }

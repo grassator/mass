@@ -2147,6 +2147,7 @@ token_match_argument(
   Value *name_token;
   Value_View maybe_type_expression = {0};
   bool generic = false;
+  Mass_Type_Constraint_Proc maybe_type_constraint = 0;
   if (is_inferred_type) {
     if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
       context_error(context, (Mass_Error) {
@@ -2164,7 +2165,23 @@ token_match_argument(
       definition, slice_literal(":"), &name_tokens, &maybe_type_expression, &operator
     );
     if (generic) {
-      name_tokens = definition;
+      if (token_maybe_split_on_operator(
+        definition, slice_literal("~"), &name_tokens, &maybe_type_expression, &operator
+      )) {
+        // TODO do this lazily?
+        Value *constraint = compile_time_eval(context, maybe_type_expression);
+        MASS_ON_ERROR(*context->result) goto err;
+        Compilation *compilation = context->compilation;
+        Program *program = compilation->jit.program;
+        // TODO check function signature
+        Value *instance = ensure_function_instance(compilation, program, constraint, (Value_View){0});
+        MASS_ON_ERROR(*context->result) goto err;
+        program_jit(compilation, &compilation->jit);
+        MASS_ON_ERROR(*context->result) goto err;
+        maybe_type_constraint = (Mass_Type_Constraint_Proc)value_as_function(program, instance);
+      } else {
+        name_tokens = definition;
+      }
     }
     if (name_tokens.length == 0) {
       context_error(context, (Mass_Error) {
@@ -2196,6 +2213,7 @@ token_match_argument(
     .tag = generic ? Function_Parameter_Tag_Generic : Function_Parameter_Tag_Runtime,
     .maybe_default_value = maybe_default_value,
     .maybe_type_expression = maybe_type_expression,
+    .maybe_type_constraint = maybe_type_constraint,
     .symbol = value_as_symbol(name_token),
     .descriptor = descriptor,
     .source_range = definition.source_range,
@@ -3815,7 +3833,11 @@ calculate_arguments_match_score(
         score += Score_Exact_Static;
       } break;
       case Function_Parameter_Tag_Generic: {
-        score += Score_Cast; // TODO consider if implicit casts actually have a higher priority
+        if (param->maybe_type_constraint) {
+          score += Score_Exact_Type;
+        } else {
+          score += Score_Cast; // TODO consider if implicit casts actually have a higher priority
+        }
       } break;
     }
   }

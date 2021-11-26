@@ -1603,6 +1603,7 @@ main(void) {
     { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
     { "Value_View", "maybe_type_expression" },
+    { "Mass_Type_Constraint_Proc", "maybe_type_constraint" },
     { "Value *", "maybe_default_value" },
   }));
 
@@ -1732,6 +1733,10 @@ main(void) {
     { "Bits", "bit_size" },
     { "Bits", "bit_alignment" },
   })));
+
+  push_type(type_function(Typedef, "Mass_Type_Constraint_Proc", "const Descriptor *", (Argument_Type[]){
+    { "const Descriptor *", "descriptor" },
+  }));
 
   export_compiler_custom_name("Error", push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),

@@ -1507,6 +1507,7 @@
     <Item Name="symbol">symbol</Item>
     <Item Name="source_range">source_range</Item>
     <Item Name="maybe_type_expression">maybe_type_expression</Item>
+    <Item Name="maybe_type_constraint">maybe_type_constraint</Item>
     <Item Name="maybe_default_value">maybe_default_value</Item>
     <Item Name="Exact_Static" Condition="tag == Function_Parameter_Tag_Exact_Static">Exact_Static</Item>
   </Expand>

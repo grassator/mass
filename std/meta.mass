@@ -29,9 +29,13 @@ pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   }
 }
 
+is_pointer_type :: fn(type : Type) => (Type) {
+  if type.tag == MASS.Descriptor_Tag.Pointer_To then type else 0
+}
+
 static_value :: fn(
   compilation : &MASS.Compilation,
-  pointer,
+  pointer ~ is_pointer_type,
   source_range : Source_Range
 ) -> (&Value) {
   type :: type_of(pointer)

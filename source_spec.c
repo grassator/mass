@@ -1060,6 +1060,45 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 32);
     }
+
+    it("should support type constraints on template parameters") {
+      u64 (*checker)() =
+        (u64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_unsigned_integer_type :: fn(t : Type) -> (Type) {\n"
+            "if t == u64 then t else if t == u32 then t else 0"
+          "}\n"
+          "my_signed_integer_type :: fn(t : Type) -> (Type) {\n"
+            "if t == s64 then t else if t == s32 then t else 0"
+          "}\n"
+          "foo :: fn(x ~ my_unsigned_integer_type) -> (u64) { 42 }\n"
+          "foo :: fn(x ~ my_signed_integer_type) -> (u64) { 21 }\n"
+          "checker :: fn() -> (u64) {\n"
+            "x : u32 = 0\n"
+            "foo(x)\n"
+          "}"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should prefer an match with type constraints over the one without") {
+      u64 (*checker)() =
+        (u64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_unsigned_integer_type :: fn(t : Type) -> (Type) {\n"
+            "if t == u64 then t else if t == u32 then t else 0"
+          "}\n"
+          "foo :: fn(x ~ my_unsigned_integer_type) -> (u64) { 42 }\n"
+          "foo :: fn(x) -> (u64) { 21 }\n"
+          "checker :: fn() -> (u64) {\n"
+            "x : u32 = 0\n"
+            "foo(x)\n"
+          "}"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Intrinsics") {

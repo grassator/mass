@@ -559,6 +559,9 @@ typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
+typedef const Descriptor * (*Mass_Type_Constraint_Proc)
+  (const Descriptor * descriptor);
+
 typedef struct Mass_Error Mass_Error;
 typedef dyn_array_type(Mass_Error *) Array_Mass_Error_Ptr;
 typedef dyn_array_type(const Mass_Error *) Array_Const_Mass_Error_Ptr;
@@ -1579,6 +1582,7 @@ typedef struct Function_Parameter {
   const Symbol * symbol;
   Source_Range source_range;
   Value_View maybe_type_expression;
+  Mass_Type_Constraint_Proc maybe_type_constraint;
   Value * maybe_default_value;
   union {
     Function_Parameter_Exact_Static Exact_Static;
@@ -2518,6 +2522,7 @@ static Descriptor descriptor_array_descriptor_ptr;
 static Descriptor descriptor_array_const_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
 static Descriptor descriptor_descriptor_pointer_pointer;
+static Descriptor descriptor_mass_type_constraint_proc;
 static Descriptor descriptor_mass_error;
 static Descriptor descriptor_array_mass_error;
 static Descriptor descriptor_array_mass_error_ptr;
@@ -4492,6 +4497,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
     .offset = offsetof(Function_Parameter, maybe_type_expression),
   },
   {
+    .descriptor = &descriptor_mass_type_constraint_proc,
+    .name = slice_literal_fields("maybe_type_constraint"),
+    .offset = offsetof(Function_Parameter, maybe_type_constraint),
+  },
+  {
     .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("maybe_default_value"),
     .offset = offsetof(Function_Parameter, maybe_default_value),
@@ -4957,6 +4967,14 @@ MASS_DEFINE_TYPE_VALUE(descriptor);
 DEFINE_VALUE_IS_AS_HELPERS(Descriptor, descriptor);
 DEFINE_VALUE_IS_AS_HELPERS(Descriptor *, descriptor_pointer);
 /*union struct end*/
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  mass_type_constraint_proc,
+  &descriptor_descriptor_pointer,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_descriptor_pointer,
+  }
+)
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error_ptr, Array_Mass_Error_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error, Array_Mass_Error)
