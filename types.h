@@ -38,8 +38,10 @@
   }
 
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
+  static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
+    .brand = &(mass_meta_brand_##_NAME_),\
     .name = slice_literal_fields(#_NAME_),\
     .bit_size = {_BIT_SIZE_},\
     .bit_alignment = (_BIT_ALIGNMENT_),\
@@ -53,9 +55,11 @@
     .length = countof((const Struct_Field[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
   };\
+  static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Struct,\
     .name = slice_literal_fields(#_NAME_),\
+    .brand = &(mass_meta_brand_##_NAME_),\
     .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
     .Struct = {\

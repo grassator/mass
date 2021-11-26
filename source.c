@@ -598,7 +598,6 @@ anonymous_struct_descriptor_from_tuple(
     .bit_size = {struct_aligner.bit_size},
     .bit_alignment = {struct_aligner.bit_alignment},
     .Struct = {
-      .is_tuple = true,
       .fields = fields,
     },
   };
@@ -2944,7 +2943,7 @@ mass_c_struct(
   Descriptor *descriptor =
     anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
   assert(descriptor->tag == Descriptor_Tag_Struct);
-  descriptor->Struct.is_tuple = false;
+  descriptor->brand = allocator_allocate(context->allocator, Symbol);
 
   Value *result = allocator_allocate(context->allocator, Value);
   *result = MASS_TYPE_VALUE(descriptor);
@@ -4230,7 +4229,7 @@ mass_ensure_trampoline(
     .tag = Descriptor_Tag_Struct,
     .bit_size = {struct_aligner.bit_size},
     .bit_alignment = {struct_aligner.bit_alignment},
-    .Struct = { .is_tuple = true, .fields = fields, },
+    .Struct = { .fields = fields, },
   };
 
   Execution_Context *trampoline_context = allocator_allocate(context->allocator, Execution_Context);

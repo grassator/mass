@@ -1724,7 +1724,6 @@ typedef struct Descriptor_Fixed_Size_Array {
   u64 length;
 } Descriptor_Fixed_Size_Array;
 typedef struct Descriptor_Struct {
-  u64 is_tuple;
   Array_Struct_Field fields;
 } Descriptor_Struct;
 typedef struct Descriptor_Pointer_To {
@@ -1734,6 +1733,7 @@ typedef struct Descriptor_Pointer_To {
 typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
+  const Symbol * brand;
   Slice name;
   Bits bit_size;
   Bits bit_alignment;
@@ -4902,11 +4902,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_fixed_size_array, Descriptor_Fixed_Size
 MASS_DEFINE_TYPE_VALUE(descriptor_fixed_size_array);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct, Descriptor_Struct,
   {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("is_tuple"),
-    .offset = offsetof(Descriptor_Struct, is_tuple),
-  },
-  {
     .descriptor = &descriptor_array_struct_field,
     .name = slice_literal_fields("fields"),
     .offset = offsetof(Descriptor_Struct, fields),
@@ -4931,6 +4926,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .name = slice_literal_fields("tag"),
     .descriptor = &descriptor_descriptor_tag,
     .offset = offsetof(Descriptor, tag),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("brand"),
+    .offset = offsetof(Descriptor, brand),
   },
   {
     .descriptor = &descriptor_slice,

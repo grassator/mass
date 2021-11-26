@@ -1727,7 +1727,6 @@ main(void) {
       { "u64", "length" },
     }),
     struct_fields("Struct", (Struct_Item[]){
-      { "u64", "is_tuple" },
       { "Array_Struct_Field", "fields" },
     }),
     struct_fields("Pointer_To", (Struct_Item[]){
@@ -1735,6 +1734,7 @@ main(void) {
       { "const Descriptor *", "descriptor" },
     }),
   }), (Struct_Item[]){
+    { "const Symbol *", "brand" },
     { "Slice", "name" },
     { "Bits", "bit_size" },
     { "Bits", "bit_alignment" },

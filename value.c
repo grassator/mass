@@ -284,6 +284,7 @@ same_type(
     b = b->Pointer_To.descriptor;
   }
   if (a->tag != b->tag) return false;
+  if (a->brand && b->brand && a->brand != b->brand) return false;
   switch(a->tag) {
     case Descriptor_Tag_Void: {
       return true;
@@ -1374,10 +1375,7 @@ same_type_or_can_implicitly_move_cast(
       return true;
     }
   }
-  if (
-    target->tag == Descriptor_Tag_Struct &&
-    target->Struct.is_tuple
-  ) {
+  if (target->tag == Descriptor_Tag_Struct) {
     assert(source->tag == Descriptor_Tag_Struct);
     if (dyn_array_length(source->Struct.fields) != dyn_array_length(target->Struct.fields)) {
       return false;
