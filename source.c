@@ -3780,14 +3780,14 @@ calculate_arguments_match_score(
   Value_View args_view,
   Mass_Argument_Scoring_Flags scoring_flags
 ) {
-  enum {MAX_ARG_COUNT = 500};
-  enum {
-    Score_Exact_Static = MAX_ARG_COUNT * MAX_ARG_COUNT * MAX_ARG_COUNT,
-    Score_Exact_Type_Static = MAX_ARG_COUNT * MAX_ARG_COUNT * MAX_ARG_COUNT,
-    Score_Exact_Type = MAX_ARG_COUNT * MAX_ARG_COUNT,
-    Score_Exact_Default = MAX_ARG_COUNT,
-    Score_Cast = 1,
-  };
+  const s64 MAX_ARG_COUNT = 255;
+  const s64 Score_Cast = 1;
+  const s64 Score_Generic = Score_Cast << 8;
+  const s64 Score_Generic_Constrained = Score_Generic << 8;
+  const s64 Score_Same_Type = Score_Generic_Constrained << 8;
+  const s64 Score_Same_Type_Static = Score_Same_Type << 8;
+  const s64 Score_Exact_Static = Score_Same_Type_Static << 8;
+
   assert(args_view.length < MAX_ARG_COUNT);
   s64 score = 0;
   if (args_view.length > dyn_array_length(descriptor->parameters)) return -1;
@@ -3811,9 +3811,9 @@ calculate_arguments_match_score(
       case Function_Parameter_Tag_Runtime: {
         if (same_type(target_descriptor, source_descriptor)) {
           if (scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time) {
-            score += Score_Exact_Type_Static;
+            score += Score_Same_Type_Static;
           } else {
-            score += Score_Exact_Type;
+            score += Score_Same_Type;
           }
         } else if (
           source_arg &&
@@ -3834,9 +3834,9 @@ calculate_arguments_match_score(
       } break;
       case Function_Parameter_Tag_Generic: {
         if (param->maybe_type_constraint) {
-          score += Score_Exact_Type;
+          score += Score_Generic_Constrained;
         } else {
-          score += Score_Cast; // TODO consider if implicit casts actually have a higher priority
+          score += Score_Generic;
         }
       } break;
     }
