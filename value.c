@@ -573,6 +573,9 @@ storage_static_equal_internal(
 ) {
   if (!same_type(a_descriptor, b_descriptor)) return false;
   u64 byte_size = descriptor_byte_size(a_descriptor);
+  // TODO @Speed This should be a simple memcmp, but right now there is no good story
+  //       for padding bytes in Mass, so safer to recurse.
+  //return memcmp(a_memory, b_memory, byte_size) == 0;
   switch(a_descriptor->tag) {
     case Descriptor_Tag_Void: {
       return true;
@@ -583,7 +586,7 @@ storage_static_equal_internal(
       return memcmp(a_memory, b_memory, byte_size) == 0;
     } break;
     case Descriptor_Tag_Fixed_Size_Array: {
-      // compare field by field
+      // compare item by item
       if (a_descriptor->Fixed_Size_Array.length != b_descriptor->Fixed_Size_Array.length) {
         return false;
       }
