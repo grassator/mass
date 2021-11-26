@@ -42,20 +42,13 @@ mass_value_from_expected_result(
       return value_make(allocator, descriptor, storage, source_range);
     } break;
     case Expected_Result_Tag_Flexible: {
-      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
       if (mass_descriptor_is_void(descriptor)) return &void_value;
-      Storage storage;
-      if (
-        (flexible->storage & Expected_Result_Storage_Register) &&
-        descriptor->bit_size.as_u64 <= 64
-      ) {
+      Storage storage = storage_none;
+      if (descriptor->bit_size.as_u64 <= 64) {
         Register reg = register_acquire_temp(builder);
         storage = storage_register(reg, descriptor->bit_size);
-      } else if (flexible->storage & Expected_Result_Storage_Memory) {
+      } else if (descriptor->bit_size.as_u64) {
         storage = reserve_stack_storage(builder, descriptor->bit_size);
-      } else {
-        storage = storage_none;
-        panic("Unexpected flexible storage request");
       }
       storage.flags |= Storage_Flags_Temporary;
       return value_make(allocator, descriptor, storage, source_range);
@@ -95,29 +88,7 @@ expected_result_any(
 ) {
   return (Expected_Result){
     .tag = Expected_Result_Tag_Flexible,
-    .Flexible = {
-      .descriptor = descriptor,
-      .storage
-        = Expected_Result_Storage_Static
-        | Expected_Result_Storage_Memory
-        | Expected_Result_Storage_Unpacked
-        | Expected_Result_Storage_Register
-        | Expected_Result_Storage_Xmm
-        | Expected_Result_Storage_Eflags,
-    },
-  };
-}
-
-static inline Expected_Result
-expected_result_static(
-  const Descriptor *descriptor
-) {
-  return (Expected_Result){
-    .tag = Expected_Result_Tag_Flexible,
-    .Flexible = {
-      .descriptor = descriptor,
-      .storage = Expected_Result_Storage_Static
-    },
+    .Flexible = { .descriptor = descriptor },
   };
 }
 
@@ -131,47 +102,13 @@ expected_result_validate(
     case Expected_Result_Tag_Exact: {
       assert(same_type(expected_result->Exact.descriptor, actual_value->descriptor));
       assert(storage_equal(&expected_result->Exact.storage, &actual_value->storage));
-      break;
-    }
+    } break;
     case Expected_Result_Tag_Flexible: {
       const Expected_Result_Flexible *flexible = &expected_result->Flexible;
       if (flexible->descriptor) {
         assert(same_type(flexible->descriptor, actual_value->descriptor));
       }
-      switch(actual_value->storage.tag) {
-        case Storage_Tag_None: break;
-        case Storage_Tag_Eflags: {
-          assert(flexible->storage & Expected_Result_Storage_Eflags);
-          break;
-        }
-        case Storage_Tag_Register: {
-          assert(flexible->storage & Expected_Result_Storage_Register);
-          break;
-        }
-        case Storage_Tag_Xmm: {
-          assert(flexible->storage & Expected_Result_Storage_Xmm);
-          break;
-        }
-        case Storage_Tag_Static:
-        case Storage_Tag_Immediate: {
-          assert(flexible->storage & Expected_Result_Storage_Static);
-          break;
-        }
-        case Storage_Tag_Memory: {
-          assert(flexible->storage & Expected_Result_Storage_Memory);
-          break;
-        }
-        case Storage_Tag_Unpacked: {
-          assert(flexible->storage & Expected_Result_Storage_Unpacked);
-          break;
-        }
-        default: {
-          panic("Unknown Storage tag");
-          break;
-        }
-      }
-      break;
-    }
+    } break;
   }
   return actual_value;
 }
@@ -2330,60 +2267,6 @@ mass_expected_result_ensure_value_or_temp(
         });
         return 0;
       }
-      if (value->storage.tag == Storage_Tag_None) {
-        return value;
-      }
-      if (
-        (value->storage.tag == Storage_Tag_Static || value->storage.tag == Storage_Tag_Immediate) &&
-        (flexible->storage & Expected_Result_Storage_Static)
-      ) {
-        return value;
-      }
-      if (
-        value->storage.tag == Storage_Tag_Eflags &&
-        (flexible->storage & Expected_Result_Storage_Eflags)
-      ) {
-        return value;
-      }
-      if (
-        value->storage.tag == Storage_Tag_Memory &&
-        (flexible->storage & Expected_Result_Storage_Memory)
-      ) {
-        return value;
-      }
-      if (
-        value->storage.tag == Storage_Tag_Unpacked &&
-        (flexible->storage & Expected_Result_Storage_Unpacked)
-      ) {
-        return value;
-      }
-      if (flexible->storage & Expected_Result_Storage_Register) {
-        if (value->storage.tag == Storage_Tag_Register) {
-          return value;
-        }
-        Register temp_register = register_acquire_temp(builder);
-        Storage temp_storage = storage_register(temp_register, expected_descriptor->bit_size);
-        Value *temp_result = value_make(
-          compilation->allocator, expected_descriptor, temp_storage, value->source_range
-        );
-        mass_assign(compilation, builder, temp_result, value, &value->source_range);
-        storage_release_if_temporary(builder, &value->storage);
-        return temp_result;
-      }
-      if (flexible->storage & Expected_Result_Storage_Memory) {
-        assert(value->storage.tag != Storage_Tag_Register); // checked above
-        Storage storage = reserve_stack_storage(builder, expected_descriptor->bit_size);
-        Value *temp_result = value_init(
-          allocator_allocate(compilation->allocator, Value),
-          expected_descriptor, storage, value->source_range
-        );
-        mass_assign(compilation, builder, temp_result, value, &value->source_range);
-        storage_release_if_temporary(builder, &value->storage);
-        return temp_result;
-      }
-      // FIXME support floats
-      assert(value->storage.tag != Storage_Tag_Xmm);
-      panic("Unable to put the value into the expected storage");
       return value;
     }
     default: {
@@ -3191,7 +3074,7 @@ mass_cast_helper(
   }
 
   if (mass_value_is_compile_time_known(expression)) {
-    Expected_Result expected_result = expected_result_static(target_descriptor);
+    Expected_Result expected_result = expected_result_any(target_descriptor);
     return mass_handle_cast_lazy_proc(context->compilation, 0, &expected_result, &source_range, &lazy_payload);
   }
 
@@ -5679,7 +5562,7 @@ mass_struct_field_access(
   };
 
   if (mass_value_is_compile_time_known(struct_)) {
-    Expected_Result expected_result = expected_result_static(field->descriptor);
+    Expected_Result expected_result = expected_result_any(field->descriptor);
     return mass_handle_field_access_lazy_proc(
       context->compilation, 0, &expected_result, source_range, &stack_lazy_payload
     );
@@ -5833,7 +5716,7 @@ mass_handle_dot_operator(
       rhs = token_parse_single(context, rhs);
       Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
       if (mass_value_is_compile_time_known(lhs)) {
-        Expected_Result expected_result = expected_result_static(descriptor);
+        Expected_Result expected_result = expected_result_any(descriptor);
         return mass_handle_array_access_lazy_proc(
           context->compilation, 0, &expected_result, &args_view.source_range, &lazy_payload
         );

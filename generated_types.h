@@ -426,31 +426,6 @@ typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
-typedef enum Expected_Result_Storage {
-  Expected_Result_Storage_None = 0,
-  Expected_Result_Storage_Static = 1,
-  Expected_Result_Storage_Memory = 2,
-  Expected_Result_Storage_Register = 4,
-  Expected_Result_Storage_Xmm = 8,
-  Expected_Result_Storage_Eflags = 16,
-  Expected_Result_Storage_Unpacked = 32,
-} Expected_Result_Storage;
-
-const char *expected_result_storage_name(Expected_Result_Storage value) {
-  if (value == 0) return "Expected_Result_Storage_None";
-  if (value == 1) return "Expected_Result_Storage_Static";
-  if (value == 2) return "Expected_Result_Storage_Memory";
-  if (value == 4) return "Expected_Result_Storage_Register";
-  if (value == 8) return "Expected_Result_Storage_Xmm";
-  if (value == 16) return "Expected_Result_Storage_Eflags";
-  if (value == 32) return "Expected_Result_Storage_Unpacked";
-  assert(!"Unexpected value for enum Expected_Result_Storage");
-  return 0;
-};
-
-typedef dyn_array_type(Expected_Result_Storage *) Array_Expected_Result_Storage_Ptr;
-typedef dyn_array_type(const Expected_Result_Storage *) Array_Const_Expected_Result_Storage_Ptr;
-
 typedef struct Expected_Result Expected_Result;
 typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
 typedef dyn_array_type(const Expected_Result *) Array_Const_Expected_Result_Ptr;
@@ -1553,8 +1528,6 @@ typedef struct Expected_Result_Exact {
 } Expected_Result_Exact;
 typedef struct Expected_Result_Flexible {
   const Descriptor * descriptor;
-  Expected_Result_Storage storage;
-  u32 _storage_padding;
 } Expected_Result_Flexible;
 typedef struct Expected_Result {
   Expected_Result_Tag tag;
@@ -2436,12 +2409,6 @@ static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
-static Descriptor descriptor_expected_result_storage;
-static Descriptor descriptor_array_expected_result_storage;
-static Descriptor descriptor_array_expected_result_storage_ptr;
-static Descriptor descriptor_array_const_expected_result_storage_ptr;
-static Descriptor descriptor_expected_result_storage_pointer;
-static Descriptor descriptor_expected_result_storage_pointer_pointer;
 static Descriptor descriptor_expected_result;
 static Descriptor descriptor_array_expected_result;
 static Descriptor descriptor_array_expected_result_ptr;
@@ -4366,18 +4333,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
 MASS_DEFINE_TYPE_VALUE(value);
 DEFINE_VALUE_IS_AS_HELPERS(Value, value);
 DEFINE_VALUE_IS_AS_HELPERS(Value *, value_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(expected_result_storage, Expected_Result_Storage)
-static C_Enum_Item expected_result_storage_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Static"), .value = 1 },
-{ .name = slice_literal_fields("Memory"), .value = 2 },
-{ .name = slice_literal_fields("Register"), .value = 4 },
-{ .name = slice_literal_fields("Xmm"), .value = 8 },
-{ .name = slice_literal_fields("Eflags"), .value = 16 },
-{ .name = slice_literal_fields("Unpacked"), .value = 32 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Expected_Result_Storage, expected_result_storage);
-DEFINE_VALUE_IS_AS_HELPERS(Expected_Result_Storage *, expected_result_storage_pointer);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result_ptr, Array_Expected_Result_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result, Array_Expected_Result)
@@ -4404,16 +4359,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(expected_result_flexible, Expected_Result_Flexible
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("descriptor"),
     .offset = offsetof(Expected_Result_Flexible, descriptor),
-  },
-  {
-    .descriptor = &descriptor_expected_result_storage,
-    .name = slice_literal_fields("storage"),
-    .offset = offsetof(Expected_Result_Flexible, storage),
-  },
-  {
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("_storage_padding"),
-    .offset = offsetof(Expected_Result_Flexible, _storage_padding),
   },
 );
 MASS_DEFINE_TYPE_VALUE(expected_result_flexible);

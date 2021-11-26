@@ -1563,16 +1563,6 @@ main(void) {
     { "Source_Range", "source_range" },
   })));
 
-  push_type(type_enum("Expected_Result_Storage", (Enum_Type_Item[]){
-    { "None", 0 },
-    { "Static", 1 << 0 },
-    { "Memory", 1 << 1 },
-    { "Register", 1 << 2 },
-    { "Xmm", 1 << 3 },
-    { "Eflags", 1 << 4 },
-    { "Unpacked", 1 << 5 },
-  }));
-
   export_compiler(push_type(type_union("Expected_Result", (Struct_Type[]){
     struct_fields("Exact", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
@@ -1580,8 +1570,6 @@ main(void) {
     }),
     struct_fields("Flexible", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
-      { "Expected_Result_Storage", "storage" },
-      { "u32", "_storage_padding" },
     }),
   })));
 
