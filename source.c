@@ -589,24 +589,6 @@ deduce_runtime_descriptor_for_value(
   return value_or_lazy_value_descriptor(value);
 }
 
-static inline const Descriptor *
-signed_integer_next_size_descriptor(
-  const Descriptor *descriptor
-) {
-  assert(descriptor_is_signed_integer(descriptor));
-  assert(descriptor->tag == Descriptor_Tag_Integer);
-  if (descriptor == &descriptor_s8) {
-    return &descriptor_s16;
-  } else if (descriptor == &descriptor_s16) {
-    return &descriptor_s32;
-  } else if (descriptor == &descriptor_s32) {
-    return &descriptor_s64;
-  } else {
-    panic("Unexpected iteger size");
-    return 0;
-  }
-}
-
 static const Descriptor *
 large_enough_common_integer_descriptor_for_values(
   Compilation *compilation,
@@ -643,8 +625,8 @@ large_enough_common_integer_descriptor_for_values(
 
   if (left_is_literal) {
     if (right_is_literal) {
-      // TODO consider if this should support large unsigned numbers
-      return &descriptor_s64;
+      assert(false);
+      return 0;
     } else {
       return right;
     }
@@ -660,32 +642,10 @@ large_enough_common_integer_descriptor_for_values(
   u64 left_size = left->bit_size.as_u64;
   u64 right_size = right->bit_size.as_u64;
 
-  if (left_signed == right_signed) {
-    if (left_size == right_size) return left;
-    return left_size > right_size ? left : right;
-  } else {
-    const Descriptor *signed_side = left_signed ? left : right;
-    const Descriptor *other_side = left_signed ? right : left;
-    // If the signed and unsigned have the same size need to
-    // increase the size of the signed one so it fits the unsigned
-    if (left_size == right_size) {
-      if (left_size == 64) {
-        compilation_error(compilation, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = left_value->source_range,
-          .Type_Mismatch = { .expected = signed_side, .actual = other_side },
-          .detailed_message = slice_literal("Could not find large enough signed integer to fit both operands"),
-        });
-        return 0;
-      }
-      return signed_integer_next_size_descriptor(signed_side);
-    }
-
-    // Now we know that the signed operand is large enough to fit the unsigned one
-    return signed_side;
-  }
+  assert(left_signed == right_signed);
+  assert(left_size == right_size);
+  return left;
 }
-
 
 static inline bool
 struct_find_field_by_name(
