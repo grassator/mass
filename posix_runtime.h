@@ -80,7 +80,7 @@ posix_program_jit(
   u64 ro_data_protected_size = posix_buffer_ensure_last_page_is_writable(ro_data_buffer);
 
   program_jit_imports(compilation, jit, ro_data_buffer, &posix_library_load_callbacks);
-  MASS_ON_ERROR(*compilation->result) return;
+  if (mass_has_error(compilation)) return;
 
   // Encode newly added functions
   u64 function_count = dyn_array_length(program->functions);

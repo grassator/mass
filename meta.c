@@ -5,6 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <limits.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include "prelude.h"
