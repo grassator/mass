@@ -275,30 +275,6 @@ Value void_value = {
 };
 
 static inline bool
-descriptor_is_unsigned_integer(
-  const Descriptor *descriptor
-) {
-  return (
-    descriptor == &descriptor_u8  ||
-    descriptor == &descriptor_u16 ||
-    descriptor == &descriptor_u32 ||
-    descriptor == &descriptor_u64
-  );
-}
-
-static inline bool
-descriptor_is_signed_integer(
-  const Descriptor *descriptor
-) {
-  return (
-    descriptor == &descriptor_s8  ||
-    descriptor == &descriptor_s16 ||
-    descriptor == &descriptor_s32 ||
-    descriptor == &descriptor_s64
-  );
-}
-
-static inline bool
 descriptor_is_integer(
   const Descriptor *descriptor
 ) {
@@ -307,6 +283,20 @@ descriptor_is_integer(
     return false;
   }
   return true;
+}
+
+static inline bool
+descriptor_is_unsigned_integer(
+  const Descriptor *descriptor
+) {
+  return descriptor_is_integer(descriptor) && !descriptor->Integer.is_signed;
+}
+
+static inline bool
+descriptor_is_signed_integer(
+  const Descriptor *descriptor
+) {
+  return descriptor_is_integer(descriptor) && descriptor->Integer.is_signed;
 }
 
 static inline bool
