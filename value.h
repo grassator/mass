@@ -4,6 +4,19 @@
 #include <inttypes.h>
 #include "types.h"
 
+static inline void
+mass_error_impl(
+  Mass_Result *result,
+  Mass_Error error
+) {
+  assert(result->tag != Mass_Result_Tag_Error);
+  *result = (Mass_Result){ .tag = Mass_Result_Tag_Error, .Error.error = error };
+}
+
+// Having this macro allows to do `return mass_error(..)`
+// for any function that would accept literal 0 return.
+#define mass_error(_CONTEXT_, ...) (mass_error_impl((_CONTEXT_)->result, __VA_ARGS__), 0)
+
 static inline Function_Parameter
 function_parameter_with_default(
   const Symbol *symbol,

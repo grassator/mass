@@ -227,32 +227,8 @@ program_import_module(
 );
 
 static inline Mass_Result
-mass_error(
-  Mass_Error error
-) {
-  return (Mass_Result){ .tag = Mass_Result_Tag_Error, .Error.error = error };
-}
-
-static inline Mass_Result
 mass_success() {
   return (Mass_Result){ .tag = Mass_Result_Tag_Success };
-}
-
-static inline void
-compilation_error(
-  Compilation *compilation,
-  Mass_Error error
-) {
-  assert(compilation->result->tag != Mass_Result_Tag_Error);
-  *compilation->result = mass_error(error);
-}
-
-static inline void
-context_error(
-  Execution_Context *context,
-  Mass_Error error
-) {
-  compilation_error(context->compilation, error);
 }
 
 static void

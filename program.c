@@ -235,7 +235,7 @@ program_jit_imports(
       char *library_name = slice_to_c_string(compilation->temp_allocator, lib->name);
       handle = callbacks->load_library(library_name);
       if (!handle) {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Dynamic_Library_Load,
           .source_range = source_range,
           .Dynamic_Library_Load = {
@@ -254,7 +254,7 @@ program_jit_imports(
         char *symbol_name = slice_to_c_string(compilation->temp_allocator, symbol->name);
         fn_type_opaque address = (fn_type_opaque)callbacks->load_symbol(handle, symbol_name);
         if (!handle) {
-          compilation_error(compilation, (Mass_Error) {
+          mass_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found,
             .source_range = source_range,
             .Dynamic_Library_Symbol_Not_Found = {

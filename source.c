@@ -11,14 +11,14 @@ mass_value_ensure_static_of(
   const Descriptor *expected_descriptor
 ) {
   if (!mass_value_is_compile_time_known(value)) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Expected_Static,
       .source_range = value->source_range,
     });
     return false;
   }
   if (!same_type(value->descriptor, expected_descriptor)) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = value->source_range,
       .Type_Mismatch = { .expected = expected_descriptor, .actual = value->descriptor },
@@ -237,7 +237,7 @@ token_value_force_immediate_integer(
         return 0;
       }
       case Literal_Cast_Result_Target_Too_Small: {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Integer_Range,
           .source_range = *source_range,
           .Integer_Range = { .descriptor = target_descriptor },
@@ -250,7 +250,7 @@ token_value_force_immediate_integer(
         return 0;
       }
       case Literal_Cast_Result_Unsigned_Target_For_Negative_Literal: {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Integer_Range,
           .source_range = *source_range,
           .Integer_Range = { .descriptor = target_descriptor },
@@ -499,7 +499,7 @@ anonymous_struct_descriptor_from_tuple(
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
     if (name.length) {
       if (hash_map_has(field_name_set, name)) {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
           .source_range = item->source_range,
           .Redefinition = { .name = name },
@@ -653,7 +653,7 @@ assign_tuple(
       Slice message = dyn_array_length(fields) > dyn_array_length(tuple->items)
         ? slice_literal("Tuple does not have enough items to match the struct it is assigned to")
         : slice_literal("Tuple has too many items for the struct it is assigned to");
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
@@ -677,7 +677,7 @@ assign_tuple(
         const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
         Scope_Entry *entry = scope_lookup(tuple->scope_where_it_was_created, symbol);
         if (!entry) {
-          compilation_error(compilation, (Mass_Error) {
+          mass_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Undefined_Variable,
             .Undefined_Variable = { .name = symbol->name },
             .source_range = tuple_item->source_range,
@@ -685,7 +685,7 @@ assign_tuple(
           goto err;
         }
         if (entry->epoch.as_u64 != tuple->epoch.as_u64) {
-          compilation_error(compilation, (Mass_Error) {
+          mass_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Epoch_Mismatch,
             .source_range = source->source_range,
           });
@@ -693,7 +693,7 @@ assign_tuple(
         }
         field_source = scope_entry_force_value(compilation, entry);
         if (!struct_find_field_by_name(target->descriptor, symbol->name, &field, &field_index)) {
-          compilation_error(compilation, (Mass_Error) {
+          mass_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Unknown_Field,
             .source_range = tuple_item->source_range,
             .Unknown_Field = { .name = symbol->name, .type = target->descriptor },
@@ -708,7 +708,7 @@ assign_tuple(
         }
         const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
         if (!struct_find_field_by_name(target->descriptor, accessor->symbol->name, &field, &field_index)) {
-          compilation_error(compilation, (Mass_Error) {
+          mass_error(compilation, (Mass_Error) {
             .tag = Mass_Error_Tag_Unknown_Field,
             .source_range = tuple_item->source_range,
             .Unknown_Field = { .name = accessor->symbol->name, .type = target->descriptor },
@@ -721,7 +721,7 @@ assign_tuple(
       }
       field_index += 1;
       if (hash_map_has(assigned_set, field)) {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
           .source_range = tuple_item->source_range,
           .Redefinition = { .name = field->name },
@@ -746,7 +746,7 @@ assign_tuple(
       Slice message = length > dyn_array_length(tuple->items)
         ? slice_literal("Tuple does not have enough items to match the array it is assigned to")
         : slice_literal("Tuple has too many items for the struct it is assigned to");
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
@@ -771,7 +771,7 @@ assign_tuple(
       MASS_ON_ERROR(*compilation->result) goto err;
     }
   } else {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = *source_range,
       .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
@@ -845,7 +845,7 @@ mass_assign(
   const Source_Range *source_range
 ) {
   if (target->flags & Value_Flags_Constant) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Assignment_To_Constant,
       .source_range = *source_range,
     });
@@ -897,7 +897,7 @@ mass_assign(
         move_value(builder, source_range, &target->storage, &zero);
         return;
       } else {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = *source_range,
           .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
@@ -911,7 +911,7 @@ mass_assign(
       );
       MASS_ON_ERROR(*compilation->result) return;
     } else if (source->descriptor != target->descriptor) {
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
@@ -968,7 +968,7 @@ mass_assign(
         move_value(builder, source_range, &target->storage, &source->storage);
       }
     } else {
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
         .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
@@ -1048,7 +1048,7 @@ mass_assign(
   }
 
   err:
-  compilation_error(compilation, (Mass_Error) {
+  mass_error(compilation, (Mass_Error) {
     .tag = Mass_Error_Tag_Type_Mismatch,
     .source_range = *source_range,
     .Type_Mismatch = {
@@ -1066,7 +1066,7 @@ value_force_lazy_static(
   // TODO figure out how to get rid of this cast
   Lazy_Static_Value *lazy = (Lazy_Static_Value *)value_as_lazy_static_value(value);
   if (lazy->resolving) {
-    context_error(&lazy->context, (Mass_Error) {
+    mass_error(&lazy->context, (Mass_Error) {
       .tag = Mass_Error_Tag_Circular_Dependency,
       .source_range = value->source_range,
       .Circular_Dependency = { .name = name },
@@ -1103,7 +1103,7 @@ scope_maybe_force_overload(
     value->descriptor != &descriptor_function_literal &&
     value->descriptor != &descriptor_overload
   ) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Non_Function_Overload,
       .source_range = value->source_range,
     });
@@ -1148,7 +1148,7 @@ mass_context_force_lookup(
   Scope_Entry *entry = scope_lookup(scope, symbol);
 
   if (!entry) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Undefined_Variable,
       .Undefined_Variable = { .name = symbol->name },
       .source_range = *lookup_range,
@@ -1157,7 +1157,7 @@ mass_context_force_lookup(
   }
   if (!(context->flags & Execution_Context_Flags_Type_Only)) {
     if (entry->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && entry->epoch.as_u64 != context->epoch.as_u64) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = *lookup_range,
       });
@@ -1211,7 +1211,7 @@ scope_define_operator(
   const Symbol *symbol = mass_ensure_symbol_for_map(compilation->allocator, map, name);
 
   if (scope_lookup_shallow(scope, symbol)) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Operator_Fixity_Conflict,
       .source_range = source_range,
       .Operator_Fixity_Conflict = {
@@ -1682,7 +1682,7 @@ context_parse_error(
   Value_View view,
   u32 peek_index
 ) {
-  context_error(context, (Mass_Error) {
+  mass_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = value_view_slice(&view, peek_index, peek_index).source_range,
   });
@@ -2021,7 +2021,7 @@ mass_ensure_jit_function_for_value(
     if (!label->resolved) {
       // Not sure if there are other reasons for the label to not be resolved but that 100%
       // happens when there is a recursive call to intrinsics
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Recursive_Intrinsic_Use,
         .source_range = *source_range,
       });
@@ -2053,7 +2053,7 @@ token_match_argument(
     view, slice_literal("::"), &definition, &static_expression, &equals
   )) {
     if (static_expression.length == 0) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
         .detailed_message = slice_literal("Expected an expression after `::`"),
@@ -2062,7 +2062,7 @@ token_match_argument(
     }
     // TODO @CopyPaste
     if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
         .detailed_message = slice_literal("Expected an argument name"),
@@ -2087,7 +2087,7 @@ token_match_argument(
     view, slice_literal("="), &definition, &default_expression, &equals
   )) {
     if (default_expression.length == 0) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
         .detailed_message = slice_literal("Expected an expression after `=`"),
@@ -2099,7 +2099,7 @@ token_match_argument(
   )) {
     is_inferred_type = true;
     if (default_expression.length == 0) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
         .detailed_message = slice_literal("Expected an expression after `:=`"),
@@ -2118,7 +2118,7 @@ token_match_argument(
   Mass_Type_Constraint_Proc maybe_type_constraint = 0;
   if (is_inferred_type) {
     if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
         .detailed_message = slice_literal("Expected an argument name"),
@@ -2147,7 +2147,7 @@ token_match_argument(
       }
     }
     if (name_tokens.length == 0) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
         .detailed_message = slice_literal("':' operator expects an identifier on the left hand side"),
@@ -2156,7 +2156,7 @@ token_match_argument(
     }
     name_token = value_view_get(name_tokens, 0);
     if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
         .source_range = name_tokens.source_range,
       });
@@ -2172,7 +2172,7 @@ token_match_argument(
         context->compilation, context->program, maybe_default_value, 0
       );
       //if (!descriptor) {
-        //context_error(context, (Mass_Error) {
+        //mass_error(context, (Mass_Error) {
           //.tag = Mass_Error_Tag_No_Runtime_Use,
           //.source_range = maybe_default_value->source_range,
         //});
@@ -2250,7 +2250,7 @@ mass_expected_result_ensure_value_or_temp(
       const Descriptor *expected_descriptor =
         flexible->descriptor ? flexible->descriptor : value->descriptor;
       if (!same_type(expected_descriptor, value->descriptor)) {
-        compilation_error(compilation, (Mass_Error) {
+        mass_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = value->source_range,
           .Type_Mismatch = { .expected = expected_descriptor, .actual = value->descriptor },
@@ -2279,7 +2279,7 @@ value_force(
     const Lazy_Value *lazy = value_as_lazy_value(value);
 
     if (lazy->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && lazy->epoch.as_u64 != builder->epoch.as_u64) {
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = value->source_range,
       });
@@ -2303,7 +2303,7 @@ value_force_exact(
   Value *source
 ) {
   if (target->flags & Value_Flags_Constant) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Assignment_To_Constant,
       .source_range = target->source_range,
     });
@@ -2472,7 +2472,7 @@ mass_exports(
   while (!it.done) {
     Value_View item = token_split_next(&it, &token_pattern_comma_operator);
     if (item.length != 1 || !value_is_symbol(value_view_get(item, 0))) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = item.source_range,
         .detailed_message = slice_literal("Exports {} block must contain a comma-separated identifier list")
@@ -2515,7 +2515,7 @@ token_parse_operator_definition(
 
   Value *precedence_value = token_parse_single(context, precedence_token);
   if (!value_is_i64(precedence_value)) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = precedence_token->source_range,
       .detailed_message ="Expected a precedence literal number",
@@ -2555,7 +2555,7 @@ token_parse_operator_definition(
     arguments[1] = value_view_get(definition, 2);
   } else {
     operator_token = 0;
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = pattern_token->source_range,
       .detailed_message ="Expected the pattern to have two (for prefix / postfix) or three tokens"
@@ -2565,7 +2565,7 @@ token_parse_operator_definition(
 
   for (u8 i = 0; i < argument_count; ++i) {
     if (!value_is_symbol(arguments[i])) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
         .source_range = arguments[i]->source_range,
       });
@@ -2594,7 +2594,7 @@ token_parse_operator_definition(
       .Intrinsic = { .body = body },
     };
   } else {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = body->source_range,
       .detailed_message = slice_literal("Expected a valid operator body"),
@@ -2666,7 +2666,7 @@ mass_import(
   return value_make(context->allocator, &descriptor_module, storage_static(module), args.source_range);
 
   parse_err:
-  context_error(context, (Mass_Error) {
+  mass_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = args.source_range,
     .detailed_message ="import() expects a single string argument"
@@ -2758,7 +2758,7 @@ token_parse_syntax_definition(
     ) {
       Value *symbol_token = value_view_peek(definition, ++i);
       if (!symbol_token || !value_is_symbol(symbol_token)) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Invalid_Identifier,
           .source_range = value->source_range,
         });
@@ -2780,7 +2780,7 @@ token_parse_syntax_definition(
         panic("Internal Error: Unexpected @-like operator");
       }
       if (!last_pattern) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = value->source_range,
           .detailed_message = slice_literal("@ requires a valid pattern before it")
@@ -2789,7 +2789,7 @@ token_parse_syntax_definition(
       }
       last_pattern->capture_name = value_as_symbol(symbol_token)->name;
     } else {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = value->source_range,
         .detailed_message = slice_literal("Expected a string token")
@@ -3159,7 +3159,7 @@ token_parse_constant_definitions(
     return 0;
   }
   if (lhs.length > 1) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Unimplemented,
       .source_range = lhs.source_range,
       .detailed_message = slice_literal("Multiple assignment are not supported at the moment")
@@ -3173,7 +3173,7 @@ token_parse_constant_definitions(
   }
 
   if (!value_is_symbol(symbol)) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Invalid_Identifier,
       .source_range = symbol->source_range,
     });
@@ -3314,7 +3314,7 @@ mass_handle_macro_call(
     literal->info->returns.descriptor &&
     !same_type_or_can_implicitly_move_cast(literal->info->returns.descriptor, return_descriptor)
   ) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = body_value->source_range,
       .Type_Mismatch = {
@@ -3955,7 +3955,7 @@ mass_match_overload_or_error(
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
       Array_Value_Ptr error_args = value_view_to_value_array(compilation->allocator, args_view);
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = args_view.source_range,
         .No_Matching_Overload = { .target = target, .arguments = error_args },
@@ -3963,7 +3963,7 @@ mass_match_overload_or_error(
       return false;
     }
     case Overload_Match_Tag_Undecidable: {
-      compilation_error(compilation, (Mass_Error) {
+      mass_error(compilation, (Mass_Error) {
         .tag = Mass_Error_Tag_Undecidable_Overload,
         .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
         .source_range = args_view.source_range,
@@ -4271,7 +4271,7 @@ token_handle_function_call(
       use_scope(&capture_context, module->exports.scope);
     } else {
       Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = source_range,
         .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
@@ -4313,7 +4313,7 @@ token_handle_function_call(
     if (expected_descriptor && !mass_descriptor_is_void(expected_descriptor)) {
       const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(result);
       if (!same_type(expected_descriptor, actual_descriptor)) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = source_range,
           .Type_Mismatch = { .actual = actual_descriptor, .expected = expected_descriptor },
@@ -4363,7 +4363,7 @@ token_handle_parsed_function_call(
     args_view = value_view_from_value_array(temp_args, &source_range);
   } else if (args_token->descriptor == &descriptor_value_view) {
     if (!mass_value_is_compile_time_known(args_token)) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Expected_Static,
         .source_range = source_range,
         .detailed_message = slice_literal("Expected a static Value_View"),
@@ -4372,7 +4372,7 @@ token_handle_parsed_function_call(
     }
     args_view = *value_as_value_view(args_token);
   } else {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = source_range,
       .detailed_message = slice_literal("Expected a list of arguments in ()"),
@@ -4767,7 +4767,7 @@ mass_handle_generic_comparison_lazy_proc(
   const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
 
   if (!same_type(lhs_descriptor, rhs_descriptor)) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = *source_range,
       .Type_Mismatch = { .expected = lhs_descriptor, .actual = rhs_descriptor },
@@ -4958,7 +4958,7 @@ mass_handle_startup_call_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 
   err:
-  compilation_error(compilation, (Mass_Error) {
+  mass_error(compilation, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = *source_range,
     .detailed_message = slice_literal("`startup` expects a () -> () {...} function as an argument"),
@@ -5079,7 +5079,7 @@ mass_static_assert(
       detailed_message = (Slice){0};
     }
 
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_User_Defined,
       .source_range = args.source_range,
       .detailed_message = detailed_message,
@@ -5158,7 +5158,7 @@ mass_handle_apply_operator(
   Scope_Entry *apply_entry = scope_lookup(context->scope, context->compilation->common_symbols.apply);
   if (!apply_entry) {
     Value *rhs_value = value_view_get(operands_view, 1);
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = rhs_value->source_range,
       .detailed_message = slice_literal("Expected an operator"),
@@ -5181,7 +5181,7 @@ mass_handle_typed_symbol_operator(
   Source_Range source_range = operands.source_range;
 
   if (!value_is_symbol(lhs_value)) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = source_range,
       .detailed_message = "operator : expects a symbol on the left hand side"
@@ -5239,7 +5239,7 @@ mass_handle_assignment_lazy_proc(
 
   const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
   if (!mass_descriptor_is_void(expected_descriptor)) {
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = *source_range,
       .Type_Mismatch = { .expected = expected_descriptor, .actual = &descriptor_void },
@@ -5362,7 +5362,7 @@ mass_eval(
   if (value_is_group_paren(body) || value_is_group_curly(body)) {
     return compile_time_eval(context, args_view);
   } else {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args_view.source_range,
       .detailed_message = slice_literal("@ operator must be followed by an expression in () or {}"),
@@ -5613,7 +5613,7 @@ mass_handle_dereference_operator(
   MASS_ON_ERROR(*context->result) return 0;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
   if (descriptor->tag != Descriptor_Tag_Pointer_To) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
       .Type_Mismatch = {
@@ -5655,7 +5655,7 @@ mass_handle_dot_operator(
       u64 index = value_as_i64(rhs)->bits;
       if (unwrapped_descriptor->tag != Descriptor_Tag_Struct) goto err;
       if (index >= dyn_array_length(unwrapped_descriptor->Struct.fields)) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs->source_range,
           .Unknown_Field = {
@@ -5669,7 +5669,7 @@ mass_handle_dot_operator(
       return mass_struct_field_access(context, lhs, field, &args_view.source_range);
     }
     if (!value_is_symbol(rhs)) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
         .source_range = rhs->source_range,
         .detailed_message = slice_literal("Right hand side of the . operator on structs must be an identifier"),
@@ -5681,7 +5681,7 @@ mass_handle_dot_operator(
 
     if (lhs_forced_descriptor == &descriptor_module) {
       if (!mass_value_is_compile_time_known(lhs)) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Expected_Static,
           .source_range = lhs->source_range,
         });
@@ -5690,7 +5690,7 @@ mass_handle_dot_operator(
       const Module *module = value_as_module(lhs);
       Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, field_symbol);
       if (!entry) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs->source_range,
           .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
@@ -5703,7 +5703,7 @@ mass_handle_dot_operator(
     } else {
       const Struct_Field *field;
       if (!struct_find_field_by_name(unwrapped_descriptor, field_name, &field, &(u64){0})) {
-        context_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs->source_range,
           .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
@@ -5738,7 +5738,7 @@ mass_handle_dot_operator(
         context, args_view.source_range, heap_payload, descriptor, mass_handle_array_access_lazy_proc
       );
     } else {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = rhs->source_range,
         .detailed_message =
@@ -5748,7 +5748,7 @@ mass_handle_dot_operator(
     }
   }
   err:
-  context_error(context, (Mass_Error) {
+  mass_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = lhs->source_range,
     .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
@@ -5769,7 +5769,7 @@ token_dispatch_operator(
   u32 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
 
   if (dyn_array_length(*stack) < argument_count) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = stack_entry->source_range,
       .detailed_message = slice_literal("Not enough arguments for operator"),
@@ -6041,7 +6041,7 @@ function_info_from_parameters_and_return_type(
       dyn_array_push(temp_params, param);
       if (previous_argument_has_default_value) {
         if (!param.maybe_default_value) {
-          context_error(context, (Mass_Error) {
+          mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
             .source_range = return_types->source_range,
           });
@@ -6114,7 +6114,7 @@ token_parse_function_literal(
   }
 
   if (is_macro && is_compile_time) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = keyword->source_range,
       .detailed_message = slice_literal("Function-like macro can not be marked compile time"),
@@ -6148,7 +6148,7 @@ token_parse_function_literal(
     };
     Value_View rest = value_view_match_till(view, &peek_index, &end_pattern);
     if (is_macro) {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = rest.source_range,
         .detailed_message = slice_literal("Function-like macro must have a literal body in {}"),
@@ -6344,7 +6344,7 @@ token_parse_expression(
       result = *dyn_array_last(value_stack);
       result = token_parse_single(context, result);
     } else {
-      context_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = view.source_range,
       });
@@ -6495,7 +6495,7 @@ token_parse_block_view(
       } else if (value_is_module_exports(parse_result)) {
         Value_View match_view = value_view_slice(&rest, 0, match_length);
         if (!(context->flags & Execution_Context_Flags_Global)) {
-          context_error(context, (Mass_Error) {
+          mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Parse,
             .source_range = match_view.source_range,
             .detailed_message = slice_literal("Export declarations are only supported at top level"),
@@ -6503,7 +6503,7 @@ token_parse_block_view(
           goto defer;
         }
         if (context->module->exports.tag != Module_Exports_Tag_Not_Specified) {
-          context_error(context, (Mass_Error) {
+          mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Parse,
             .source_range = match_view.source_range,
             .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
@@ -6520,7 +6520,7 @@ token_parse_block_view(
 
     if (match_length) continue;
     Value *token = value_view_get(rest, 0);
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = token->source_range,
     });
@@ -6610,7 +6610,7 @@ mass_handle_label_lazy_proc(
 ) {
   if (label_value->descriptor != &descriptor_label_pointer) {
     Slice source = source_from_source_range(compilation, source_range);
-    compilation_error(compilation, (Mass_Error) {
+    mass_error(compilation, (Mass_Error) {
       .tag = Mass_Error_Tag_Redefinition,
       .source_range = *source_range,
       .other_source_range = label_value->source_range,
@@ -6648,7 +6648,7 @@ token_parse_statement_label(
   Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
 
   if (rest.length != 1 || !value_is_symbol(value_view_get(rest, 0))) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Invalid_Identifier,
       .source_range = rest.source_range,
     });
@@ -6737,7 +6737,7 @@ token_define_global_variable(
     context->compilation, context->program, value, 0
   );
   if (!descriptor) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Runtime_Use,
       .source_range = expression.source_range,
     });
@@ -6809,7 +6809,7 @@ token_define_local_variable(
   );
   MASS_ON_ERROR(*context->result) return;
   if (!variable_descriptor) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Runtime_Use,
       .source_range = expression.source_range,
     });
@@ -6858,7 +6858,7 @@ token_parse_definition_and_assignment_statements(
     return 0;
   }
   if (lhs.length > 1) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Unimplemented,
       .source_range = lhs.source_range,
       .detailed_message = slice_literal("multiple assignments"),
@@ -6868,7 +6868,7 @@ token_parse_definition_and_assignment_statements(
   Value *name_token = value_view_get(view, 0);
 
   if (!value_is_symbol(name_token)) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Invalid_Identifier,
       .source_range = name_token->source_range,
       .Invalid_Identifier = {.id = name_token},
@@ -7080,7 +7080,7 @@ module_process_exports(
         const Symbol *symbol = value_as_symbol(*symbol_pointer);
         Scope_Entry *entry = scope_lookup_shallow(module->own_scope, symbol);
         if (!entry) {
-          context_error(import_context, (Mass_Error) {
+          mass_error(import_context, (Mass_Error) {
             .tag = Mass_Error_Tag_Undefined_Variable,
             .source_range = (*symbol_pointer)->source_range,
             .Undefined_Variable = {.name = symbol->name},
@@ -7211,7 +7211,7 @@ program_module_from_file(
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path);
   if (!buffer) {
     Source_Range error_source_range = { .file = file, .offsets = {0} };
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Open,
       .source_range = error_source_range,
       .detailed_message = slice_literal("Unable to open the file"),
@@ -7222,7 +7222,7 @@ program_module_from_file(
   file->text = fixed_buffer_as_slice(buffer);
 
   if (buffer->occupied > UINT32_MAX) {
-    context_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Too_Large,
       .File_Too_Large = { .path = file_path },
       .source_range = {
