@@ -4858,13 +4858,11 @@ mass_handle_comparison(
   Execution_Context *context,
   Value_View arguments,
   Lazy_Value_Proc lazy_value_proc,
-  void *raw_payload
+  Compare_Type compare_type
 ) {
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
   Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
   MASS_ON_ERROR(*context->result) return 0;
-
-  Compare_Type compare_type = (Compare_Type)(u64)raw_payload;
 
   Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
@@ -4878,43 +4876,43 @@ mass_handle_comparison(
 
 static inline Value *mass_integer_less(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Less
+    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less
   );
 }
 static inline Value *mass_integer_greater(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Greater
+    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater
   );
 }
 static inline Value *mass_integer_less_equal(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Less_Equal
+    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less_Equal
   );
 }
 static inline Value *mass_integer_greater_equal(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Signed_Greater_Equal
+    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater_Equal
   );
 }
 static inline Value *mass_integer_equal(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Equal
+    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Equal
   );
 }
 static inline Value *mass_integer_not_equal(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, (void*)Compare_Type_Not_Equal
+    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
 static inline Value *mass_generic_equal(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_generic_comparison_lazy_proc, (void*)Compare_Type_Equal
+    context, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Equal
   );
 }
 static inline Value *mass_generic_not_equal(Execution_Context *context, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_generic_comparison_lazy_proc, (void*)Compare_Type_Not_Equal
+    context, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
