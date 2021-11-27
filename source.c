@@ -161,17 +161,17 @@ token_statement_matcher_in_scopes(
 }
 
 static void
-use_scope(
-  Execution_Context *context,
-  const Scope *scope_to_use
+mass_copy_scope_exports(
+  Scope *to,
+  const Scope *from
 ) {
   // TODO also deal with statement matchers here
-  for (u64 i = 0; i < scope_to_use->map->capacity; ++i) {
-    Scope_Map__Entry *map_entry = &scope_to_use->map->entries[i];
+  for (u64 i = 0; i < from->map->capacity; ++i) {
+    Scope_Map__Entry *map_entry = &from->map->entries[i];
     if (!map_entry->occupied) continue;
     Scope_Entry *entry = map_entry->value;
     const Symbol *symbol = map_entry->key;
-    scope_define_value(context->scope, entry->epoch, entry->source_range, symbol, entry->value);
+    scope_define_value(to, entry->epoch, entry->source_range, symbol, entry->value);
   }
 }
 
@@ -4267,7 +4267,7 @@ token_handle_function_call(
         return 0;
       }
       const Module *module = value_as_module(module_arg);
-      use_scope(&capture_context, module->exports.scope);
+      mass_copy_scope_exports(capture->scope, module->exports.scope);
     } else {
       Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
       mass_error(context, (Mass_Error) {
@@ -6593,7 +6593,7 @@ token_parse_statement_using(
   }
 
   const Module *module = value_as_module(result);
-  use_scope(context, module->exports.scope);
+  mass_copy_scope_exports(context->scope, module->exports.scope);
 
   err:
   return peek_index;
