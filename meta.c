@@ -9,11 +9,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include "prelude.h"
 
-typedef enum Opaque_Numeric_Interpretation {
-  Opaque_Numeric_Interpretation_None = 0,
-  Opaque_Numeric_Interpretation_Twos_Complement = 1,
-} Opaque_Numeric_Interpretation;
-
 typedef struct {
   const char *name;
   int32_t value;
@@ -69,9 +64,14 @@ typedef struct {
   uint64_t argument_count;
 } Function_Type;
 
+typedef enum {
+  Meta_Integer_Type_Unsigned = false,
+  Meta_Integer_Type_Signed = true,
+} Meta_Integer_Type;
+
 typedef struct {
-  Opaque_Numeric_Interpretation numeric_interpretation;
-} Meta_C_Opaque;
+  bool is_signed;
+} Meta_Integer;
 
 typedef enum {
   Meta_Type_Tag_C_Opaque,
@@ -79,6 +79,7 @@ typedef enum {
   Meta_Type_Tag_Tagged_Union,
   Meta_Type_Tag_Enum,
   Meta_Type_Tag_Float,
+  Meta_Type_Tag_Integer,
   Meta_Type_Tag_Function,
   Meta_Type_Tag_Hash_Map,
 } Meta_Type_Tag;
@@ -105,9 +106,9 @@ typedef struct {
     Struct_Type struct_;
     Enum_Type enum_;
     Tagged_Union_Type union_;
+    Meta_Integer integer;
     Function_Type function;
     Hash_Map_Type hash_map;
-    Meta_C_Opaque c_opaque;
   };
 } Meta_Type;
 
@@ -207,6 +208,7 @@ print_c_type_forward_declaration(
       break;
     }
     case Meta_Type_Tag_Float:
+    case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_C_Opaque: {
       name = type->name;
       break;
@@ -335,6 +337,7 @@ print_c_type(
       break;
     }
     case Meta_Type_Tag_Float:
+    case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_C_Opaque: {
       if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
         fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->name, type->name);
@@ -494,6 +497,7 @@ print_scope_export(
   Meta_Type *type
 ) {
   switch(type->tag) {
+    case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Struct: {
@@ -618,6 +622,7 @@ print_natvis(
       // TODO
       break;
     }
+    case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
@@ -677,6 +682,7 @@ print_mass_descriptor_fixed_array_types(
       }
       break;
     }
+    case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
@@ -722,6 +728,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
+    case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque: {
       char *lowercase_name = strtolower(type->name);
@@ -810,33 +817,22 @@ print_mass_descriptor_and_type(
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
     }
-    case Meta_Type_Tag_Float: {
-      fprintf(file, "MASS_DEFINE_FLOAT_C_TYPE(%s, %s)\n", lowercase_name, type->name);
+    case Meta_Type_Tag_Float:
+    case Meta_Type_Tag_Integer:
+    case Meta_Type_Tag_C_Opaque: {
+      if (type->tag == Meta_Type_Tag_Float) {
+        fprintf(file, "MASS_DEFINE_FLOAT_C_TYPE(%s, %s)\n", lowercase_name, type->name);
+      } else if (type->tag == Meta_Type_Tag_Integer) {
+        fprintf(file, "MASS_DEFINE_INTEGER_C_TYPE(%s, %s, %i)\n", lowercase_name, type->name, type->integer.is_signed);
+      } else {
+        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->name);
+      }
       if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
         fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
       }
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
     } break;
-    case Meta_Type_Tag_C_Opaque: {
-      const char *numeric_interpretation_string = 0;
-      switch(type->c_opaque.numeric_interpretation) {
-        case Opaque_Numeric_Interpretation_None: {
-          numeric_interpretation_string = "Opaque_Numeric_Interpretation_None";
-        } break;
-        case Opaque_Numeric_Interpretation_Twos_Complement: {
-          numeric_interpretation_string = "Opaque_Numeric_Interpretation_Twos_Complement";
-        } break;
-      }
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s, .Opaque.numeric_interpretation = %s)\n",
-        lowercase_name, type->name, numeric_interpretation_string);
-      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
-        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
-      }
-      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
-      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
-      break;
-    }
     case Meta_Type_Tag_Enum: {
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->name);
 
@@ -966,17 +962,23 @@ print_mass_descriptor_and_type(
     .item_count = countof(__VA_ARGS__),\
   }
 
-#define type_c_opaque(_NAME_STRING_, _NUMERIC_INTERPRETATION_)\
+#define type_c_opaque(_NAME_STRING_)\
   (Meta_Type){\
     .tag = Meta_Type_Tag_C_Opaque,\
     .name = (_NAME_STRING_),\
-    .c_opaque.numeric_interpretation = (_NUMERIC_INTERPRETATION_),\
   }
 
 #define type_float(_NAME_STRING_)\
   (Meta_Type){\
     .tag = Meta_Type_Tag_Float,\
     .name = (_NAME_STRING_),\
+  }
+
+#define type_integer(_NAME_STRING_, _SIGNEDNESS_)\
+  (Meta_Type){\
+    .tag = Meta_Type_Tag_Integer,\
+    .name = (_NAME_STRING_),\
+    .integer.is_signed = (bool)(_SIGNEDNESS_),\
   }
 
 #define type_enum(_NAME_STRING_, ...)\
@@ -1719,11 +1721,6 @@ main(void) {
     { "const Descriptor *", "descriptor"},
   }));
 
-  push_type(type_enum("Opaque_Numeric_Interpretation", (Enum_Type_Item[]){
-    { "None", Opaque_Numeric_Interpretation_None },
-    { "Twos_Complement", Opaque_Numeric_Interpretation_Twos_Complement },
-  }));
-
   push_type(type_struct("Struct_Field", (Struct_Item[]){
     // TODO This should probably be "const Symbol *", but generating that is a giant pain
     { "Slice", "name"},
@@ -1734,10 +1731,10 @@ main(void) {
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Void"),
+    struct_empty("Opaque"),
     struct_empty("Float"),
-    struct_fields("Opaque", (Struct_Item[]){
-      { "Opaque_Numeric_Interpretation", "numeric_interpretation" },
-      { "u32", "_numeric_interpretation_padding" },
+    struct_fields("Integer", (Struct_Item[]){
+      { "u64", "is_signed" },
     }),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "const Function_Info *", "info" },
@@ -2143,50 +2140,43 @@ main(void) {
   export_compiler_custom_name("generic_equal", push_type(type_intrinsic("mass_generic_equal")));
   export_compiler_custom_name("generic_not_equal", push_type(type_intrinsic("mass_generic_not_equal")));
 
-  // Standard C types
-  set_flags(push_type(
-    type_c_opaque("char", Opaque_Numeric_Interpretation_Twos_Complement)),
-    Meta_Type_Flags_No_C_Type
-  );
-  set_flags(push_type(
-    type_c_opaque("int", Opaque_Numeric_Interpretation_Twos_Complement)),
-    Meta_Type_Flags_No_C_Type
-  );
+  //////////////////////
+  // Standard C types //
+  //////////////////////
+
+  // The signedness of `char` is implementation defined. To keep things same
+  // we assume that the meta program and the main one are both compiled
+  // on the same machine with the same compiler and flags, allowing to detect
+  // `char` sign here. It is still going to be a problem in case someone wants
+  // to do C++ name mangling but that is way down the line.
+  Meta_Integer_Type char_type = CHAR_MIN != 0 ? Meta_Integer_Type_Signed : Meta_Integer_Type_Unsigned;
+  set_flags(push_type(type_integer("char", char_type)), Meta_Type_Flags_No_C_Type);
+  set_flags(push_type(type_integer("int", Meta_Integer_Type_Signed)), Meta_Type_Flags_No_C_Type);
 
   // Prelude Types
-  export_compiler(set_flags(
-    push_type(type_c_opaque("Allocator", Opaque_Numeric_Interpretation_None)),
-    Meta_Type_Flags_No_C_Type
-  ));
-  set_flags(
-    push_type(type_c_opaque("Virtual_Memory_Buffer", Opaque_Numeric_Interpretation_None)),
-    Meta_Type_Flags_No_C_Type
-  );
+  export_compiler(set_flags(push_type(type_c_opaque("Allocator")), Meta_Type_Flags_No_C_Type));
+  set_flags(push_type(type_c_opaque("Virtual_Memory_Buffer")), Meta_Type_Flags_No_C_Type);
 
   set_flags(
-    export_global_custom_name("bool",
-      push_type(type_c_opaque("_Bool", Opaque_Numeric_Interpretation_None))),
+    export_global_custom_name("bool", push_type(type_c_opaque("_Bool"))),
     Meta_Type_Flags_No_C_Type
-  );
+   );
 
-  export_global(set_flags(
-    push_type(type_c_opaque("i64", Opaque_Numeric_Interpretation_Twos_Complement)),
-    Meta_Type_Flags_No_C_Type
-  ));
+  export_global(set_flags(push_type(type_c_opaque("i64")), Meta_Type_Flags_No_C_Type));
 
   #define PROCESS_INTEGER_TYPES(F)\
-    F(u8) F(u16) F(u32) F(u64)\
-    F(s8) F(s16) F(s32) F(s64)
+    F(u8, Unsigned) F(u16, Unsigned) F(u32, Unsigned) F(u64, Unsigned)\
+    F(s8, Signed) F(s16, Signed) F(s32, Signed) F(s64, Signed)
 
-  #define PROCESS_FLOAT_TYPES(F)\
+  #define PROCESS_FLOAT_TYPES(F, ...)\
     F(f32) F(f64)
 
   #define PROCESS_NUMERIC_TYPES(F)\
     PROCESS_INTEGER_TYPES(F)\
     PROCESS_FLOAT_TYPES(F)
 
-  #define DEFINE_INTEGER_TYPE(T)\
-    export_global(set_flags(push_type(type_c_opaque(#T, Opaque_Numeric_Interpretation_Twos_Complement)),\
+  #define DEFINE_INTEGER_TYPE(T, SIGNEDNESS)\
+    export_global(set_flags(push_type(type_integer(#T, Meta_Integer_Type_##SIGNEDNESS)),\
       Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
   #define DEFINE_FLOAT_TYPE(T)\
     export_global(set_flags(push_type(type_float(#T)),\
@@ -2194,7 +2184,7 @@ main(void) {
   PROCESS_INTEGER_TYPES(DEFINE_INTEGER_TYPE)
   PROCESS_FLOAT_TYPES(DEFINE_FLOAT_TYPE)
 
-  #define DEFINE_RANGES(T)\
+  #define DEFINE_RANGES(T, ...)\
     set_flags(push_type(type_struct("Range_" #T, (Struct_Item[]){\
       { #T, "from" },\
       { #T, "to" },\

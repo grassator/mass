@@ -1868,11 +1868,14 @@
   <DisplayString Condition="tag == Descriptor_Tag_Void">
     Void
   </DisplayString>
+  <DisplayString Condition="tag == Descriptor_Tag_Opaque">
+    Opaque
+  </DisplayString>
   <DisplayString Condition="tag == Descriptor_Tag_Float">
     Float
   </DisplayString>
-  <DisplayString Condition="tag == Descriptor_Tag_Opaque">
-    Opaque { Opaque }
+  <DisplayString Condition="tag == Descriptor_Tag_Integer">
+    Integer { Integer }
   </DisplayString>
   <DisplayString Condition="tag == Descriptor_Tag_Function_Instance">
     Function_Instance { Function_Instance }
@@ -1892,7 +1895,7 @@
     <Item Name="name">name</Item>
     <Item Name="bit_size">bit_size</Item>
     <Item Name="bit_alignment">bit_alignment</Item>
-    <Item Name="Opaque" Condition="tag == Descriptor_Tag_Opaque">Opaque</Item>
+    <Item Name="Integer" Condition="tag == Descriptor_Tag_Integer">Integer</Item>
     <Item Name="Function_Instance" Condition="tag == Descriptor_Tag_Function_Instance">Function_Instance</Item>
     <Item Name="Fixed_Size_Array" Condition="tag == Descriptor_Tag_Fixed_Size_Array">Fixed_Size_Array</Item>
     <Item Name="Struct" Condition="tag == Descriptor_Tag_Struct">Struct</Item>

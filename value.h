@@ -303,10 +303,7 @@ descriptor_is_integer(
   const Descriptor *descriptor
 ) {
   if (!descriptor) return false;
-  if (descriptor->tag != Descriptor_Tag_Opaque) {
-    return false;
-  }
-  if (descriptor->Opaque.numeric_interpretation != Opaque_Numeric_Interpretation_Twos_Complement) {
+  if (descriptor->tag != Descriptor_Tag_Integer) {
     return false;
   }
   return true;

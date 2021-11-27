@@ -537,21 +537,6 @@ typedef struct Typed_Symbol Typed_Symbol;
 typedef dyn_array_type(Typed_Symbol *) Array_Typed_Symbol_Ptr;
 typedef dyn_array_type(const Typed_Symbol *) Array_Const_Typed_Symbol_Ptr;
 
-typedef enum Opaque_Numeric_Interpretation {
-  Opaque_Numeric_Interpretation_None = 0,
-  Opaque_Numeric_Interpretation_Twos_Complement = 1,
-} Opaque_Numeric_Interpretation;
-
-const char *opaque_numeric_interpretation_name(Opaque_Numeric_Interpretation value) {
-  if (value == 0) return "Opaque_Numeric_Interpretation_None";
-  if (value == 1) return "Opaque_Numeric_Interpretation_Twos_Complement";
-  assert(!"Unexpected value for enum Opaque_Numeric_Interpretation");
-  return 0;
-};
-
-typedef dyn_array_type(Opaque_Numeric_Interpretation *) Array_Opaque_Numeric_Interpretation_Ptr;
-typedef dyn_array_type(const Opaque_Numeric_Interpretation *) Array_Const_Opaque_Numeric_Interpretation_Ptr;
-
 typedef struct Struct_Field Struct_Field;
 typedef dyn_array_type(Struct_Field *) Array_Struct_Field_Ptr;
 typedef dyn_array_type(const Struct_Field *) Array_Const_Struct_Field_Ptr;
@@ -1720,18 +1705,18 @@ typedef dyn_array_type(Struct_Field) Array_Struct_Field;
 
 typedef enum {
   Descriptor_Tag_Void = 0,
-  Descriptor_Tag_Float = 1,
-  Descriptor_Tag_Opaque = 2,
-  Descriptor_Tag_Function_Instance = 3,
-  Descriptor_Tag_Fixed_Size_Array = 4,
-  Descriptor_Tag_Struct = 5,
-  Descriptor_Tag_Pointer_To = 6,
+  Descriptor_Tag_Opaque = 1,
+  Descriptor_Tag_Float = 2,
+  Descriptor_Tag_Integer = 3,
+  Descriptor_Tag_Function_Instance = 4,
+  Descriptor_Tag_Fixed_Size_Array = 5,
+  Descriptor_Tag_Struct = 6,
+  Descriptor_Tag_Pointer_To = 7,
 } Descriptor_Tag;
 
-typedef struct Descriptor_Opaque {
-  Opaque_Numeric_Interpretation numeric_interpretation;
-  u32 _numeric_interpretation_padding;
-} Descriptor_Opaque;
+typedef struct Descriptor_Integer {
+  u64 is_signed;
+} Descriptor_Integer;
 typedef struct Descriptor_Function_Instance {
   const Function_Info * info;
   Function_Call_Setup call_setup;
@@ -1755,17 +1740,17 @@ typedef struct Descriptor {
   Bits bit_size;
   Bits bit_alignment;
   union {
-    Descriptor_Opaque Opaque;
+    Descriptor_Integer Integer;
     Descriptor_Function_Instance Function_Instance;
     Descriptor_Fixed_Size_Array Fixed_Size_Array;
     Descriptor_Struct Struct;
     Descriptor_Pointer_To Pointer_To;
   };
 } Descriptor;
-static inline Descriptor_Opaque *
-descriptor_as_opaque(Descriptor *descriptor) {
-  assert(descriptor->tag == Descriptor_Tag_Opaque);
-  return &descriptor->Opaque;
+static inline Descriptor_Integer *
+descriptor_as_integer(Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Integer);
+  return &descriptor->Integer;
 }
 static inline Descriptor_Function_Instance *
 descriptor_as_function_instance(Descriptor *descriptor) {
@@ -2533,12 +2518,6 @@ static Descriptor descriptor_array_typed_symbol;
 static Descriptor descriptor_array_typed_symbol_ptr;
 static Descriptor descriptor_typed_symbol_pointer;
 static Descriptor descriptor_typed_symbol_pointer_pointer;
-static Descriptor descriptor_opaque_numeric_interpretation;
-static Descriptor descriptor_array_opaque_numeric_interpretation;
-static Descriptor descriptor_array_opaque_numeric_interpretation_ptr;
-static Descriptor descriptor_array_const_opaque_numeric_interpretation_ptr;
-static Descriptor descriptor_opaque_numeric_interpretation_pointer;
-static Descriptor descriptor_opaque_numeric_interpretation_pointer_pointer;
 static Descriptor descriptor_struct_field;
 static Descriptor descriptor_array_struct_field;
 static Descriptor descriptor_array_struct_field_ptr;
@@ -4872,13 +4851,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(typed_symbol, Typed_Symbol,
 MASS_DEFINE_TYPE_VALUE(typed_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol *, typed_symbol_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(opaque_numeric_interpretation, Opaque_Numeric_Interpretation)
-static C_Enum_Item opaque_numeric_interpretation_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Twos_Complement"), .value = 1 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Opaque_Numeric_Interpretation, opaque_numeric_interpretation);
-DEFINE_VALUE_IS_AS_HELPERS(Opaque_Numeric_Interpretation *, opaque_numeric_interpretation_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_struct_field_ptr, Array_Struct_Field_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_struct_field, Array_Struct_Field)
 MASS_DEFINE_STRUCT_DESCRIPTOR(struct_field, Struct_Field,
@@ -4912,26 +4884,22 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Void"), .value = 0 },
-{ .name = slice_literal_fields("Float"), .value = 1 },
-{ .name = slice_literal_fields("Opaque"), .value = 2 },
-{ .name = slice_literal_fields("Function_Instance"), .value = 3 },
-{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 4 },
-{ .name = slice_literal_fields("Struct"), .value = 5 },
-{ .name = slice_literal_fields("Pointer_To"), .value = 6 },
+{ .name = slice_literal_fields("Opaque"), .value = 1 },
+{ .name = slice_literal_fields("Float"), .value = 2 },
+{ .name = slice_literal_fields("Integer"), .value = 3 },
+{ .name = slice_literal_fields("Function_Instance"), .value = 4 },
+{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 5 },
+{ .name = slice_literal_fields("Struct"), .value = 6 },
+{ .name = slice_literal_fields("Pointer_To"), .value = 7 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_opaque, Descriptor_Opaque,
+MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_integer, Descriptor_Integer,
   {
-    .descriptor = &descriptor_opaque_numeric_interpretation,
-    .name = slice_literal_fields("numeric_interpretation"),
-    .offset = offsetof(Descriptor_Opaque, numeric_interpretation),
-  },
-  {
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("_numeric_interpretation_padding"),
-    .offset = offsetof(Descriptor_Opaque, _numeric_interpretation_padding),
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("is_signed"),
+    .offset = offsetof(Descriptor_Integer, is_signed),
   },
 );
-MASS_DEFINE_TYPE_VALUE(descriptor_opaque);
+MASS_DEFINE_TYPE_VALUE(descriptor_integer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_Instance,
   {
     .descriptor = &descriptor_function_info_pointer,
@@ -5006,9 +4974,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .offset = offsetof(Descriptor, bit_alignment),
   },
   {
-    .name = slice_literal_fields("Opaque"),
-    .descriptor = &descriptor_descriptor_opaque,
-    .offset = offsetof(Descriptor, Opaque),
+    .name = slice_literal_fields("Integer"),
+    .descriptor = &descriptor_descriptor_integer,
+    .offset = offsetof(Descriptor, Integer),
   },
   {
     .name = slice_literal_fields("Function_Instance"),
@@ -5928,52 +5896,52 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(x64_mnemonic, X64_Mnemonic,
 MASS_DEFINE_TYPE_VALUE(x64_mnemonic);
 DEFINE_VALUE_IS_AS_HELPERS(X64_Mnemonic, x64_mnemonic);
 DEFINE_VALUE_IS_AS_HELPERS(X64_Mnemonic *, x64_mnemonic_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(char, char, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(char, char, 1)
 MASS_DEFINE_OPAQUE_C_TYPE(array_char, Array_char)
 DEFINE_VALUE_IS_AS_HELPERS(char, char);
 DEFINE_VALUE_IS_AS_HELPERS(char *, char_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(int, int, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(int, int, 1)
 MASS_DEFINE_OPAQUE_C_TYPE(array_int, Array_int)
 DEFINE_VALUE_IS_AS_HELPERS(int, int);
 DEFINE_VALUE_IS_AS_HELPERS(int *, int_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_None)
+MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator)
 MASS_DEFINE_OPAQUE_C_TYPE(array_allocator, Array_Allocator)
 DEFINE_VALUE_IS_AS_HELPERS(Allocator, allocator);
 DEFINE_VALUE_IS_AS_HELPERS(Allocator *, allocator_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_None)
+MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer)
 MASS_DEFINE_OPAQUE_C_TYPE(array_virtual_memory_buffer, Array_Virtual_Memory_Buffer)
 DEFINE_VALUE_IS_AS_HELPERS(Virtual_Memory_Buffer, virtual_memory_buffer);
 DEFINE_VALUE_IS_AS_HELPERS(Virtual_Memory_Buffer *, virtual_memory_buffer_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_None)
+MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool)
 MASS_DEFINE_OPAQUE_C_TYPE(array__bool, Array__Bool)
 DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool);
 DEFINE_VALUE_IS_AS_HELPERS(_Bool *, _bool_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(i64, i64, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_OPAQUE_C_TYPE(i64, i64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_i64, Array_i64)
 DEFINE_VALUE_IS_AS_HELPERS(i64, i64);
 DEFINE_VALUE_IS_AS_HELPERS(i64 *, i64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(u8, u8, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(u8, u8, 0)
 DEFINE_VALUE_IS_AS_HELPERS(u8, u8);
 DEFINE_VALUE_IS_AS_HELPERS(u8 *, u8_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(u16, u16, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(u16, u16, 0)
 DEFINE_VALUE_IS_AS_HELPERS(u16, u16);
 DEFINE_VALUE_IS_AS_HELPERS(u16 *, u16_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(u32, u32, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(u32, u32, 0)
 DEFINE_VALUE_IS_AS_HELPERS(u32, u32);
 DEFINE_VALUE_IS_AS_HELPERS(u32 *, u32_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(u64, u64, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(u64, u64, 0)
 DEFINE_VALUE_IS_AS_HELPERS(u64, u64);
 DEFINE_VALUE_IS_AS_HELPERS(u64 *, u64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(s8, s8, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(s8, s8, 1)
 DEFINE_VALUE_IS_AS_HELPERS(s8, s8);
 DEFINE_VALUE_IS_AS_HELPERS(s8 *, s8_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(s16, s16, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(s16, s16, 1)
 DEFINE_VALUE_IS_AS_HELPERS(s16, s16);
 DEFINE_VALUE_IS_AS_HELPERS(s16 *, s16_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(s32, s32, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(s32, s32, 1)
 DEFINE_VALUE_IS_AS_HELPERS(s32, s32);
 DEFINE_VALUE_IS_AS_HELPERS(s32 *, s32_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(s64, s64, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
+MASS_DEFINE_INTEGER_C_TYPE(s64, s64, 1)
 DEFINE_VALUE_IS_AS_HELPERS(s64, s64);
 DEFINE_VALUE_IS_AS_HELPERS(s64 *, s64_pointer);
 MASS_DEFINE_FLOAT_C_TYPE(f32, f32)

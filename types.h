@@ -114,7 +114,16 @@
   MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT, __VA_ARGS__)
 
 #define MASS_DEFINE_FLOAT_C_TYPE(_NAME_, _C_TYPE_)\
-  MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Float, _NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT);\
+  MASS_DEFINE_DESCRIPTOR(\
+    Descriptor_Tag_Float, _NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT\
+  );\
+  MASS_DEFINE_TYPE_VALUE(_NAME_);
+
+#define MASS_DEFINE_INTEGER_C_TYPE(_NAME_, _C_TYPE_, _IS_SIGNED_)\
+  MASS_DEFINE_DESCRIPTOR(\
+    Descriptor_Tag_Integer, _NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT,\
+    .Integer.is_signed = (_IS_SIGNED_),\
+  );\
   MASS_DEFINE_TYPE_VALUE(_NAME_);
 
 #define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\

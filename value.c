@@ -291,6 +291,9 @@ same_type(
     case Descriptor_Tag_Float: {
       return true;
     }
+    case Descriptor_Tag_Integer: {
+      return a->Integer.is_signed == b->Integer.is_signed;
+    }
     case Descriptor_Tag_Pointer_To: {
       return same_type(a->Pointer_To.descriptor, b->Pointer_To.descriptor);
     }
@@ -584,6 +587,7 @@ storage_static_equal_internal(
     } break;
     // Opaques, references and pointers can be compared with memcmp
     case Descriptor_Tag_Float:
+    case Descriptor_Tag_Integer:
     case Descriptor_Tag_Opaque:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;

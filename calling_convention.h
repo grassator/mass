@@ -410,7 +410,8 @@ x86_64_system_v_classify(
     } break;
     case Descriptor_Tag_Function_Instance:
     case Descriptor_Tag_Pointer_To:
-    case Descriptor_Tag_Opaque: {
+    case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Integer: {
       if (descriptor->bit_size.as_u64 == 0) {
         return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
       }
@@ -547,7 +548,8 @@ x86_64_system_v_classify_field_recursively(
       case Descriptor_Tag_Function_Instance:
       case Descriptor_Tag_Pointer_To:
       case Descriptor_Tag_Opaque:
-      case Descriptor_Tag_Float: {
+      case Descriptor_Tag_Float:
+      case Descriptor_Tag_Integer: {
         u64 start_eightbyte_index = field_offset_in_root_aggregate / eightbyte;
         u64 end_eightbyte_index = (field_offset_in_root_aggregate + item_byte_size - 1) / eightbyte;
 

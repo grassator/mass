@@ -283,12 +283,12 @@ compiler_scope_define_exports(
     slice_literal("Descriptor_Tag"), type_descriptor_tag_value,
     descriptor_tag_items, countof(descriptor_tag_items)
   );
-  Source_Range Descriptor_Opaque__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Descriptor_Opaque__source_range, "Descriptor_Opaque");
+  Source_Range Descriptor_Integer__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Descriptor_Integer__source_range, "Descriptor_Integer");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Descriptor_Opaque__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Descriptor_Opaque")),
-    type_descriptor_opaque_value
+    scope, VALUE_STATIC_EPOCH, Descriptor_Integer__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Integer")),
+    type_descriptor_integer_value
   );
   Source_Range Descriptor_Function_Instance__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Descriptor_Function_Instance__source_range, "Descriptor_Function_Instance");
