@@ -302,7 +302,7 @@ same_type(
         a->Fixed_Size_Array.length == b->Fixed_Size_Array.length;
     }
     case Descriptor_Tag_Struct:
-    case Descriptor_Tag_Opaque: {
+    case Descriptor_Tag_Raw: {
       return a == b;
     }
     case Descriptor_Tag_Function_Instance: {
@@ -588,7 +588,7 @@ storage_static_equal_internal(
     // Opaques, references and pointers can be compared with memcmp
     case Descriptor_Tag_Float:
     case Descriptor_Tag_Integer:
-    case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Raw:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
     } break;

@@ -1868,8 +1868,8 @@
   <DisplayString Condition="tag == Descriptor_Tag_Void">
     Void
   </DisplayString>
-  <DisplayString Condition="tag == Descriptor_Tag_Opaque">
-    Opaque
+  <DisplayString Condition="tag == Descriptor_Tag_Raw">
+    Raw
   </DisplayString>
   <DisplayString Condition="tag == Descriptor_Tag_Float">
     Float

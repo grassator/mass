@@ -1731,7 +1731,7 @@ main(void) {
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Void"),
-    struct_empty("Opaque"),
+    struct_empty("Raw"),
     struct_empty("Float"),
     struct_fields("Integer", (Struct_Item[]){
       { "u64", "is_signed" },

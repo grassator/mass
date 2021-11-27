@@ -1705,7 +1705,7 @@ typedef dyn_array_type(Struct_Field) Array_Struct_Field;
 
 typedef enum {
   Descriptor_Tag_Void = 0,
-  Descriptor_Tag_Opaque = 1,
+  Descriptor_Tag_Raw = 1,
   Descriptor_Tag_Float = 2,
   Descriptor_Tag_Integer = 3,
   Descriptor_Tag_Function_Instance = 4,
@@ -4884,7 +4884,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Void"), .value = 0 },
-{ .name = slice_literal_fields("Opaque"), .value = 1 },
+{ .name = slice_literal_fields("Raw"), .value = 1 },
 { .name = slice_literal_fields("Float"), .value = 2 },
 { .name = slice_literal_fields("Integer"), .value = 3 },
 { .name = slice_literal_fields("Function_Instance"), .value = 4 },

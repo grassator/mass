@@ -51,7 +51,7 @@
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
 
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(...)\
-  MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Opaque, __VA_ARGS__)
+  MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Raw, __VA_ARGS__)
 
 #define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, _C_TYPE_, ...)\
   dyn_array_struct(Struct_Field) descriptor_##_NAME_##_fields = {\

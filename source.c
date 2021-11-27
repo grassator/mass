@@ -594,7 +594,7 @@ signed_integer_next_size_descriptor(
   const Descriptor *descriptor
 ) {
   assert(descriptor_is_signed_integer(descriptor));
-  assert(descriptor->tag == Descriptor_Tag_Opaque);
+  assert(descriptor->tag == Descriptor_Tag_Integer);
   if (descriptor == &descriptor_s8) {
     return &descriptor_s16;
   } else if (descriptor == &descriptor_s16) {
@@ -1597,7 +1597,7 @@ tokenizer_push_string_literal(
     // TODO This should be an array of `i8`
     Descriptor *bits_descriptor = &combined->bits_descriptor;
     *bits_descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Opaque,
+      .tag = Descriptor_Tag_Raw,
       .bit_size = {length * CHAR_BIT},
       .bit_alignment = { CHAR_BIT },
     };
@@ -4845,7 +4845,7 @@ mass_handle_generic_comparison_lazy_proc(
       );
     } break;
     case Descriptor_Tag_Pointer_To:
-    case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Raw:
     case Descriptor_Tag_Float:
     case Descriptor_Tag_Integer:
     case Descriptor_Tag_Function_Instance: {
