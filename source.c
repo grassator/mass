@@ -575,64 +575,6 @@ deduce_runtime_descriptor_for_value(
   return value_or_lazy_value_descriptor(value);
 }
 
-static const Descriptor *
-large_enough_common_integer_descriptor_for_values(
-  Compilation *compilation,
-  const Value *left_value,
-  const Value *right_value
-) {
-  const Descriptor *left = value_or_lazy_value_descriptor(left_value);
-  const Descriptor *right = value_or_lazy_value_descriptor(right_value);
-
-  bool left_is_integer = descriptor_is_integer(left);
-  bool right_is_integer = descriptor_is_integer(right);
-
-  bool left_is_literal = value_is_i64(left_value);
-  bool right_is_literal = value_is_i64(right_value);
-
-  if (!left_is_integer && !left_is_literal) {
-    // TODO :GenericIntegerType
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = left_value->source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = left },
-    });
-    return 0;
-  }
-  if (!right_is_integer && !right_is_literal) {
-    // TODO :GenericIntegerType
-    compilation_error(compilation, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = right_value->source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = right },
-    });
-    return 0;
-  }
-
-  if (left_is_literal) {
-    if (right_is_literal) {
-      assert(false);
-      return 0;
-    } else {
-      return right;
-    }
-  } else {
-    if (right_is_literal) {
-      return left;
-    }
-  }
-
-  bool left_signed = descriptor_is_signed_integer(left);
-  bool right_signed = descriptor_is_signed_integer(right);
-
-  u64 left_size = left->bit_size.as_u64;
-  u64 right_size = right->bit_size.as_u64;
-
-  assert(left_signed == right_signed);
-  assert(left_size == right_size);
-  return left;
-}
-
 static inline bool
 struct_find_field_by_name(
   const Descriptor *descriptor,
@@ -4601,16 +4543,25 @@ static Value *
 mass_handle_arithmetic_operation(
   Execution_Context *context,
   Value_View arguments,
-  void *operator_payload
+  Mass_Arithmetic_Operator operator
 ) {
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
   Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
 
   MASS_ON_ERROR(*context->result) return 0;
-  Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)operator_payload;
 
-  const Descriptor *descriptor =
-    large_enough_common_integer_descriptor_for_values(context->compilation, lhs, rhs);
+  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(lhs);
+  if (value_is_i64(rhs)) {
+    rhs = token_value_force_immediate_integer(
+      context->compilation, rhs, result_descriptor, &arguments.source_range
+    );
+  } else if (value_is_i64(lhs)) {
+    result_descriptor = value_or_lazy_value_descriptor(rhs);
+    lhs = token_value_force_immediate_integer(
+      context->compilation, lhs, result_descriptor, &arguments.source_range
+    );
+  }
+  assert(same_type(value_or_lazy_value_descriptor(lhs), value_or_lazy_value_descriptor(rhs)));
 
   Mass_Arithmetic_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range };
@@ -4618,24 +4569,24 @@ mass_handle_arithmetic_operation(
     allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
   *lazy_payload = stack_lazy_payload;
   return mass_make_lazy_value(
-    context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
+    context, arguments.source_range, lazy_payload, result_descriptor, mass_handle_arithmetic_operation_lazy_proc
   );
 }
 
 static inline Value *mass_integer_add(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Add);
+  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Add);
 }
 static inline Value *mass_integer_subtract(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Subtract);
+  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Subtract);
 }
 static inline Value *mass_integer_multiply(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Multiply);
+  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Multiply);
 }
 static inline Value *mass_integer_divide(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Divide);
+  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Divide);
 }
 static inline Value *mass_integer_remainder(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Remainder);
+  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Remainder);
 }
 
 typedef struct {
@@ -4653,9 +4604,11 @@ mass_handle_integer_comparison_lazy_proc(
   Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
+  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(payload->lhs);
+  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(payload->rhs);
+  assert(same_type(lhs_descriptor, rhs_descriptor));
 
-  const Descriptor *descriptor =
-    large_enough_common_integer_descriptor_for_values(compilation, payload->lhs, payload->rhs);
+  const Descriptor *descriptor = lhs_descriptor;
   assert(descriptor_is_integer(descriptor));
 
   if (descriptor_is_unsigned_integer(descriptor)) {
@@ -4849,6 +4802,16 @@ mass_handle_comparison(
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
   Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
   MASS_ON_ERROR(*context->result) return 0;
+
+  if (value_is_i64(rhs)) {
+    rhs = token_value_force_immediate_integer(
+      context->compilation, rhs, value_or_lazy_value_descriptor(lhs), &arguments.source_range
+    );
+  } else if (value_is_i64(lhs)) {
+    lhs = token_value_force_immediate_integer(
+      context->compilation, lhs, value_or_lazy_value_descriptor(rhs), &arguments.source_range
+    );
+  }
 
   Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
