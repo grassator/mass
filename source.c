@@ -267,20 +267,6 @@ token_value_force_immediate_integer(
   return value;
 }
 
-static inline Value *
-maybe_coerce_i64_to_integer(
-  Compilation *compilation,
-  Value *value,
-  const Descriptor *target_descriptor,
-  const Source_Range *source_range
-) {
-  if (!descriptor_is_integer(target_descriptor)) return value;
-  if (!value_is_i64(value)) return value;
-  return token_value_force_immediate_integer(
-    compilation, value, target_descriptor, source_range
-  );
-}
-
 static bool
 assign_from_static(
   Compilation *compilation,
