@@ -79,15 +79,18 @@ mass_ensure_symbol(
   Slice name
 );
 
-static Overload_Match
-mass_match_overload(
+static const Descriptor *
+deduce_runtime_descriptor_for_value(
+  Compilation *compilation,
+  Program *program,
   Value *value,
-  Value_View args
+  const Descriptor *maybe_desired_descriptor
 );
 
 static bool
 mass_match_overload_or_error(
   Compilation *compilation,
+  Program *program,
   Value *target,
   Value_View args_view,
   Overload_Match_Found *match_found

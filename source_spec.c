@@ -661,19 +661,6 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_No_Runtime_Use);
     }
 
-    it("should report an error when trying to use an inferred local from a generic function") {
-      test_program_inline_source_base(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) {"
-          "local := macro() { 42 };"
-          "local()"
-        "}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_No_Runtime_Use);
-    }
-
     it("should be able to parse and run functions with overloads") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "checker", &test_context,

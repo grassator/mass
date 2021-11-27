@@ -387,8 +387,10 @@ value_indirect_from_pointer(
 
 static const Descriptor *
 deduce_runtime_descriptor_for_value(
-  Execution_Context *context,
-  Value *value
+  Compilation *compilation,
+  Program *program,
+  Value *value,
+  const Descriptor *maybe_desired_descriptor
 );
 
 typedef struct {
@@ -432,31 +434,33 @@ typedef enum {
 
 static inline const Descriptor *
 value_ensure_type(
-  Execution_Context *context,
+  Compilation *compilation,
+  Program *program,
   Value *value,
   Source_Range source_range
 );
 
 static Descriptor *
 anonymous_struct_descriptor_from_tuple(
-  Execution_Context *context,
+  Compilation *compilation,
+  Program *program,
   const Tuple *tuple,
   Tuple_Eval_Mode tuple_eval_mode
 ) {
   Descriptor *tuple_descriptor = 0;
-  Temp_Mark temp_mark = context_temp_mark(context);
+  Temp_Mark temp_mark = compilation_temp_mark(compilation);
 
   C_Struct_Aligner struct_aligner = {0};
   Array_Struct_Field fields = dyn_array_make(
     Array_Struct_Field,
-    .allocator = context->allocator,
+    .allocator = compilation->allocator,
     .capacity = dyn_array_length(tuple->items),
   );
 
   Slice_Set *field_name_set = hash_map_make(
     Slice_Set,
     .initial_capacity = dyn_array_length(tuple->items) * 2,
-    .allocator = context->temp_allocator,
+    .allocator = compilation->temp_allocator,
   );
 
   for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
@@ -468,14 +472,14 @@ anonymous_struct_descriptor_from_tuple(
       case Tuple_Eval_Mode_Value: {
         if (value_is_assignment(item)) {
           const Assignment *assignment = value_as_assignment(item);
-          if (!mass_value_ensure_static_of(context->compilation, assignment->target, &descriptor_named_accessor)) {
+          if (!mass_value_ensure_static_of(compilation, assignment->target, &descriptor_named_accessor)) {
             goto err;
           }
           const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
           name = accessor->symbol->name;
-          field_descriptor = deduce_runtime_descriptor_for_value(context, assignment->source);
+          field_descriptor = deduce_runtime_descriptor_for_value(compilation, program, assignment->source, 0);
         } else {
-          field_descriptor = deduce_runtime_descriptor_for_value(context, item);
+          field_descriptor = deduce_runtime_descriptor_for_value(compilation, program, item, 0);
         }
       } break;
       case Tuple_Eval_Mode_Type: {
@@ -484,7 +488,7 @@ anonymous_struct_descriptor_from_tuple(
           name = typed_symbol->symbol->name;
           field_descriptor = typed_symbol->descriptor;
         } else {
-          field_descriptor = value_ensure_type(context, item, item->source_range);
+          field_descriptor = value_ensure_type(compilation, program, item, item->source_range);
         }
       } break;
       default: {
@@ -495,7 +499,7 @@ anonymous_struct_descriptor_from_tuple(
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
     if (name.length) {
       if (hash_map_has(field_name_set, name)) {
-        context_error(context, (Mass_Error) {
+        compilation_error(compilation, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
           .source_range = item->source_range,
           .Redefinition = { .name = name },
@@ -515,7 +519,7 @@ anonymous_struct_descriptor_from_tuple(
   }
   c_struct_aligner_end(&struct_aligner);
 
-  tuple_descriptor = allocator_allocate(context->allocator, Descriptor);
+  tuple_descriptor = allocator_allocate(compilation->allocator, Descriptor);
   *tuple_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
     .bit_size = {struct_aligner.bit_size},
@@ -526,52 +530,90 @@ anonymous_struct_descriptor_from_tuple(
   };
 
   err:
-  context_temp_reset_to_mark(context, temp_mark);
+  compilation_temp_reset_to_mark(compilation, temp_mark);
 
   return tuple_descriptor;
 }
 
+// TODO make this function produce a better error on failure
 static const Descriptor *
 deduce_runtime_descriptor_for_value(
-  Execution_Context *context,
-  Value *value
+  Compilation *compilation,
+  Program *program,
+  Value *value,
+  const Descriptor *maybe_desired_descriptor
 ) {
-  if (mass_value_is_compile_time_known(value)) {
-    if (value->descriptor == &descriptor_i64) {
+  if (!mass_value_is_compile_time_known(value)) {
+    return value_or_lazy_value_descriptor(value);
+  }
+
+  if (value->descriptor == &descriptor_i64) {
+    if (maybe_desired_descriptor) {
+      Literal_Cast_Result cast_result =
+        value_i64_cast_to(value, maybe_desired_descriptor, &(u64){0}, &(u64){0});
+      if (cast_result == Literal_Cast_Result_Success) {
+        return maybe_desired_descriptor;
+      } else {
+        return 0;
+      }
+    } else {
       return &descriptor_s64;
     }
-    if (value->descriptor == &descriptor_tuple) {
-      const Tuple *tuple = value_as_tuple(value);
-      return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
-    }
+  }
+
+  if (value->descriptor == &descriptor_tuple) {
+    const Tuple *tuple = value_as_tuple(value);
+    return anonymous_struct_descriptor_from_tuple(compilation, program, tuple, Tuple_Eval_Mode_Value);
+  }
+
+  if (value->descriptor == &descriptor_overload || value->descriptor == &descriptor_function_literal) {
+    const Function_Info *target_info;
     if (value->descriptor == &descriptor_function_literal) {
       const Function_Literal *literal = value_as_function_literal(value);
       if (literal->flags & Function_Literal_Flags_Macro) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_No_Runtime_Use,
-          .source_range = value->source_range,
-          .detailed_message = slice_literal("Macros can't be used as a runtime value"),
-        });
         return 0;
       }
       if (literal->flags & Function_Literal_Flags_Generic) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_No_Runtime_Use,
-          .source_range = value->source_range,
-          .detailed_message = slice_literal(
-            "A generic function can't be used as a runtime value. You need to cast to a concrete type."
-          ),
-        });
         return 0;
       }
-      // Non-generic functions should not need actual args to get an instance
-      Value_View args_view = {0};
-      Value *instance =
-        ensure_function_instance(context->compilation, context->program, value, args_view);
-      MASS_ON_ERROR(*context->result) return 0;
-      return instance->descriptor;
+      target_info = literal->info;
+    } else {
+      if (!maybe_desired_descriptor || maybe_desired_descriptor->tag != Descriptor_Tag_Function_Instance) {
+        return 0;
+      }
+      target_info = maybe_desired_descriptor->Function_Instance.info;
     }
+    // @CopyPaste in `mass_assign`
+    // TODO @Speed use temp allocator here
+    Array_Value_Ptr fake_args = dyn_array_make(
+      Array_Value_Ptr,
+      .allocator = compilation->allocator,
+      .capacity = dyn_array_length(target_info->parameters),
+    );
+    DYN_ARRAY_FOREACH(Function_Parameter, param, target_info->parameters) {
+      assert(param->tag == Function_Parameter_Tag_Runtime);
+      assert(param->descriptor);
+      Value *fake_value = value_make(
+        compilation->allocator,
+        param->descriptor,
+        storage_none,
+        param->source_range
+      );
+      dyn_array_push(fake_args, fake_value);
+    }
+    Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);
+
+    Overload_Match_Found match_found;
+    if (!mass_match_overload_or_error(compilation, program, value, args_view, &match_found)) {
+      return 0;
+    }
+    // @Speed it is probably wasteful to ask for an instance every time here
+    Value *instance = ensure_function_instance(compilation, program, match_found.value, args_view);
+    MASS_ON_ERROR(*compilation->result) panic("UNREACHABLE");
+    assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
+    return instance->descriptor;
   }
+
   return value_or_lazy_value_descriptor(value);
 }
 
@@ -910,7 +952,7 @@ mass_assign(
       Value_View args_view = value_view_from_value_array(fake_args, &source->source_range);
 
       Overload_Match_Found match_found;
-      if (!mass_match_overload_or_error(compilation, source, args_view, &match_found)) {
+      if (!mass_match_overload_or_error(compilation, builder->program, source, args_view, &match_found)) {
         return;
       }
 
@@ -1548,16 +1590,17 @@ token_split_next(
 
 static inline const Descriptor *
 value_ensure_type(
-  Execution_Context *context,
+  Compilation *compilation,
+  Program *program,
   Value *value,
   Source_Range source_range
 ) {
   if (!value) return 0;
   if (value_is_tuple(value)) {
     const Tuple *tuple = value_as_tuple(value);
-    return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
+    return anonymous_struct_descriptor_from_tuple(compilation, program, tuple, Tuple_Eval_Mode_Type);
   }
-  if (!mass_value_ensure_static_of(context->compilation, value, &descriptor_descriptor_pointer)) {
+  if (!mass_value_ensure_static_of(compilation, value, &descriptor_descriptor_pointer)) {
     return 0;
   }
   // Can't use `value_as_descriptor_pointer` because it might a user-generated version
@@ -1924,7 +1967,7 @@ token_match_type(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Value *type_value = compile_time_eval(context, view);
-  return value_ensure_type(context, type_value, view.source_range);
+  return value_ensure_type(context->compilation, context->program, type_value, view.source_range);
 }
 
 static inline bool
@@ -2125,7 +2168,16 @@ token_match_argument(
   if (default_expression.length) {
     maybe_default_value = compile_time_eval(context, default_expression);
     if (is_inferred_type) {
-      descriptor = deduce_runtime_descriptor_for_value(context, maybe_default_value);
+      descriptor = deduce_runtime_descriptor_for_value(
+        context->compilation, context->program, maybe_default_value, 0
+      );
+      //if (!descriptor) {
+        //context_error(context, (Mass_Error) {
+          //.tag = Mass_Error_Tag_No_Runtime_Use,
+          //.source_range = maybe_default_value->source_range,
+        //});
+        //goto err;
+      //}
     }
   }
 
@@ -2770,8 +2822,9 @@ mass_c_struct(
   Value *tuple_value = token_parse_single(context, value_view_get(args, 1));
   const Tuple *tuple = value_as_tuple(tuple_value);
 
-  Descriptor *descriptor =
-    anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
+  Descriptor *descriptor = anonymous_struct_descriptor_from_tuple(
+    context->compilation, context->program, tuple, Tuple_Eval_Mode_Type
+  );
   assert(descriptor->tag == Descriptor_Tag_Struct);
   descriptor->brand = allocator_allocate(context->allocator, Symbol);
 
@@ -3040,8 +3093,9 @@ mass_cast(
 ) {
   MASS_ON_ERROR(*context->result) return 0;
   assert(args_view.length == 2);
-  const Descriptor *target_descriptor =
-    value_ensure_type(context, value_view_get(args_view, 0), args_view.source_range);
+  const Descriptor *target_descriptor = value_ensure_type(
+    context->compilation, context->program, value_view_get(args_view, 0), args_view.source_range
+  );
   Value *expression = value_view_get(args_view, 1);
   return mass_cast_helper(context, target_descriptor, expression, args_view.source_range);
 }
@@ -3676,7 +3730,9 @@ ensure_parameter_descriptors(
     Value *type_value =
       mass_context_force_lookup(&temp_context, temp_context.scope, symbol, &source_range);
     MASS_ON_ERROR(*temp_context.result) goto err;
-    param->descriptor = value_ensure_type(&temp_context, type_value, source_range);
+    param->descriptor = value_ensure_type(
+      temp_context.compilation, temp_context.program, type_value, source_range
+    );
     MASS_ON_ERROR(*temp_context.result) goto err;
     assert(param->descriptor);
   }
@@ -3705,6 +3761,8 @@ typedef enum {
 
 static s64
 calculate_arguments_match_score(
+  Compilation *compilation,
+  Program *program,
   const Function_Info *descriptor,
   Value_View args_view,
   Mass_Argument_Scoring_Flags scoring_flags
@@ -3731,25 +3789,27 @@ calculate_arguments_match_score(
     } else {
       source_arg = value_view_get(args_view, arg_index);
     }
-    source_descriptor = value_or_lazy_value_descriptor(source_arg);
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
+        source_descriptor = value_or_lazy_value_descriptor(source_arg);
         if (same_type(target_descriptor, source_descriptor)) {
           if (scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time) {
             score += Score_Same_Type_Static;
           } else {
             score += Score_Same_Type;
           }
-        } else if (mass_value_is_compile_time_known(source_arg)) {
-          if (same_value_type_or_can_implicitly_move_cast(target_descriptor, source_arg)) {
+        } else {
+          if (mass_value_is_compile_time_known(source_arg)) {
+            source_descriptor = deduce_runtime_descriptor_for_value(
+              compilation, program, source_arg, target_descriptor
+            );
+            if (!source_descriptor) return -1;
+          }
+          if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
             score += Score_Cast;
           } else {
             return -1;
           }
-        } else if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
-          score += Score_Cast;
-        } else {
-          return -1;
         }
       } break;
       case Function_Parameter_Tag_Exact_Static: {
@@ -3790,6 +3850,8 @@ match_overload_argument_count(
 
 static void
 mass_match_overload_candidate(
+  Compilation *compilation,
+  Program *program,
   Value *candidate,
   const Mass_Overload_Match_Args *args,
   struct Overload_Match_State *match,
@@ -3797,8 +3859,8 @@ mass_match_overload_candidate(
 ) {
   if (value_is_overload(candidate)) {
     const Overload *overload = value_as_overload(candidate);
-    mass_match_overload_candidate(overload->value, args, match, best_conflict_match);
-    mass_match_overload_candidate(overload->next, args, match, best_conflict_match);
+    mass_match_overload_candidate(compilation, program, overload->value, args, match, best_conflict_match);
+    mass_match_overload_candidate(compilation, program, overload->next, args, match, best_conflict_match);
   } else {
     const Function_Info *overload_info;
     if (value_is_function_literal(candidate)) {
@@ -3824,7 +3886,9 @@ mass_match_overload_candidate(
       scoring_flags |= Mass_Argument_Scoring_Flags_Prefer_Compile_Time;
     }
 
-    s64 score = calculate_arguments_match_score(overload_info, args->view, scoring_flags);
+    s64 score = calculate_arguments_match_score(
+      compilation, program, overload_info, args->view, scoring_flags
+    );
     if (score > match->score) {
       match->info = overload_info;
       match->value = candidate;
@@ -3841,6 +3905,8 @@ mass_match_overload_candidate(
 
 static Overload_Match
 mass_match_overload(
+  Compilation *compilation,
+  Program *program,
   Value *value,
   Value_View args_view
 ) {
@@ -3856,7 +3922,7 @@ mass_match_overload(
       break;
     }
   }
-  mass_match_overload_candidate(value, &args, &match, &best_conflict_match);
+  mass_match_overload_candidate(compilation, program, value, &args, &match, &best_conflict_match);
 
   if (match.score == -1) {
     return (Overload_Match){.tag = Overload_Match_Tag_No_Match};
@@ -3879,11 +3945,12 @@ mass_match_overload(
 static bool
 mass_match_overload_or_error(
   Compilation *compilation,
+  Program *program,
   Value *target,
   Value_View args_view,
   Overload_Match_Found *match_found
 ) {
-  Overload_Match match = mass_match_overload(target, args_view);
+  Overload_Match match = mass_match_overload(compilation, program, target, args_view);
   MASS_ON_ERROR(*compilation->result) return 0;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
@@ -4217,7 +4284,9 @@ token_handle_function_call(
 
   Compilation *compilation = context->compilation;
   Overload_Match_Found match_found;
-  if (!mass_match_overload_or_error(compilation, target_expression, args_view, &match_found)) return 0;
+  if (!mass_match_overload_or_error(
+    compilation, context->program, target_expression, args_view, &match_found
+  )) return 0;
 
   Value *overload = match_found.value;
   const Function_Info *info = match_found.info;
@@ -5054,7 +5123,8 @@ mass_pointer_to_type(
 ) {
   assert(args_view.length == 1);
   Value *type_value = value_view_get(args_view, 0);
-  const Descriptor *descriptor = value_ensure_type(context, type_value, args_view.source_range);
+  const Descriptor *descriptor =
+    value_ensure_type(context->compilation, context->program, type_value, args_view.source_range);
   MASS_ON_ERROR(*context->result) return 0;
   const Descriptor *pointer_descriptor = descriptor_pointer_to(context->compilation, descriptor);
   Storage storage = storage_immediate(&pointer_descriptor);
@@ -5119,7 +5189,8 @@ mass_handle_typed_symbol_operator(
     return 0;
   }
 
-  const Descriptor *descriptor = value_ensure_type(context, rhs_value, source_range);
+  const Descriptor *descriptor =
+    value_ensure_type(context->compilation, context->program, rhs_value, source_range);
   Typed_Symbol *typed_symbol = allocator_allocate(context->allocator, Typed_Symbol);
   *typed_symbol = (Typed_Symbol) {
     .symbol = value_as_symbol(lhs_value),
@@ -5846,10 +5917,12 @@ token_parse_if_expression(
     return condition ? value_then : value_else;
   }
 
-  // TODO probably want to unify then and else branch before returning
-  const Descriptor *result_descriptor = context_is_compile_time_eval(context)
-    ? value_or_lazy_value_descriptor(value_then)
-    : deduce_runtime_descriptor_for_value(context, value_else);
+  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(value_then);
+  if (context_is_compile_time_eval(context)) {
+    result_descriptor = deduce_runtime_descriptor_for_value(
+      context->compilation, context->program, value_else, result_descriptor
+    );
+  }
 
   Mass_If_Expression_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_If_Expression_Lazy_Payload);
@@ -6660,7 +6733,16 @@ token_define_global_variable(
   Value *value = token_parse_expression(context, expression, &(u32){0}, 0);
   MASS_ON_ERROR(*context->result) return;
 
-  const Descriptor *descriptor = deduce_runtime_descriptor_for_value(context, value);
+  const Descriptor *descriptor = deduce_runtime_descriptor_for_value(
+    context->compilation, context->program, value, 0
+  );
+  if (!descriptor) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_No_Runtime_Use,
+      .source_range = expression.source_range,
+    });
+    return;
+  }
   Value *global_value;
   if (storage_is_label(&value->storage)) {
     global_value = value;
@@ -6722,8 +6804,17 @@ token_define_local_variable(
 
   Value *value = token_parse_expression(context, expression, &(u32){0}, 0);
   MASS_ON_ERROR(*context->result) return;
-  const Descriptor *variable_descriptor =
-    deduce_runtime_descriptor_for_value(context, value);
+  const Descriptor *variable_descriptor = deduce_runtime_descriptor_for_value(
+    context->compilation, context->program, value, 0
+  );
+  MASS_ON_ERROR(*context->result) return;
+  if (!variable_descriptor) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_No_Runtime_Use,
+      .source_range = expression.source_range,
+    });
+    return;
+  }
 
   Mass_Variable_Definition_Lazy_Payload *variable_payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
