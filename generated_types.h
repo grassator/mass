@@ -540,13 +540,11 @@ typedef dyn_array_type(const Typed_Symbol *) Array_Const_Typed_Symbol_Ptr;
 typedef enum Opaque_Numeric_Interpretation {
   Opaque_Numeric_Interpretation_None = 0,
   Opaque_Numeric_Interpretation_Twos_Complement = 1,
-  Opaque_Numeric_Interpretation_Ieee_Float = 2,
 } Opaque_Numeric_Interpretation;
 
 const char *opaque_numeric_interpretation_name(Opaque_Numeric_Interpretation value) {
   if (value == 0) return "Opaque_Numeric_Interpretation_None";
   if (value == 1) return "Opaque_Numeric_Interpretation_Twos_Complement";
-  if (value == 2) return "Opaque_Numeric_Interpretation_Ieee_Float";
   assert(!"Unexpected value for enum Opaque_Numeric_Interpretation");
   return 0;
 };
@@ -1722,11 +1720,12 @@ typedef dyn_array_type(Struct_Field) Array_Struct_Field;
 
 typedef enum {
   Descriptor_Tag_Void = 0,
-  Descriptor_Tag_Opaque = 1,
-  Descriptor_Tag_Function_Instance = 2,
-  Descriptor_Tag_Fixed_Size_Array = 3,
-  Descriptor_Tag_Struct = 4,
-  Descriptor_Tag_Pointer_To = 5,
+  Descriptor_Tag_Float = 1,
+  Descriptor_Tag_Opaque = 2,
+  Descriptor_Tag_Function_Instance = 3,
+  Descriptor_Tag_Fixed_Size_Array = 4,
+  Descriptor_Tag_Struct = 5,
+  Descriptor_Tag_Pointer_To = 6,
 } Descriptor_Tag;
 
 typedef struct Descriptor_Opaque {
@@ -4877,7 +4876,6 @@ MASS_DEFINE_OPAQUE_C_TYPE(opaque_numeric_interpretation, Opaque_Numeric_Interpre
 static C_Enum_Item opaque_numeric_interpretation_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Twos_Complement"), .value = 1 },
-{ .name = slice_literal_fields("Ieee_Float"), .value = 2 },
 };
 DEFINE_VALUE_IS_AS_HELPERS(Opaque_Numeric_Interpretation, opaque_numeric_interpretation);
 DEFINE_VALUE_IS_AS_HELPERS(Opaque_Numeric_Interpretation *, opaque_numeric_interpretation_pointer);
@@ -4914,11 +4912,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Void"), .value = 0 },
-{ .name = slice_literal_fields("Opaque"), .value = 1 },
-{ .name = slice_literal_fields("Function_Instance"), .value = 2 },
-{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 3 },
-{ .name = slice_literal_fields("Struct"), .value = 4 },
-{ .name = slice_literal_fields("Pointer_To"), .value = 5 },
+{ .name = slice_literal_fields("Float"), .value = 1 },
+{ .name = slice_literal_fields("Opaque"), .value = 2 },
+{ .name = slice_literal_fields("Function_Instance"), .value = 3 },
+{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 4 },
+{ .name = slice_literal_fields("Struct"), .value = 5 },
+{ .name = slice_literal_fields("Pointer_To"), .value = 6 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_opaque, Descriptor_Opaque,
   {
@@ -5977,10 +5976,10 @@ DEFINE_VALUE_IS_AS_HELPERS(s32 *, s32_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(s64, s64, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Twos_Complement)
 DEFINE_VALUE_IS_AS_HELPERS(s64, s64);
 DEFINE_VALUE_IS_AS_HELPERS(s64 *, s64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(f32, f32, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Ieee_Float)
+MASS_DEFINE_FLOAT_C_TYPE(f32, f32)
 DEFINE_VALUE_IS_AS_HELPERS(f32, f32);
 DEFINE_VALUE_IS_AS_HELPERS(f32 *, f32_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(f64, f64, .Opaque.numeric_interpretation = Opaque_Numeric_Interpretation_Ieee_Float)
+MASS_DEFINE_FLOAT_C_TYPE(f64, f64)
 DEFINE_VALUE_IS_AS_HELPERS(f64, f64);
 DEFINE_VALUE_IS_AS_HELPERS(f64 *, f64_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8_ptr, Array_Range_u8_Ptr)

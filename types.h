@@ -37,10 +37,10 @@
     .Pointer_To.descriptor = &descriptor_##_NAME_,\
   }
 
-#define MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
+#define MASS_DEFINE_DESCRIPTOR(_TAG_, _NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
   static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   static Descriptor descriptor_##_NAME_ = {\
-    .tag = Descriptor_Tag_Opaque,\
+    .tag = (_TAG_),\
     .brand = &(mass_meta_brand_##_NAME_),\
     .name = slice_literal_fields(#_NAME_),\
     .bit_size = {_BIT_SIZE_},\
@@ -49,6 +49,9 @@
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
+
+#define MASS_DEFINE_OPAQUE_DESCRIPTOR(...)\
+  MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Opaque, __VA_ARGS__)
 
 #define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, _C_TYPE_, ...)\
   dyn_array_struct(Struct_Field) descriptor_##_NAME_##_fields = {\
@@ -109,6 +112,10 @@
 
 #define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_, ...)\
   MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT, __VA_ARGS__)
+
+#define MASS_DEFINE_FLOAT_C_TYPE(_NAME_, _C_TYPE_)\
+  MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Float, _NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT);\
+  MASS_DEFINE_TYPE_VALUE(_NAME_);
 
 #define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\
   Value_View _VAR_NAME_;\

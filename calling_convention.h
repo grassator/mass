@@ -415,8 +415,7 @@ x86_64_system_v_classify(
         return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
       }
       if (byte_size <= eightbyte) {
-        SYSTEM_V_ARGUMENT_CLASS class =
-          descriptor_is_float(descriptor) ? SYSTEM_V_SSE : SYSTEM_V_INTEGER;
+        SYSTEM_V_ARGUMENT_CLASS class = SYSTEM_V_INTEGER;
         return (System_V_Classification){
           .class = class,
           .descriptor = descriptor,
@@ -425,6 +424,10 @@ x86_64_system_v_classify(
       } else {
         return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
       }
+    } break;
+    case Descriptor_Tag_Float: {
+      assert(byte_size <= eightbyte);
+      return (System_V_Classification){ .class = SYSTEM_V_SSE, .descriptor = descriptor };
     } break;
     case Descriptor_Tag_Struct: {
       it = (System_V_Aggregate_Iterator) {
@@ -543,7 +546,8 @@ x86_64_system_v_classify_field_recursively(
       case Descriptor_Tag_Void:
       case Descriptor_Tag_Function_Instance:
       case Descriptor_Tag_Pointer_To:
-      case Descriptor_Tag_Opaque: {
+      case Descriptor_Tag_Opaque:
+      case Descriptor_Tag_Float: {
         u64 start_eightbyte_index = field_offset_in_root_aggregate / eightbyte;
         u64 end_eightbyte_index = (field_offset_in_root_aggregate + item_byte_size - 1) / eightbyte;
 

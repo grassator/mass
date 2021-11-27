@@ -284,9 +284,11 @@ same_type(
     b = b->Pointer_To.descriptor;
   }
   if (a->tag != b->tag) return false;
+  if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
   if (a->brand && b->brand && a->brand != b->brand) return false;
   switch(a->tag) {
-    case Descriptor_Tag_Void: {
+    case Descriptor_Tag_Void:
+    case Descriptor_Tag_Float: {
       return true;
     }
     case Descriptor_Tag_Pointer_To: {
@@ -581,6 +583,7 @@ storage_static_equal_internal(
       return true;
     } break;
     // Opaques, references and pointers can be compared with memcmp
+    case Descriptor_Tag_Float:
     case Descriptor_Tag_Opaque:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;

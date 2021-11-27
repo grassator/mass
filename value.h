@@ -317,10 +317,7 @@ descriptor_is_float(
   const Descriptor *descriptor
 ) {
   if (!descriptor) return false;
-  if (descriptor->tag != Descriptor_Tag_Opaque) {
-    return false;
-  }
-  if (descriptor->Opaque.numeric_interpretation != Opaque_Numeric_Interpretation_Ieee_Float) {
+  if (descriptor->tag != Descriptor_Tag_Float) {
     return false;
   }
   return true;

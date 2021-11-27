@@ -12,7 +12,6 @@
 typedef enum Opaque_Numeric_Interpretation {
   Opaque_Numeric_Interpretation_None = 0,
   Opaque_Numeric_Interpretation_Twos_Complement = 1,
-  Opaque_Numeric_Interpretation_Ieee_Float = 2,
 } Opaque_Numeric_Interpretation;
 
 typedef struct {
@@ -79,6 +78,7 @@ typedef enum {
   Meta_Type_Tag_Struct,
   Meta_Type_Tag_Tagged_Union,
   Meta_Type_Tag_Enum,
+  Meta_Type_Tag_Float,
   Meta_Type_Tag_Function,
   Meta_Type_Tag_Hash_Map,
 } Meta_Type_Tag;
@@ -206,6 +206,7 @@ print_c_type_forward_declaration(
       }
       break;
     }
+    case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque: {
       name = type->name;
       break;
@@ -333,6 +334,7 @@ print_c_type(
       }
       break;
     }
+    case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque: {
       if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
         fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->name, type->name);
@@ -492,6 +494,7 @@ print_scope_export(
   Meta_Type *type
 ) {
   switch(type->tag) {
+    case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Struct: {
       print_scope_define(file, type->name, type->export_name);
@@ -615,6 +618,7 @@ print_natvis(
       // TODO
       break;
     }
+    case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function: {
@@ -673,6 +677,7 @@ print_mass_descriptor_fixed_array_types(
       }
       break;
     }
+    case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
@@ -717,6 +722,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
+    case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque: {
       char *lowercase_name = strtolower(type->name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
@@ -804,6 +810,14 @@ print_mass_descriptor_and_type(
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
     }
+    case Meta_Type_Tag_Float: {
+      fprintf(file, "MASS_DEFINE_FLOAT_C_TYPE(%s, %s)\n", lowercase_name, type->name);
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      }
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
+      fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
+    } break;
     case Meta_Type_Tag_C_Opaque: {
       const char *numeric_interpretation_string = 0;
       switch(type->c_opaque.numeric_interpretation) {
@@ -812,9 +826,6 @@ print_mass_descriptor_and_type(
         } break;
         case Opaque_Numeric_Interpretation_Twos_Complement: {
           numeric_interpretation_string = "Opaque_Numeric_Interpretation_Twos_Complement";
-        } break;
-        case Opaque_Numeric_Interpretation_Ieee_Float: {
-          numeric_interpretation_string = "Opaque_Numeric_Interpretation_Ieee_Float";
         } break;
       }
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s, .Opaque.numeric_interpretation = %s)\n",
@@ -960,6 +971,12 @@ print_mass_descriptor_and_type(
     .tag = Meta_Type_Tag_C_Opaque,\
     .name = (_NAME_STRING_),\
     .c_opaque.numeric_interpretation = (_NUMERIC_INTERPRETATION_),\
+  }
+
+#define type_float(_NAME_STRING_)\
+  (Meta_Type){\
+    .tag = Meta_Type_Tag_Float,\
+    .name = (_NAME_STRING_),\
   }
 
 #define type_enum(_NAME_STRING_, ...)\
@@ -1705,7 +1722,6 @@ main(void) {
   push_type(type_enum("Opaque_Numeric_Interpretation", (Enum_Type_Item[]){
     { "None", Opaque_Numeric_Interpretation_None },
     { "Twos_Complement", Opaque_Numeric_Interpretation_Twos_Complement },
-    { "Ieee_Float", Opaque_Numeric_Interpretation_Ieee_Float },
   }));
 
   push_type(type_struct("Struct_Field", (Struct_Item[]){
@@ -1718,6 +1734,7 @@ main(void) {
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Void"),
+    struct_empty("Float"),
     struct_fields("Opaque", (Struct_Item[]){
       { "Opaque_Numeric_Interpretation", "numeric_interpretation" },
       { "u32", "_numeric_interpretation_padding" },
@@ -2172,7 +2189,7 @@ main(void) {
     export_global(set_flags(push_type(type_c_opaque(#T, Opaque_Numeric_Interpretation_Twos_Complement)),\
       Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
   #define DEFINE_FLOAT_TYPE(T)\
-    export_global(set_flags(push_type(type_c_opaque(#T, Opaque_Numeric_Interpretation_Ieee_Float)),\
+    export_global(set_flags(push_type(type_float(#T)),\
       Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
   PROCESS_INTEGER_TYPES(DEFINE_INTEGER_TYPE)
   PROCESS_FLOAT_TYPES(DEFINE_FLOAT_TYPE)

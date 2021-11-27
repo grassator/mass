@@ -4846,6 +4846,7 @@ mass_handle_generic_comparison_lazy_proc(
     } break;
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Float:
     case Descriptor_Tag_Function_Instance: {
       if (lhs_descriptor->bit_size.as_u64 > 64) {
         panic("TODO support larger than register compares");
