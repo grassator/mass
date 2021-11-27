@@ -1313,7 +1313,7 @@ execution_context_from_compilation(
   Compilation *compilation
 ) {
   return (Execution_Context) {
-    .flags = Execution_Context_Flags_Global,
+    .flags = Parser_Flags_Global,
     .epoch = VALUE_STATIC_EPOCH,
     .allocator = compilation->allocator,
     .temp_allocator = compilation->temp_allocator,

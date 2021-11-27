@@ -1481,24 +1481,25 @@ main(void) {
     { "u8", "volatile_register_push_offsets", 16 },
   }));
 
-  push_type(type_enum("Execution_Context_Flags", (Enum_Type_Item[]){
+  export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
+    { "Allocator *", "allocator" },
+    { "Allocator *", "temp_allocator" },
+    { "Compilation *", "compilation" },
+    { "Program *", "program" },
+    { "Mass_Result *", "result" },
+
+    { "Parser_Flags", "flags" },
+    { "s32", "_flags_padding" },
+    { "Epoch", "epoch" },
+    { "Scope *", "scope" },
+    { "Module *", "module" },
+  })));
+
+  push_type(type_enum("Parser_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Global", 1 << 0 },
     { "Type_Only", 1 << 1 },
   }));
-
-  export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
-    { "Allocator *", "allocator" },
-    { "Allocator *", "temp_allocator" },
-    { "Execution_Context_Flags", "flags" },
-    { "s32", "_flags_padding" },
-    { "Compilation *", "compilation" },
-    { "Epoch", "epoch" },
-    { "Program *", "program" },
-    { "Scope *", "scope" },
-    { "Module *", "module" },
-    { "Mass_Result *", "result" },
-  })));
 
   push_type(add_common_fields(type_union("Operator", (Struct_Type[]){
     struct_fields("Alias", (Struct_Item[]){

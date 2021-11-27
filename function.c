@@ -600,7 +600,7 @@ ensure_function_instance(
 
   Execution_Context body_context = execution_context_from_compilation(compilation);
   Scope *body_scope = scope_make(compilation->allocator, literal->context.scope);
-  body_context.flags &= ~Execution_Context_Flags_Global;
+  body_context.flags &= ~Parser_Flags_Global;
   body_context.scope = body_scope;
   body_context.program = program;
   body_context.epoch = get_new_epoch();

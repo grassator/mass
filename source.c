@@ -1156,7 +1156,7 @@ mass_context_force_lookup(
     });
     return 0;
   }
-  if (!(context->flags & Execution_Context_Flags_Type_Only)) {
+  if (!(context->flags & Parser_Flags_Type_Only)) {
     if (entry->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && entry->epoch.as_u64 != context->epoch.as_u64) {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
@@ -1894,7 +1894,7 @@ token_apply_macro_syntax(
   body_context.scope = expansion_scope;
 
   Value *result;
-  if (body_context.flags & Execution_Context_Flags_Global) {
+  if (body_context.flags & Parser_Flags_Global) {
     result = compile_time_eval(&body_context, macro->replacement);
   } else {
     result = token_parse_expression(&body_context, macro->replacement, &(u32){0}, 0);
@@ -2856,7 +2856,7 @@ compile_time_eval(
 
   Jit *jit = &context->compilation->jit;
   Execution_Context eval_context = *context;
-  eval_context.flags &= ~Execution_Context_Flags_Global;
+  eval_context.flags &= ~Parser_Flags_Global;
   eval_context.epoch = get_new_epoch();
   eval_context.program = jit->program;
   eval_context.scope = scope_make(context->allocator, context->scope);
@@ -5000,8 +5000,8 @@ mass_type_of(
 ) {
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("type_of")));
   assert(args.length == 2);
-  Execution_Context_Flags saved_flags = context->flags;
-  context->flags |= Execution_Context_Flags_Type_Only;
+  Parser_Flags saved_flags = context->flags;
+  context->flags |= Parser_Flags_Type_Only;
   Value *expression = token_parse_single(context, value_view_last(args));
   context->flags = saved_flags;
 
@@ -6493,7 +6493,7 @@ token_parse_block_view(
         );
       } else if (value_is_module_exports(parse_result)) {
         Value_View match_view = value_view_slice(&rest, 0, match_length);
-        if (!(context->flags & Execution_Context_Flags_Global)) {
+        if (!(context->flags & Parser_Flags_Global)) {
           mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Parse,
             .source_range = match_view.source_range,
@@ -6875,7 +6875,7 @@ token_parse_definition_and_assignment_statements(
     goto err;
   }
 
-  if (context->flags & Execution_Context_Flags_Global) {
+  if (context->flags & Parser_Flags_Global) {
     token_define_global_variable(context, name_token, rhs);
   } else {
     token_define_local_variable(context, name_token, out_lazy_value, rhs);
