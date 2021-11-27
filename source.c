@@ -3740,10 +3740,13 @@ calculate_arguments_match_score(
           } else {
             score += Score_Same_Type;
           }
-        } else if (
-          source_arg &&
-          same_value_type_or_can_implicitly_move_cast(target_descriptor, source_arg)
-        ) {
+        } else if (mass_value_is_compile_time_known(source_arg)) {
+          if (same_value_type_or_can_implicitly_move_cast(target_descriptor, source_arg)) {
+            score += Score_Cast;
+          } else {
+            return -1;
+          }
+        } else if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
           score += Score_Cast;
         } else {
           return -1;
