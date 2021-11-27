@@ -35,9 +35,10 @@ mass_cli_print_usage() {
 static s32
 mass_cli_print_error(
   Compilation *compilation,
-  Mass_Error *error
+  Mass_Result *result
 ) {
-  mass_print_error(compilation, error);
+  assert(result->tag == Mass_Result_Tag_Error);
+  mass_print_error(compilation, &result->Error.error);
   return -1;
 }
 
@@ -110,24 +111,23 @@ int main(s32 argc, char **argv) {
   compilation_init(&compilation, os);
   Execution_Context context = execution_context_from_compilation(&compilation);
 
-  Mass_Result result =
-    program_load_file_module_into_root_scope(&context, slice_literal("std/prelude"));
-  if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&compilation, &result.Error.error);
+  program_load_file_module_into_root_scope(&context, slice_literal("std/prelude"));
+  if (mass_has_error(&context)) {
+    return mass_cli_print_error(&compilation, context.result);
   }
 
   if (mode == Mass_Cli_Mode_Script) {
     mass_run_script(&context, file_path);
-    if(context.result->tag != Mass_Result_Tag_Success) {
-      return mass_cli_print_error(&compilation, &context.result->Error.error);
+    if (mass_has_error(&context)) {
+      return mass_cli_print_error(&compilation, context.result);
     }
     return 0;
   }
 
   Module *root_module = program_module_from_file(&context, file_path, context.scope);
   program_import_module(&context, root_module);
-  if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&compilation, &result.Error.error);
+  if (mass_has_error(&context)) {
+    return mass_cli_print_error(&compilation, context.result);
   }
 
   const Symbol *main_symbol = mass_ensure_symbol(&compilation, slice_literal("main"));
@@ -140,8 +140,8 @@ int main(s32 argc, char **argv) {
   }
   context.program->entry_point = main;
   ensure_function_instance(&compilation, context.program, main, (Value_View){0});
-  MASS_ON_ERROR(*context.result) {
-    return mass_cli_print_error(&compilation, &context.result->Error.error);
+  if (mass_has_error(&context)) {
+    return mass_cli_print_error(&compilation, context.result);
   }
 
   switch(mode) {
@@ -172,8 +172,8 @@ int main(s32 argc, char **argv) {
       Jit jit;
       jit_init(&jit, context.program);
       program_jit(context.compilation, &jit);
-      MASS_ON_ERROR(*context.result) {
-        return mass_cli_print_error(&compilation, &result.Error.error);
+      if (mass_has_error(&context)) {
+        return mass_cli_print_error(&compilation, context.result);
       }
       fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);
       main();

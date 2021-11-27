@@ -1107,8 +1107,7 @@ function_literal_info_for_args(
 
   // :SpecializationInfiniteLoop
   added_specialization->info = specialized_info;
-
-  MASS_ON_ERROR(*context->result) return 0;
+  if (mass_has_error(context)) return 0;
 
   return specialized_info;
 }

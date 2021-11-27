@@ -573,7 +573,7 @@ ensure_function_instance(
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
 
-  MASS_ON_ERROR(*compilation->result) return 0;
+  if (mass_has_error(compilation)) return 0;
 
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(compilation->allocator, fn_info);
   const Descriptor *instance_descriptor =
@@ -666,7 +666,7 @@ ensure_function_instance(
   } else {
     panic("Unexpected function body type");
   }
-  MASS_ON_ERROR(*compilation->result) return 0;
+  if (mass_has_error(compilation)) return 0;
 
   value_force_exact(compilation, builder, return_value, parse_result);
 

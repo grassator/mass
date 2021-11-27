@@ -82,9 +82,8 @@ test_program_source_base(
   Execution_Context *context,
   Test_Program_Source source
 ) {
-  Mass_Result result =
-    program_load_file_module_into_root_scope(context, slice_literal("std/prelude"));
-  MASS_ON_ERROR(result) return 0;
+  program_load_file_module_into_root_scope(context, slice_literal("std/prelude"));
+  if (mass_has_error(context)) return 0;
 
   Module *test_module = 0;
   switch(source.tag) {
@@ -101,7 +100,7 @@ test_program_source_base(
     } break;
   }
   program_import_module(context, test_module);
-  MASS_ON_ERROR(*context->result) return 0;
+  if (mass_has_error(context)) return 0;
   Slice id_slice = slice_from_c_string(id);
   Source_Range symbol_source_range;
   INIT_LITERAL_SOURCE_RANGE(&symbol_source_range, "__test_symbol__");
@@ -122,14 +121,14 @@ test_program_source_function(
   Test_Program_Source source
 ) {
   Value *value = test_program_source_base(function_id, context, source);
-  MASS_ON_ERROR(*context->result) return 0;
+  if (mass_has_error(context)) return 0;
   if (!value) return 0;
   static Jit test_jit;
   jit_init(&test_jit, context->program);
   program_jit(context->compilation, &test_jit);
-  MASS_ON_ERROR(*context->result) return 0;
+  if (mass_has_error(context)) return 0;
   fn_type_opaque fn = value_as_function(test_jit.program, value);
-  MASS_ON_ERROR(*context->result) return 0;
+  if (mass_has_error(context)) return 0;
   return fn;
 }
 
@@ -2659,9 +2658,8 @@ spec("source") {
 
   describe("Script mode") {
     it("should support script-mode execution") {
-      Mass_Result result =
-        program_load_file_module_into_root_scope(&test_context, slice_literal("std/prelude"));
-      check(spec_check_mass_result(&result));
+      program_load_file_module_into_root_scope(&test_context, slice_literal("std/prelude"));
+      check(spec_check_mass_result(test_context.result));
       mass_run_script(&test_context, slice_literal("fixtures/script_mode"));
       check(spec_check_mass_result(test_context.result));
     }

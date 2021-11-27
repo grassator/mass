@@ -555,7 +555,7 @@ win32_program_jit(
   }
 
   program_jit_imports(compilation, jit, ro_data_buffer, &win32_library_load_callbacks);
-  MASS_ON_ERROR(*compilation->result) return;
+  if (mass_has_error(compilation)) return;
 
   u64 function_count = dyn_array_length(program->functions);
   if (jit->previous_counts.functions != function_count) {

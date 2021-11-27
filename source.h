@@ -220,7 +220,7 @@ program_module_from_file(
   Scope *scope
 );
 
-static Mass_Result
+static void
 program_import_module(
   Execution_Context *context,
   Module *module
