@@ -206,6 +206,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Execution_Context")),
     type_execution_context_value
   );
+  Source_Range Parser__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Parser__source_range, "Parser");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Parser__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Parser")),
+    type_parser_value
+  );
   Source_Range Scope__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Scope__source_range, "Scope");
   scope_define_value(
@@ -515,6 +522,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -525,6 +536,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -539,6 +554,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -549,6 +568,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -563,6 +586,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -573,6 +600,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -587,6 +618,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -597,6 +632,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -611,6 +650,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -621,6 +664,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -635,6 +682,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -645,6 +696,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -659,6 +714,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -671,6 +730,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -681,6 +744,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -879,6 +946,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -889,6 +960,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -903,6 +978,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -913,6 +992,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -927,6 +1010,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -937,6 +1024,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -951,6 +1042,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -961,6 +1056,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -975,6 +1074,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -985,6 +1088,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
@@ -999,6 +1106,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -1011,6 +1122,10 @@ compiler_scope_define_exports(
 &descriptor_execution_context_pointer
     ),
     function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),
 &descriptor_value_view
     )
@@ -1021,6 +1136,10 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("args")),

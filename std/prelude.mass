@@ -48,7 +48,7 @@ debugger :: fn() -> () intrinsic {
 
 
   lazy_value := allocate(context.allocator, MASS.Lazy_Value)
-  lazy_value.epoch = context.epoch
+  lazy_value.epoch = parser.epoch
   lazy_value.descriptor = Void
   lazy_value.proc = lazy_value_proc
   lazy_value.payload = 0

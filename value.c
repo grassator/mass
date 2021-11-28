@@ -1103,7 +1103,7 @@ function_literal_info_for_args(
       .info = 0,
     });
 
-  ensure_parameter_descriptors(context->compilation, specialized_info, context->scope);
+  ensure_parameter_descriptors(context->compilation, specialized_info, literal->own_scope);
 
   // :SpecializationInfiniteLoop
   added_specialization->info = specialized_info;
@@ -1313,13 +1313,10 @@ execution_context_from_compilation(
   Compilation *compilation
 ) {
   return (Execution_Context) {
-    .flags = Parser_Flags_Global,
-    .epoch = VALUE_STATIC_EPOCH,
     .allocator = compilation->allocator,
     .temp_allocator = compilation->temp_allocator,
     .program = compilation->runtime_program,
     .compilation = compilation,
-    .scope = compilation->root_scope,
     .result = compilation->result,
   };
 }

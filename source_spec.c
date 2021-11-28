@@ -92,11 +92,11 @@ test_program_source_base(
       Source_Range source_range = test_inline_source_range(context->compilation, source.text);
       *test_module = (Module) {
         .source_range = source_range,
-        .own_scope = context->scope,
+        .own_scope = context->compilation->root_scope,
       };
     } break;
     case Test_Program_Source_Tag_File: {
-      test_module = program_module_from_file(context, source.path, context->scope);
+      test_module = program_module_from_file(context, source.path, context->compilation->root_scope);
     } break;
   }
   program_import_module(context, test_module);
@@ -105,9 +105,8 @@ test_program_source_base(
   Source_Range symbol_source_range;
   INIT_LITERAL_SOURCE_RANGE(&symbol_source_range, "__test_symbol__");
   const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice);
-  Value *value = mass_context_force_lookup(
-    context, test_module->own_scope, symbol, &symbol_source_range
-  );
+  Scope_Entry *entry = scope_lookup(context->compilation->root_scope, symbol);
+  Value *value = scope_entry_force_value(context->compilation, entry);
   if (value && value->descriptor == &descriptor_function_literal) {
     return ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
   }
@@ -1176,7 +1175,7 @@ spec("source") {
             "value : &MASS.Value = allocate(context.allocator, MASS.Value)\n"
 
             "lazy_value : &MASS.Lazy_Value = allocate(context.allocator, MASS.Lazy_Value)\n"
-            "lazy_value.epoch = context.epoch\n"
+            "lazy_value.epoch = parser.epoch\n"
             "lazy_value.descriptor = type_of(())\n"
             "lazy_value.proc = lazy_value_proc\n"
             "lazy_value.payload = 0\n"

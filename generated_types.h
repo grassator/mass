@@ -373,6 +373,10 @@ const char *parser_flags_name(Parser_Flags value) {
 typedef dyn_array_type(Parser_Flags *) Array_Parser_Flags_Ptr;
 typedef dyn_array_type(const Parser_Flags *) Array_Const_Parser_Flags_Ptr;
 
+typedef struct Parser Parser;
+typedef dyn_array_type(Parser *) Array_Parser_Ptr;
+typedef dyn_array_type(const Parser *) Array_Const_Parser_Ptr;
+
 typedef struct Operator Operator;
 typedef dyn_array_type(Operator *) Array_Operator_Ptr;
 typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
@@ -439,10 +443,10 @@ typedef dyn_array_type(Lazy_Static_Value *) Array_Lazy_Static_Value_Ptr;
 typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_Ptr;
 
 typedef Value * (*Mass_Intrinsic_Proc)
-  (Execution_Context * context, Value_View view);
+  (Execution_Context * context, Parser * parser, Value_View view);
 
 typedef Value * (*Mass_Handle_Operator_Proc)
-  (Execution_Context * context, Value_View view, const Operator * operator);
+  (Execution_Context * context, Parser * parser, Value_View view, const Operator * operator);
 
 typedef struct Function_Parameter Function_Parameter;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
@@ -585,7 +589,7 @@ typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
 typedef u32 (*Token_Statement_Matcher_Proc)
-  (Execution_Context * context, Value_View view, Lazy_Value * out_lazy_value, void * payload);
+  (Execution_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value, void * payload);
 
 typedef void (*Mass_Trampoline_Proc)
   (void * payload);
@@ -696,49 +700,49 @@ static void push_instruction
   (Code_Block * code_block, Instruction instruction);
 
 static Value * mass_intrinsic
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_call
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_import
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_pointer_to
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_pointer_to_type
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_eval
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_fragment
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_inline_module
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_c_struct
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_exports
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_cast
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_type_of
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_size_of
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_startup
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_static_assert
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
@@ -786,43 +790,43 @@ static i64 mass_i64_unsigned_remainder
   (i64 a, i64 b);
 
 static Value * mass_integer_add
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_subtract
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_multiply
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_divide
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_remainder
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_less
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_greater
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_less_equal
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_greater_equal
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_equal
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_not_equal
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_generic_equal
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_generic_not_equal
-  (Execution_Context * context, Value_View args);
+  (Execution_Context * context, Parser * parser, Value_View args);
 
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
@@ -1385,13 +1389,17 @@ typedef struct Execution_Context {
   Compilation * compilation;
   Program * program;
   Mass_Result * result;
+} Execution_Context;
+typedef dyn_array_type(Execution_Context) Array_Execution_Context;
+
+typedef struct Parser {
   Parser_Flags flags;
   s32 _flags_padding;
   Epoch epoch;
   Scope * scope;
   Module * module;
-} Execution_Context;
-typedef dyn_array_type(Execution_Context) Array_Execution_Context;
+} Parser;
+typedef dyn_array_type(Parser) Array_Parser;
 
 typedef enum {
   Operator_Tag_Alias = 0,
@@ -1571,6 +1579,7 @@ typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 
 typedef struct Lazy_Static_Value {
   Execution_Context context;
+  Parser parser;
   Value_View expression;
   u64 resolving;
 } Lazy_Static_Value;
@@ -1628,6 +1637,7 @@ typedef struct Function_Literal {
   Function_Literal_Flags flags;
   u32 _flags_padding;
   Execution_Context context;
+  Scope * own_scope;
   Function_Info * info;
   Value * body;
   Array_Value_Ptr instances;
@@ -2370,6 +2380,11 @@ static Descriptor descriptor_array_parser_flags_ptr;
 static Descriptor descriptor_array_const_parser_flags_ptr;
 static Descriptor descriptor_parser_flags_pointer;
 static Descriptor descriptor_parser_flags_pointer_pointer;
+static Descriptor descriptor_parser;
+static Descriptor descriptor_array_parser;
+static Descriptor descriptor_array_parser_ptr;
+static Descriptor descriptor_parser_pointer;
+static Descriptor descriptor_parser_pointer_pointer;
 static Descriptor descriptor_operator;
 static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
@@ -4018,31 +4033,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
     .name = slice_literal_fields("result"),
     .offset = offsetof(Execution_Context, result),
   },
-  {
-    .descriptor = &descriptor_parser_flags,
-    .name = slice_literal_fields("flags"),
-    .offset = offsetof(Execution_Context, flags),
-  },
-  {
-    .descriptor = &descriptor_s32,
-    .name = slice_literal_fields("_flags_padding"),
-    .offset = offsetof(Execution_Context, _flags_padding),
-  },
-  {
-    .descriptor = &descriptor_epoch,
-    .name = slice_literal_fields("epoch"),
-    .offset = offsetof(Execution_Context, epoch),
-  },
-  {
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .offset = offsetof(Execution_Context, scope),
-  },
-  {
-    .descriptor = &descriptor_module_pointer,
-    .name = slice_literal_fields("module"),
-    .offset = offsetof(Execution_Context, module),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(execution_context);
 DEFINE_VALUE_IS_AS_HELPERS(Execution_Context, execution_context);
@@ -4055,6 +4045,38 @@ static C_Enum_Item parser_flags_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Parser_Flags, parser_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Parser_Flags *, parser_flags_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_parser_ptr, Array_Parser_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_parser, Array_Parser)
+MASS_DEFINE_STRUCT_DESCRIPTOR(parser, Parser,
+  {
+    .descriptor = &descriptor_parser_flags,
+    .name = slice_literal_fields("flags"),
+    .offset = offsetof(Parser, flags),
+  },
+  {
+    .descriptor = &descriptor_s32,
+    .name = slice_literal_fields("_flags_padding"),
+    .offset = offsetof(Parser, _flags_padding),
+  },
+  {
+    .descriptor = &descriptor_epoch,
+    .name = slice_literal_fields("epoch"),
+    .offset = offsetof(Parser, epoch),
+  },
+  {
+    .descriptor = &descriptor_scope_pointer,
+    .name = slice_literal_fields("scope"),
+    .offset = offsetof(Parser, scope),
+  },
+  {
+    .descriptor = &descriptor_module_pointer,
+    .name = slice_literal_fields("module"),
+    .offset = offsetof(Parser, module),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(parser);
+DEFINE_VALUE_IS_AS_HELPERS(Parser, parser);
+DEFINE_VALUE_IS_AS_HELPERS(Parser *, parser_pointer);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator_ptr, Array_Operator_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator, Array_Operator)
@@ -4459,6 +4481,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
     .offset = offsetof(Lazy_Static_Value, context),
   },
   {
+    .descriptor = &descriptor_parser,
+    .name = slice_literal_fields("parser"),
+    .offset = offsetof(Lazy_Static_Value, parser),
+  },
+  {
     .descriptor = &descriptor_value_view,
     .name = slice_literal_fields("expression"),
     .offset = offsetof(Lazy_Static_Value, expression),
@@ -4481,6 +4508,10 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_parser_pointer,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_value_view,
   }
 )
@@ -4490,6 +4521,10 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_execution_context_pointer,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_parser_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
@@ -4657,6 +4692,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .descriptor = &descriptor_execution_context,
     .name = slice_literal_fields("context"),
     .offset = offsetof(Function_Literal, context),
+  },
+  {
+    .descriptor = &descriptor_scope_pointer,
+    .name = slice_literal_fields("own_scope"),
+    .offset = offsetof(Function_Literal, own_scope),
   },
   {
     .descriptor = &descriptor_function_info_pointer,
@@ -5448,6 +5488,10 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_execution_context_pointer,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_parser_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,

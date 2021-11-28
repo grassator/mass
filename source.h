@@ -125,6 +125,7 @@ module_compiler_init(
 static Value *
 mass_handle_apply_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View operands_view,
   const Operator *operator
 );
@@ -143,12 +144,14 @@ scope_print_names(
 static Value *
 compile_time_eval(
   Execution_Context *context,
+  Parser *parser,
   Value_View view
 );
 
 static Value *
 token_parse_expression(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 *out_match_length,
   const Symbol *end_symbol
@@ -157,6 +160,7 @@ token_parse_expression(
 static Value *
 token_handle_function_call(
   Execution_Context *context,
+  Parser *parser,
   Value *target_expression,
   Value_View args_view,
   Source_Range source_range
@@ -198,18 +202,21 @@ value_or_lazy_value_descriptor(
 static Value *
 token_parse_block_view(
   Execution_Context *program,
+  Parser *parser,
   Value_View view
 );
 
 static Value *
 token_parse_block_no_scope(
   Execution_Context *context,
+  Parser *parser,
   const Group_Curly *group
 );
 
 static Value *
 token_parse_block(
   Execution_Context *program,
+  Parser *parser,
   const Group_Curly *group
 );
 
@@ -245,6 +252,7 @@ scope_define_enum(
 static Value *
 mass_define_stack_value_from_typed_symbol(
   Execution_Context *context,
+  Parser *parser,
   const Typed_Symbol *typed_symbol,
   Source_Range source_range
 );

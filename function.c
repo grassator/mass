@@ -599,11 +599,15 @@ ensure_function_instance(
   dyn_array_push(literal->instances, cached_instance);
 
   Execution_Context body_context = execution_context_from_compilation(compilation);
-  Scope *body_scope = scope_make(compilation->allocator, literal->context.scope);
-  body_context.flags &= ~Parser_Flags_Global;
-  body_context.scope = body_scope;
   body_context.program = program;
-  body_context.epoch = get_new_epoch();
+
+  Scope *body_scope = scope_make(compilation->allocator, literal->own_scope);
+  Parser body_parser = {
+    .flags = Parser_Flags_None,
+    .scope = body_scope,
+    .epoch = get_new_epoch(),
+    .module = 0, // FIXME provide module here
+  };
 
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(compilation->allocator, end_label_pieces, countof(end_label_pieces));
@@ -617,7 +621,7 @@ ensure_function_instance(
 
   Function_Builder *builder = &(Function_Builder){
     .program = program,
-    .epoch = body_context.epoch,
+    .epoch = body_parser.epoch,
     .function = fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .return_value = return_value,
@@ -648,7 +652,7 @@ ensure_function_instance(
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->symbol;
       if (param_symbol) {
-        scope_define_value(body_scope, body_context.epoch, def_param->source_range, param_symbol, arg_value);
+        scope_define_value(body_scope, body_parser.epoch, def_param->source_range, param_symbol, arg_value);
       }
     }
   }
@@ -657,10 +661,10 @@ ensure_function_instance(
 
   Value *parse_result = 0;
   if (value_is_group_curly(literal->body)) {
-    parse_result = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));
+    parse_result = token_parse_block_no_scope(&body_context, &body_parser, value_as_group_curly(literal->body));
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = value_as_value_view(literal->body);
-    parse_result = token_parse_block_view(&body_context, *view);
+    parse_result = token_parse_block_view(&body_context, &body_parser, *view);
   } else if (literal->body->descriptor == &descriptor_lazy_value) {
     parse_result = literal->body;
   } else {

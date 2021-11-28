@@ -130,13 +130,14 @@ scope_make(
 static inline u32
 scope_statement_matcher_shallow(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   const Scope *scope
 ) {
   const Token_Statement_Matcher *matcher = scope->statement_matcher;
   for (; matcher; matcher = matcher->previous) {
-    u32 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
+    u32 match_length = matcher->proc(context, parser, view, out_lazy_value, matcher->payload);
 
     if (mass_has_error(context)) return 0;
     if (match_length) return match_length;
@@ -147,6 +148,7 @@ scope_statement_matcher_shallow(
 static inline u32
 token_statement_matcher_in_scopes(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   const Scope *scope
@@ -154,7 +156,7 @@ token_statement_matcher_in_scopes(
   for (; scope; scope = scope->parent) {
     // Do a reverse iteration because we want statements that are defined later
     // to have higher precedence when parsing
-    u32 match_length = scope_statement_matcher_shallow(context, view, out_lazy_value, scope);
+    u32 match_length = scope_statement_matcher_shallow(context, parser, view, out_lazy_value, scope);
     if (match_length) return match_length;
   }
   return 0;
@@ -1075,7 +1077,7 @@ value_force_lazy_static(
     return 0;
   }
   lazy->resolving = true;
-  Value *result = compile_time_eval(&lazy->context, lazy->expression);
+  Value *result = compile_time_eval(&lazy->context, &lazy->parser, lazy->expression);
   if (!result) return 0;
   lazy->resolving = false;
   *value = *result;
@@ -1142,6 +1144,7 @@ scope_entry_force_value(
 static inline Value *
 mass_context_force_lookup(
   Execution_Context *context,
+  const Parser *parser,
   const Scope *scope,
   const Symbol *symbol,
   const Source_Range *lookup_range
@@ -1156,8 +1159,8 @@ mass_context_force_lookup(
     });
     return 0;
   }
-  if (!(context->flags & Parser_Flags_Type_Only)) {
-    if (entry->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && entry->epoch.as_u64 != context->epoch.as_u64) {
+  if (!(parser->flags & Parser_Flags_Type_Only)) {
+    if (entry->epoch.as_u64 != VALUE_STATIC_EPOCH.as_u64 && entry->epoch.as_u64 != parser->epoch.as_u64) {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
         .source_range = *lookup_range,
@@ -1635,6 +1638,7 @@ value_view_match_till(
 static inline Value_View
 value_view_match_till_end_of_statement(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 *peek_index
 ) {
@@ -1680,6 +1684,7 @@ value_view_maybe_match_any_of(
 static inline void
 context_parse_error(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 peek_index
 ) {
@@ -1697,12 +1702,14 @@ typedef struct {
 static inline const Descriptor *
 token_match_type(
   Execution_Context *context,
+  Parser *parser,
   Value_View view
 );
 
 static Value *
 token_parse_tuple(
   Execution_Context *context,
+  Parser *parser,
   Value_View view
 ) {
   Value_View remaining = view;
@@ -1714,9 +1721,8 @@ token_parse_tuple(
   Array_Value_Ptr items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
   for (; remaining.length; remaining = value_view_rest(&remaining, match_length)) {
     if (mass_has_error(context)) goto err;
-    Value *item = token_parse_expression(
-      context, remaining, &match_length, context->compilation->common_symbols.operator_comma
-    );
+    const Symbol *end_symbol = context->compilation->common_symbols.operator_comma;
+    Value *item = token_parse_expression(context, parser, remaining, &match_length, end_symbol);
     dyn_array_push(items, item);
   }
 
@@ -1726,9 +1732,9 @@ token_parse_tuple(
   });
   Tuple *tuple = &combined->tuple;
   *tuple = (Tuple) {
-    .epoch = context->epoch,
+    .epoch = parser->epoch,
     .items = items,
-    .scope_where_it_was_created = context->scope,
+    .scope_where_it_was_created = parser->scope,
   };
   Storage result_storage = storage_static_heap(tuple, descriptor_tuple.bit_size);
   result_value = value_init(&combined->value, &descriptor_tuple, result_storage, view.source_range);
@@ -1739,19 +1745,20 @@ token_parse_tuple(
 static Value *
 token_parse_single(
   Execution_Context *context,
+  Parser *parser,
   Value *value
 ) {
   if (value->descriptor == &descriptor_group_paren) {
-    return token_parse_expression(context, value_as_group_paren(value)->children, &(u32){0}, 0);
+    return token_parse_expression(context, parser, value_as_group_paren(value)->children, &(u32){0}, 0);
   } else if (value->descriptor == &descriptor_group_curly) {
-    return token_parse_block(context, value_as_group_curly(value));
+    return token_parse_block(context, parser, value_as_group_curly(value));
   } else if (value->descriptor == &descriptor_group_square) {
-    return token_parse_tuple(context, value_as_group_square(value)->children);
+    return token_parse_tuple(context, parser, value_as_group_square(value)->children);
   } else if (value->descriptor == &descriptor_quoted) {
     const Quoted *quoted = value_as_quoted(value);
     return quoted->value;
   } else if (value_is_symbol(value)) {
-    return mass_context_force_lookup(context, context->scope, value_as_symbol(value), &value->source_range);
+    return mass_context_force_lookup(context, parser, parser->scope, value_as_symbol(value), &value->source_range);
   } else {
     return value;
   }
@@ -1760,6 +1767,7 @@ token_parse_single(
 static Value *
 mass_quote(
   Execution_Context *context,
+  Parser *parser,
   Value_View args,
   const void *payload
 ) {
@@ -1776,11 +1784,12 @@ mass_quote(
 static Value *
 mass_unquote(
   Execution_Context *context,
+  Parser *parser,
   Value_View args,
   const void *payload
 ) {
   assert(args.length == 1);
-  return token_parse_single(context, value_view_get(args, 0));
+  return token_parse_single(context, parser, value_view_get(args, 0));
 }
 
 static u32
@@ -1852,6 +1861,7 @@ token_match_pattern(
 static Value *
 token_apply_macro_syntax(
   Execution_Context *context,
+  Parser *parser,
   Array_Value_View match,
   Macro *macro,
   Source_Range source_range
@@ -1862,7 +1872,7 @@ token_apply_macro_syntax(
   // to support implementing disjointed syntax, such as for (;;) loop
   // or switch / pattern matching.
   // Symboleally there should be a way to control this explicitly somehow.
-  Scope *captured_scope = scope_make(context->allocator, context->scope);
+  Scope *captured_scope = scope_make(context->allocator, parser->scope);
   Scope *expansion_scope = scope_make(context->allocator, macro->scope);
 
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
@@ -1890,14 +1900,14 @@ token_apply_macro_syntax(
     scope_define_value(expansion_scope, VALUE_STATIC_EPOCH, capture_view.source_range, capture_symbol, result);
   }
 
-  Execution_Context body_context = *context;
-  body_context.scope = expansion_scope;
+  Parser body_parser = *parser;
+  body_parser.scope = expansion_scope;
 
   Value *result;
-  if (body_context.flags & Parser_Flags_Global) {
-    result = compile_time_eval(&body_context, macro->replacement);
+  if (body_parser.flags & Parser_Flags_Global) {
+    result = compile_time_eval(context, &body_parser, macro->replacement);
   } else {
-    result = token_parse_expression(&body_context, macro->replacement, &(u32){0}, 0);
+    result = token_parse_expression(context, &body_parser, macro->replacement, &(u32){0}, 0);
   }
   // The result of the expansion should map to the source range of the match
   if (result) result->source_range = source_range;
@@ -1919,6 +1929,7 @@ mass_handle_statement_lazy_proc(
 static u32
 token_parse_macro_statement(
   Execution_Context *context,
+  Parser *parser,
   Value_View value_view,
   Lazy_Value *out_lazy_value,
   Macro *macro
@@ -1949,7 +1960,7 @@ token_parse_macro_statement(
   }
 
   Value_View match_view = value_view_slice(&value_view, 0, match_length);
-  Value *expansion_value = token_apply_macro_syntax(context, match, macro, match_view.source_range);
+  Value *expansion_value = token_apply_macro_syntax(context, parser, match, macro, match_view.source_range);
   if (expansion_value) {
     out_lazy_value->payload = expansion_value;
     out_lazy_value->proc = mass_handle_statement_lazy_proc;
@@ -1963,11 +1974,12 @@ token_parse_macro_statement(
 static inline const Descriptor *
 token_match_type(
   Execution_Context *context,
+  Parser *parser,
   Value_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Value *type_value = compile_time_eval(context, view);
+  Value *type_value = compile_time_eval(context, parser, view);
   return value_ensure_type(context->compilation, context->program, type_value, view.source_range);
 }
 
@@ -2038,6 +2050,7 @@ mass_ensure_jit_function_for_value(
 static Function_Parameter
 token_match_argument(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Function_Info *function
 ) {
@@ -2071,7 +2084,7 @@ token_match_argument(
       goto err;
     }
     Value *name_token = value_view_get(definition, 0);
-    Value *static_value = compile_time_eval(context, static_expression);
+    Value *static_value = compile_time_eval(context, parser, static_expression);
     if (mass_has_error(context)) goto err;
     return (Function_Parameter) {
       .tag = Function_Parameter_Tag_Exact_Static,
@@ -2137,7 +2150,7 @@ token_match_argument(
       if (token_maybe_split_on_operator(
         definition, slice_literal("~"), &name_tokens, &maybe_type_expression, &operator
       )) {
-        Value *constraint = compile_time_eval(context, maybe_type_expression);
+        Value *constraint = compile_time_eval(context, parser, maybe_type_expression);
         if (mass_has_error(context)) goto err;
         maybe_type_constraint = (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(
           context->compilation, constraint, &maybe_type_expression.source_range
@@ -2167,7 +2180,7 @@ token_match_argument(
 
   Value *maybe_default_value = 0;
   if (default_expression.length) {
-    maybe_default_value = compile_time_eval(context, default_expression);
+    maybe_default_value = compile_time_eval(context, parser, default_expression);
     if (is_inferred_type) {
       descriptor = deduce_runtime_descriptor_for_value(
         context->compilation, context->program, maybe_default_value, 0
@@ -2323,6 +2336,7 @@ value_force_exact(
 static void
 token_match_call_arguments(
   Execution_Context *context,
+  Parser *parser,
   const Group_Paren *args_group,
   Array_Value_Ptr *out_args
 ) {
@@ -2337,7 +2351,7 @@ token_match_call_arguments(
   while (!it.done) {
     if (context->result->tag != Mass_Result_Tag_Success) return;
     Value_View view = token_split_next(&it, &token_pattern_comma_operator);
-    Value *parse_result = token_parse_expression(context, view, &(u32){0}, 0);
+    Value *parse_result = token_parse_expression(context, parser, view, &(u32){0}, 0);
     dyn_array_push(*out_args, parse_result);
   }
 }
@@ -2345,6 +2359,7 @@ token_match_call_arguments(
 static Value *
 token_handle_user_defined_operator_proc(
   Execution_Context *context,
+  Parser *parser,
   Value_View args,
   const Operator *operator
 ) {
@@ -2354,23 +2369,24 @@ token_handle_user_defined_operator_proc(
   assert(argument_count == args.length);
 
   Value *fn = mass_context_force_lookup(
-    context, context->scope, operator->Alias.symbol, &args.source_range
+    context, parser, parser->scope, operator->Alias.symbol, &args.source_range
   );
   if (mass_has_error(context)) return 0;
 
   Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
   for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
-    *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
+    *dyn_array_get(args_array, i) = token_parse_single(context, parser, *dyn_array_get(args_array, i));
     if (mass_has_error(context)) return 0;
   }
   args = value_view_from_value_array(args_array, &args.source_range);
 
-  return token_handle_function_call(context, fn, args, args.source_range);
+  return token_handle_function_call(context, parser, fn, args, args.source_range);
 }
 
 static inline Value *
 mass_make_lazy_value_with_epoch(
   Execution_Context *context,
+  Parser *parser,
   Source_Range source_range,
   void *payload,
   const Descriptor *descriptor,
@@ -2398,19 +2414,21 @@ mass_make_lazy_value_with_epoch(
 static inline Value *
 mass_make_lazy_value(
   Execution_Context *context,
+  Parser *parser,
   Source_Range source_range,
   void *payload,
   const Descriptor *descriptor,
   Lazy_Value_Proc proc
 ) {
   return mass_make_lazy_value_with_epoch(
-    context, source_range, payload, descriptor, context->epoch, proc
+    context, parser, source_range, payload, descriptor, parser->epoch, proc
   );
 }
 
 static inline void
 scope_define_lazy_compile_time_expression(
   Execution_Context *context,
+  Parser *parser,
   Scope *scope,
   const Symbol *symbol,
   Value_View view
@@ -2422,6 +2440,7 @@ scope_define_lazy_compile_time_expression(
   Lazy_Static_Value *lazy_static_value = &combined->lazy_static_value;
   *lazy_static_value = (Lazy_Static_Value){
     .context = *context,
+    .parser = *parser,
     .expression = view,
   };
   Value *value = value_init(
@@ -2437,6 +2456,7 @@ scope_define_lazy_compile_time_expression(
 static Value *
 mass_exports(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   assert(args.length == 2);
@@ -2489,6 +2509,7 @@ mass_exports(
 static u32
 token_parse_operator_definition(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   void *unused_data
@@ -2501,20 +2522,21 @@ token_parse_operator_definition(
   );
   if (!keyword_token) return 0;
   Value *precedence_token = value_view_next(view, &peek_index);
-  if (!precedence_token) { context_parse_error(context, view, peek_index); goto err; }
+  if (!precedence_token) { context_parse_error(context, parser, view, peek_index); goto err; }
   Value *pattern_token = value_view_next(view, &peek_index);
-  if (!value_is_group_paren(pattern_token)) { context_parse_error(context, view, peek_index); goto err; }
+  if (!value_is_group_paren(pattern_token)) { context_parse_error(context, parser, view, peek_index); goto err; }
 
   Value_View rest = value_view_rest(&view, peek_index);
   u32 body_length;
   Value *body = token_parse_expression(
-    context, rest, &body_length, context->compilation->common_symbols.operator_semicolon
+    context, parser, rest, &body_length, context->compilation->common_symbols.operator_semicolon
   );
+  if (mass_has_error(context)) goto err;
 
-  if (!body_length) { context_parse_error(context, view, peek_index); goto err; }
+  if (!body_length) { context_parse_error(context, parser, view, peek_index); goto err; }
   peek_index += body_length;
 
-  Value *precedence_value = token_parse_single(context, precedence_token);
+  Value *precedence_value = token_parse_single(context, parser, precedence_token);
   if (!value_is_i64(precedence_value)) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -2605,7 +2627,7 @@ token_parse_operator_definition(
 
   scope_define_operator(
     context->compilation,
-    context->scope,
+    parser->scope,
     keyword_token->source_range,
     value_as_symbol(operator_token)->name,
     operator
@@ -2636,6 +2658,7 @@ mass_normalize_import_path(
 static Value *
 mass_import(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   if (args.length != 1) goto parse_err;
@@ -2675,22 +2698,24 @@ mass_import(
 static void
 mass_push_token_matcher(
   Execution_Context *context,
+  Parser *parser,
   Token_Statement_Matcher_Proc proc,
   void *payload
 ) {
   Token_Statement_Matcher *matcher =
     allocator_allocate(context->allocator, Token_Statement_Matcher);
   *matcher = (Token_Statement_Matcher){
-    .previous = context->scope->statement_matcher,
+    .previous = parser->scope->statement_matcher,
     .proc = proc,
     .payload = payload,
   };
-  context->scope->statement_matcher = matcher;
+  parser->scope->statement_matcher = matcher;
 }
 
 static u32
 token_parse_syntax_definition(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   void *payload
@@ -2706,17 +2731,17 @@ token_parse_syntax_definition(
     view, &peek_index, context->compilation->common_symbols.statement
   );
   if (!statement_token) {
-    context_parse_error(context, view, peek_index);
+    context_parse_error(context, parser, view, peek_index);
     return 0;
   }
 
   Value *pattern_token = value_view_next(view, &peek_index);
   if (!value_is_group_paren(pattern_token)) {
-    context_parse_error(context, view, peek_index);
+    context_parse_error(context, parser, view, peek_index);
     return 0;
   }
 
-  Value_View replacement = value_view_match_till_end_of_statement(context, view, &peek_index);
+  Value_View replacement = value_view_match_till_end_of_statement(context, parser, view, &peek_index);
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
@@ -2799,9 +2824,9 @@ token_parse_syntax_definition(
   *macro = (Macro){
     .pattern = pattern,
     .replacement = replacement,
-    .scope = context->scope
+    .scope = parser->scope
   };
-  mass_push_token_matcher(context, token_parse_macro_statement, macro);
+  mass_push_token_matcher(context, parser, token_parse_macro_statement, macro);
   return peek_index;
 
   err:
@@ -2812,12 +2837,13 @@ token_parse_syntax_definition(
 static Value *
 mass_c_struct(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   assert(args.length == 2);
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("c_struct")));
 
-  Value *tuple_value = token_parse_single(context, value_view_get(args, 1));
+  Value *tuple_value = token_parse_single(context, parser, value_view_get(args, 1));
   const Tuple *tuple = value_as_tuple(tuple_value);
 
   Descriptor *descriptor = anonymous_struct_descriptor_from_tuple(
@@ -2848,6 +2874,7 @@ value_or_lazy_value_descriptor(
 static Value *
 compile_time_eval(
   Execution_Context *context,
+  Parser *parser,
   Value_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2856,10 +2883,14 @@ compile_time_eval(
 
   Jit *jit = &context->compilation->jit;
   Execution_Context eval_context = *context;
-  eval_context.flags &= ~Parser_Flags_Global;
-  eval_context.epoch = get_new_epoch();
   eval_context.program = jit->program;
-  eval_context.scope = scope_make(context->allocator, context->scope);
+
+  Parser eval_parser = {
+    .flags = Parser_Flags_None,
+    .epoch = get_new_epoch(),
+    .scope = scope_make(context->allocator, parser->scope),
+    .module = parser->module,
+  };
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
@@ -2872,7 +2903,7 @@ compile_time_eval(
   );
   Function_Builder eval_builder = {
     .program = jit->program,
-    .epoch = eval_context.epoch,
+    .epoch = eval_parser.epoch,
     .function = &fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .code_block = {
@@ -2885,7 +2916,7 @@ compile_time_eval(
     .source = source_from_source_range(context->compilation, source_range),
   };
 
-  Value *expression_result_value = token_parse_expression(&eval_context, view, &(u32){0}, 0);
+  Value *expression_result_value = token_parse_expression(&eval_context, &eval_parser, view, &(u32){0}, 0);
   if(mass_has_error(&eval_context)) {
     context->result = eval_context.result;
     return 0;
@@ -3050,6 +3081,7 @@ mass_handle_tuple_cast_lazy_proc(
 static Value *
 mass_cast_helper(
   Execution_Context *context,
+  Parser *parser,
   const Descriptor *target_descriptor,
   Value *expression,
   Source_Range source_range
@@ -3067,7 +3099,7 @@ mass_cast_helper(
     *heap_payload = lazy_payload;
 
     return mass_make_lazy_value(
-      context, source_range, heap_payload, target_descriptor, mass_handle_tuple_cast_lazy_proc
+      context, parser, source_range, heap_payload, target_descriptor, mass_handle_tuple_cast_lazy_proc
     );
   }
 
@@ -3080,13 +3112,14 @@ mass_cast_helper(
   *heap_payload = lazy_payload;
 
   return mass_make_lazy_value(
-    context, source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+    context, parser, source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
   );
 }
 
 static Value *
 mass_cast(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view
 ) {
   if (mass_has_error(context)) return 0;
@@ -3095,12 +3128,13 @@ mass_cast(
     context->compilation, context->program, value_view_get(args_view, 0), args_view.source_range
   );
   Value *expression = value_view_get(args_view, 1);
-  return mass_cast_helper(context, target_descriptor, expression, args_view.source_range);
+  return mass_cast_helper(context, parser, target_descriptor, expression, args_view.source_range);
 }
 
 static void
 token_dispatch_operator(
   Execution_Context *context,
+  Parser *parser,
   Array_Value_Ptr *stack,
   Operator_Stack_Entry *operator_entry
 );
@@ -3108,6 +3142,7 @@ token_dispatch_operator(
 static bool
 token_handle_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Array_Value_Ptr *stack,
   Array_Operator_Stack_Entry *operator_stack,
@@ -3129,7 +3164,7 @@ token_handle_operator(
     dyn_array_pop(*operator_stack);
 
     // apply the operator on the stack
-    token_dispatch_operator(context, stack, last_operator);
+    token_dispatch_operator(context, parser, stack, last_operator);
   }
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
     .source_range = source_range,
@@ -3141,6 +3176,7 @@ token_handle_operator(
 static u32
 token_parse_constant_definitions(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   void *unused_payload
@@ -3152,7 +3188,7 @@ token_parse_constant_definitions(
   Value *operator;
 
   u32 statement_length = 0;
-  view = value_view_match_till_end_of_statement(context, view, &statement_length);
+  view = value_view_match_till_end_of_statement(context, parser, view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
     return 0;
   }
@@ -3166,7 +3202,7 @@ token_parse_constant_definitions(
   }
   Value *symbol = value_view_get(view, 0);
   if (value_is_group_paren(symbol)) {
-    symbol = compile_time_eval(context, value_as_group_paren(symbol)->children);
+    symbol = compile_time_eval(context, parser, value_as_group_paren(symbol)->children);
     if (mass_has_error(context)) goto err;
   }
 
@@ -3178,7 +3214,7 @@ token_parse_constant_definitions(
     goto err;
   }
 
-  scope_define_lazy_compile_time_expression(context, context->scope, value_as_symbol(symbol), rhs);
+  scope_define_lazy_compile_time_expression(context, parser, parser->scope, value_as_symbol(symbol), rhs);
 
   err:
   return statement_length;
@@ -3246,6 +3282,7 @@ mass_macro_temp_param_lazy_proc(
 static inline Value *
 mass_handle_macro_call(
   Execution_Context *context,
+  Parser *parser,
   Value *overload,
   Value_View args_view,
   Source_Range source_range
@@ -3256,7 +3293,7 @@ mass_handle_macro_call(
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
-  Scope *body_scope = scope_make(context->allocator, literal->context.scope);
+  Scope *body_scope = scope_make(context->allocator, literal->own_scope);
 
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     if (mass_has_error(context)) goto err;
@@ -3270,7 +3307,7 @@ mass_handle_macro_call(
       }
 
       Epoch arg_epoch =
-        mass_value_is_compile_time_known(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
+        mass_value_is_compile_time_known(arg_value) ? VALUE_STATIC_EPOCH : parser->epoch;
 
       bool needs_casting = (
         // FIXME pass in resolved Function_Info from call and remove a guard on the next line
@@ -3290,7 +3327,7 @@ mass_handle_macro_call(
         // Otherwise we will create a temp copy
         // TODO should this be forced or is first access ok?
         param_value = mass_make_lazy_value(
-          context, param->source_range,
+          context, parser, param->source_range,
           arg_value, param->descriptor,
           mass_macro_temp_param_lazy_proc
         );
@@ -3302,9 +3339,10 @@ mass_handle_macro_call(
     }
   }
 
-  Execution_Context body_context = *context;
-  body_context.scope = body_scope;
-  Value *body_value = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));
+  Parser body_parser = *parser;
+  body_parser.scope = body_scope;
+
+  Value *body_value = token_parse_block_no_scope(context, &body_parser, value_as_group_curly(literal->body));
   if (mass_has_error(context)) goto err;
 
   const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
@@ -3329,7 +3367,7 @@ mass_handle_macro_call(
 
   Source_Range return_range = literal->info->returns.maybe_type_expression.source_range;
   return mass_make_lazy_value(
-    context, return_range, body_value, return_descriptor, mass_macro_lazy_proc
+    context, parser, return_range, body_value, return_descriptor, mass_macro_lazy_proc
   );
 
   err:
@@ -3700,9 +3738,12 @@ ensure_parameter_descriptors(
   Scope *arguments_scope
 ) {
   Execution_Context temp_context = execution_context_from_compilation(compilation);
-  Temp_Mark temp_mark = context_temp_mark(&temp_context);
+  Parser args_parser = {
+    .flags = Parser_Flags_None,
+    .scope = scope_make(temp_context.temp_allocator, arguments_scope),
+  };
 
-  temp_context.scope = scope_make(temp_context.temp_allocator, arguments_scope);
+  Temp_Mark temp_mark = context_temp_mark(&temp_context);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     Source_Range source_range = param->source_range;
@@ -3712,11 +3753,11 @@ ensure_parameter_descriptors(
         temp_context.temp_allocator, &descriptor_descriptor_pointer, storage, source_range
       );
       scope_define_value(
-        temp_context.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value
+        args_parser.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value
       );
     } else {
       scope_define_lazy_compile_time_expression(
-        &temp_context, temp_context.scope, param->symbol, param->maybe_type_expression
+        &temp_context, &args_parser, args_parser.scope, param->symbol, param->maybe_type_expression
       );
     }
   }
@@ -3726,7 +3767,7 @@ ensure_parameter_descriptors(
     const Symbol *symbol = param->symbol;
     Source_Range source_range = param->source_range;
     Value *type_value =
-      mass_context_force_lookup(&temp_context, temp_context.scope, symbol, &source_range);
+      mass_context_force_lookup(&temp_context, &args_parser, args_parser.scope, symbol, &source_range);
     if (mass_has_error(&temp_context)) goto err;
     param->descriptor = value_ensure_type(
       temp_context.compilation, temp_context.program, type_value, source_range
@@ -3738,7 +3779,7 @@ ensure_parameter_descriptors(
   if (!info->returns.descriptor) {
     assert(info->returns.maybe_type_expression.length);
     info->returns.descriptor =
-      token_match_type(&temp_context, info->returns.maybe_type_expression);
+      token_match_type(&temp_context, &args_parser, info->returns.maybe_type_expression);
     if (mass_has_error(&temp_context)) goto err;
     assert(info->returns.descriptor);
   }
@@ -3983,6 +4024,7 @@ mass_match_overload_or_error(
 static inline Value *
 mass_intrinsic_call(
   Execution_Context *context,
+  Parser *parser,
   Value *overload,
   Value_View args_view
 ) {
@@ -3992,7 +4034,7 @@ mass_intrinsic_call(
   );
   if (mass_has_error(context)) return 0;
 
-  return jitted_code(context, args_view);
+  return jitted_code(context, parser, args_view);
 }
 
 static inline bool
@@ -4013,6 +4055,7 @@ value_is_intrinsic(
 static const Mass_Trampoline *
 mass_ensure_trampoline(
   Execution_Context *context,
+  Parser *parser,
   Value *original,
   const Function_Info *original_info,
   Value_View args_view
@@ -4096,8 +4139,7 @@ mass_ensure_trampoline(
     .Struct = { .fields = fields, },
   };
 
-  Execution_Context *trampoline_context = allocator_allocate(context->allocator, Execution_Context);
-  trampoline_context->scope = scope_make(context->allocator, context->compilation->root_scope);
+  Scope *trampoline_scope = scope_make(context->allocator, context->compilation->root_scope);
 
   Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
   trampoline_info->flags = Function_Info_Flags_Compile_Time;
@@ -4119,9 +4161,7 @@ mass_ensure_trampoline(
   Source_Range proxy_source_range;
   INIT_LITERAL_SOURCE_RANGE(&proxy_source_range, "proxy");
   const Symbol *proxy_symbol = mass_ensure_symbol(context->compilation, slice_literal("proxy"));
-  scope_define_value(
-    trampoline_context->scope, VALUE_STATIC_EPOCH, proxy_source_range, proxy_symbol, proxy_value
-  );
+  scope_define_value(trampoline_scope, VALUE_STATIC_EPOCH, proxy_source_range, proxy_symbol, proxy_value);
   Fixed_Buffer *buffer =
     fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
   fixed_buffer_append_slice(buffer, slice_literal("{args.returns = proxy("));
@@ -4151,7 +4191,8 @@ mass_ensure_trampoline(
   *trampoline_literal = (Function_Literal) {
     .info = trampoline_info,
     .body = body_value,
-    .context = *trampoline_context,
+    .own_scope = trampoline_scope,
+    .context = *context,
   };
   Value *literal_value = value_make(
     context->allocator, &descriptor_function_literal, storage_static(trampoline_literal), body_range
@@ -4172,12 +4213,13 @@ mass_ensure_trampoline(
 static Value *
 mass_trampoline_call(
   Execution_Context *context,
+  Parser *parser,
   Value *original,
   const Function_Info *original_info,
   Value_View args_view
 ) {
   const Mass_Trampoline *trampoline =
-    mass_ensure_trampoline(context, original, original_info, args_view);
+    mass_ensure_trampoline(context, parser, original, original_info, args_view);
   if (mass_has_error(context)) return 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
@@ -4250,6 +4292,7 @@ mass_can_trampoline_call(
 static Value *
 token_handle_function_call(
   Execution_Context *context,
+  Parser *parser,
   Value *target_expression,
   Value_View args_view,
   Source_Range source_range
@@ -4257,8 +4300,8 @@ token_handle_function_call(
   // TODO move this to `apply`
   if (value_is_macro_capture(target_expression)) {
     const Macro_Capture *capture = value_as_macro_capture(target_expression);
-    Execution_Context capture_context = *context;
-    capture_context.scope = capture->scope;
+    Parser capture_parser = *parser;
+    capture_parser.scope = capture->scope;
     if (args_view.length == 0) {
       // Nothing to do
     } else if (args_view.length == 1) {
@@ -4278,7 +4321,7 @@ token_handle_function_call(
       });
       return 0;
     }
-    return token_parse_block_view(&capture_context, capture->view);
+    return token_parse_block_view(context, &capture_parser, capture->view);
   }
 
   Compilation *compilation = context->compilation;
@@ -4294,10 +4337,10 @@ token_handle_function_call(
     const Function_Literal *literal = value_as_function_literal(overload);
     if (value_is_intrinsic(literal->body)) {
       // FIXME :IntrinsicReturnType Should check the returned result here
-      return mass_intrinsic_call(context, literal->body, args_view);
+      return mass_intrinsic_call(context, parser, literal->body, args_view);
     }
     if (literal->flags & Function_Literal_Flags_Macro) {
-      return mass_handle_macro_call(context, overload, args_view, source_range);
+      return mass_handle_macro_call(context, parser, overload, args_view, source_range);
     }
   }
 
@@ -4306,7 +4349,7 @@ token_handle_function_call(
       panic("A compile-time overload should not have been matched if we can't call it");
     }
 
-    Value *result = mass_trampoline_call(context, overload, info, args_view);
+    Value *result = mass_trampoline_call(context, parser, overload, info, args_view);
     if (mass_has_error(context)) return 0;
     const Descriptor *expected_descriptor = info->returns.descriptor;
     if (expected_descriptor && !mass_descriptor_is_void(expected_descriptor)) {
@@ -4332,7 +4375,7 @@ token_handle_function_call(
 
   const Descriptor *lazy_descriptor = info->returns.descriptor;
   Value *result = mass_make_lazy_value(
-    context, source_range, call_payload, lazy_descriptor, call_function_overload
+    context, parser, source_range, call_payload, lazy_descriptor, call_function_overload
   );
   return result;
 }
@@ -4340,6 +4383,7 @@ token_handle_function_call(
 static Value *
 token_handle_parsed_function_call(
   Execution_Context *context,
+  Parser *parser,
   Value *target_token,
   Value *args_token,
   Source_Range source_range
@@ -4347,7 +4391,7 @@ token_handle_parsed_function_call(
   Value *call_return_value = 0;
   Temp_Mark temp_mark = context_temp_mark(context);
 
-  Value *target_expression = token_parse_single(context, target_token);
+  Value *target_expression = token_parse_single(context, parser, target_token);
   if (mass_has_error(context)) goto defer;
 
   Value_View args_view;
@@ -4357,7 +4401,7 @@ token_handle_parsed_function_call(
       .allocator = context->temp_allocator,
       .capacity = 32,
     );
-    token_match_call_arguments(context, value_as_group_paren(args_token), &temp_args);
+    token_match_call_arguments(context, parser, value_as_group_paren(args_token), &temp_args);
     if (mass_has_error(context)) goto defer;
     args_view = value_view_from_value_array(temp_args, &source_range);
   } else if (args_token->descriptor == &descriptor_value_view) {
@@ -4379,7 +4423,7 @@ token_handle_parsed_function_call(
     goto defer;
   }
 
-  call_return_value = token_handle_function_call(context, target_expression, args_view, source_range);
+  call_return_value = token_handle_function_call(context, parser, target_expression, args_view, source_range);
 
   defer:
   context_temp_reset_to_mark(context, temp_mark);
@@ -4613,11 +4657,12 @@ mass_handle_arithmetic_operation_lazy_proc(
 static Value *
 mass_handle_arithmetic_operation(
   Execution_Context *context,
+  Parser *parser,
   Value_View arguments,
   Mass_Arithmetic_Operator operator
 ) {
-  Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
-  Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
+  Value *lhs = token_parse_single(context, parser, value_view_get(arguments, 0));
+  Value *rhs = token_parse_single(context, parser, value_view_get(arguments, 1));
 
   if (mass_has_error(context)) return 0;
 
@@ -4640,24 +4685,24 @@ mass_handle_arithmetic_operation(
     allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
   *lazy_payload = stack_lazy_payload;
   return mass_make_lazy_value(
-    context, arguments.source_range, lazy_payload, result_descriptor, mass_handle_arithmetic_operation_lazy_proc
+    context, parser, arguments.source_range, lazy_payload, result_descriptor, mass_handle_arithmetic_operation_lazy_proc
   );
 }
 
-static inline Value *mass_integer_add(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Add);
+static inline Value *mass_integer_add(Execution_Context *context, Parser *parser, Value_View arguments) {
+  return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Add);
 }
-static inline Value *mass_integer_subtract(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Subtract);
+static inline Value *mass_integer_subtract(Execution_Context *context, Parser *parser, Value_View arguments) {
+  return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Subtract);
 }
-static inline Value *mass_integer_multiply(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Multiply);
+static inline Value *mass_integer_multiply(Execution_Context *context, Parser *parser, Value_View arguments) {
+  return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Multiply);
 }
-static inline Value *mass_integer_divide(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Divide);
+static inline Value *mass_integer_divide(Execution_Context *context, Parser *parser, Value_View arguments) {
+  return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Divide);
 }
-static inline Value *mass_integer_remainder(Execution_Context *context, Value_View arguments) {
-  return mass_handle_arithmetic_operation(context, arguments, Mass_Arithmetic_Operator_Remainder);
+static inline Value *mass_integer_remainder(Execution_Context *context, Parser *parser, Value_View arguments) {
+  return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Remainder);
 }
 
 typedef struct {
@@ -4866,12 +4911,13 @@ mass_handle_generic_comparison_lazy_proc(
 static inline Value *
 mass_handle_comparison(
   Execution_Context *context,
+  Parser *parser,
   Value_View arguments,
   Lazy_Value_Proc lazy_value_proc,
   Compare_Type compare_type
 ) {
-  Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
-  Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
+  Value *lhs = token_parse_single(context, parser, value_view_get(arguments, 0));
+  Value *rhs = token_parse_single(context, parser, value_view_get(arguments, 1));
   if (mass_has_error(context)) return 0;
 
   if (value_is_i64(rhs)) {
@@ -4890,49 +4936,49 @@ mass_handle_comparison(
     allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
   *payload = stack_lazy_payload;
   return mass_make_lazy_value(
-    context, arguments.source_range, payload, &descriptor__bool, lazy_value_proc
+    context, parser, arguments.source_range, payload, &descriptor__bool, lazy_value_proc
   );
 }
 
-static inline Value *mass_integer_less(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_less(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less
+    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less
   );
 }
-static inline Value *mass_integer_greater(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_greater(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater
+    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater
   );
 }
-static inline Value *mass_integer_less_equal(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_less_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less_Equal
+    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less_Equal
   );
 }
-static inline Value *mass_integer_greater_equal(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_greater_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater_Equal
+    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater_Equal
   );
 }
-static inline Value *mass_integer_equal(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Equal
+    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Equal
   );
 }
-static inline Value *mass_integer_not_equal(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_integer_not_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Not_Equal
+    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
-static inline Value *mass_generic_equal(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_generic_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Equal
+    context, parser, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Equal
   );
 }
-static inline Value *mass_generic_not_equal(Execution_Context *context, Value_View arguments) {
+static inline Value *mass_generic_not_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Not_Equal
+    context, parser, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
@@ -4968,13 +5014,14 @@ mass_handle_startup_call_lazy_proc(
 static Value *
 mass_startup(
   Execution_Context *context,
+  Parser *parser,
   Value_View arguments
 ) {
   assert(arguments.length == 1);
   Value *startup_function = value_view_get(arguments, 0);
 
   return mass_make_lazy_value(
-    context,
+    context, parser,
     arguments.source_range,
     startup_function,
     &descriptor_void,
@@ -4996,14 +5043,15 @@ user_presentable_descriptor_for(
 static Value *
 mass_type_of(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("type_of")));
   assert(args.length == 2);
-  Parser_Flags saved_flags = context->flags;
-  context->flags |= Parser_Flags_Type_Only;
-  Value *expression = token_parse_single(context, value_view_last(args));
-  context->flags = saved_flags;
+  Parser_Flags saved_flags = parser->flags;
+  parser->flags |= Parser_Flags_Type_Only;
+  Value *expression = token_parse_single(context, parser, value_view_last(args));
+  parser->flags = saved_flags;
 
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
 
@@ -5018,11 +5066,12 @@ mass_type_of(
 static Value *
 mass_size_of(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("size_of")));
   assert(args.length == 2);
-  Value *expression = token_parse_single(context, value_view_last(args));
+  Value *expression = token_parse_single(context, parser, value_view_last(args));
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 
@@ -5063,6 +5112,7 @@ mass_pointer_to_lazy_proc(
 static Value *
 mass_static_assert(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   // TODO Resolve optional arguments before calling the intrinsic
@@ -5093,6 +5143,7 @@ mass_static_assert(
 static Value *
 mass_pointer_to(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   assert(args.length == 1);
@@ -5111,13 +5162,14 @@ mass_pointer_to(
   }
 
   return mass_make_lazy_value(
-    context, args.source_range, pointee, descriptor, mass_pointer_to_lazy_proc
+    context, parser, args.source_range, pointee, descriptor, mass_pointer_to_lazy_proc
   );
 }
 
 static Value *
 mass_pointer_to_type(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view
 ) {
   assert(args_view.length == 1);
@@ -5135,26 +5187,28 @@ mass_pointer_to_type(
 static Value *
 mass_call(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view
 ) {
   assert(args_view.length == 2);
   Value *lhs_value = value_view_get(args_view, 0);
   Value *rhs_value = value_view_get(args_view, 1);
   return token_handle_parsed_function_call(
-    context, lhs_value, rhs_value, args_view.source_range
+    context, parser, lhs_value, rhs_value, args_view.source_range
   );
 }
 
 static Value *
 mass_handle_apply_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View operands_view,
   const Operator *operator
 ) {
   Source_Range source_range = operands_view.source_range;
 
   // TODO can we cache this somehow
-  Scope_Entry *apply_entry = scope_lookup(context->scope, context->compilation->common_symbols.apply);
+  Scope_Entry *apply_entry = scope_lookup(parser->scope, context->compilation->common_symbols.apply);
   if (!apply_entry) {
     Value *rhs_value = value_view_get(operands_view, 1);
     mass_error(context, (Mass_Error) {
@@ -5166,17 +5220,18 @@ mass_handle_apply_operator(
   }
 
   Value *apply_function = scope_entry_force_value(context->compilation, apply_entry);
-  return token_handle_function_call(context, apply_function, operands_view, source_range);
+  return token_handle_function_call(context, parser, apply_function, operands_view, source_range);
 }
 
 static Value *
 mass_handle_typed_symbol_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View operands,
   const Operator *operator
 ) {
   Value *lhs_value = value_view_get(operands, 0);
-  Value *rhs_value = token_parse_single(context, value_view_get(operands, 1));
+  Value *rhs_value = token_parse_single(context, parser, value_view_get(operands, 1));
   Source_Range source_range = operands.source_range;
 
   if (!value_is_symbol(lhs_value)) {
@@ -5252,6 +5307,7 @@ mass_handle_assignment_lazy_proc(
 static Value *
 mass_define_stack_value_from_typed_symbol(
   Execution_Context *context,
+  Parser *parser,
   const Typed_Symbol *typed_symbol,
   Source_Range source_range
 ) {
@@ -5261,28 +5317,29 @@ mass_define_stack_value_from_typed_symbol(
     .descriptor = typed_symbol->descriptor,
   };
   Value *defined = mass_make_lazy_value(
-    context, source_range, payload,
+    context, parser, source_range, payload,
     typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
   );
-  scope_define_value(context->scope, context->epoch, source_range, typed_symbol->symbol, defined);
+  scope_define_value(parser->scope, parser->epoch, source_range, typed_symbol->symbol, defined);
   return defined;
 }
 
 static Value *
 mass_handle_assignment_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View operands,
   const Operator *operator
 ) {
-  Value *target = token_parse_single(context, value_view_get(operands, 0));
-  Value *source = token_parse_single(context, value_view_get(operands, 1));
+  Value *target = token_parse_single(context, parser, value_view_get(operands, 0));
+  Value *source = token_parse_single(context, parser, value_view_get(operands, 1));
 
 
   if (mass_has_error(context)) return 0;
 
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
-    target = mass_define_stack_value_from_typed_symbol(context, typed_symbol, target->source_range);
+    target = mass_define_stack_value_from_typed_symbol(context, parser, typed_symbol, target->source_range);
   }
 
   Assignment *assignment = allocator_allocate(context->allocator, Assignment);
@@ -5322,14 +5379,15 @@ mass_goto_lazy_proc(
 static Value *
 mass_handle_goto_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View operands,
   const void *payload
 ) {
   assert(operands.length == 1);
-  Value *target = token_parse_single(context, value_view_get(operands, 0));
+  Value *target = token_parse_single(context, parser, value_view_get(operands, 0));
 
   return mass_make_lazy_value(
-    context, operands.source_range, target,
+    context, parser, operands.source_range, target,
     &descriptor_void, mass_goto_lazy_proc
   );
 }
@@ -5337,6 +5395,7 @@ mass_handle_goto_operator(
 static Value *
 mass_fragment(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view
 ) {
   assert(args_view.length == 1);
@@ -5344,7 +5403,7 @@ mass_fragment(
   const Group_Curly *group = value_as_group_curly(source_value);
   Code_Fragment *fragment = allocator_allocate(context->allocator, Code_Fragment);
   *fragment = (Code_Fragment) {
-    .scope = context->scope,
+    .scope = parser->scope,
     .children = group->children,
   };
 
@@ -5354,12 +5413,13 @@ mass_fragment(
 static Value *
 mass_eval(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view
 ) {
   assert(args_view.length == 1);
   Value *body = value_view_get(args_view, 0);
   if (value_is_group_paren(body) || value_is_group_curly(body)) {
-    return compile_time_eval(context, args_view);
+    return compile_time_eval(context, parser, args_view);
   } else {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -5561,6 +5621,7 @@ mass_handle_array_access_lazy_proc(
 static Value *
 mass_struct_field_access(
   Execution_Context *context,
+  Parser *parser,
   Value *struct_,
   const Struct_Field *field,
   const Source_Range *source_range
@@ -5581,7 +5642,7 @@ mass_struct_field_access(
     *lazy_payload = stack_lazy_payload;
 
     return mass_make_lazy_value(
-      context,
+      context, parser,
       *source_range,
       lazy_payload,
       field->descriptor,
@@ -5605,10 +5666,11 @@ mass_handle_dereference_operator_lazy_proc(
 static Value *
 mass_handle_dereference_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view,
   const void *payload
 ) {
-  Value *pointer = token_parse_single(context, value_view_get(args_view, 0));
+  Value *pointer = token_parse_single(context, parser, value_view_get(args_view, 0));
   if (mass_has_error(context)) return 0;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
   if (descriptor->tag != Descriptor_Tag_Pointer_To) {
@@ -5624,7 +5686,7 @@ mass_handle_dereference_operator(
   }
   // FIXME support this for static values
   return mass_make_lazy_value(
-    context,
+    context, parser,
     args_view.source_range,
     pointer,
     descriptor->Pointer_To.descriptor,
@@ -5635,10 +5697,11 @@ mass_handle_dereference_operator(
 static Value *
 mass_handle_dot_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view,
   const Operator *operator
 ) {
-  Value *lhs = token_parse_single(context, value_view_get(args_view, 0));
+  Value *lhs = token_parse_single(context, parser, value_view_get(args_view, 0));
   Value *rhs = value_view_get(args_view, 1);
   if (mass_has_error(context)) return 0;
 
@@ -5665,7 +5728,7 @@ mass_handle_dot_operator(
         return 0;
       }
       const Struct_Field *field = dyn_array_get(unwrapped_descriptor->Struct.fields, index);
-      return mass_struct_field_access(context, lhs, field, &args_view.source_range);
+      return mass_struct_field_access(context, parser, lhs, field, &args_view.source_range);
     }
     if (!value_is_symbol(rhs)) {
       mass_error(context, (Mass_Error) {
@@ -5709,7 +5772,7 @@ mass_handle_dot_operator(
         });
         return 0;
       }
-      return mass_struct_field_access(context, lhs, field, &args_view.source_range);
+      return mass_struct_field_access(context, parser, lhs, field, &args_view.source_range);
     }
   } else if (
     lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
@@ -5722,7 +5785,7 @@ mass_handle_dot_operator(
       } else {
         descriptor = descriptor->Pointer_To.descriptor;
       }
-      rhs = token_parse_single(context, rhs);
+      rhs = token_parse_single(context, parser, rhs);
       Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
       if (mass_value_is_compile_time_known(lhs)) {
         Expected_Result expected_result = expected_result_any(descriptor);
@@ -5734,7 +5797,7 @@ mass_handle_dot_operator(
         allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
       *heap_payload = lazy_payload;
       return mass_make_lazy_value(
-        context, args_view.source_range, heap_payload, descriptor, mass_handle_array_access_lazy_proc
+        context, parser, args_view.source_range, heap_payload, descriptor, mass_handle_array_access_lazy_proc
       );
     } else {
       mass_error(context, (Mass_Error) {
@@ -5758,6 +5821,7 @@ mass_handle_dot_operator(
 static void
 token_dispatch_operator(
   Execution_Context *context,
+  Parser *parser,
   Array_Value_Ptr *stack,
   Operator_Stack_Entry *stack_entry
 ) {
@@ -5793,13 +5857,14 @@ token_dispatch_operator(
   Value *result_value = 0;
   switch(operator->tag) {
     case Operator_Tag_Alias: {
-      result_value = operator->Alias.handler(context, args_view, operator);
+      result_value = operator->Alias.handler(context, parser, args_view, operator);
     } break;
     case Operator_Tag_Intrinsic: {
       Mass_Intrinsic_Proc proc = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
         context->compilation, operator->Intrinsic.body, &source_range
       );
-      result_value = proc(context, args_view);
+      if (mass_has_error(context)) return;
+      result_value = proc(context, parser, args_view);
     } break;
   }
   if (mass_has_error(context)) return;
@@ -5865,6 +5930,7 @@ mass_handle_if_expression_lazy_proc(
 static Value *
 token_parse_if_expression(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 *matched_length,
   const Symbol *end_symbol
@@ -5880,7 +5946,7 @@ token_parse_if_expression(
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
     u32 condition_length;
     value_condition = token_parse_expression(
-      context, condition_view, &condition_length, context->compilation->common_symbols.then
+      context, parser, condition_view, &condition_length, context->compilation->common_symbols.then
     );
     peek_index += condition_length;
     if (mass_has_error(context)) return 0;
@@ -5891,7 +5957,7 @@ token_parse_if_expression(
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
     u32 then_length;
     value_then = token_parse_expression(
-      context, then_view, &then_length, context->compilation->common_symbols._else
+      context, parser, then_view, &then_length, context->compilation->common_symbols._else
     );
     peek_index += then_length;
     if (mass_has_error(context)) return 0;
@@ -5901,7 +5967,7 @@ token_parse_if_expression(
   {
     Value_View else_view = value_view_slice(&view, peek_index, view.length);
     u32 else_length;
-    value_else = token_parse_expression(context, else_view, &else_length, end_symbol);
+    value_else = token_parse_expression(context, parser, else_view, &else_length, end_symbol);
     peek_index += else_length;
     if (mass_has_error(context)) return 0;
   }
@@ -5932,20 +5998,19 @@ token_parse_if_expression(
   };
 
   return mass_make_lazy_value(
-    context, keyword->source_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
+    context, parser, keyword->source_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
   );
 }
 
 static Function_Literal *
 mass_make_fake_function_literal(
   Execution_Context *context,
+  Parser *parser,
   Value *body,
   const Descriptor *returns,
   const Source_Range *source_range
 ) {
-  Scope *function_scope = scope_make(context->allocator, context->scope);
-  Execution_Context function_context = *context;
-  function_context.scope = function_scope;
+  Scope *function_scope = scope_make(context->allocator, parser->scope);
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info);
@@ -5958,6 +6023,7 @@ mass_make_fake_function_literal(
     .info = fn_info,
     .body = body,
     .context = *context,
+    .own_scope = function_scope,
   };
   return literal;
 }
@@ -5965,6 +6031,7 @@ mass_make_fake_function_literal(
 static Value *
 mass_intrinsic(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view
 ) {
   assert(args_view.length == 2);
@@ -5972,13 +6039,13 @@ mass_intrinsic(
 
   Value *body = value_view_get(args_view, 1);
   if (!value_is_group_curly(body)) {
-    context_parse_error(context, args_view, 1);
+    context_parse_error(context, parser, args_view, 1);
     return 0;
   }
   const Source_Range *source_range = &args_view.source_range;
 
   Function_Literal *literal = mass_make_fake_function_literal(
-    context, body, &descriptor_value_pointer, source_range
+    context, parser, body, &descriptor_value_pointer, source_range
   );
 
   // @Volatile :IntrinsicFunctionSignature
@@ -5996,6 +6063,12 @@ mass_intrinsic(
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
     // TODO make a common symbol for this
+    .symbol = mass_ensure_symbol(context->compilation, slice_literal("parser")),
+    .descriptor = &descriptor_parser_pointer,
+    .source_range = *source_range,
+  });
+  dyn_array_push(literal->info->parameters, (Function_Parameter) {
+    // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
     .descriptor = &descriptor_value_view,
     .source_range = *source_range,
@@ -6008,15 +6081,13 @@ mass_intrinsic(
 static Function_Info *
 function_info_from_parameters_and_return_type(
   Execution_Context *context,
+  Parser *parser,
   Value_View args_view,
   Value *return_types
 ) {
-  Epoch function_epoch = get_new_epoch();
-  Scope *function_scope = scope_make(context->allocator, context->scope);
-
-  Execution_Context arg_context = *context;
-  arg_context.scope = function_scope;
-  arg_context.epoch = function_epoch;
+  Parser arg_parser = *parser;
+  arg_parser.scope = scope_make(context->allocator, parser->scope);
+  arg_parser.epoch = get_new_epoch();
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info);
@@ -6035,7 +6106,7 @@ function_info_from_parameters_and_return_type(
 
     for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
       Value_View param_view = token_split_next(&it, &token_pattern_comma_operator);
-      Function_Parameter param = token_match_argument(&arg_context, param_view, fn_info);
+      Function_Parameter param = token_match_argument(context, &arg_parser, param_view, fn_info);
       if (mass_has_error(context)) goto defer;
       dyn_array_push(temp_params, param);
       if (previous_argument_has_default_value) {
@@ -6074,6 +6145,7 @@ function_info_from_parameters_and_return_type(
 static Value *
 token_parse_function_literal(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 *matched_length,
   const Symbol *end_symbol
@@ -6096,7 +6168,7 @@ token_parse_function_literal(
 
   Value *args = value_view_next(view, &peek_index);
   if (!value_is_group_paren(args)) {
-    context_parse_error(context, view, peek_index);
+    context_parse_error(context, parser, view, peek_index);
     return 0;
   }
 
@@ -6124,7 +6196,7 @@ token_parse_function_literal(
   if (arrow) {
     returns = value_view_next(view, &peek_index);
     if (!returns) {
-      context_parse_error(context, view, peek_index);
+      context_parse_error(context, parser, view, peek_index);
       return 0;
     }
   } else {
@@ -6136,7 +6208,7 @@ token_parse_function_literal(
 
   Value_View args_view = value_as_group_paren(args)->children;
   Function_Info *fn_info =
-    function_info_from_parameters_and_return_type(context, args_view, returns);
+    function_info_from_parameters_and_return_type(context, parser, args_view, returns);
   if (mass_has_error(context)) return 0;
 
   Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_group_curly);
@@ -6154,7 +6226,7 @@ token_parse_function_literal(
       });
       return 0;
     }
-    if (rest.length) body_value = compile_time_eval(context, rest);
+    if (rest.length) body_value = compile_time_eval(context, parser, rest);
   }
   if (mass_has_error(context)) return 0;
 
@@ -6170,7 +6242,7 @@ token_parse_function_literal(
 
   // TODO support this on non-Linux systems
   if (is_syscall) {
-    ensure_parameter_descriptors(context->compilation, fn_info, context->scope);
+    ensure_parameter_descriptors(context->compilation, fn_info, parser->scope);
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
@@ -6198,7 +6270,7 @@ token_parse_function_literal(
     }
     if (is_macro) flags |= Function_Literal_Flags_Macro;
     if (!(flags & Function_Literal_Flags_Generic)) {
-      ensure_parameter_descriptors(context->compilation, fn_info, context->scope);
+      ensure_parameter_descriptors(context->compilation, fn_info, parser->scope);
       if (mass_has_error(context)) return 0;
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
@@ -6207,10 +6279,11 @@ token_parse_function_literal(
       .info = fn_info,
       .body = body_value,
       .context = *context,
+      .own_scope = parser->scope,
     };
     return value_make(context->allocator, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    ensure_parameter_descriptors(context->compilation, fn_info, context->scope);
+    ensure_parameter_descriptors(context->compilation, fn_info, parser->scope);
     if (mass_has_error(context)) return 0;
 
     const Calling_Convention *calling_convention =
@@ -6226,6 +6299,7 @@ token_parse_function_literal(
 
 typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 *out_match_length,
   const Symbol *end_symbol
@@ -6239,6 +6313,7 @@ typedef struct {
 static Value *
 token_parse_expression(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   u32 *out_match_length,
   const Symbol *end_symbol
@@ -6246,7 +6321,7 @@ token_parse_expression(
   if(view.length == 0) return &void_value;
   if(view.length == 1) {
     *out_match_length = 1;
-    return token_parse_single(context, value_view_get(view, 0));
+    return token_parse_single(context, parser, value_view_get(view, 0));
   }
 
   Value *result = 0;
@@ -6277,7 +6352,7 @@ token_parse_expression(
 
     { // if expression
       u32 match_length = 0;
-      Value *match_result = token_parse_if_expression(context, rest, &match_length, end_symbol);
+      Value *match_result = token_parse_if_expression(context, parser, rest, &match_length, end_symbol);
       if (mass_has_error(context)) goto defer;
       if (match_length) {
         dyn_array_push(value_stack, match_result);
@@ -6289,7 +6364,7 @@ token_parse_expression(
 
     { // function literal
       u32 match_length = 0;
-      Value *match_result = token_parse_function_literal(context, rest, &match_length, end_symbol);
+      Value *match_result = token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
       if (mass_has_error(context)) goto defer;
       if (match_length) {
         dyn_array_push(value_stack, match_result);
@@ -6311,11 +6386,11 @@ token_parse_expression(
 
     if (value_is_symbol(value)) {
       const Operator *maybe_operator = scope_lookup_operator(
-        context->compilation, context->scope, value_as_symbol(value)->name, fixity_mask
+        context->compilation, parser->scope, value_as_symbol(value)->name, fixity_mask
       );
       if (maybe_operator) {
         if (!token_handle_operator(
-          context, view, &value_stack, &operator_stack, maybe_operator, value->source_range
+          context, parser, view, &value_stack, &operator_stack, maybe_operator, value->source_range
         )) goto defer;
         is_previous_an_operator = (maybe_operator->fixity != Operator_Fixity_Postfix);
         continue;
@@ -6325,7 +6400,7 @@ token_parse_expression(
     if (!is_previous_an_operator) {
       const Operator *empty_space_operator = &context->compilation->apply_operator;
       if (!token_handle_operator(
-        context, view, &value_stack, &operator_stack, empty_space_operator, value->source_range
+        context, parser, view, &value_stack, &operator_stack, empty_space_operator, value->source_range
       )) goto defer;
     }
     dyn_array_push(value_stack, value);
@@ -6335,13 +6410,13 @@ token_parse_expression(
   drain:
   while (dyn_array_length(operator_stack)) {
     Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
-    token_dispatch_operator(context, &value_stack, entry);
+    token_dispatch_operator(context, parser, &value_stack, entry);
   }
 
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(value_stack) == 1) {
       result = *dyn_array_last(value_stack);
-      result = token_parse_single(context, result);
+      result = token_parse_single(context, parser, result);
     } else {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
@@ -6417,6 +6492,7 @@ mass_handle_block_lazy_proc(
 static Value *
 token_parse_block_view(
   Execution_Context *context,
+  Parser *parser,
   Value_View children_view
 ) {
   if (!children_view.length) return &void_value;
@@ -6443,10 +6519,10 @@ token_parse_block_view(
       continue;
     }
     Lazy_Value lazy_value = {
-      .epoch = context->epoch,
+      .epoch = parser->epoch,
       .descriptor = &descriptor_void,
     };
-    match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, context->scope);
+    match_length = token_statement_matcher_in_scopes(context, parser, rest, &lazy_value, parser->scope);
     if (mass_has_error(context)) goto defer;
 
     if (match_length) {
@@ -6469,7 +6545,7 @@ token_parse_block_view(
       continue;
     }
     Value *parse_result = token_parse_expression(
-      context, rest, &match_length, context->compilation->common_symbols.operator_semicolon
+      context, parser, rest, &match_length, context->compilation->common_symbols.operator_semicolon
     );
     if (mass_has_error(context)) goto defer;
 
@@ -6478,22 +6554,22 @@ token_parse_block_view(
         // TODO make lazy value accept const payload
         Assignment *assignment = (Assignment *)value_as_assignment(parse_result);
         parse_result = mass_make_lazy_value(
-          context, parse_result->source_range, assignment,
+          context, parser, parse_result->source_range, assignment,
           &descriptor_void, mass_handle_assignment_lazy_proc
         );
       } else if (value_is_code_fragment(parse_result)) {
         const Code_Fragment *fragment = value_as_code_fragment(parse_result);
-        Scope *saved_scope = context->scope;
-        context->scope = fragment->scope;
-        parse_result = token_parse_block_view(context, fragment->children);
-        context->scope = saved_scope;
+        Scope *saved_scope = parser->scope;
+        parser->scope = fragment->scope;
+        parse_result = token_parse_block_view(context, parser, fragment->children);
+        parser->scope = saved_scope;
       } else if (parse_result->descriptor == &descriptor_typed_symbol) {
         parse_result = mass_define_stack_value_from_typed_symbol(
-          context, value_as_typed_symbol(parse_result), parse_result->source_range
+          context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
         );
       } else if (value_is_module_exports(parse_result)) {
         Value_View match_view = value_view_slice(&rest, 0, match_length);
-        if (!(context->flags & Parser_Flags_Global)) {
+        if (!(parser->flags & Parser_Flags_Global)) {
           mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Parse,
             .source_range = match_view.source_range,
@@ -6501,17 +6577,17 @@ token_parse_block_view(
           });
           goto defer;
         }
-        if (context->module->exports.tag != Module_Exports_Tag_Not_Specified) {
+        if (parser->module->exports.tag != Module_Exports_Tag_Not_Specified) {
           mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Parse,
             .source_range = match_view.source_range,
             .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
-            .other_source_range = context->module->exports.source_range,
+            .other_source_range = parser->module->exports.source_range,
           });
           goto defer;
         }
         const Module_Exports *exports = value_as_module_exports(parse_result);
-        context->module->exports = *exports;
+        parser->module->exports = *exports;
         continue;
       }
     }
@@ -6542,7 +6618,7 @@ token_parse_block_view(
       PACK_AS_VOID_POINTER(payload, lazy_statements);
 
       return mass_make_lazy_value(
-        context, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
+        context, parser, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
       );
     }
   } else {
@@ -6557,25 +6633,27 @@ token_parse_block_view(
 static inline Value *
 token_parse_block_no_scope(
   Execution_Context *context,
+  Parser *parser,
   const Group_Curly *group
 ) {
-  return token_parse_block_view(context, group->children);
+  return token_parse_block_view(context, parser, group->children);
 }
 
 static inline Value *
 token_parse_block(
   Execution_Context *context,
+  Parser *parser,
   const Group_Curly *group
 ) {
-  Execution_Context body_context = *context;
-  Scope *block_scope = scope_make(context->allocator, context->scope);
-  body_context.scope = block_scope;
-  return token_parse_block_no_scope(&body_context, group);
+  Parser block_parser = *parser;
+  block_parser.scope = scope_make(context->allocator, parser->scope);
+  return token_parse_block_no_scope(context, &block_parser, group);
 }
 
 static u32
 token_parse_statement_using(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   void *unused_payload
@@ -6585,15 +6663,15 @@ token_parse_statement_using(
     view, &peek_index, context->compilation->common_symbols.using
   );
   if (!keyword) return 0;
-  Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
+  Value_View rest = value_view_match_till_end_of_statement(context, parser, view, &peek_index);
 
-  Value *result = compile_time_eval(context, rest);
+  Value *result = compile_time_eval(context, parser, rest);
   if (!mass_value_ensure_static_of(context->compilation, result, &descriptor_module)) {
     goto err;
   }
 
   const Module *module = value_as_module(result);
-  mass_copy_scope_exports(context->scope, module->exports.scope);
+  mass_copy_scope_exports(parser->scope, module->exports.scope);
 
   err:
   return peek_index;
@@ -6631,6 +6709,7 @@ mass_handle_label_lazy_proc(
 static u32
 token_parse_statement_label(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   void *unused_payload
@@ -6644,7 +6723,7 @@ token_parse_statement_label(
     view, &peek_index, context->compilation->common_symbols.placeholder
   );
 
-  Value_View rest = value_view_match_till_end_of_statement(context, view, &peek_index);
+  Value_View rest = value_view_match_till_end_of_statement(context, parser, view, &peek_index);
 
   if (rest.length != 1 || !value_is_symbol(value_view_get(rest, 0))) {
     mass_error(context, (Mass_Error) {
@@ -6662,10 +6741,10 @@ token_parse_statement_label(
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   Value *value;
-  if (scope_lookup(context->scope, symbol)) {
-    value = mass_context_force_lookup(context, context->scope, symbol, &source_range);
+  if (scope_lookup(parser->scope, symbol)) {
+    value = mass_context_force_lookup(context, parser, parser->scope, symbol, &source_range);
   } else {
-    Scope *label_scope = context->scope;
+    Scope *label_scope = parser->scope;
 
     Label *label = make_label(
       context->allocator, context->program, &context->program->memory.code, name
@@ -6709,14 +6788,15 @@ mass_handle_explicit_return_lazy_proc(
 static Value *
 mass_handle_return_operator(
   Execution_Context *context,
+  Parser *parser,
   Value_View args,
   const Operator *operator
 ) {
   assert(args.length == 1);
-  Value *return_value = token_parse_single(context, value_view_get(args, 0));
+  Value *return_value = token_parse_single(context, parser, value_view_get(args, 0));
 
   return mass_make_lazy_value(
-    context, args.source_range, return_value, &descriptor_void,
+    context, parser, args.source_range, return_value, &descriptor_void,
     mass_handle_explicit_return_lazy_proc
   );
 }
@@ -6724,12 +6804,13 @@ mass_handle_return_operator(
 static void
 token_define_global_variable(
   Execution_Context *context,
+  Parser *parser,
   Value *symbol,
   Value_View expression
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = token_parse_expression(context, expression, &(u32){0}, 0);
+  Value *value = token_parse_expression(context, parser, expression, &(u32){0}, 0);
   if (mass_has_error(context)) return;
 
   const Descriptor *descriptor = deduce_runtime_descriptor_for_value(
@@ -6759,7 +6840,7 @@ token_define_global_variable(
     if (mass_value_is_compile_time_known(value)) {
       // TODO this is a bit awkward but
       Function_Builder fake_builder = {
-        .epoch = context->epoch,
+        .epoch = parser->epoch,
         .program = context->compilation->jit.program,
       };
       mass_assign(context->compilation, &fake_builder, global_value, value, &expression.source_range);
@@ -6772,12 +6853,12 @@ token_define_global_variable(
       };
 
       Value *body_value = mass_make_lazy_value(
-        context, symbol->source_range, assignment_payload, &descriptor_void,
+        context, parser, symbol->source_range, assignment_payload, &descriptor_void,
         mass_handle_assignment_lazy_proc
       );
 
       Function_Literal *startup_literal = mass_make_fake_function_literal(
-        context, body_value, &descriptor_void, &expression.source_range
+        context, parser, body_value, &descriptor_void, &expression.source_range
       );
       Value *startup_function = value_make(
         context->allocator, &descriptor_function_literal, storage_static(startup_literal), value->source_range
@@ -6789,19 +6870,20 @@ token_define_global_variable(
     }
   }
 
-  scope_define_value(context->scope, VALUE_STATIC_EPOCH, symbol->source_range, value_as_symbol(symbol), global_value);
+  scope_define_value(parser->scope, VALUE_STATIC_EPOCH, symbol->source_range, value_as_symbol(symbol), global_value);
 }
 
 static void
 token_define_local_variable(
   Execution_Context *context,
+  Parser *parser,
   Value *symbol,
   Lazy_Value *out_lazy_value,
   Value_View expression
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = token_parse_expression(context, expression, &(u32){0}, 0);
+  Value *value = token_parse_expression(context, parser, expression, &(u32){0}, 0);
   if (mass_has_error(context)) return;
   const Descriptor *variable_descriptor = deduce_runtime_descriptor_for_value(
     context->compilation, context->program, value, 0
@@ -6822,13 +6904,13 @@ token_define_local_variable(
   };
 
   Value *variable_value = mass_make_lazy_value(
-    context, symbol->source_range, variable_payload, variable_descriptor,
+    context, parser, symbol->source_range, variable_payload, variable_descriptor,
     mass_handle_variable_definition_lazy_proc
   );
 
   const Source_Range *source_range = &symbol->source_range;
 
-  scope_define_value(context->scope, context->epoch, *source_range, value_as_symbol(symbol), variable_value);
+  scope_define_value(parser->scope, parser->epoch, *source_range, value_as_symbol(symbol), variable_value);
 
   Assignment *assignment_payload = allocator_allocate(context->allocator, Assignment);
   *assignment_payload = (Assignment) {
@@ -6843,6 +6925,7 @@ token_define_local_variable(
 static u32
 token_parse_definition_and_assignment_statements(
   Execution_Context *context,
+  Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
   void *unused_payload
@@ -6852,7 +6935,7 @@ token_parse_definition_and_assignment_statements(
   Value *operator;
 
   u32 statement_length = 0;
-  view = value_view_match_till_end_of_statement(context, view, &statement_length);
+  view = value_view_match_till_end_of_statement(context, parser, view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
     return 0;
   }
@@ -6875,10 +6958,10 @@ token_parse_definition_and_assignment_statements(
     goto err;
   }
 
-  if (context->flags & Parser_Flags_Global) {
-    token_define_global_variable(context, name_token, rhs);
+  if (parser->flags & Parser_Flags_Global) {
+    token_define_global_variable(context, parser, name_token, rhs);
   } else {
-    token_define_local_variable(context, name_token, out_lazy_value, rhs);
+    token_define_local_variable(context, parser, name_token, out_lazy_value, rhs);
   }
 
   err:
@@ -7062,9 +7145,10 @@ scope_define_builtins(
 
 static void
 module_process_exports(
-  Execution_Context *import_context,
-  Module *module
+  Execution_Context *context,
+  Parser *parser
 ) {
+  Module *module = parser->module;
   switch(module->exports.tag) {
     case Module_Exports_Tag_Not_Specified: // Export everything when no explicit exports specified
     case Module_Exports_Tag_All: {
@@ -7072,14 +7156,14 @@ module_process_exports(
       break;
     }
     case Module_Exports_Tag_Selective: {
-      module->exports.scope = scope_make(import_context->allocator, module->own_scope->parent);
+      module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
       Array_Value_Ptr symbols = module->exports.Selective.symbols;
       for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
         Value **symbol_pointer = dyn_array_get(symbols, i);
         const Symbol *symbol = value_as_symbol(*symbol_pointer);
         Scope_Entry *entry = scope_lookup_shallow(module->own_scope, symbol);
         if (!entry) {
-          mass_error(import_context, (Mass_Error) {
+          mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Undefined_Variable,
             .source_range = (*symbol_pointer)->source_range,
             .Undefined_Variable = {.name = symbol->name},
@@ -7087,7 +7171,7 @@ module_process_exports(
         }
 
         Value_View expr = value_view_single(symbol_pointer);
-        scope_define_lazy_compile_time_expression(import_context, module->exports.scope, symbol, expr);
+        scope_define_lazy_compile_time_expression(context, parser, module->exports.scope, symbol, expr);
       }
       break;
     }
@@ -7097,6 +7181,7 @@ module_process_exports(
 static Value *
 mass_inline_module(
   Execution_Context *context,
+  Parser *parser,
   Value_View args
 ) {
   assert(args.length == 2);
@@ -7106,35 +7191,40 @@ mass_inline_module(
   Module *module = allocator_allocate(context->allocator, Module);
   *module = (Module) {
     .source_range = args.source_range,
-    .own_scope = scope_make(context->allocator, context->scope),
+    .own_scope = scope_make(context->allocator, parser->scope),
   };
-  Execution_Context import_context = execution_context_from_compilation(context->compilation);
-  import_context.module = module;
-  import_context.scope = module->own_scope;
-  Value *block_result = token_parse_block_view(&import_context, curly->children);
-  value_force_exact(context->compilation, 0, &void_value, block_result);
-  module_process_exports(&import_context, module);
+  Parser module_parser = {
+    .flags = Parser_Flags_Global,
+    .scope = module->own_scope,
+    .module = module,
+    .epoch = VALUE_STATIC_EPOCH,
+  };
+  // Need a new context here to ensure we are using the runtime program for new modules
+  Execution_Context module_context = execution_context_from_compilation(context->compilation);
+  Value *block_result = token_parse_block_view(&module_context, &module_parser, curly->children);
+  value_force_exact(module_context.compilation, 0, &void_value, block_result);
+  module_process_exports(&module_context, &module_parser);
 
-  return value_make(context->allocator, &descriptor_module, storage_static(module), args.source_range);
+  return value_make(module_context.allocator, &descriptor_module, storage_static(module), args.source_range);
 }
 
 static inline void
 program_parse(
-  Execution_Context *context
+  Execution_Context *context,
+  Parser *parser
 ) {
-  assert(context->module);
-
+  assert(parser->module);
   Performance_Counter perf = system_performance_counter_start();
   Value_View tokens;
-  *context->result = tokenize(context->compilation, context->module->source_range, &tokens);
+  *context->result = tokenize(context->compilation, parser->module->source_range, &tokens);
   if (mass_has_error(context)) return;
   if (0) {
     u64 usec = system_performance_counter_end(&perf);
     printf("Tokenizer took %"PRIu64" µs\n", usec);
   }
 
-  Value *block_result = token_parse_block_view(context, tokens);
-  compile_time_eval(context, value_view_single(&block_result));
+  Value *block_result = token_parse_block_view(context, parser, tokens);
+  compile_time_eval(context, parser, value_view_single(&block_result));
 }
 
 
@@ -7248,12 +7338,16 @@ program_import_module(
   Execution_Context *context,
   Module *module
 ) {
-  Execution_Context import_context = execution_context_from_compilation(context->compilation);
-  import_context.module = module;
-  import_context.scope = module->own_scope;
-  program_parse(&import_context);
-  if (mass_has_error(&import_context)) return;
-  module_process_exports(&import_context, module);
+  Parser import_parser = {
+    .flags = Parser_Flags_Global,
+    .scope = module->own_scope,
+    .module = module,
+    .epoch = VALUE_STATIC_EPOCH,
+  };
+
+  program_parse(context, &import_parser);
+  if (mass_has_error(context)) return;
+  module_process_exports(context, &import_parser);
 }
 
 static void
@@ -7306,7 +7400,7 @@ mass_run_script(
   Slice file_path
 ) {
   Compilation *compilation = context->compilation;
-  Module *root_module = program_module_from_file(context, file_path, context->scope);
+  Module *root_module = program_module_from_file(context, file_path, compilation->root_scope);
   if (mass_has_error(context)) return;
 
   // Trim leading whitespace and possible a shebang
@@ -7320,8 +7414,15 @@ mass_run_script(
   Value *fake_function_body = value_make(
     context->allocator, &descriptor_value_view, storage_static(tokens), source_range
   );
+  Parser parser = {
+    .flags = Parser_Flags_None,
+    .scope = compilation->root_scope,
+    .module = root_module,
+    .epoch = get_new_epoch(),
+  };
+
   Function_Literal *literal = mass_make_fake_function_literal(
-    context, fake_function_body, &descriptor_void, &source_range
+    context, &parser, fake_function_body, &descriptor_void, &source_range
   );
   Value *entry =
     value_make(context->allocator, &descriptor_function_literal, storage_static(literal), source_range);

@@ -124,16 +124,15 @@ int main(s32 argc, char **argv) {
     return 0;
   }
 
-  Module *root_module = program_module_from_file(&context, file_path, context.scope);
+  Module *root_module = program_module_from_file(&context, file_path, compilation.root_scope);
   program_import_module(&context, root_module);
   if (mass_has_error(&context)) {
     return mass_cli_print_error(&compilation, context.result);
   }
 
   const Symbol *main_symbol = mass_ensure_symbol(&compilation, slice_literal("main"));
-  Source_Range entry_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&entry_source_range, "__entry");
-  Value *main = mass_context_force_lookup(&context, root_module->exports.scope, main_symbol, &entry_source_range);
+  Scope_Entry *entry = scope_lookup(compilation.root_scope, main_symbol);
+  Value *main = scope_entry_force_value(&compilation, entry);
   if (!main) {
     printf("Could not find entry point function `main`");
     return -1;

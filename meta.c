@@ -444,8 +444,8 @@ print_scope_define_function(
     case Function_Kind_Intrinsic: {
       fprintf(file, " | Function_Info_Flags_Intrinsic");
 
-      if (function->argument_count != 2) {
-        printf("Intrinsic %s must have 2 arguments", function->name);
+      if (function->argument_count != 3) {
+        printf("Intrinsic %s must have 3 arguments", function->name);
         exit(1);
       }
       {
@@ -456,9 +456,16 @@ print_scope_define_function(
         }
       }
       {
-        const char *expected = "Value_View";
+        const char *expected = "Parser *";
         if (strcmp(function->arguments[1].type, expected) != 0) {
           printf("Intrinsic %s second argument must have type %s", function->name, expected);
+          exit(1);
+        }
+      }
+      {
+        const char *expected = "Value_View";
+        if (strcmp(function->arguments[2].type, expected) != 0) {
+          printf("Intrinsic %s third argument must have type %s", function->name, expected);
           exit(1);
         }
       }
@@ -1059,6 +1066,7 @@ type_function_impl(
 #define type_intrinsic(_NAME_STRING_)\
   type_function(Intrinsic, (_NAME_STRING_), "Value *", (Argument_Type[]){\
     { "Execution_Context *", "context" },\
+    { "Parser *", "parser" },\
     { "Value_View", "args" },\
   })
 
@@ -1487,12 +1495,6 @@ main(void) {
     { "Compilation *", "compilation" },
     { "Program *", "program" },
     { "Mass_Result *", "result" },
-
-    { "Parser_Flags", "flags" },
-    { "s32", "_flags_padding" },
-    { "Epoch", "epoch" },
-    { "Scope *", "scope" },
-    { "Module *", "module" },
   })));
 
   push_type(type_enum("Parser_Flags", (Enum_Type_Item[]){
@@ -1500,6 +1502,14 @@ main(void) {
     { "Global", 1 << 0 },
     { "Type_Only", 1 << 1 },
   }));
+
+  export_compiler(push_type(type_struct("Parser", (Struct_Item[]){
+    { "Parser_Flags", "flags" },
+    { "s32", "_flags_padding" },
+    { "Epoch", "epoch" },
+    { "Scope *", "scope" },
+    { "Module *", "module" },
+  })));
 
   push_type(add_common_fields(type_union("Operator", (Struct_Type[]){
     struct_fields("Alias", (Struct_Item[]){
@@ -1608,17 +1618,20 @@ main(void) {
 
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
+    { "Parser", "parser" },
     { "Value_View", "expression" },
     { "u64", "resolving" },
   }));
 
   push_type(type_function(Typedef, "Mass_Intrinsic_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
+    { "Parser *", "parser" },
     { "Value_View", "view" },
   }));
 
   push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
+    { "Parser *", "parser" },
     { "Value_View", "view" },
     { "const Operator *", "operator" },
   }));
@@ -1671,6 +1684,7 @@ main(void) {
     { "Function_Literal_Flags", "flags"},
     { "u32", "_flags_padding"},
     { "Execution_Context", "context" },
+    { "Scope *", "own_scope" },
     { "Function_Info *", "info" },
     { "Value *", "body" },
     { "Array_Value_Ptr", "instances"},
@@ -1874,6 +1888,7 @@ main(void) {
 
   push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u32", (Argument_Type[]){
     { "Execution_Context *", "context" },
+    { "Parser *", "parser" },
     { "Value_View", "view" },
     { "Lazy_Value *", "out_lazy_value" },
     { "void *", "payload" },
