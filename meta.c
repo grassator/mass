@@ -1632,9 +1632,15 @@ main(void) {
     { "Intrinsic", 1 << 2},
   }));
 
-  push_type(type_struct("Function_Return", (Struct_Item[]){
-    { "const Descriptor *", "descriptor" },
-    { "Value_View", "maybe_type_expression" },
+  push_type(add_common_fields(type_union("Function_Return", (Struct_Type[]){
+    struct_fields("Generic", (Struct_Item[]){
+      { "Value_View", "type_expression" },
+    }),
+    struct_fields("Exact", (Struct_Item[]){
+      { "const Descriptor *", "descriptor" },
+    }),
+  }), (Struct_Item[]){
+    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Function_Info", (Struct_Item[]){

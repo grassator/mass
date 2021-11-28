@@ -2673,10 +2673,16 @@ compile_time_eval(
     .scope = scope_make(context->allocator, parser->scope),
     .module = parser->module,
   };
+  Value *expression_result_value = token_parse_expression(&eval_context, &eval_parser, view, &(u32){0}, 0);
+  if(mass_has_error(&eval_context)) {
+    context->result = eval_context.result;
+    return 0;
+  }
+  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
-  function_info_init(&fn_info);
+  function_info_init(&fn_info, function_return_exact(result_descriptor, *source_range));
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Section *section = &jit->program->memory.code;
@@ -2696,15 +2702,6 @@ compile_time_eval(
     },
     .source = source_from_source_range(context->compilation, source_range),
   };
-
-  Value *expression_result_value = token_parse_expression(&eval_context, &eval_parser, view, &(u32){0}, 0);
-  if(mass_has_error(&eval_context)) {
-    context->result = eval_context.result;
-    return 0;
-  }
-  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
-  // Lazy evaluation should not generate any instructions
-  assert(!eval_builder.code_block.first_bucket);
 
   Expected_Result expected_result = expected_result_any(result_descriptor);
   Value *forced_value = value_force(
@@ -3125,29 +3122,30 @@ mass_handle_macro_call(
   Value *body_value = token_parse_block_no_scope(context, &body_parser, value_as_group_curly(literal->body));
   if (mass_has_error(context)) goto err;
 
-  const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
-  if (
-    literal->info->returns.descriptor &&
-    !same_type_or_can_implicitly_move_cast(literal->info->returns.descriptor, return_descriptor)
-  ) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = body_value->source_range,
-      .Type_Mismatch = {
-        .expected = literal->info->returns.descriptor,
-        .actual = return_descriptor,
-      },
-    });
-    goto err;
+  const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
+  switch(literal->info->returns.tag) {
+    case Function_Return_Tag_Exact: {
+      const Descriptor *expected = literal->info->returns.Exact.descriptor;
+      if (!same_type_or_can_implicitly_move_cast(expected, actual_return_descriptor)) {
+        return mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = body_value->source_range,
+          .Type_Mismatch = { .expected = expected, .actual = actual_return_descriptor },
+        });
+      }
+    } break;
+    case Function_Return_Tag_Generic: {
+      panic("TODO");
+    } break;
   }
 
   if (mass_value_is_compile_time_known(body_value)) {
     return body_value;
   }
 
-  Source_Range return_range = literal->info->returns.maybe_type_expression.source_range;
+  Source_Range return_range = literal->info->returns.source_range;
   return mass_make_lazy_value(
-    context, parser, return_range, body_value, return_descriptor, mass_macro_lazy_proc
+    context, parser, return_range, body_value, actual_return_descriptor, mass_macro_lazy_proc
   );
 
   err:
@@ -3217,7 +3215,7 @@ call_function_overload(
 
   mass_assert_storage_is_valid_in_context(&instance->storage, context);
 
-  const Descriptor *return_descriptor = fn_info->returns.descriptor;
+  const Descriptor *return_descriptor = function_return_as_exact(&fn_info->returns)->descriptor;
   Value *fn_return_value;
   if (mass_descriptor_is_void(return_descriptor)) {
     fn_return_value = &void_value;
@@ -3555,13 +3553,21 @@ ensure_parameter_descriptors(
     assert(param->descriptor);
   }
 
-  if (!info->returns.descriptor) {
-    assert(info->returns.maybe_type_expression.length);
-    info->returns.descriptor =
-      token_match_type(&temp_context, &args_parser, info->returns.maybe_type_expression);
-    if (mass_has_error(&temp_context)) goto err;
-    assert(info->returns.descriptor);
+  switch(info->returns.tag) {
+    case Function_Return_Tag_Exact: {
+      // Nothing to do, we already know the type
+    } break;
+    case Function_Return_Tag_Generic: {
+      const Descriptor *descriptor =
+        token_match_type(&temp_context, &args_parser, info->returns.Generic.type_expression);
+      info->returns = (Function_Return) {
+        .tag = Function_Return_Tag_Exact,
+        .source_range = info->returns.source_range,
+        .Exact = { .descriptor = descriptor },
+      };
+    } break;
   }
+  assert(info->returns.tag == Function_Return_Tag_Exact);
 
   err:
   context_temp_reset_to_mark(&temp_context, temp_mark);
@@ -3893,13 +3899,14 @@ mass_ensure_trampoline(
     });
   }
 
-  const Descriptor *return_descriptor = original_info->returns.descriptor;
+  assert(original_info->returns.tag == Function_Return_Tag_Exact);
+  const Descriptor *return_descriptor = original_info->returns.Exact.descriptor;
   u64 return_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, return_descriptor);
   {
     dyn_array_push(fields, (Struct_Field) {
       .name = slice_literal("returns"),
       .descriptor = return_descriptor,
-      .source_range = original_info->returns.maybe_type_expression.source_range,
+      .source_range = original_info->returns.source_range,
       .offset = return_byte_offset,
     });
   }
@@ -3916,9 +3923,15 @@ mass_ensure_trampoline(
 
   Scope *trampoline_scope = scope_make(context->allocator, context->compilation->root_scope);
 
+  Source_Range return_range;
+  INIT_LITERAL_SOURCE_RANGE(&return_range, "()");
   Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
   trampoline_info->flags = Function_Info_Flags_Compile_Time;
-  trampoline_info->returns = (Function_Return) { .descriptor = &descriptor_void };
+  trampoline_info->returns = (Function_Return) {
+    .tag = Function_Return_Tag_Exact,
+    .source_range = return_range,
+    .Exact = { .descriptor = &descriptor_void },
+  };
   trampoline_info->parameters = dyn_array_make(
     Array_Function_Parameter,
     .allocator = context->allocator,
@@ -4021,8 +4034,10 @@ mass_trampoline_call(
   }
 
   trampoline->proc(args_struct_memory);
+  const Descriptor *return_descriptor =
+    function_return_as_exact(&trampoline->original_info->returns)->descriptor;
   Value *result;
-  if (mass_descriptor_is_void(trampoline->original_info->returns.descriptor)) {
+  if (mass_descriptor_is_void(return_descriptor)) {
     result = &void_value;
   } else {
     const Struct_Field *return_field = dyn_array_last(fields);
@@ -4098,18 +4113,6 @@ token_handle_function_call(
 
     Value *result = mass_trampoline_call(context, parser, overload, info, args_view);
     if (mass_has_error(context)) return 0;
-    const Descriptor *expected_descriptor = info->returns.descriptor;
-    if (expected_descriptor && !mass_descriptor_is_void(expected_descriptor)) {
-      const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(result);
-      if (!same_type(expected_descriptor, actual_descriptor)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = source_range,
-          .Type_Mismatch = { .actual = actual_descriptor, .expected = expected_descriptor },
-        });
-        return 0;
-      }
-    }
     return result;
   }
 
@@ -4120,7 +4123,7 @@ token_handle_function_call(
     .args = value_view_to_value_array(context->allocator, args_view),
   };
 
-  const Descriptor *lazy_descriptor = info->returns.descriptor;
+  const Descriptor *lazy_descriptor = function_return_as_exact(&info->returns)->descriptor;
   Value *result = mass_make_lazy_value(
     context, parser, source_range, call_payload, lazy_descriptor, call_function_overload
   );
@@ -4740,7 +4743,9 @@ mass_handle_startup_call_lazy_proc(
   if(startup_function->descriptor != &descriptor_function_literal) goto err;
   const Function_Literal *literal = value_as_function_literal(startup_function);
   if (dyn_array_length(literal->info->parameters)) goto err;
-  if (!mass_descriptor_is_void(literal->info->returns.descriptor)) goto err;
+  if (literal->info->returns.tag != Function_Return_Tag_Exact) goto err;
+  const Descriptor *descriptor = function_return_as_exact(&literal->info->returns)->descriptor;
+  if (!mass_descriptor_is_void(descriptor)) goto err;
 
   // This call is executed at compile time, but the actual startup function
   // will be run only at runtime so we need to make sure to use the right Program
@@ -5456,7 +5461,7 @@ mass_struct_get(
       return mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Unknown_Field,
         .source_range = rhs->source_range,
-        .Unknown_Field = { .name = symbol->name, .type = unwrapped_lhs_descriptor, },
+        .Unknown_Field = { .name = symbol->name, .type = unwrapped_lhs_descriptor },
       });
     }
   }
@@ -5757,10 +5762,7 @@ mass_make_fake_function_literal(
   Scope *function_scope = scope_make(context->allocator, parser->scope);
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info);
-  fn_info->returns = (Function_Return) {
-    .descriptor = returns,
-  };
+  function_info_init(fn_info, function_return_exact(returns, *source_range));
 
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
   *literal = (Function_Literal){
@@ -5833,8 +5835,22 @@ function_info_from_parameters_and_return_type(
   arg_parser.scope = scope_make(context->allocator, parser->scope);
   arg_parser.epoch = get_new_epoch();
 
+  Source_Range return_range = return_types->source_range;
+  Function_Return returns;
+  if (value_is_group_paren(return_types)) {
+    Value_View return_types_view = value_as_group_paren(return_types)->children;
+    if (return_types_view.length == 0) {
+      returns = function_return_exact(&descriptor_void, return_range);
+    } else {
+      returns = function_return_generic(return_types_view, return_range);
+    }
+  } else {
+    Value_View return_types_view = value_view_make_single(context->allocator, return_types);
+    returns = function_return_generic(return_types_view, return_range);
+  }
+
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info);
+  function_info_init(fn_info, returns);
 
   Temp_Mark temp_mark = context_temp_mark(context);
 
@@ -5868,17 +5884,6 @@ function_info_from_parameters_and_return_type(
     dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
   }
 
-  if (value_is_group_paren(return_types)) {
-    Value_View return_types_view = value_as_group_paren(return_types)->children;
-    if (return_types_view.length == 0) {
-      fn_info->returns = (Function_Return) { .descriptor = &descriptor_void, };
-    } else {
-      fn_info->returns = (Function_Return) { .maybe_type_expression = return_types_view, };
-    }
-  } else {
-    Value_View return_types_view = value_view_make_single(context->allocator, return_types);
-    fn_info->returns = (Function_Return) { .maybe_type_expression = return_types_view, };
-  }
   if (mass_has_error(context)) return 0;
 
   defer:

@@ -71,6 +71,7 @@ mass_error_append_descriptor(
 
 static void
 mass_error_append_function_signature_string(
+  Compilation *compilation,
   Fixed_Buffer *result,
   const Function_Info *info
 ) {
@@ -83,9 +84,20 @@ mass_error_append_function_signature_string(
     APPEND_LITERAL(" : ");
     mass_error_append_descriptor(result, arg->descriptor);
   }
-  APPEND_LITERAL(") -> (");
-  mass_error_append_descriptor(result, info->returns.descriptor);
   APPEND_LITERAL(")");
+  switch(info->returns.tag) {
+    case Function_Return_Tag_Exact: {
+      APPEND_LITERAL(" -> ");
+      mass_error_append_descriptor(result, info->returns.Exact.descriptor);
+    } break;
+    case Function_Return_Tag_Generic: {
+      APPEND_LITERAL(" -> ");
+      Slice source = source_from_source_range(
+        compilation, &info->returns.Generic.type_expression.source_range
+      );
+      APPEND_SLICE(source);
+    } break;
+  }
 }
 
 static Fixed_Buffer *
@@ -206,9 +218,9 @@ mass_error_to_string(
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
       APPEND_LITERAL("Could not decide which overload is better: \n  ");
-      mass_error_append_function_signature_string(result, overloads->a);
+      mass_error_append_function_signature_string(compilation, result, overloads->a);
       APPEND_LITERAL("\n  ");
-      mass_error_append_function_signature_string(result, overloads->b);
+      mass_error_append_function_signature_string(compilation, result, overloads->b);
     } break;
     case Mass_Error_Tag_Non_Function_Overload: {
       APPEND_LITERAL("Trying to define a non-function overload ");
@@ -258,9 +270,13 @@ same_function_signature(
   const Function_Info *a_info,
   const Function_Info *b_info
 ) {
-  if (!same_type(a_info->returns.descriptor, b_info->returns.descriptor)) {
+  // TODO should the generics / inferred be handled here
+  if (a_info->returns.tag != b_info->returns.tag) return false;
+  if (a_info->returns.tag != Function_Return_Tag_Exact) return false;
+  if (!same_type(a_info->returns.Exact.descriptor, b_info->returns.Exact.descriptor)) {
     return false;
   }
+
   if (dyn_array_length(a_info->parameters) != dyn_array_length(b_info->parameters)) {
     return false;
   }
@@ -980,13 +996,39 @@ descriptor_array_of(
   return result;
 }
 
+static inline Function_Return
+function_return_exact(
+  const Descriptor *descriptor,
+  Source_Range source_range
+) {
+  assert(descriptor);
+  return (Function_Return) {
+    .tag = Function_Return_Tag_Exact,
+    .source_range = source_range,
+    .Exact = { .descriptor = descriptor },
+  };
+}
+
+static inline Function_Return
+function_return_generic(
+  Value_View type_expression,
+  Source_Range source_range
+) {
+  return (Function_Return) {
+    .tag = Function_Return_Tag_Generic,
+    .source_range = source_range,
+    .Generic = { .type_expression = type_expression },
+  };
+}
+
 static inline void
 function_info_init(
-  Function_Info *info
+  Function_Info *info,
+  Function_Return returns
 ) {
   *info = (Function_Info) {
     .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .returns = {.descriptor = &descriptor_void},
+    .returns = returns,
   };
 }
 

@@ -653,7 +653,8 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   bool is_indirect_return = false;
-  if (mass_descriptor_is_void(function->returns.descriptor)) {
+  const Descriptor *return_descriptor = function_return_as_exact(&function->returns)->descriptor;
+  if (mass_descriptor_is_void(return_descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
@@ -673,11 +674,10 @@ calling_convention_x86_64_system_v_call_setup_proc(
       },
     };
 
-    System_V_Classification classification =
-      x86_64_system_v_classify(function->returns.descriptor);
+    System_V_Classification classification = x86_64_system_v_classify(return_descriptor);
     if (classification.class == SYSTEM_V_MEMORY) {
       is_indirect_return = true;
-      Bits bit_size = function->returns.descriptor->bit_size;
+      Bits bit_size = return_descriptor->bit_size;
       result.caller_return = storage_indirect(bit_size, Register_A);
       result.callee_return = storage_indirect(bit_size, Register_DI);
     } else {
@@ -735,11 +735,10 @@ calling_convention_x86_64_system_v_call_setup_proc(
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (is_indirect_return) {
-    const Descriptor *descriptor = function->returns.descriptor;
     dyn_array_push(result.parameters, (Function_Call_Parameter) {
       .flags = Function_Call_Parameter_Flags_Uninitialized,
-      .descriptor = descriptor,
-      .storage = storage_indirect(descriptor->bit_size, Register_DI),
+      .descriptor = return_descriptor,
+      .storage = storage_indirect(return_descriptor->bit_size, Register_DI),
     });
   }
   call_setup_fill_parameter_register_bitset(&result);
@@ -756,12 +755,13 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Syscall},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
-  if (mass_descriptor_is_void(function->returns.descriptor)) {
+  const Descriptor *return_descriptor = function_return_as_exact(&function->returns)->descriptor;
+  if (mass_descriptor_is_void(return_descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
     // TODO provide user error? or should it be handled earlier?
-    assert(function->returns.descriptor->bit_size.as_u64 == 32);
+    assert(return_descriptor->bit_size.as_u64 == 32);
 
     Storage common_storage = storage_register(Register_A, (Bits){32});
     result.callee_return = common_storage;
@@ -828,21 +828,20 @@ calling_convention_x86_64_windows_call_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Call},
     .calling_convention = &calling_convention_x86_64_windows,
   };
+  const Descriptor *return_descriptor = function_return_as_exact(&function->returns)->descriptor;
   bool is_indirect_return = false;
-  if (mass_descriptor_is_void(function->returns.descriptor)) {
+  if (mass_descriptor_is_void(return_descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
   } else {
-    Bits bit_size = function->returns.descriptor->bit_size;
-    if (descriptor_is_float(function->returns.descriptor)) {
+    Bits bit_size = return_descriptor->bit_size;
+    if (descriptor_is_float(return_descriptor)) {
       Storage common_storage = storage_register(Register_Xmm0, bit_size);
       result.callee_return = common_storage;
       result.caller_return = common_storage;
     } else {
       if (bit_size.as_u64 > 64) {
         is_indirect_return = true;
-        const Descriptor *return_descriptor = function->returns.descriptor;
-
         result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
         result.callee_return = storage_indirect(return_descriptor->bit_size, Register_C);
       } else {
@@ -901,7 +900,6 @@ calling_convention_x86_64_windows_call_setup_proc(
   }
 
   if (is_indirect_return) {
-    const Descriptor *return_descriptor = function->returns.descriptor;
     dyn_array_push(result.parameters, (Function_Call_Parameter) {
       .flags = Function_Call_Parameter_Flags_Uninitialized,
       .descriptor = return_descriptor,

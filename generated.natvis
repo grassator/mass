@@ -1485,6 +1485,20 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Function_Return">
+  <DisplayString Condition="tag == Function_Return_Tag_Generic">
+    Generic { Generic }
+  </DisplayString>
+  <DisplayString Condition="tag == Function_Return_Tag_Exact">
+    Exact { Exact }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="Generic" Condition="tag == Function_Return_Tag_Generic">Generic</Item>
+    <Item Name="Exact" Condition="tag == Function_Return_Tag_Exact">Exact</Item>
+  </Expand>
+</Type>
 <Type Name="Array_Function_Info">
   <Expand>
     <Item Name="[length]">data->length</Item>

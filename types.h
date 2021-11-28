@@ -79,7 +79,7 @@
   };\
   static Function_Info descriptor_##_NAME_##__info = {\
     .flags = Function_Info_Flags_None,\
-    .returns.descriptor = (_RETURN_DESCRIPTOR_),\
+    .returns = {.tag = Function_Return_Tag_Exact, .Exact.descriptor = (_RETURN_DESCRIPTOR_) },\
     .parameters = {(Dyn_Array_Internal *)&descriptor_##_NAME_##__parameters,}\
   };\
   static Descriptor descriptor_##_NAME_ = {\
@@ -134,7 +134,7 @@
     MASS_ON_ERROR(tokenize(compilation, source_range, &_VAR_NAME_)) panic("unreached");\
   }
 
-#define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _RETURN_DESCRIPTOR_, ...)\
+#define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
   Function_Parameter raw_parameters[] = {__VA_ARGS__};\
   u64 arg_length = countof(raw_parameters);\
   Array_Function_Parameter parameters = \
@@ -142,10 +142,16 @@
   for (u64 i = 0; i < arg_length; ++i) {\
     dyn_array_push(parameters, raw_parameters[i]);\
   }\
+  Source_Range return_range;\
+  INIT_LITERAL_SOURCE_RANGE(&return_range, _NAME_);\
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
   *function = (Function_Info){\
     .flags = (_FLAGS_),\
-    .returns.descriptor = (_RETURN_DESCRIPTOR_),\
+    .returns = {\
+      .tag = Function_Return_Tag_Exact,\
+      .source_range = return_range,\
+      .Exact.descriptor = (_RETURN_DESCRIPTOR_),\
+    },\
     .parameters = parameters,\
   };
 
@@ -153,7 +159,7 @@
 do {\
   Source_Range source_range;\
   INIT_LITERAL_SOURCE_RANGE(&source_range, _NAME_);\
-  MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
+  MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_NAME_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Value *info_value = value_init(\
     allocator_allocate(allocator, Value),\
     &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
@@ -166,7 +172,7 @@ do {\
 do {\
   Source_Range source_range;\
   INIT_LITERAL_SOURCE_RANGE(&source_range, _NAME_);\
-  MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
+  MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_NAME_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(allocator, function);\
   const Descriptor *instance_descriptor = descriptor_function_instance(\
     allocator, slice_literal(_NAME_), function, call_setup\

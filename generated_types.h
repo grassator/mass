@@ -1555,12 +1555,37 @@ function_parameter_as_exact_static(const Function_Parameter *function_parameter)
   return &function_parameter->Exact_Static;
 }
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
-typedef struct Function_Return {
-  const Descriptor * descriptor;
-  Value_View maybe_type_expression;
-} Function_Return;
-typedef dyn_array_type(Function_Return) Array_Function_Return;
+typedef enum {
+  Function_Return_Tag_Generic = 0,
+  Function_Return_Tag_Exact = 1,
+} Function_Return_Tag;
 
+typedef struct Function_Return_Generic {
+  Value_View type_expression;
+} Function_Return_Generic;
+typedef struct Function_Return_Exact {
+  const Descriptor * descriptor;
+} Function_Return_Exact;
+typedef struct Function_Return {
+  Function_Return_Tag tag;
+  char _tag_padding[4];
+  Source_Range source_range;
+  union {
+    Function_Return_Generic Generic;
+    Function_Return_Exact Exact;
+  };
+} Function_Return;
+static inline const Function_Return_Generic *
+function_return_as_generic(const Function_Return *function_return) {
+  assert(function_return->tag == Function_Return_Tag_Generic);
+  return &function_return->Generic;
+}
+static inline const Function_Return_Exact *
+function_return_as_exact(const Function_Return *function_return) {
+  assert(function_return->tag == Function_Return_Tag_Exact);
+  return &function_return->Exact;
+}
+typedef dyn_array_type(Function_Return) Array_Function_Return;
 typedef struct Function_Info {
   Function_Info_Flags flags;
   u32 _flags_padding;
@@ -4430,23 +4455,56 @@ static C_Enum_Item function_info_flags_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info_Flags, function_info_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info_Flags *, function_info_flags_pointer);
+/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
-MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
+MASS_DEFINE_OPAQUE_C_TYPE(function_return_tag, Function_Return_Tag)
+static C_Enum_Item function_return_tag_items[] = {
+{ .name = slice_literal_fields("Generic"), .value = 0 },
+{ .name = slice_literal_fields("Exact"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_return_generic, Function_Return_Generic,
+  {
+    .descriptor = &descriptor_value_view,
+    .name = slice_literal_fields("type_expression"),
+    .offset = offsetof(Function_Return_Generic, type_expression),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_return_generic);
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_return_exact, Function_Return_Exact,
   {
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("descriptor"),
-    .offset = offsetof(Function_Return, descriptor),
+    .offset = offsetof(Function_Return_Exact, descriptor),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_return_exact);
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
+  {
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_function_return_tag,
+    .offset = offsetof(Function_Return, tag),
   },
   {
-    .descriptor = &descriptor_value_view,
-    .name = slice_literal_fields("maybe_type_expression"),
-    .offset = offsetof(Function_Return, maybe_type_expression),
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .offset = offsetof(Function_Return, source_range),
+  },
+  {
+    .name = slice_literal_fields("Generic"),
+    .descriptor = &descriptor_function_return_generic,
+    .offset = offsetof(Function_Return, Generic),
+  },
+  {
+    .name = slice_literal_fields("Exact"),
+    .descriptor = &descriptor_function_return_exact,
+    .offset = offsetof(Function_Return, Exact),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Return, function_return);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Return *, function_return_pointer);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
