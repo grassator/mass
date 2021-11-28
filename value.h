@@ -13,9 +13,14 @@ mass_result_set_error(
   *result = (Mass_Result){ .tag = Mass_Result_Tag_Error, .Error.error = error };
 }
 
-// Having this macro allows to do `return mass_error(..)`
-// for any function that would accept literal 0 return.
-#define mass_error(_CONTEXT_, ...) (mass_result_set_error((_CONTEXT_)->result, __VA_ARGS__), 0)
+static inline bool
+mass_error(
+  Mass_Context *context,
+  Mass_Error error
+) {
+  mass_result_set_error(context->result, error);
+  return false;
+}
 
 static inline bool
 mass_result_is_error(

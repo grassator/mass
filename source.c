@@ -3131,11 +3131,12 @@ mass_handle_macro_call(
       const Descriptor *expected = literal->info->returns.Exact.descriptor;
       // TODO should this actually perform a cast?
       if (!same_type_or_can_implicitly_move_cast(expected, actual_return_descriptor)) {
-        return mass_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = body_value->source_range,
           .Type_Mismatch = { .expected = expected, .actual = actual_return_descriptor },
         });
+        return 0;
       }
     } break;
     case Function_Return_Tag_Generic: {
@@ -3842,11 +3843,12 @@ mass_intrinsic_call(
       }
       const Descriptor *actual = value_or_lazy_value_descriptor(result);
       if (!same_type(expected, actual)) {
-        return mass_error(context, (Mass_Error) {
+        mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = info->returns.source_range,
           .Type_Mismatch = { .expected = expected, .actual = actual },
         });
+        return 0;
       }
     } break;
     case Function_Return_Tag_Generic: {
@@ -5404,7 +5406,7 @@ mass_handle_dereference_operator(
   if (mass_has_error(context)) return 0;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
   if (descriptor->tag != Descriptor_Tag_Pointer_To) {
-    return mass_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
       .Type_Mismatch = {
@@ -5412,6 +5414,7 @@ mass_handle_dereference_operator(
         .actual = descriptor,
       },
     });
+    return 0;
   }
   // FIXME support this for static values
   return mass_make_lazy_value(
@@ -5484,22 +5487,24 @@ mass_struct_get(
     }
     if (!field) {
       Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
-      return mass_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Unknown_Field,
         .source_range = rhs->source_range,
         .Unknown_Field = { .name = field_name, .type = unwrapped_lhs_descriptor },
       });
+      return 0;
     }
   } else {
     if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
     const Symbol *symbol = value_as_symbol(rhs);
 
     if (!struct_find_field_by_name(unwrapped_lhs_descriptor, symbol->name, &field, &(u64){0})) {
-      return mass_error(context, (Mass_Error) {
+      mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Unknown_Field,
         .source_range = rhs->source_range,
         .Unknown_Field = { .name = symbol->name, .type = unwrapped_lhs_descriptor },
       });
+      return 0;
     }
   }
   return mass_struct_field_access(context, parser, lhs, field, &args_view.source_range);
@@ -5529,11 +5534,12 @@ mass_array_like_get(
   const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
   // TODO this should this only accept i64?
   if (rhs_descriptor != &descriptor_i64 && !descriptor_is_integer(rhs_descriptor)) {
-    return mass_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
       .Type_Mismatch = { .expected = &descriptor_i64, .actual = rhs_descriptor },
     });
+    return 0;
   }
 
   Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
@@ -5587,11 +5593,12 @@ mass_get(
     return mass_array_like_get(context, parser, parsed_args);
   }
 
-  return mass_error(context, (Mass_Error) {
+  mass_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = lhs->source_range,
     .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
   });
+  return 0;
 }
 
 static Value *
