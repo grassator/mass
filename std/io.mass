@@ -1,4 +1,4 @@
-exports {print}
+exports [.print]
 
 // TODO figure out how to do it with OS support
 //cached_stdout_handle := 0

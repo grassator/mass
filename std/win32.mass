@@ -1,4 +1,4 @@
-exports {..}
+exports [.ExitProcess, .GetStdHandle, .WriteFile]
 
 ExitProcess :: fn(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
 GetStdHandle :: fn(handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")

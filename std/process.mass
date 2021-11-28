@@ -1,4 +1,4 @@
-exports {exit}
+exports [.exit]
 
 exit :: fn(status : s32) -> () {
   if get_target_os() == os.Windows then {

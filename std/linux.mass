@@ -1,4 +1,4 @@
-exports {..}
+exports [.sys_write, .sys_exit, .STDOUT_FILENO]
 
 STDOUT_FILENO :: 1
 

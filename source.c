@@ -2298,48 +2298,38 @@ mass_exports(
 ) {
   assert(args.length == 2);
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("exports")));
-  Value_View children = value_as_group_curly(value_view_get(args, 1))->children;
+  Value *tuple_value = token_parse_single(context, parser, value_view_get(args, 1));
+  if (mass_has_error(context)) return 0;
+  if (!mass_value_ensure_static_of(context, tuple_value, &descriptor_tuple)) {
+    return 0;
+  }
+  const Tuple *tuple = value_as_tuple(tuple_value);
 
   Module_Exports *export = mass_allocate(context, Module_Exports);
-  *export = (Module_Exports){0};
-  Value *result = value_make(
-    context->allocator, &descriptor_module_exports, storage_static(export), args.source_range
-  );
-
-  if (children.length == 1) {
-    if (value_match_symbol(value_view_get(children, 0), slice_literal(".."))) {
-      *export = (Module_Exports) {
-        .tag = Module_Exports_Tag_All,
-        .source_range = args.source_range,
-      };
-      return result;
-    }
-  }
-
   *export = (Module_Exports) {
     .tag = Module_Exports_Tag_Selective,
     .Selective = {
-      // TODO use a temp array first
-      .symbols = dyn_array_make(Array_Value_Ptr, .capacity = children.length / 2 + 1 ),
+      .symbols = dyn_array_make(Array_Value_Ptr, .capacity = dyn_array_length(tuple->items)),
     },
     .source_range = args.source_range,
   };
 
-  Value_View_Split_Iterator it = { .view = children };
-
-  while (!it.done) {
-    Value_View item = token_split_next(&it, &token_pattern_comma_operator);
-    if (item.length != 1 || !value_is_symbol(value_view_get(item, 0))) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = item.source_range,
-        .detailed_message = slice_literal("Exports {} block must contain a comma-separated identifier list")
-      });
+  for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
+    Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+    if (!mass_value_ensure_static_of(context, tuple_item, &descriptor_named_accessor)) {
       return 0;
     }
-    dyn_array_push(export->Selective.symbols, value_view_get(item, 0));
+    // TODO support renaming and wildcard exports
+    const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
+    Value *symbol_value = value_make(
+      context->allocator, &descriptor_symbol_pointer, storage_immediate(&symbol), tuple_item->source_range
+    );
+    dyn_array_push(export->Selective.symbols, symbol_value);
   }
 
+  Value *result = value_make(
+    context->allocator, &descriptor_module_exports, storage_static(export), args.source_range
+  );
   return result;
 }
 

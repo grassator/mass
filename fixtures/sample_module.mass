@@ -1,4 +1,3 @@
-exports {the_answer}
-
+exports [.the_answer]
 the_answer :: 42
 
