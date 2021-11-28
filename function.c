@@ -617,7 +617,6 @@ ensure_function_instance(
   );
 
   Function_Builder *builder = &(Function_Builder){
-    .program = program,
     .epoch = body_parser.epoch,
     .function = fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
@@ -718,7 +717,6 @@ program_init_startup_code(
   Value *function = value_make(context->allocator, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
-    .program = program,
     .epoch = get_new_epoch(),
     .function = fn_info,
     .code_block = {

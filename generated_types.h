@@ -1358,7 +1358,6 @@ typedef struct Epoch {
 typedef dyn_array_type(Epoch) Array_Epoch;
 
 typedef struct Function_Builder {
-  Program * program;
   Epoch epoch;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
@@ -3889,11 +3888,6 @@ DEFINE_VALUE_IS_AS_HELPERS(Epoch *, epoch_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
-  {
-    .descriptor = &descriptor_program_pointer,
-    .name = slice_literal_fields("program"),
-    .offset = offsetof(Function_Builder, program),
-  },
   {
     .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),

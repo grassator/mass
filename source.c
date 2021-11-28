@@ -279,7 +279,7 @@ assign_from_static(
   const Source_Range *source_range
 ) {
   if (
-    builder->program != context->compilation->jit.program &&
+    !context_is_compile_time_eval(context) &&
     source->descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     // If a static value contains a pointer, we expect an entry in a special map used to track
@@ -289,14 +289,14 @@ assign_from_static(
     Value *static_pointer = *hash_map_get(context->compilation->static_pointer_map, source_memory);
     if (static_pointer->storage.tag == Storage_Tag_None) {
       Section *section = (static_pointer->flags & Value_Flags_Constant)
-       ? &builder->program->memory.ro_data
-       : &builder->program->memory.rw_data;
+       ? &context->program->memory.ro_data
+       : &context->program->memory.rw_data;
       u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
       u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
 
       // TODO this should also be deduped
       Label *label = allocate_section_memory(
-        context->allocator, builder->program, section, byte_size, alignment
+        context->allocator, context->program, section, byte_size, alignment
       );
       static_pointer->storage = data_label32(label, static_pointer->descriptor->bit_size);
 
@@ -313,7 +313,7 @@ assign_from_static(
     }
     assert(storage_is_label(&static_pointer->storage));
     if (storage_is_label(&target->storage)) {
-      dyn_array_push(builder->program->relocations, (Relocation) {
+      dyn_array_push(context->program->relocations, (Relocation) {
         .patch_at = target->storage,
         .address_of = static_pointer->storage,
       });
@@ -2898,7 +2898,6 @@ compile_time_eval(
     context->allocator, jit->program, section, slice_literal("compile_time_eval")
   );
   Function_Builder eval_builder = {
-    .program = jit->program,
     .epoch = eval_parser.epoch,
     .function = &fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
@@ -3231,8 +3230,8 @@ mass_macro_lazy_proc(
   {
     builder->code_block.end_label = make_label(
       context->allocator,
-      builder->program,
-      &builder->program->memory.code,
+      context->program,
+      &context->program->memory.code,
       slice_literal("macro return")
     );
     builder->return_value = result_value;
@@ -3431,7 +3430,7 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  mass_assert_storage_is_valid_in_program(context->compilation, builder->program, &instance->storage);
+  mass_assert_storage_is_valid_in_program(context->compilation, context->program, &instance->storage);
 
   const Descriptor *return_descriptor = fn_info->returns.descriptor;
   Value *fn_return_value;
@@ -5880,7 +5879,7 @@ mass_handle_if_expression_lazy_proc(
   Value *condition = value_force(context, builder, &expected_condition, payload->condition);
   if (mass_has_error(context)) return 0;
 
-  Program *program = builder->program;
+  Program *program = context->program;
   Label *else_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("else"));
 
@@ -6825,12 +6824,7 @@ token_define_global_variable(
     global_value = value_make(context->allocator, descriptor, global_storage, expression.source_range);
 
     if (mass_value_is_compile_time_known(value)) {
-      // TODO this is a bit awkward but
-      Function_Builder fake_builder = {
-        .epoch = parser->epoch,
-        .program = context->compilation->jit.program,
-      };
-      mass_assign(context, &fake_builder, global_value, value, &expression.source_range);
+      mass_assign(context, 0, global_value, value, &expression.source_range);
       if (mass_has_error(context)) return;
     } else {
       Assignment *assignment_payload = allocator_allocate(context->allocator, Assignment);
