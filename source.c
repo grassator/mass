@@ -2633,24 +2633,6 @@ token_parse_operator_definition(
   return peek_index;
 }
 
-static inline Slice
-mass_normalize_import_path(
-  const Allocator *allocator,
-  Slice raw
-) {
-  // @Speed
-  char *bytes = allocator_allocate_bytes(allocator, raw.length, _Alignof(char));
-  Slice normalized_slashes = {
-    .bytes = bytes,
-    .length = raw.length
-  };
-  // Copy and normalize the slashes
-  for (u64 i = 0; i < raw.length; ++i) {
-    bytes[i] = (raw.bytes[i] == '\\') ? '/' : raw.bytes[i];
-  }
-  return slice_normalize_path(allocator, normalized_slashes);
-}
-
 static Value *
 mass_import(
   Mass_Context *context,
@@ -2666,7 +2648,7 @@ mass_import(
   if (slice_equal(file_path, slice_literal("mass"))) {
     module = &context->compilation->compiler_module;
   } else {
-    file_path = mass_normalize_import_path(context->allocator, file_path);
+    file_path = slice_normalize_path(context->allocator, file_path);
     Module **module_pointer = hash_map_get(context->compilation->module_map, file_path);
     if (module_pointer) {
       module = *module_pointer;
