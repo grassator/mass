@@ -1867,7 +1867,7 @@ spec("source") {
       check(sum_up_to(3) == 6);
     }
 
-    it("should be able to use `break` statement inside of the while loop") {
+    xit("should be able to use `break` statement inside of the while loop") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn(to : s32) -> (s32) {"
@@ -1887,7 +1887,7 @@ spec("source") {
       check(checker(1) == 0);
     }
 
-    it("should be able to use `continue` statement inside of the while loop") {
+    xit("should be able to use `continue` statement inside of the while loop") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn(to : s32) -> (s32) {"

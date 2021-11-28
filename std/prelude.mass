@@ -2,10 +2,7 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_start
   label placeholder _loop_done
   if condition() then {
-    body(module {
-      break :: ~> { goto _loop_done }
-      continue :: ~> { goto _loop_start }
-    })
+    body()
     goto _loop_start
   } else {}
   label _loop_done
