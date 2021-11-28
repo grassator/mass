@@ -110,63 +110,32 @@ operator 30 (. x) intrinsic {
 pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
 pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
 
+make_arithmetic_operations_module :: macro(type : Type) {
+  module {
+    add :: fn(x : type, y : type) -> (type) MASS.integer_add
+    subtract :: fn(x : type, y : type) -> (type) MASS.integer_subtract
+    multiply :: fn(x : type, y : type) -> (type) MASS.integer_multiply
+    divide :: fn(x : type, y : type) -> (type) MASS.integer_divide
+    remainder :: fn(x : type, y : type) -> (type) MASS.integer_remainder
+    negate :: fn(x : type) -> (type) { 0 - x }
 
-add :: fn(x : s8, y : s8) -> (s8) MASS.integer_add
-subtract :: fn(x : s8, y : s8) -> (s8) MASS.integer_subtract
-multiply :: fn(x : s8, y : s8) -> (s8) MASS.integer_multiply
-divide :: fn(x : s8, y : s8) -> (s8) MASS.integer_divide
-remainder :: fn(x : s8, y : s8) -> (s8) MASS.integer_remainder
-negate :: fn(x : s8) -> (s8) { 0 - x }
-
-less :: fn(x : s8, y : s8) -> (bool) MASS.integer_less
-less_equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_less_equal
-greater :: fn(x : s8, y : s8) -> (bool) MASS.integer_greater
-greater_equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_greater_equal
-equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_equal
-not_equal :: fn(x : s8, y : s8) -> (bool) MASS.integer_not_equal
-
-
-template_signed_integer_overloads :: macro(template, impl) {
-  f :: template(impl, s64)
-  f :: template(impl, s32)
-  f :: template(impl, s16)
-  f
+    less :: fn(x : type, y : type) -> (bool) MASS.integer_less
+    less_equal :: fn(x : type, y : type) -> (bool) MASS.integer_less_equal
+    greater :: fn(x : type, y : type) -> (bool) MASS.integer_greater
+    greater_equal :: fn(x : type, y : type) -> (bool) MASS.integer_greater_equal
+    equal :: fn(x : type, y : type) -> (bool) MASS.integer_equal
+    not_equal :: fn(x : type, y : type) -> (bool) MASS.integer_not_equal
+  }
 }
 
-template_unsigned_integer_overloads :: macro(template, impl) {
-  f :: template(impl, u64)
-  f :: template(impl, u32)
-  f :: template(impl, u16)
-  f :: template(impl, u8)
-  f
-}
-
-template_integer_overloads :: macro(template, impl) {
-  f :: template_signed_integer_overloads(template, impl)
-  f :: template_unsigned_integer_overloads(template, impl)
-  f
-}
-
-arithmetic_template :: macro(impl, type : Type) {
-  fn(x : type, y : type) -> (type) impl
-}
-
-add :: template_integer_overloads(arithmetic_template, MASS.integer_add)
-subtract :: template_integer_overloads(arithmetic_template, MASS.integer_subtract)
-multiply :: template_integer_overloads(arithmetic_template, MASS.integer_multiply)
-divide :: template_integer_overloads(arithmetic_template, MASS.integer_divide)
-remainder :: template_integer_overloads(arithmetic_template, MASS.integer_remainder)
-
-comparison_template :: macro(impl, type : Type) {
-  fn(x : type, y : type) -> (bool) impl
-}
-
-less :: template_integer_overloads(comparison_template, MASS.integer_less)
-less_equal :: template_integer_overloads(comparison_template, MASS.integer_less_equal)
-greater :: template_integer_overloads(comparison_template, MASS.integer_greater)
-greater_equal :: template_integer_overloads(comparison_template, MASS.integer_greater_equal)
-equal :: template_integer_overloads(comparison_template, MASS.integer_equal)
-not_equal :: template_integer_overloads(comparison_template, MASS.integer_not_equal)
+using make_arithmetic_operations_module(s8)
+using make_arithmetic_operations_module(s16)
+using make_arithmetic_operations_module(s32)
+using make_arithmetic_operations_module(s64)
+using make_arithmetic_operations_module(u8)
+using make_arithmetic_operations_module(u16)
+using make_arithmetic_operations_module(u32)
+using make_arithmetic_operations_module(u64)
 
 equal :: fn(x, y : x) -> (bool) MASS.generic_equal
 not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
@@ -251,8 +220,4 @@ get_target_os :: fn() -> (os._Type) intrinsic {
 }
 
 syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
-
-negate :: template_signed_integer_overloads(macro(impl, type : Type) {
-  macro(x : type) { 0 - x }
-}, ())
 
