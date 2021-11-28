@@ -527,33 +527,6 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Macro_Capture">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Macro_Capture_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Macro_Capture_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
 <Type Name="Array_Quoted">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -1136,76 +1109,6 @@
     <Item Name="precedence">precedence</Item>
     <Item Name="Alias" Condition="tag == Operator_Tag_Alias">Alias</Item>
     <Item Name="Intrinsic" Condition="tag == Operator_Tag_Intrinsic">Intrinsic</Item>
-  </Expand>
-</Type>
-<Type Name="Array_Macro_Pattern">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Macro_Pattern_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Macro_Pattern_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Macro_Pattern">
-  <DisplayString Condition="tag == Macro_Pattern_Tag_Any_Token_Single">
-    Any_Token_Single
-  </DisplayString>
-  <DisplayString Condition="tag == Macro_Pattern_Tag_Any_Token_Sequence">
-    Any_Token_Sequence
-  </DisplayString>
-  <DisplayString Condition="tag == Macro_Pattern_Tag_Single_Token">
-    Single_Token { Single_Token }
-  </DisplayString>
-  <Expand>
-    <Item Name="tag">tag</Item>
-    <Item Name="capture_name">capture_name</Item>
-    <Item Name="Single_Token" Condition="tag == Macro_Pattern_Tag_Single_Token">Single_Token</Item>
-  </Expand>
-</Type>
-<Type Name="Array_Macro">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Macro_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Macro_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
   </Expand>
 </Type>
 <Type Name="Array_Token_Statement_Matcher">

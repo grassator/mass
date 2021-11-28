@@ -1826,26 +1826,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to define and use a syntax macro matching a curly brace block") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "syntax statement (\"block\" {}@body) body();"
-        "checker :: fn() -> (s64) { result := 20; block { result = 42 }; result }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to define and use a syntax macro matching a sequence at the end") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "syntax statement (\"comment\" ..@ignore);"
-        "checker :: fn() -> (s64) { x := 42; comment x = x + 1; x }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should be able to use a while loop") {
       s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "sum_up_to", &test_context,

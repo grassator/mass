@@ -1294,13 +1294,6 @@ main(void) {
     { "16", 16 },
   }));
 
-  push_type(type_struct("Macro_Capture", (Struct_Item[]){
-    { "Scope *", "scope" },
-    { "Slice", "name" },
-    { "Value_View", "view" },
-    { "Source_Range", "source_range" },
-  }));
-
   export_compiler(push_type(type_struct("Quoted", (Struct_Item[]){
     { "Value *", "value" },
   })));
@@ -1508,22 +1501,6 @@ main(void) {
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
     { "u64", "precedence" },
-  }));
-
-  push_type(add_common_fields(type_union("Macro_Pattern", (Struct_Type[]){
-    struct_empty("Any_Token_Single"),
-    struct_empty("Any_Token_Sequence"),
-    struct_fields("Single_Token", (Struct_Item[]){
-      { "Token_Pattern", "token_pattern" },
-    }),
-  }), (Struct_Item[]){
-    { "Slice", "capture_name" },
-  }));
-
-  push_type(type_struct("Macro", (Struct_Item[]){
-    { "Array_Macro_Pattern", "pattern" },
-    { "Value_View", "replacement" },
-    { "Scope *", "scope" },
   }));
 
   push_type(type_struct("Token_Statement_Matcher", (Struct_Item[]){

@@ -1546,18 +1546,6 @@ tokenizer_push_string_literal(
 
 #include "generated_tokenizer.c"
 
-static inline Value *
-token_peek_match(
-  Value_View view,
-  u64 index,
-  const Token_Pattern *pattern
-) {
-  Value *token = value_view_peek(view, index);
-  if (!token) return 0;
-  if (!value_match(token, pattern)) return 0;
-  return token;
-}
-
 typedef struct {
   Value_View view;
   u32 index;
@@ -1787,128 +1775,6 @@ mass_unquote(
   return token_parse_single(context, parser, value_view_get(args, 0));
 }
 
-static u32
-token_match_pattern(
-  Value_View view,
-  Array_Macro_Pattern macro_pattern,
-  Array_Value_View *out_match
-) {
-  u32 pattern_length = u64_to_u32(dyn_array_length(macro_pattern));
-  if (!pattern_length) panic("Zero-length pattern does not make sense");
-
-  u32 pattern_index = 0;
-  u32 view_index = 0;
-
-  for (; pattern_index < pattern_length && view_index < view.length; pattern_index++) {
-    Macro_Pattern *pattern = dyn_array_get(macro_pattern, pattern_index);
-    switch(pattern->tag) {
-      case Macro_Pattern_Tag_Single_Token: {
-        Value *token = token_peek_match(view, view_index, &pattern->Single_Token.token_pattern);
-        if (!token) {
-          return 0;
-        }
-        // fallthrough
-      }
-      case Macro_Pattern_Tag_Any_Token_Single: {
-        dyn_array_push(*out_match, value_view_slice(&view, view_index, view_index + 1));
-        view_index++;
-        break;
-      }
-      case Macro_Pattern_Tag_Any_Token_Sequence: {
-        u32 any_token_start_view_index = view_index;
-        Macro_Pattern *peek = pattern_index + 1 < pattern_length
-          ? dyn_array_get(macro_pattern, pattern_index + 1)
-          : 0;
-        assert(!peek || peek->tag == Macro_Pattern_Tag_Single_Token);
-        const Token_Pattern *end_pattern = 0;
-        if (peek) {
-          end_pattern = &peek->Single_Token.token_pattern;
-        } else {
-          end_pattern = &token_pattern_semicolon;
-        }
-
-        for (; view_index < view.length; ++view_index) {
-          Value *token = value_view_get(view, view_index);
-          if (value_match(token, end_pattern)) {
-            break;
-          }
-        }
-        dyn_array_push(*out_match, value_view_slice(&view, any_token_start_view_index, view_index));
-        break;
-      }
-    }
-  }
-
-  // Did not match full pattern
-  if (
-    pattern_index != pattern_length &&
-    !(
-      pattern_index == pattern_length - 1 &&
-      dyn_array_last(macro_pattern)->tag == Macro_Pattern_Tag_Any_Token_Sequence
-    )
-  ) {
-    return 0;
-  }
-
-  return view_index;
-}
-
-static Value *
-token_apply_macro_syntax(
-  Mass_Context *context,
-  Parser *parser,
-  Array_Value_View match,
-  Macro *macro,
-  Source_Range source_range
-) {
-  assert(macro->scope);
-
-  // All captured token sequences need to have access to the same base scope
-  // to support implementing disjointed syntax, such as for (;;) loop
-  // or switch / pattern matching.
-  // Symboleally there should be a way to control this explicitly somehow.
-  Scope *captured_scope = scope_make(context->allocator, parser->scope);
-  Scope *expansion_scope = scope_make(context->allocator, macro->scope);
-
-  for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
-    Macro_Pattern *item = dyn_array_get(macro->pattern, i);
-    Slice capture_name = item->capture_name;
-
-    if (!capture_name.length) continue;
-    Value_View capture_view = *dyn_array_get(match, i);
-    allocator_allocate_bulk(context->allocator, combined, {
-      Macro_Capture capture;
-      Value value;
-    });
-    Macro_Capture *capture = &combined->capture;
-    *capture = (Macro_Capture){
-      .name = item->capture_name,
-      .view = capture_view,
-      .scope = captured_scope,
-    };
-    Value *result = value_init(
-      &combined->value,
-      &descriptor_macro_capture, storage_static(capture), capture_view.source_range
-    );
-    const Symbol *capture_symbol =
-      mass_ensure_symbol(context->compilation, capture_name);
-    scope_define_value(expansion_scope, VALUE_STATIC_EPOCH, capture_view.source_range, capture_symbol, result);
-  }
-
-  Parser body_parser = *parser;
-  body_parser.scope = expansion_scope;
-
-  Value *result;
-  if (body_parser.flags & Parser_Flags_Global) {
-    result = compile_time_eval(context, &body_parser, macro->replacement);
-  } else {
-    result = token_parse_expression(context, &body_parser, macro->replacement, &(u32){0}, 0);
-  }
-  // The result of the expansion should map to the source range of the match
-  if (result) result->source_range = source_range;
-  return result;
-}
-
 static Value *
 mass_handle_statement_lazy_proc(
   Mass_Context *context,
@@ -1919,51 +1785,6 @@ mass_handle_statement_lazy_proc(
 ) {
   assert(mass_descriptor_is_void(mass_expected_result_descriptor(expected_result)));
   return value_force(context, builder, expected_result, lazy_value);
-}
-
-static u32
-token_parse_macro_statement(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View value_view,
-  Lazy_Value *out_lazy_value,
-  Macro *macro
-) {
-  assert(macro);
-  if (!value_view.length) return 0;
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_View match = dyn_array_make(
-    Array_Value_View,
-    .allocator = context->temp_allocator,
-    .capacity = 32,
-  );
-
-  u32 match_length = token_match_pattern(value_view, macro->pattern, &match);
-  if (!match_length) goto defer;
-
-  Value_View rest = value_view_rest(&value_view, match_length);
-  if (rest.length) {
-    const Symbol *semicolon = context->compilation->common_symbols.operator_semicolon;
-    Value *first_remaining = value_view_get(rest, 0);
-    if (value_is_symbol(first_remaining) && value_as_symbol(first_remaining) == semicolon) {
-      match_length += 1;
-    } else {
-      match_length = 0;
-      goto defer;
-    }
-  }
-
-  Value_View match_view = value_view_slice(&value_view, 0, match_length);
-  Value *expansion_value = token_apply_macro_syntax(context, parser, match, macro, match_view.source_range);
-  if (expansion_value) {
-    out_lazy_value->payload = expansion_value;
-    out_lazy_value->proc = mass_handle_statement_lazy_proc;
-  }
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
-  return match_length;
 }
 
 static inline const Descriptor *
@@ -2792,128 +2613,6 @@ token_parse_while(
   out_lazy_value->proc = mass_handle_while_lazy_proc;
   out_lazy_value->payload = lazy_payload;
 
-  return peek_index;
-}
-
-static u32
-token_parse_syntax_definition(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u32 peek_index = 0;
-  Value *syntax_token = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.syntax
-  );
-  if (!syntax_token) return 0;
-  Value *statement_token = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.statement
-  );
-  if (!statement_token) {
-    context_parse_error(context, parser, view, peek_index);
-    return 0;
-  }
-
-  Value *pattern_token = value_view_next(view, &peek_index);
-  if (!value_is_group_paren(pattern_token)) {
-    context_parse_error(context, parser, view, peek_index);
-    return 0;
-  }
-
-  Value_View replacement = value_view_match_till_end_of_statement(context, parser, view, &peek_index);
-  Value_View definition = value_as_group_paren(pattern_token)->children;
-
-  Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
-
-  for (u64 i = 0; i < definition.length; ++i) {
-    Value *value = value_view_get(definition, i);
-    if (value_is_slice(value)) {
-      const Slice *slice = value_as_slice(value);
-      const Symbol *symbol = mass_ensure_symbol(context->compilation, *slice);
-      dyn_array_push(pattern, (Macro_Pattern) {
-        .tag = Macro_Pattern_Tag_Single_Token,
-        .Single_Token = {
-          .token_pattern = {
-            .tag = Token_Pattern_Tag_Cached_Symbol,
-            .Cached_Symbol.pointer = symbol,
-          }
-        },
-      });
-    } else if (
-      value->descriptor == &descriptor_group_paren ||
-      value->descriptor == &descriptor_group_square ||
-      value->descriptor == &descriptor_group_curly
-    ) {
-      dyn_array_push(pattern, (Macro_Pattern) {
-        .tag = Macro_Pattern_Tag_Single_Token,
-        .Single_Token = {
-          .token_pattern = {
-            .tag = Token_Pattern_Tag_Descriptor,
-            .Descriptor.descriptor = value->descriptor,
-          }
-        },
-      });
-    } else if (
-      value_match_symbol(value, slice_literal("..@")) ||
-      value_match_symbol(value, slice_literal(".@")) ||
-      value_match_symbol(value, slice_literal("@"))
-    ) {
-      Value *symbol_token = value_view_peek(definition, ++i);
-      if (!symbol_token || !value_is_symbol(symbol_token)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Invalid_Identifier,
-          .source_range = value->source_range,
-        });
-        goto err;
-      }
-      Macro_Pattern *last_pattern = 0;
-      Slice symbol_name = value_as_symbol(value)->name;
-      if (slice_equal(symbol_name, slice_literal("@"))) {
-        last_pattern = dyn_array_last(pattern);
-      } else if (slice_equal(symbol_name, slice_literal(".@"))) {
-        last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Any_Token_Single,
-        });
-      } else if (slice_equal(symbol_name, slice_literal("..@"))) {
-        last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Any_Token_Sequence,
-        });
-      } else {
-        panic("Internal Error: Unexpected @-like operator");
-      }
-      if (!last_pattern) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = value->source_range,
-          .detailed_message = slice_literal("@ requires a valid pattern before it")
-        });
-        goto err;
-      }
-      last_pattern->capture_name = value_as_symbol(symbol_token)->name;
-    } else {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = value->source_range,
-        .detailed_message = slice_literal("Expected a string token")
-      });
-      goto err;
-    }
-  }
-  Macro *macro = mass_allocate(context, Macro);
-  *macro = (Macro){
-    .pattern = pattern,
-    .replacement = replacement,
-    .scope = parser->scope
-  };
-  mass_push_token_matcher(context, parser, token_parse_macro_statement, macro);
-  return peek_index;
-
-  err:
-  dyn_array_destroy(pattern);
   return peek_index;
 }
 
@@ -4373,33 +4072,6 @@ token_handle_function_call(
   Value_View args_view,
   Source_Range source_range
 ) {
-  // TODO move this to `apply`
-  if (value_is_macro_capture(target_expression)) {
-    const Macro_Capture *capture = value_as_macro_capture(target_expression);
-    Parser capture_parser = *parser;
-    capture_parser.scope = capture->scope;
-    if (args_view.length == 0) {
-      // Nothing to do
-    } else if (args_view.length == 1) {
-      Value *module_arg = value_view_get(args_view, 0);
-      if (!mass_value_ensure_static_of(context, module_arg, &descriptor_module)) {
-        return 0;
-      }
-      const Module *module = value_as_module(module_arg);
-      mass_copy_scope_exports(capture->scope, module->exports.scope);
-    } else {
-      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_No_Matching_Overload,
-        .source_range = source_range,
-        .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
-        .detailed_message = slice_literal("Macro capture can only accept an Module Scope argument"),
-      });
-      return 0;
-    }
-    return token_parse_block_view(context, &capture_parser, capture->view);
-  }
-
   Overload_Match_Found match_found;
   if (!mass_match_overload_or_error(context, target_expression, args_view, &match_found)) {
     return 0;
@@ -7198,7 +6870,6 @@ scope_define_builtins(
       {.proc = token_parse_definition_and_assignment_statements},
       {.proc = token_parse_statement_label},
       {.proc = token_parse_statement_using},
-      {.proc = token_parse_syntax_definition},
       {.proc = token_parse_while},
       {.proc = token_parse_operator_definition},
     };

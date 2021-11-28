@@ -189,10 +189,6 @@ const char *number_base_name(Number_Base value) {
 typedef dyn_array_type(Number_Base *) Array_Number_Base_Ptr;
 typedef dyn_array_type(const Number_Base *) Array_Const_Number_Base_Ptr;
 
-typedef struct Macro_Capture Macro_Capture;
-typedef dyn_array_type(Macro_Capture *) Array_Macro_Capture_Ptr;
-typedef dyn_array_type(const Macro_Capture *) Array_Const_Macro_Capture_Ptr;
-
 typedef struct Quoted Quoted;
 typedef dyn_array_type(Quoted *) Array_Quoted_Ptr;
 typedef dyn_array_type(const Quoted *) Array_Const_Quoted_Ptr;
@@ -376,14 +372,6 @@ typedef dyn_array_type(const Parser *) Array_Const_Parser_Ptr;
 typedef struct Operator Operator;
 typedef dyn_array_type(Operator *) Array_Operator_Ptr;
 typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
-
-typedef struct Macro_Pattern Macro_Pattern;
-typedef dyn_array_type(Macro_Pattern *) Array_Macro_Pattern_Ptr;
-typedef dyn_array_type(const Macro_Pattern *) Array_Const_Macro_Pattern_Ptr;
-
-typedef struct Macro Macro;
-typedef dyn_array_type(Macro *) Array_Macro_Ptr;
-typedef dyn_array_type(const Macro *) Array_Const_Macro_Ptr;
 
 typedef struct Token_Statement_Matcher Token_Statement_Matcher;
 typedef dyn_array_type(Token_Statement_Matcher *) Array_Token_Statement_Matcher_Ptr;
@@ -1090,14 +1078,6 @@ typedef struct Label_Location_Diff_Patch_Info {
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
-typedef struct Macro_Capture {
-  Scope * scope;
-  Slice name;
-  Value_View view;
-  Source_Range source_range;
-} Macro_Capture;
-typedef dyn_array_type(Macro_Capture) Array_Macro_Capture;
-
 typedef struct Quoted {
   Value * value;
 } Quoted;
@@ -1420,36 +1400,6 @@ operator_as_intrinsic(Operator *operator) {
   return &operator->Intrinsic;
 }
 typedef dyn_array_type(Operator) Array_Operator;
-typedef enum {
-  Macro_Pattern_Tag_Any_Token_Single = 0,
-  Macro_Pattern_Tag_Any_Token_Sequence = 1,
-  Macro_Pattern_Tag_Single_Token = 2,
-} Macro_Pattern_Tag;
-
-typedef struct Macro_Pattern_Single_Token {
-  Token_Pattern token_pattern;
-} Macro_Pattern_Single_Token;
-typedef struct Macro_Pattern {
-  Macro_Pattern_Tag tag;
-  char _tag_padding[4];
-  Slice capture_name;
-  union {
-    Macro_Pattern_Single_Token Single_Token;
-  };
-} Macro_Pattern;
-static inline Macro_Pattern_Single_Token *
-macro_pattern_as_single_token(Macro_Pattern *macro_pattern) {
-  assert(macro_pattern->tag == Macro_Pattern_Tag_Single_Token);
-  return &macro_pattern->Single_Token;
-}
-typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
-typedef struct Macro {
-  Array_Macro_Pattern pattern;
-  Value_View replacement;
-  Scope * scope;
-} Macro;
-typedef dyn_array_type(Macro) Array_Macro;
-
 typedef struct Token_Statement_Matcher {
   const Token_Statement_Matcher * previous;
   Token_Statement_Matcher_Proc proc;
@@ -2251,11 +2201,6 @@ static Descriptor descriptor_array_number_base_ptr;
 static Descriptor descriptor_array_const_number_base_ptr;
 static Descriptor descriptor_number_base_pointer;
 static Descriptor descriptor_number_base_pointer_pointer;
-static Descriptor descriptor_macro_capture;
-static Descriptor descriptor_array_macro_capture;
-static Descriptor descriptor_array_macro_capture_ptr;
-static Descriptor descriptor_macro_capture_pointer;
-static Descriptor descriptor_macro_capture_pointer_pointer;
 static Descriptor descriptor_quoted;
 static Descriptor descriptor_array_quoted;
 static Descriptor descriptor_array_quoted_ptr;
@@ -2386,17 +2331,6 @@ static Descriptor descriptor_array_operator_ptr;
 static Descriptor descriptor_array_const_operator_ptr;
 static Descriptor descriptor_operator_pointer;
 static Descriptor descriptor_operator_pointer_pointer;
-static Descriptor descriptor_macro_pattern;
-static Descriptor descriptor_array_macro_pattern;
-static Descriptor descriptor_array_macro_pattern_ptr;
-static Descriptor descriptor_array_const_macro_pattern_ptr;
-static Descriptor descriptor_macro_pattern_pointer;
-static Descriptor descriptor_macro_pattern_pointer_pointer;
-static Descriptor descriptor_macro;
-static Descriptor descriptor_array_macro;
-static Descriptor descriptor_array_macro_ptr;
-static Descriptor descriptor_macro_pointer;
-static Descriptor descriptor_macro_pointer_pointer;
 static Descriptor descriptor_token_statement_matcher;
 static Descriptor descriptor_array_token_statement_matcher;
 static Descriptor descriptor_array_token_statement_matcher_ptr;
@@ -3320,33 +3254,6 @@ static C_Enum_Item number_base_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Number_Base, number_base);
 DEFINE_VALUE_IS_AS_HELPERS(Number_Base *, number_base_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture_ptr, Array_Macro_Capture_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture, Array_Macro_Capture)
-MASS_DEFINE_STRUCT_DESCRIPTOR(macro_capture, Macro_Capture,
-  {
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .offset = offsetof(Macro_Capture, scope),
-  },
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("name"),
-    .offset = offsetof(Macro_Capture, name),
-  },
-  {
-    .descriptor = &descriptor_value_view,
-    .name = slice_literal_fields("view"),
-    .offset = offsetof(Macro_Capture, view),
-  },
-  {
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .offset = offsetof(Macro_Capture, source_range),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(macro_capture);
-DEFINE_VALUE_IS_AS_HELPERS(Macro_Capture, macro_capture);
-DEFINE_VALUE_IS_AS_HELPERS(Macro_Capture *, macro_capture_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_quoted_ptr, Array_Quoted_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_quoted, Array_Quoted)
 MASS_DEFINE_STRUCT_DESCRIPTOR(quoted, Quoted,
@@ -4080,66 +3987,6 @@ MASS_DEFINE_TYPE_VALUE(operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator, operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator *, operator_pointer);
 /*union struct end*/
-/*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern_ptr, Array_Macro_Pattern_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern, Array_Macro_Pattern)
-MASS_DEFINE_OPAQUE_C_TYPE(macro_pattern_tag, Macro_Pattern_Tag)
-static C_Enum_Item macro_pattern_tag_items[] = {
-{ .name = slice_literal_fields("Any_Token_Single"), .value = 0 },
-{ .name = slice_literal_fields("Any_Token_Sequence"), .value = 1 },
-{ .name = slice_literal_fields("Single_Token"), .value = 2 },
-};
-MASS_DEFINE_STRUCT_DESCRIPTOR(macro_pattern_single_token, Macro_Pattern_Single_Token,
-  {
-    .descriptor = &descriptor_token_pattern,
-    .name = slice_literal_fields("token_pattern"),
-    .offset = offsetof(Macro_Pattern_Single_Token, token_pattern),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(macro_pattern_single_token);
-MASS_DEFINE_STRUCT_DESCRIPTOR(macro_pattern, Macro_Pattern,
-  {
-    .name = slice_literal_fields("tag"),
-    .descriptor = &descriptor_macro_pattern_tag,
-    .offset = offsetof(Macro_Pattern, tag),
-  },
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("capture_name"),
-    .offset = offsetof(Macro_Pattern, capture_name),
-  },
-  {
-    .name = slice_literal_fields("Single_Token"),
-    .descriptor = &descriptor_macro_pattern_single_token,
-    .offset = offsetof(Macro_Pattern, Single_Token),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(macro_pattern);
-DEFINE_VALUE_IS_AS_HELPERS(Macro_Pattern, macro_pattern);
-DEFINE_VALUE_IS_AS_HELPERS(Macro_Pattern *, macro_pattern_pointer);
-/*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_macro_ptr, Array_Macro_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_macro, Array_Macro)
-MASS_DEFINE_STRUCT_DESCRIPTOR(macro, Macro,
-  {
-    .descriptor = &descriptor_array_macro_pattern,
-    .name = slice_literal_fields("pattern"),
-    .offset = offsetof(Macro, pattern),
-  },
-  {
-    .descriptor = &descriptor_value_view,
-    .name = slice_literal_fields("replacement"),
-    .offset = offsetof(Macro, replacement),
-  },
-  {
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .offset = offsetof(Macro, scope),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(macro);
-DEFINE_VALUE_IS_AS_HELPERS(Macro, macro);
-DEFINE_VALUE_IS_AS_HELPERS(Macro *, macro_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher_ptr, Array_Token_Statement_Matcher_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher, Array_Token_Statement_Matcher)
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
