@@ -1915,56 +1915,6 @@ spec("source") {
     }
   }
 
-  describe("labels / goto") {
-    it("should be able to parse and run a program with labels and goto") {
-      s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
-        "sum_up_to", &test_context,
-        "sum_up_to :: fn(to : s32) -> (s32) {"
-          "x := to;"
-          "sum : s32;"
-          "sum = 0;"
-          "label loop;"
-          "if x < 0 then { return sum } else {};"
-          "sum = sum + x;"
-          "x = x - 1;"
-          "goto loop;"
-          // FIXME This return is never reached and ideally should not be required
-          //       but currently there is no way to track dead branches
-          "sum"
-        "}"
-      );
-      check(sum_up_to);
-      check(sum_up_to(0) == 0);
-      check(sum_up_to(1) == 1);
-      check(sum_up_to(2) == 3);
-      check(sum_up_to(3) == 6);
-    }
-
-    it("should be able to goto a label defined after the goto") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "test :: fn() -> (s32) {"
-          "x : s32 = 42;"
-          "label placeholder skip;"
-          "goto skip;"
-          "x = 0;"
-          "label skip;"
-          "x"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should report an error when encountering wrong type of label identifier") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: fn(status: s32) -> () { x : s32; goto x; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-    }
-  }
-
   describe("Strings") {
     it("should accept string arguments") {
       const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(

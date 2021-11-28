@@ -5099,46 +5099,6 @@ mass_handle_assignment_operator(
 }
 
 static Value *
-mass_goto_lazy_proc(
-  Mass_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range,
-  Value *payload_target
-) {
-  Expected_Result expected_target = expected_result_any(&descriptor_label_pointer);
-  Value *target = value_force(context, builder, &expected_target, payload_target);
-  if (mass_has_error(context)) return 0;
-  if (!mass_value_ensure_static_of(context, target, &descriptor_label_pointer)) {
-    return 0;
-  }
-
-  Label *label = *value_as_label_pointer(target);
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range,
-    &(Instruction_Assembly){jmp, {code_label32(label)}}
-  );
-
-  return expected_result_validate(expected_result, &void_value);
-}
-
-static Value *
-mass_handle_goto_operator(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View operands,
-  const void *payload
-) {
-  assert(operands.length == 1);
-  Value *target = token_parse_single(context, parser, value_view_get(operands, 0));
-
-  return mass_make_lazy_value(
-    context, parser, operands.source_range, target,
-    &descriptor_void, mass_goto_lazy_proc
-  );
-}
-
-static Value *
 mass_eval(
   Mass_Context *context,
   Parser *parser,
@@ -6400,94 +6360,6 @@ token_parse_statement_using(
 }
 
 static Value *
-mass_handle_label_lazy_proc(
-  Mass_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range,
-  Value *label_value
-) {
-  if (label_value->descriptor != &descriptor_label_pointer) {
-    Slice source = source_from_source_range(context->compilation, source_range);
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Redefinition,
-      .source_range = *source_range,
-      .other_source_range = label_value->source_range,
-      .Redefinition = { .name = source, },
-      .detailed_message = slice_literal("Trying to redefine a non-label variable as a label"),
-    });
-    return 0;
-  }
-
-  Label *label = *value_as_label_pointer(label_value);
-  push_instruction(&builder->code_block, (Instruction) {
-    .tag = Instruction_Tag_Label,
-    .Label.pointer = label,
-  });
-
-  return expected_result_validate(expected_result, &void_value);
-}
-
-static u32
-token_parse_statement_label(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
-) {
-  u32 peek_index = 0;
-  Value *keyword = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.label
-  );
-  if (!keyword) return 0;
-  Value *placeholder = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.placeholder
-  );
-
-  Value_View rest = value_view_match_till_end_of_statement(context, parser, view, &peek_index);
-
-  if (rest.length != 1 || !value_is_symbol(value_view_get(rest, 0))) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Invalid_Identifier,
-      .source_range = rest.source_range,
-    });
-    goto err;
-  }
-
-  Value *symbol_token = value_view_get(rest, 0);
-  Source_Range source_range = symbol_token->source_range;
-  const Symbol *symbol = value_as_symbol(symbol_token);
-  Slice name = symbol->name;
-
-  // :ForwardLabelRef
-  // First try to lookup a label that might have been declared by `goto`
-  Value *value;
-  if (scope_lookup(parser->scope, symbol)) {
-    value = mass_context_force_lookup(context, parser, parser->scope, symbol, &source_range);
-  } else {
-    Scope *label_scope = parser->scope;
-
-    Label *label = make_label(
-      context->allocator, context->program, &context->program->memory.code, name
-    );
-    value = value_make(
-      context->allocator, &descriptor_label_pointer, storage_immediate(&label), source_range
-    );
-    scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, symbol, value);
-    if (placeholder) {
-      return peek_index;
-    }
-  }
-
-  out_lazy_value->proc = mass_handle_label_lazy_proc;
-  out_lazy_value->payload = value;
-
-  err:
-  return peek_index;
-}
-
-static Value *
 mass_handle_explicit_return_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
@@ -6830,21 +6702,11 @@ scope_define_builtins(
     .tag = Operator_Tag_Alias,
     .Alias.handler = mass_handle_return_operator,
   ));
-  Source_Range goto_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&goto_source_range, "goto");
-  scope_define_operator(&context, scope, goto_source_range, slice_literal("goto"), allocator_make(allocator, Operator,
-    .precedence = 0,
-    .fixity = Operator_Fixity_Prefix,
-    .associativity = Operator_Associativity_Right,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_goto_operator,
-  ));
 
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
       {.proc = token_parse_definition_and_assignment_statements},
-      {.proc = token_parse_statement_label},
       {.proc = token_parse_statement_using},
       {.proc = token_parse_while},
       {.proc = token_parse_operator_definition},
