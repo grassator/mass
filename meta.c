@@ -449,7 +449,7 @@ print_scope_define_function(
         exit(1);
       }
       {
-        const char *expected = "Execution_Context *";
+        const char *expected = "Mass_Context *";
         if (strcmp(function->arguments[0].type, expected) != 0) {
           printf("Intrinsic %s first argument must have type %s", function->name, expected);
           exit(1);
@@ -1065,7 +1065,7 @@ type_function_impl(
 
 #define type_intrinsic(_NAME_STRING_)\
   type_function(Intrinsic, (_NAME_STRING_), "Value *", (Argument_Type[]){\
-    { "Execution_Context *", "context" },\
+    { "Mass_Context *", "context" },\
     { "Parser *", "parser" },\
     { "Value_View", "args" },\
   })
@@ -1489,7 +1489,7 @@ main(void) {
     { "u8", "volatile_register_push_offsets", 16 },
   }));
 
-  export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
+  export_compiler_custom_name("Context", push_type(type_struct("Mass_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
     { "Allocator *", "temp_allocator" },
     { "Compilation *", "compilation" },
@@ -1617,20 +1617,20 @@ main(void) {
   })));
 
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
-    { "Execution_Context", "context" },
+    { "Mass_Context", "context" },
     { "Parser", "parser" },
     { "Value_View", "expression" },
     { "u64", "resolving" },
   }));
 
   push_type(type_function(Typedef, "Mass_Intrinsic_Proc", "Value *", (Argument_Type[]){
-    { "Execution_Context *", "context" },
+    { "Mass_Context *", "context" },
     { "Parser *", "parser" },
     { "Value_View", "view" },
   }));
 
   push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
-    { "Execution_Context *", "context" },
+    { "Mass_Context *", "context" },
     { "Parser *", "parser" },
     { "Value_View", "view" },
     { "const Operator *", "operator" },
@@ -1683,7 +1683,7 @@ main(void) {
   push_type(type_struct("Function_Literal", (Struct_Item[]){
     { "Function_Literal_Flags", "flags"},
     { "u32", "_flags_padding"},
-    { "Execution_Context", "context" },
+    { "Mass_Context", "context" },
     { "Scope *", "own_scope" },
     { "Function_Info *", "info" },
     { "Value *", "body" },
@@ -1887,7 +1887,7 @@ main(void) {
   }));
 
   push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u32", (Argument_Type[]){
-    { "Execution_Context *", "context" },
+    { "Mass_Context *", "context" },
     { "Parser *", "parser" },
     { "Value_View", "view" },
     { "Lazy_Value *", "out_lazy_value" },

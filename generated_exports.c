@@ -199,12 +199,12 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Function_Builder")),
     type_function_builder_value
   );
-  Source_Range Execution_Context__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Execution_Context__source_range, "Execution_Context");
+  Source_Range Context__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Context__source_range, "Context");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Execution_Context__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Execution_Context")),
-    type_execution_context_value
+    scope, VALUE_STATIC_EPOCH, Context__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Context")),
+    type_mass_context_value
   );
   Source_Range Parser__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Parser__source_range, "Parser");
@@ -519,7 +519,7 @@ compiler_scope_define_exports(
     mass_intrinsic, "intrinsic", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -535,7 +535,7 @@ compiler_scope_define_exports(
     mass_call, "call", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -551,7 +551,7 @@ compiler_scope_define_exports(
     mass_import, "import", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -567,7 +567,7 @@ compiler_scope_define_exports(
     mass_pointer_to, "pointer_to", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -583,7 +583,7 @@ compiler_scope_define_exports(
     mass_pointer_to_type, "pointer_to_type", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -599,7 +599,7 @@ compiler_scope_define_exports(
     mass_eval, "eval", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -615,7 +615,7 @@ compiler_scope_define_exports(
     mass_fragment, "fragment", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -631,7 +631,7 @@ compiler_scope_define_exports(
     mass_inline_module, "inline_module", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -647,7 +647,7 @@ compiler_scope_define_exports(
     mass_c_struct, "c_struct", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -663,7 +663,7 @@ compiler_scope_define_exports(
     mass_exports, "exports", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -679,7 +679,7 @@ compiler_scope_define_exports(
     mass_cast, "cast", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -695,7 +695,7 @@ compiler_scope_define_exports(
     mass_type_of, "type_of", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -711,7 +711,7 @@ compiler_scope_define_exports(
     mass_size_of, "size_of", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -727,7 +727,7 @@ compiler_scope_define_exports(
     mass_startup, "startup", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -743,7 +743,7 @@ compiler_scope_define_exports(
     mass_static_assert, "static_assert", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -943,7 +943,7 @@ compiler_scope_define_exports(
     mass_integer_add, "integer_add", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -959,7 +959,7 @@ compiler_scope_define_exports(
     mass_integer_subtract, "integer_subtract", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -975,7 +975,7 @@ compiler_scope_define_exports(
     mass_integer_multiply, "integer_multiply", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -991,7 +991,7 @@ compiler_scope_define_exports(
     mass_integer_divide, "integer_divide", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1007,7 +1007,7 @@ compiler_scope_define_exports(
     mass_integer_remainder, "integer_remainder", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1023,7 +1023,7 @@ compiler_scope_define_exports(
     mass_integer_less, "integer_less", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1039,7 +1039,7 @@ compiler_scope_define_exports(
     mass_integer_greater, "integer_greater", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1055,7 +1055,7 @@ compiler_scope_define_exports(
     mass_integer_less_equal, "integer_less_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1071,7 +1071,7 @@ compiler_scope_define_exports(
     mass_integer_greater_equal, "integer_greater_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1087,7 +1087,7 @@ compiler_scope_define_exports(
     mass_integer_equal, "integer_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1103,7 +1103,7 @@ compiler_scope_define_exports(
     mass_integer_not_equal, "integer_not_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1119,7 +1119,7 @@ compiler_scope_define_exports(
     mass_generic_equal, "generic_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),
@@ -1135,7 +1135,7 @@ compiler_scope_define_exports(
     mass_generic_not_equal, "generic_not_equal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("parser")),

@@ -598,7 +598,7 @@ ensure_function_instance(
   );
   dyn_array_push(literal->instances, cached_instance);
 
-  Execution_Context body_context = execution_context_from_compilation(compilation);
+  Mass_Context body_context = mass_context_from_compilation(compilation);
   body_context.program = program;
 
   Scope *body_scope = scope_make(compilation->allocator, literal->own_scope);
@@ -700,7 +700,7 @@ ensure_function_instance(
 
 static void
 program_init_startup_code(
-  Execution_Context *context
+  Mass_Context *context
 ) {
   Program *program = context->program;
   Compilation *compilation = context->compilation;

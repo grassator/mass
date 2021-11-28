@@ -1035,7 +1035,7 @@ function_literal_info_for_args(
   Value_View args
 ) {
   if (!(literal->flags & Function_Literal_Flags_Generic)) return literal->info;
-  const Execution_Context *context = &literal->context;
+  const Mass_Context *context = &literal->context;
 
   // FIXME @ConstCast avoid this
   Function_Literal *mutable_literal = (Function_Literal *)literal;
@@ -1303,16 +1303,16 @@ compilation_deinit(
 
 static inline bool
 context_is_compile_time_eval(
-  const Execution_Context *context
+  const Mass_Context *context
 ) {
   return context->compilation->jit.program == context->program;
 };
 
-Execution_Context
-execution_context_from_compilation(
+Mass_Context
+mass_context_from_compilation(
   Compilation *compilation
 ) {
-  return (Execution_Context) {
+  return (Mass_Context) {
     .allocator = compilation->allocator,
     .temp_allocator = compilation->temp_allocator,
     .program = compilation->runtime_program,

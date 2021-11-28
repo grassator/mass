@@ -352,9 +352,9 @@ typedef struct Function_Layout Function_Layout;
 typedef dyn_array_type(Function_Layout *) Array_Function_Layout_Ptr;
 typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
 
-typedef struct Execution_Context Execution_Context;
-typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
-typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
+typedef struct Mass_Context Mass_Context;
+typedef dyn_array_type(Mass_Context *) Array_Mass_Context_Ptr;
+typedef dyn_array_type(const Mass_Context *) Array_Const_Mass_Context_Ptr;
 
 typedef enum Parser_Flags {
   Parser_Flags_None = 0,
@@ -443,10 +443,10 @@ typedef dyn_array_type(Lazy_Static_Value *) Array_Lazy_Static_Value_Ptr;
 typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_Ptr;
 
 typedef Value * (*Mass_Intrinsic_Proc)
-  (Execution_Context * context, Parser * parser, Value_View view);
+  (Mass_Context * context, Parser * parser, Value_View view);
 
 typedef Value * (*Mass_Handle_Operator_Proc)
-  (Execution_Context * context, Parser * parser, Value_View view, const Operator * operator);
+  (Mass_Context * context, Parser * parser, Value_View view, const Operator * operator);
 
 typedef struct Function_Parameter Function_Parameter;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
@@ -589,7 +589,7 @@ typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
 typedef u32 (*Token_Statement_Matcher_Proc)
-  (Execution_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value, void * payload);
+  (Mass_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value, void * payload);
 
 typedef void (*Mass_Trampoline_Proc)
   (void * payload);
@@ -700,49 +700,49 @@ static void push_instruction
   (Code_Block * code_block, Instruction instruction);
 
 static Value * mass_intrinsic
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_call
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_import
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_pointer_to
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_pointer_to_type
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_eval
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_fragment
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_inline_module
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_c_struct
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_exports
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_cast
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_type_of
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_size_of
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_startup
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_static_assert
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
@@ -790,43 +790,43 @@ static i64 mass_i64_unsigned_remainder
   (i64 a, i64 b);
 
 static Value * mass_integer_add
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_subtract
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_multiply
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_divide
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_remainder
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_less
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_greater
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_less_equal
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_greater_equal
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_equal
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_integer_not_equal
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_generic_equal
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_generic_not_equal
-  (Execution_Context * context, Parser * parser, Value_View args);
+  (Mass_Context * context, Parser * parser, Value_View args);
 
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
@@ -1383,14 +1383,14 @@ typedef struct Function_Layout {
 } Function_Layout;
 typedef dyn_array_type(Function_Layout) Array_Function_Layout;
 
-typedef struct Execution_Context {
+typedef struct Mass_Context {
   Allocator * allocator;
   Allocator * temp_allocator;
   Compilation * compilation;
   Program * program;
   Mass_Result * result;
-} Execution_Context;
-typedef dyn_array_type(Execution_Context) Array_Execution_Context;
+} Mass_Context;
+typedef dyn_array_type(Mass_Context) Array_Mass_Context;
 
 typedef struct Parser {
   Parser_Flags flags;
@@ -1578,7 +1578,7 @@ typedef struct Lazy_Value {
 typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 
 typedef struct Lazy_Static_Value {
-  Execution_Context context;
+  Mass_Context context;
   Parser parser;
   Value_View expression;
   u64 resolving;
@@ -1636,7 +1636,7 @@ typedef dyn_array_type(Function_Specialization) Array_Function_Specialization;
 typedef struct Function_Literal {
   Function_Literal_Flags flags;
   u32 _flags_padding;
-  Execution_Context context;
+  Mass_Context context;
   Scope * own_scope;
   Function_Info * info;
   Value * body;
@@ -2369,11 +2369,11 @@ static Descriptor descriptor_array_function_layout;
 static Descriptor descriptor_array_function_layout_ptr;
 static Descriptor descriptor_function_layout_pointer;
 static Descriptor descriptor_function_layout_pointer_pointer;
-static Descriptor descriptor_execution_context;
-static Descriptor descriptor_array_execution_context;
-static Descriptor descriptor_array_execution_context_ptr;
-static Descriptor descriptor_execution_context_pointer;
-static Descriptor descriptor_execution_context_pointer_pointer;
+static Descriptor descriptor_mass_context;
+static Descriptor descriptor_array_mass_context;
+static Descriptor descriptor_array_mass_context_ptr;
+static Descriptor descriptor_mass_context_pointer;
+static Descriptor descriptor_mass_context_pointer_pointer;
 static Descriptor descriptor_parser_flags;
 static Descriptor descriptor_array_parser_flags;
 static Descriptor descriptor_array_parser_flags_ptr;
@@ -4005,38 +4005,38 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
 MASS_DEFINE_TYPE_VALUE(function_layout);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Layout, function_layout);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Layout *, function_layout_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context_ptr, Array_Execution_Context_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context, Array_Execution_Context)
-MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_context_ptr, Array_Mass_Context_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_context, Array_Mass_Context)
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_context, Mass_Context,
   {
     .descriptor = &descriptor_allocator_pointer,
     .name = slice_literal_fields("allocator"),
-    .offset = offsetof(Execution_Context, allocator),
+    .offset = offsetof(Mass_Context, allocator),
   },
   {
     .descriptor = &descriptor_allocator_pointer,
     .name = slice_literal_fields("temp_allocator"),
-    .offset = offsetof(Execution_Context, temp_allocator),
+    .offset = offsetof(Mass_Context, temp_allocator),
   },
   {
     .descriptor = &descriptor_compilation_pointer,
     .name = slice_literal_fields("compilation"),
-    .offset = offsetof(Execution_Context, compilation),
+    .offset = offsetof(Mass_Context, compilation),
   },
   {
     .descriptor = &descriptor_program_pointer,
     .name = slice_literal_fields("program"),
-    .offset = offsetof(Execution_Context, program),
+    .offset = offsetof(Mass_Context, program),
   },
   {
     .descriptor = &descriptor_mass_result_pointer,
     .name = slice_literal_fields("result"),
-    .offset = offsetof(Execution_Context, result),
+    .offset = offsetof(Mass_Context, result),
   },
 );
-MASS_DEFINE_TYPE_VALUE(execution_context);
-DEFINE_VALUE_IS_AS_HELPERS(Execution_Context, execution_context);
-DEFINE_VALUE_IS_AS_HELPERS(Execution_Context *, execution_context_pointer);
+MASS_DEFINE_TYPE_VALUE(mass_context);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_Context, mass_context);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_Context *, mass_context_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(parser_flags, Parser_Flags)
 static C_Enum_Item parser_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -4476,7 +4476,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value_ptr, Array_Lazy_Static_Value_P
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value, Array_Lazy_Static_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
   {
-    .descriptor = &descriptor_execution_context,
+    .descriptor = &descriptor_mass_context,
     .name = slice_literal_fields("context"),
     .offset = offsetof(Lazy_Static_Value, context),
   },
@@ -4504,7 +4504,7 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_value_pointer,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_execution_context_pointer,
+    .descriptor = &descriptor_mass_context_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
@@ -4520,7 +4520,7 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_value_pointer,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_execution_context_pointer,
+    .descriptor = &descriptor_mass_context_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,
@@ -4689,7 +4689,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .offset = offsetof(Function_Literal, _flags_padding),
   },
   {
-    .descriptor = &descriptor_execution_context,
+    .descriptor = &descriptor_mass_context,
     .name = slice_literal_fields("context"),
     .offset = offsetof(Function_Literal, context),
   },
@@ -5487,7 +5487,7 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_u32,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_execution_context_pointer,
+    .descriptor = &descriptor_mass_context_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,

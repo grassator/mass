@@ -6,7 +6,7 @@
 
 static void
 program_init_startup_code(
-  Execution_Context *context
+  Mass_Context *context
 );
 
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32

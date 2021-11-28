@@ -76,14 +76,14 @@ compilation_temp_reset(
 
 static inline Temp_Mark
 context_temp_mark(
-  Execution_Context *context
+  Mass_Context *context
 ) {
   return compilation_temp_mark(context->compilation);
 }
 
 static inline void
 context_temp_reset_to_mark(
-  Execution_Context *context,
+  Mass_Context *context,
   Temp_Mark mark
 ) {
   compilation_temp_reset_to_mark(context->compilation, mark);
@@ -91,7 +91,7 @@ context_temp_reset_to_mark(
 
 static inline void
 context_temp_reset(
-  Execution_Context *context
+  Mass_Context *context
 ) {
   compilation_temp_reset(context->compilation);
 }

@@ -2,7 +2,6 @@ exports { reify, static_value, immediate, same_type, compilation_error, context_
 
 Value :: MASS.Value
 Source_Range :: MASS.Source_Range
-Execution_Context :: MASS.Execution_Context
 same_type :: MASS.same_type
 
 compilation_error :: fn(context : &MASS.Compilation, error : MASS.Error) {
@@ -11,7 +10,7 @@ compilation_error :: fn(context : &MASS.Compilation, error : MASS.Error) {
   context.result.Error.error = error
 }
 
-context_error :: fn(context : &MASS.Execution_Context, error : MASS.Error) {
+context_error :: fn(context : &MASS.Context, error : MASS.Error) {
   compilation_error(context.compilation, error)
 }
 

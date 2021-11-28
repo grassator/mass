@@ -129,7 +129,7 @@ scope_make(
 
 static inline u32
 scope_statement_matcher_shallow(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -147,7 +147,7 @@ scope_statement_matcher_shallow(
 
 static inline u32
 token_statement_matcher_in_scopes(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -1143,7 +1143,7 @@ scope_entry_force_value(
 
 static inline Value *
 mass_context_force_lookup(
-  Execution_Context *context,
+  Mass_Context *context,
   const Parser *parser,
   const Scope *scope,
   const Symbol *symbol,
@@ -1637,7 +1637,7 @@ value_view_match_till(
 
 static inline Value_View
 value_view_match_till_end_of_statement(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   u32 *peek_index
@@ -1683,7 +1683,7 @@ value_view_maybe_match_any_of(
 
 static inline void
 context_parse_error(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   u32 peek_index
@@ -1701,14 +1701,14 @@ typedef struct {
 
 static inline const Descriptor *
 token_match_type(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view
 );
 
 static Value *
 token_parse_tuple(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view
 ) {
@@ -1744,7 +1744,7 @@ token_parse_tuple(
 
 static Value *
 token_parse_single(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *value
 ) {
@@ -1766,7 +1766,7 @@ token_parse_single(
 
 static Value *
 mass_quote(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args,
   const void *payload
@@ -1783,7 +1783,7 @@ mass_quote(
 
 static Value *
 mass_unquote(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args,
   const void *payload
@@ -1860,7 +1860,7 @@ token_match_pattern(
 
 static Value *
 token_apply_macro_syntax(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Array_Value_View match,
   Macro *macro,
@@ -1928,7 +1928,7 @@ mass_handle_statement_lazy_proc(
 
 static u32
 token_parse_macro_statement(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View value_view,
   Lazy_Value *out_lazy_value,
@@ -1973,7 +1973,7 @@ token_parse_macro_statement(
 
 static inline const Descriptor *
 token_match_type(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view
 ) {
@@ -2049,7 +2049,7 @@ mass_ensure_jit_function_for_value(
 
 static Function_Parameter
 token_match_argument(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Function_Info *function
@@ -2335,7 +2335,7 @@ value_force_exact(
 
 static void
 token_match_call_arguments(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   const Group_Paren *args_group,
   Array_Value_Ptr *out_args
@@ -2358,7 +2358,7 @@ token_match_call_arguments(
 
 static Value *
 token_handle_user_defined_operator_proc(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args,
   const Operator *operator
@@ -2385,7 +2385,7 @@ token_handle_user_defined_operator_proc(
 
 static inline Value *
 mass_make_lazy_value_with_epoch(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Source_Range source_range,
   void *payload,
@@ -2413,7 +2413,7 @@ mass_make_lazy_value_with_epoch(
 
 static inline Value *
 mass_make_lazy_value(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Source_Range source_range,
   void *payload,
@@ -2427,7 +2427,7 @@ mass_make_lazy_value(
 
 static inline void
 scope_define_lazy_compile_time_expression(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Scope *scope,
   const Symbol *symbol,
@@ -2455,7 +2455,7 @@ scope_define_lazy_compile_time_expression(
 
 static Value *
 mass_exports(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -2508,7 +2508,7 @@ mass_exports(
 
 static u32
 token_parse_operator_definition(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -2657,7 +2657,7 @@ mass_normalize_import_path(
 
 static Value *
 mass_import(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -2697,7 +2697,7 @@ mass_import(
 
 static void
 mass_push_token_matcher(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Token_Statement_Matcher_Proc proc,
   void *payload
@@ -2714,7 +2714,7 @@ mass_push_token_matcher(
 
 static u32
 token_parse_syntax_definition(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -2836,7 +2836,7 @@ token_parse_syntax_definition(
 
 static Value *
 mass_c_struct(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -2873,7 +2873,7 @@ value_or_lazy_value_descriptor(
 
 static Value *
 compile_time_eval(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view
 ) {
@@ -2882,7 +2882,7 @@ compile_time_eval(
   const Source_Range *source_range = &view.source_range;
 
   Jit *jit = &context->compilation->jit;
-  Execution_Context eval_context = *context;
+  Mass_Context eval_context = *context;
   eval_context.program = jit->program;
 
   Parser eval_parser = {
@@ -3080,7 +3080,7 @@ mass_handle_tuple_cast_lazy_proc(
 
 static Value *
 mass_cast_helper(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   const Descriptor *target_descriptor,
   Value *expression,
@@ -3118,7 +3118,7 @@ mass_cast_helper(
 
 static Value *
 mass_cast(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
@@ -3133,7 +3133,7 @@ mass_cast(
 
 static void
 token_dispatch_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Array_Value_Ptr *stack,
   Operator_Stack_Entry *operator_entry
@@ -3141,7 +3141,7 @@ token_dispatch_operator(
 
 static bool
 token_handle_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Array_Value_Ptr *stack,
@@ -3175,7 +3175,7 @@ token_handle_operator(
 
 static u32
 token_parse_constant_definitions(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -3281,7 +3281,7 @@ mass_macro_temp_param_lazy_proc(
 
 static inline Value *
 mass_handle_macro_call(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *overload,
   Value_View args_view,
@@ -3737,7 +3737,7 @@ ensure_parameter_descriptors(
   Function_Info *info,
   Scope *arguments_scope
 ) {
-  Execution_Context temp_context = execution_context_from_compilation(compilation);
+  Mass_Context temp_context = mass_context_from_compilation(compilation);
   Parser args_parser = {
     .flags = Parser_Flags_None,
     .scope = scope_make(temp_context.temp_allocator, arguments_scope),
@@ -4023,7 +4023,7 @@ mass_match_overload_or_error(
 
 static inline Value *
 mass_intrinsic_call(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *overload,
   Value_View args_view
@@ -4054,7 +4054,7 @@ value_is_intrinsic(
 
 static const Mass_Trampoline *
 mass_ensure_trampoline(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *original,
   const Function_Info *original_info,
@@ -4212,7 +4212,7 @@ mass_ensure_trampoline(
 
 static Value *
 mass_trampoline_call(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *original,
   const Function_Info *original_info,
@@ -4291,7 +4291,7 @@ mass_can_trampoline_call(
 
 static Value *
 token_handle_function_call(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *target_expression,
   Value_View args_view,
@@ -4382,7 +4382,7 @@ token_handle_function_call(
 
 static Value *
 token_handle_parsed_function_call(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *target_token,
   Value *args_token,
@@ -4656,7 +4656,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
 static Value *
 mass_handle_arithmetic_operation(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View arguments,
   Mass_Arithmetic_Operator operator
@@ -4689,19 +4689,19 @@ mass_handle_arithmetic_operation(
   );
 }
 
-static inline Value *mass_integer_add(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_add(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Add);
 }
-static inline Value *mass_integer_subtract(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_subtract(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Subtract);
 }
-static inline Value *mass_integer_multiply(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_multiply(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Multiply);
 }
-static inline Value *mass_integer_divide(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_divide(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Divide);
 }
-static inline Value *mass_integer_remainder(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_remainder(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, parser, arguments, Mass_Arithmetic_Operator_Remainder);
 }
 
@@ -4910,7 +4910,7 @@ mass_handle_generic_comparison_lazy_proc(
 
 static inline Value *
 mass_handle_comparison(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View arguments,
   Lazy_Value_Proc lazy_value_proc,
@@ -4940,43 +4940,43 @@ mass_handle_comparison(
   );
 }
 
-static inline Value *mass_integer_less(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_less(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less
   );
 }
-static inline Value *mass_integer_greater(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_greater(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater
   );
 }
-static inline Value *mass_integer_less_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_less_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less_Equal
   );
 }
-static inline Value *mass_integer_greater_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_greater_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater_Equal
   );
 }
-static inline Value *mass_integer_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Equal
   );
 }
-static inline Value *mass_integer_not_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_integer_not_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
-static inline Value *mass_generic_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_generic_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Equal
   );
 }
-static inline Value *mass_generic_not_equal(Execution_Context *context, Parser *parser, Value_View arguments) {
+static inline Value *mass_generic_not_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
     context, parser, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Not_Equal
   );
@@ -5013,7 +5013,7 @@ mass_handle_startup_call_lazy_proc(
 
 static Value *
 mass_startup(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View arguments
 ) {
@@ -5042,7 +5042,7 @@ user_presentable_descriptor_for(
 
 static Value *
 mass_type_of(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -5065,7 +5065,7 @@ mass_type_of(
 
 static Value *
 mass_size_of(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -5111,7 +5111,7 @@ mass_pointer_to_lazy_proc(
 // creates weird circular dependencies of static_assert on itself.
 static Value *
 mass_static_assert(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -5142,7 +5142,7 @@ mass_static_assert(
 
 static Value *
 mass_pointer_to(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -5168,7 +5168,7 @@ mass_pointer_to(
 
 static Value *
 mass_pointer_to_type(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
@@ -5186,7 +5186,7 @@ mass_pointer_to_type(
 
 static Value *
 mass_call(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
@@ -5200,7 +5200,7 @@ mass_call(
 
 static Value *
 mass_handle_apply_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View operands_view,
   const Operator *operator
@@ -5225,7 +5225,7 @@ mass_handle_apply_operator(
 
 static Value *
 mass_handle_typed_symbol_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View operands,
   const Operator *operator
@@ -5306,7 +5306,7 @@ mass_handle_assignment_lazy_proc(
 
 static Value *
 mass_define_stack_value_from_typed_symbol(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   const Typed_Symbol *typed_symbol,
   Source_Range source_range
@@ -5326,7 +5326,7 @@ mass_define_stack_value_from_typed_symbol(
 
 static Value *
 mass_handle_assignment_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View operands,
   const Operator *operator
@@ -5378,7 +5378,7 @@ mass_goto_lazy_proc(
 
 static Value *
 mass_handle_goto_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View operands,
   const void *payload
@@ -5394,7 +5394,7 @@ mass_handle_goto_operator(
 
 static Value *
 mass_fragment(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
@@ -5412,7 +5412,7 @@ mass_fragment(
 
 static Value *
 mass_eval(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
@@ -5620,7 +5620,7 @@ mass_handle_array_access_lazy_proc(
 
 static Value *
 mass_struct_field_access(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *struct_,
   const Struct_Field *field,
@@ -5665,7 +5665,7 @@ mass_handle_dereference_operator_lazy_proc(
 
 static Value *
 mass_handle_dereference_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view,
   const void *payload
@@ -5696,7 +5696,7 @@ mass_handle_dereference_operator(
 
 static Value *
 mass_handle_dot_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view,
   const Operator *operator
@@ -5820,7 +5820,7 @@ mass_handle_dot_operator(
 
 static void
 token_dispatch_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Array_Value_Ptr *stack,
   Operator_Stack_Entry *stack_entry
@@ -5929,7 +5929,7 @@ mass_handle_if_expression_lazy_proc(
 
 static Value *
 token_parse_if_expression(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   u32 *matched_length,
@@ -6004,7 +6004,7 @@ token_parse_if_expression(
 
 static Function_Literal *
 mass_make_fake_function_literal(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *body,
   const Descriptor *returns,
@@ -6030,7 +6030,7 @@ mass_make_fake_function_literal(
 
 static Value *
 mass_intrinsic(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
@@ -6058,7 +6058,7 @@ mass_intrinsic(
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
-    .descriptor = &descriptor_execution_context_pointer,
+    .descriptor = &descriptor_mass_context_pointer,
     .source_range = *source_range,
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
@@ -6080,7 +6080,7 @@ mass_intrinsic(
 
 static Function_Info *
 function_info_from_parameters_and_return_type(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args_view,
   Value *return_types
@@ -6144,7 +6144,7 @@ function_info_from_parameters_and_return_type(
 
 static Value *
 token_parse_function_literal(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   u32 *matched_length,
@@ -6298,7 +6298,7 @@ token_parse_function_literal(
 }
 
 typedef Value *(*Expression_Matcher_Proc)(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   u32 *out_match_length,
@@ -6312,7 +6312,7 @@ typedef struct {
 
 static Value *
 token_parse_expression(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   u32 *out_match_length,
@@ -6491,7 +6491,7 @@ mass_handle_block_lazy_proc(
 
 static Value *
 token_parse_block_view(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View children_view
 ) {
@@ -6632,7 +6632,7 @@ token_parse_block_view(
 
 static inline Value *
 token_parse_block_no_scope(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   const Group_Curly *group
 ) {
@@ -6641,7 +6641,7 @@ token_parse_block_no_scope(
 
 static inline Value *
 token_parse_block(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   const Group_Curly *group
 ) {
@@ -6652,7 +6652,7 @@ token_parse_block(
 
 static u32
 token_parse_statement_using(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -6708,7 +6708,7 @@ mass_handle_label_lazy_proc(
 
 static u32
 token_parse_statement_label(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -6787,7 +6787,7 @@ mass_handle_explicit_return_lazy_proc(
 
 static Value *
 mass_handle_return_operator(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args,
   const Operator *operator
@@ -6803,7 +6803,7 @@ mass_handle_return_operator(
 
 static void
 token_define_global_variable(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *symbol,
   Value_View expression
@@ -6875,7 +6875,7 @@ token_define_global_variable(
 
 static void
 token_define_local_variable(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value *symbol,
   Lazy_Value *out_lazy_value,
@@ -6924,7 +6924,7 @@ token_define_local_variable(
 
 static u32
 token_parse_definition_and_assignment_statements(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value,
@@ -7145,7 +7145,7 @@ scope_define_builtins(
 
 static void
 module_process_exports(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser
 ) {
   Module *module = parser->module;
@@ -7180,7 +7180,7 @@ module_process_exports(
 
 static Value *
 mass_inline_module(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser,
   Value_View args
 ) {
@@ -7200,7 +7200,7 @@ mass_inline_module(
     .epoch = VALUE_STATIC_EPOCH,
   };
   // Need a new context here to ensure we are using the runtime program for new modules
-  Execution_Context module_context = execution_context_from_compilation(context->compilation);
+  Mass_Context module_context = mass_context_from_compilation(context->compilation);
   Value *block_result = token_parse_block_view(&module_context, &module_parser, curly->children);
   value_force_exact(module_context.compilation, 0, &void_value, block_result);
   module_process_exports(&module_context, &module_parser);
@@ -7210,7 +7210,7 @@ mass_inline_module(
 
 static inline void
 program_parse(
-  Execution_Context *context,
+  Mass_Context *context,
   Parser *parser
 ) {
   assert(parser->module);
@@ -7282,7 +7282,7 @@ program_absolute_path(
 
 static Module *
 program_module_from_file(
-  Execution_Context *context,
+  Mass_Context *context,
   Slice file_path,
   Scope *scope
 ) {
@@ -7335,7 +7335,7 @@ program_module_from_file(
 
 static void
 program_import_module(
-  Execution_Context *context,
+  Mass_Context *context,
   Module *module
 ) {
   Parser import_parser = {
@@ -7352,7 +7352,7 @@ program_import_module(
 
 static void
 program_load_file_module_into_root_scope(
-  Execution_Context *context,
+  Mass_Context *context,
   Slice file_path
 ) {
   Module *module = program_module_from_file(context, file_path, context->compilation->root_scope);
@@ -7396,7 +7396,7 @@ mass_maybe_trim_shebang(
 
 static void
 mass_run_script(
-  Execution_Context *context,
+  Mass_Context *context,
   Slice file_path
 ) {
   Compilation *compilation = context->compilation;

@@ -191,7 +191,7 @@ typedef struct {
 
 Encoded_Text_Section
 encode_text_section(
-  Execution_Context *context,
+  Mass_Context *context,
   IMAGE_SECTION_HEADER *header
 ) {
   Program *program = context->program;
@@ -309,7 +309,7 @@ pe32_checksum(
 static void
 write_executable(
   Slice file_path,
-  Execution_Context *context,
+  Mass_Context *context,
   Executable_Type executable_type
 ) {
   program_init_startup_code(context);

@@ -1068,7 +1068,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Execution_Context">
+<Type Name="Array_Mass_Context">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -1077,7 +1077,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Execution_Context_Ptr">
+<Type Name="Array_Mass_Context_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -1086,7 +1086,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Const_Execution_Context_Ptr">
+<Type Name="Array_Const_Mass_Context_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>

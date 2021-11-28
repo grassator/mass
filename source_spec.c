@@ -79,7 +79,7 @@ test_inline_source_range(
 static inline Value *
 test_program_source_base(
   const char *id,
-  Execution_Context *context,
+  Mass_Context *context,
   Test_Program_Source source
 ) {
   program_load_file_module_into_root_scope(context, slice_literal("std/prelude"));
@@ -116,7 +116,7 @@ test_program_source_base(
 fn_type_opaque
 test_program_source_function(
   const char *function_id,
-  Execution_Context *context,
+  Mass_Context *context,
   Test_Program_Source source
 ) {
   Value *value = test_program_source_base(function_id, context, source);
@@ -134,7 +134,7 @@ test_program_source_function(
 static Value *
 test_program_inline_source_base(
   const char *id,
-  Execution_Context *context,
+  Mass_Context *context,
   const char *source
 ) {
   return test_program_source_base(id, context, (Test_Program_Source) {
@@ -146,7 +146,7 @@ test_program_inline_source_base(
 fn_type_opaque
 test_program_inline_source_function(
   const char *function_id,
-  Execution_Context *context,
+  Mass_Context *context,
   const char *source
 ) {
   return test_program_source_function(function_id, context, (Test_Program_Source) {
@@ -158,7 +158,7 @@ test_program_inline_source_function(
 static Value *
 test_program_external_source_base(
   const char *id,
-  Execution_Context *context,
+  Mass_Context *context,
   const char *path
 ) {
   return test_program_source_base(id, context, (Test_Program_Source) {
@@ -170,7 +170,7 @@ test_program_external_source_base(
 static fn_type_opaque
 test_program_external_source_function(
   const char *function_id,
-  Execution_Context *context,
+  Mass_Context *context,
   const char *path
 ) {
   return test_program_source_function(function_id, context, (Test_Program_Source) {
@@ -181,11 +181,11 @@ test_program_external_source_function(
 
 spec("source") {
   static Compilation test_compilation = {0};
-  static Execution_Context test_context = {0};
+  static Mass_Context test_context = {0};
 
   before_each() {
     compilation_init(&test_compilation, host_os());
-    test_context = execution_context_from_compilation(&test_compilation);
+    test_context = mass_context_from_compilation(&test_compilation);
   }
 
   after_each() {

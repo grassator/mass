@@ -109,7 +109,7 @@ int main(s32 argc, char **argv) {
 
   Compilation compilation;
   compilation_init(&compilation, os);
-  Execution_Context context = execution_context_from_compilation(&compilation);
+  Mass_Context context = mass_context_from_compilation(&compilation);
 
   program_load_file_module_into_root_scope(&context, slice_literal("std/prelude"));
   if (mass_has_error(&context)) {
