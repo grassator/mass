@@ -5825,35 +5825,20 @@ mass_intrinsic(
 }
 
 static Function_Info *
-function_info_from_parameters_and_return_type(
+function_info_from_parameters_and_return(
   Mass_Context *context,
   Parser *parser,
   Value_View args_view,
-  Value *return_types
+  Function_Return returns
 ) {
   Parser arg_parser = *parser;
   arg_parser.scope = scope_make(context->allocator, parser->scope);
   arg_parser.epoch = get_new_epoch();
 
-  Source_Range return_range = return_types->source_range;
-  Function_Return returns;
-  if (value_is_group_paren(return_types)) {
-    Value_View return_types_view = value_as_group_paren(return_types)->children;
-    if (return_types_view.length == 0) {
-      returns = function_return_exact(&descriptor_void, return_range);
-    } else {
-      returns = function_return_generic(return_types_view, return_range);
-    }
-  } else {
-    Value_View return_types_view = value_view_make_single(context->allocator, return_types);
-    returns = function_return_generic(return_types_view, return_range);
-  }
-
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, returns);
 
   Temp_Mark temp_mark = context_temp_mark(context);
-
 
   if (args_view.length != 0) {
     bool previous_argument_has_default_value = false;
@@ -5873,7 +5858,7 @@ function_info_from_parameters_and_return_type(
         if (!param.maybe_default_value) {
           mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
-            .source_range = return_types->source_range,
+            .source_range = param.source_range,
           });
           goto defer;
         }
@@ -5921,7 +5906,6 @@ token_parse_function_literal(
     return 0;
   }
 
-  Value *returns;
   Value *arrow = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.operator_arrow
   );
@@ -5942,22 +5926,33 @@ token_parse_function_literal(
     return 0;
   }
 
+  Function_Return returns;
   if (arrow) {
-    returns = value_view_next(view, &peek_index);
-    if (!returns) {
+    Value *token = value_view_next(view, &peek_index);
+    if (!token) {
       context_parse_error(context, parser, view, peek_index);
       return 0;
     }
+    Source_Range return_range = token->source_range;
+    if (value_is_group_paren(token)) {
+      Value_View return_types_view = value_as_group_paren(token)->children;
+      if (return_types_view.length == 0) {
+        returns = function_return_exact(&descriptor_void, return_range);
+      } else {
+        returns = function_return_generic(return_types_view, return_range);
+      }
+    } else {
+      Value_View return_types_view = value_view_make_single(context->allocator, token);
+      returns = function_return_generic(return_types_view, return_range);
+    }
   } else {
-    static const Group_Paren empty_group_paren = {0};
-    returns = value_make(
-      context->allocator, &descriptor_group_paren, storage_static(&empty_group_paren), keyword->source_range
-    );
+    Source_Range return_range = value_view_slice(&view, peek_index, peek_index).source_range;
+    returns = function_return_exact(&descriptor_void, return_range);
   }
 
   Value_View args_view = value_as_group_paren(args)->children;
   Function_Info *fn_info =
-    function_info_from_parameters_and_return_type(context, parser, args_view, returns);
+    function_info_from_parameters_and_return(context, parser, args_view, returns);
   if (mass_has_error(context)) return 0;
 
   Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_group_curly);
