@@ -1364,14 +1364,14 @@ tokenizer_maybe_push_statement(
 ) {
   assert(dyn_array_length(*parent_stack));
   Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
-  if(parent->descriptor != &descriptor_group_curly) return false;
+  if(parent->descriptor != &descriptor_ast_block) return false;
   bool has_children = parent->index + 1 != dyn_array_length(*stack);
   // Do not treat leading newlines as semicolons
   if (!has_children) return true;
 
   Value *parent_value = *dyn_array_get(*stack, parent->index);
 
-  Group_Curly *group = (Group_Curly *)value_as_group_curly(parent_value);
+  Ast_Block *group = (Ast_Block *)value_as_ast_block(parent_value);
 
   assert(offset);
   Value_View statement = tokenizer_make_group_children_view(
@@ -1411,9 +1411,9 @@ tokenizer_group_start_curly(
 ) {
   Value *value = tokenizer_group_start(allocator, stack, parent_stack, group_descriptor, source_range);
   assert(value->storage.tag == Storage_Tag_None);
-  Group_Curly *group = allocator_allocate(allocator, Group_Curly);
+  Ast_Block *group = allocator_allocate(allocator, Ast_Block);
   // TODO use temp allocator first?
-  *group = (Group_Curly){.statements = dyn_array_make(Array_Value_View, .allocator = allocator)};
+  *group = (Ast_Block){.statements = dyn_array_make(Array_Value_View, .allocator = allocator)};
   value->storage = storage_immediate(group);
 }
 
@@ -1729,8 +1729,8 @@ token_parse_single(
 ) {
   if (value->descriptor == &descriptor_group_paren) {
     return token_parse_expression(context, parser, value_as_group_paren(value)->children, &(u32){0}, 0);
-  } else if (value->descriptor == &descriptor_group_curly) {
-    return token_parse_block(context, parser, value_as_group_curly(value));
+  } else if (value->descriptor == &descriptor_ast_block) {
+    return token_parse_block(context, parser, value_as_ast_block(value));
   } else if (value->descriptor == &descriptor_group_square) {
     return token_parse_tuple(context, parser, value_as_group_square(value)->children);
   } else if (value->descriptor == &descriptor_quoted) {
@@ -2585,7 +2585,7 @@ token_parse_while(
   u32 condition_start_index = peek_index;
   for (; peek_index < view.length; peek_index += 1) {
     Value *token = value_view_get(view, peek_index);
-    if (value_is_group_curly(token)) {
+    if (value_is_ast_block(token)) {
       break;
     }
   }
@@ -2598,7 +2598,7 @@ token_parse_while(
   }
 
   Value *body_token = value_view_next(view, &peek_index);
-  assert(value_is_group_curly(body_token));
+  assert(value_is_ast_block(body_token));
   if (view.length != peek_index) {
     Value *semicolon = value_view_next(view, &peek_index);
     const Symbol* symbol = context->compilation->common_symbols.operator_semicolon;
@@ -3125,7 +3125,7 @@ mass_handle_macro_call(
   Parser body_parser = *parser;
   body_parser.scope = body_scope;
 
-  Array_Value_View statements = value_as_group_curly(literal->body)->statements;
+  Array_Value_View statements = value_as_ast_block(literal->body)->statements;
   Value *body_value = token_parse_block_statements(context, &body_parser, statements);
   if (mass_has_error(context)) goto err;
 
@@ -4019,8 +4019,8 @@ mass_ensure_trampoline(
   if (mass_result_is_error(&result)) {
     panic("This body should always be tokenizable since we constructed it to be");
   }
-  Group_Curly body = {.statements = statements};
-  Value *body_value = value_make(context->allocator, &descriptor_group_curly, storage_immediate(&body), body_range);
+  Ast_Block body = {.statements = statements};
+  Value *body_value = value_make(context->allocator, &descriptor_ast_block, storage_immediate(&body), body_range);
 
   Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
   *trampoline_literal = (Function_Literal) {
@@ -5157,7 +5157,7 @@ mass_eval(
 ) {
   assert(args_view.length == 1);
   Value *body = value_view_get(args_view, 0);
-  if (value_is_group_paren(body) || value_is_group_curly(body)) {
+  if (value_is_group_paren(body) || value_is_ast_block(body)) {
     return compile_time_eval(context, parser, args_view);
   } else {
     mass_error(context, (Mass_Error) {
@@ -5835,7 +5835,7 @@ mass_intrinsic(
   assert(value_match_symbol(value_view_get(args_view, 0), slice_literal("intrinsic")));
 
   Value *body = value_view_get(args_view, 1);
-  if (!value_is_group_curly(body)) {
+  if (!value_is_ast_block(body)) {
     context_parse_error(context, parser, args_view, 1);
     return 0;
   }
@@ -6011,7 +6011,7 @@ token_parse_function_literal(
     function_info_from_parameters_and_return(context, parser, args_view, returns);
   if (mass_has_error(context)) return 0;
 
-  Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_group_curly);
+  Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_ast_block);
   if (!body_value) {
     Token_Pattern end_pattern = {
       .tag = Token_Pattern_Tag_Cached_Symbol,
@@ -6427,7 +6427,7 @@ static inline Value *
 token_parse_block(
   Mass_Context *context,
   Parser *parser,
-  const Group_Curly *group
+  const Ast_Block *group
 ) {
   Parser block_parser = *parser;
   block_parser.scope = scope_make(context->allocator, parser->scope);
@@ -6865,7 +6865,7 @@ mass_inline_module(
 ) {
   assert(args.length == 2);
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("module")));
-  const Group_Curly *curly = value_as_group_curly(value_view_get(args, 1));
+  const Ast_Block *curly = value_as_ast_block(value_view_get(args, 1));
 
   Module *module = mass_allocate(context, Module);
   *module = (Module) {
@@ -7090,9 +7090,9 @@ mass_run_script(
   *context->result = tokenize(context, source_range, &statements);
   if (mass_has_error(context)) return;
 
-  Group_Curly body = {.statements = statements};
+  Ast_Block body = {.statements = statements};
   Value *fake_function_body = value_make(
-    context->allocator, &descriptor_group_curly, storage_immediate(&body), source_range
+    context->allocator, &descriptor_ast_block, storage_immediate(&body), source_range
   );
 
   Parser parser = {

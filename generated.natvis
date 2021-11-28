@@ -314,7 +314,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Group_Curly">
+<Type Name="Array_Ast_Block">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -323,7 +323,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Group_Curly_Ptr">
+<Type Name="Array_Ast_Block_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -332,7 +332,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Const_Group_Curly_Ptr">
+<Type Name="Array_Const_Ast_Block_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>

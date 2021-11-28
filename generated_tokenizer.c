@@ -42,7 +42,7 @@ tokenize(
 
   // Create top-level block
   tokenizer_group_start_curly(
-    allocator, &stack, &parent_stack, &descriptor_group_curly, TOKENIZER_CURRENT_RANGE()
+    allocator, &stack, &parent_stack, &descriptor_ast_block, TOKENIZER_CURRENT_RANGE()
   );
 
   #define TOKENIZER_CURRENT_SLICE()\
@@ -420,7 +420,7 @@ yy31:
 #line 126 "tokenizer.re.c"
   {
         tokenizer_group_start_curly(
-          allocator, &stack, &parent_stack, &descriptor_group_curly, TOKENIZER_CURRENT_RANGE()
+          allocator, &stack, &parent_stack, &descriptor_ast_block, TOKENIZER_CURRENT_RANGE()
         );
         continue;
       }
@@ -635,7 +635,7 @@ yy54:
   if (result.tag == Mass_Result_Tag_Success) {
     assert(dyn_array_length(stack) == 1);
     Value *root_value = *dyn_array_pop(stack);
-    const Group_Curly *root = value_as_group_curly(root_value);
+    const Ast_Block *root = value_as_ast_block(root_value);
     *out_statements = root->statements;
   }
   fixed_buffer_destroy(string_buffer);

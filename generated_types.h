@@ -52,9 +52,9 @@ typedef struct Group_Paren Group_Paren;
 typedef dyn_array_type(Group_Paren *) Array_Group_Paren_Ptr;
 typedef dyn_array_type(const Group_Paren *) Array_Const_Group_Paren_Ptr;
 
-typedef struct Group_Curly Group_Curly;
-typedef dyn_array_type(Group_Curly *) Array_Group_Curly_Ptr;
-typedef dyn_array_type(const Group_Curly *) Array_Const_Group_Curly_Ptr;
+typedef struct Ast_Block Ast_Block;
+typedef dyn_array_type(Ast_Block *) Array_Ast_Block_Ptr;
+typedef dyn_array_type(const Ast_Block *) Array_Const_Ast_Block_Ptr;
 
 typedef struct Group_Square Group_Square;
 typedef dyn_array_type(Group_Square *) Array_Group_Square_Ptr;
@@ -977,10 +977,10 @@ typedef struct Group_Paren {
 } Group_Paren;
 typedef dyn_array_type(Group_Paren) Array_Group_Paren;
 
-typedef struct Group_Curly {
+typedef struct Ast_Block {
   Array_Value_View statements;
-} Group_Curly;
-typedef dyn_array_type(Group_Curly) Array_Group_Curly;
+} Ast_Block;
+typedef dyn_array_type(Ast_Block) Array_Ast_Block;
 
 typedef struct Group_Square {
   Value_View children;
@@ -2161,11 +2161,11 @@ static Descriptor descriptor_array_group_paren;
 static Descriptor descriptor_array_group_paren_ptr;
 static Descriptor descriptor_group_paren_pointer;
 static Descriptor descriptor_group_paren_pointer_pointer;
-static Descriptor descriptor_group_curly;
-static Descriptor descriptor_array_group_curly;
-static Descriptor descriptor_array_group_curly_ptr;
-static Descriptor descriptor_group_curly_pointer;
-static Descriptor descriptor_group_curly_pointer_pointer;
+static Descriptor descriptor_ast_block;
+static Descriptor descriptor_array_ast_block;
+static Descriptor descriptor_array_ast_block_ptr;
+static Descriptor descriptor_ast_block_pointer;
+static Descriptor descriptor_ast_block_pointer_pointer;
 static Descriptor descriptor_group_square;
 static Descriptor descriptor_array_group_square;
 static Descriptor descriptor_array_group_square_ptr;
@@ -2999,18 +2999,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group_paren, Group_Paren,
 MASS_DEFINE_TYPE_VALUE(group_paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren *, group_paren_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_curly_ptr, Array_Group_Curly_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_curly, Array_Group_Curly)
-MASS_DEFINE_STRUCT_DESCRIPTOR(group_curly, Group_Curly,
+MASS_DEFINE_OPAQUE_C_TYPE(array_ast_block_ptr, Array_Ast_Block_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_ast_block, Array_Ast_Block)
+MASS_DEFINE_STRUCT_DESCRIPTOR(ast_block, Ast_Block,
   {
     .descriptor = &descriptor_array_value_view,
     .name = slice_literal_fields("statements"),
-    .offset = offsetof(Group_Curly, statements),
+    .offset = offsetof(Ast_Block, statements),
   },
 );
-MASS_DEFINE_TYPE_VALUE(group_curly);
-DEFINE_VALUE_IS_AS_HELPERS(Group_Curly, group_curly);
-DEFINE_VALUE_IS_AS_HELPERS(Group_Curly *, group_curly_pointer);
+MASS_DEFINE_TYPE_VALUE(ast_block);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Block, ast_block);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Block *, ast_block_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_group_square_ptr, Array_Group_Square_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_group_square, Array_Group_Square)
 MASS_DEFINE_STRUCT_DESCRIPTOR(group_square, Group_Square,

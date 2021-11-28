@@ -1191,7 +1191,7 @@ main(void) {
     { "Value_View", "children" },
   })));
 
-  export_compiler(push_type(type_struct("Group_Curly", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Ast_Block", (Struct_Item[]){
     { "Array_Value_View", "statements" },
   })));
 

@@ -350,11 +350,11 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      Value *curly = value_view_get(tokens, 0);
-      check(value_is_group_curly(curly));
-      Array_Value_View group_statements = value_as_group_curly(curly)->statements;
+      Value *block = value_view_get(tokens, 0);
+      check(value_is_ast_block(block));
+      Array_Value_View group_statements = value_as_ast_block(block)->statements;
       check(dyn_array_length(group_statements) == 1);
-      spec_check_slice(source_from_source_range(test_context.compilation, &curly->source_range), slice_literal("{[]}"));
+      spec_check_slice(source_from_source_range(test_context.compilation, &block->source_range), slice_literal("{[]}"));
 
       Value *square = value_view_get(*dyn_array_get(group_statements, 0), 0);
       check(value_is_group_square(square));

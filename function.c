@@ -654,8 +654,8 @@ ensure_function_instance(
   builder->register_occupied_bitset |= call_setup.parameter_registers_bitset;
 
   Value *parse_result = 0;
-  if (value_is_group_curly(literal->body)) {
-    Array_Value_View statements = value_as_group_curly(literal->body)->statements;
+  if (value_is_ast_block(literal->body)) {
+    Array_Value_View statements = value_as_ast_block(literal->body)->statements;
     parse_result = token_parse_block_statements(context, &body_parser, statements);
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = value_as_value_view(literal->body);

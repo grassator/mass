@@ -195,7 +195,7 @@ static Value *
 token_parse_block(
   Mass_Context *program,
   Parser *parser,
-  const Group_Curly *group
+  const Ast_Block *block
 );
 
 static Module *

@@ -45,12 +45,12 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Group_Paren")),
     type_group_paren_value
   );
-  Source_Range Group_Curly__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Group_Curly__source_range, "Group_Curly");
+  Source_Range Ast_Block__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Ast_Block__source_range, "Ast_Block");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Group_Curly__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Group_Curly")),
-    type_group_curly_value
+    scope, VALUE_STATIC_EPOCH, Ast_Block__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Ast_Block")),
+    type_ast_block_value
   );
   Source_Range Group_Square__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Group_Square__source_range, "Group_Square");
