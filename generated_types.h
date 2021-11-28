@@ -521,10 +521,6 @@ typedef struct Tuple Tuple;
 typedef dyn_array_type(Tuple *) Array_Tuple_Ptr;
 typedef dyn_array_type(const Tuple *) Array_Const_Tuple_Ptr;
 
-typedef struct Code_Fragment Code_Fragment;
-typedef dyn_array_type(Code_Fragment *) Array_Code_Fragment_Ptr;
-typedef dyn_array_type(const Code_Fragment *) Array_Const_Code_Fragment_Ptr;
-
 typedef struct Typed_Symbol Typed_Symbol;
 typedef dyn_array_type(Typed_Symbol *) Array_Typed_Symbol_Ptr;
 typedef dyn_array_type(const Typed_Symbol *) Array_Const_Typed_Symbol_Ptr;
@@ -703,9 +699,6 @@ static Value * mass_pointer_to_type
   (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_eval
-  (Mass_Context * context, Parser * parser, Value_View args);
-
-static Value * mass_fragment
   (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_inline_module
@@ -1642,12 +1635,6 @@ typedef struct Tuple {
 } Tuple;
 typedef dyn_array_type(Tuple) Array_Tuple;
 
-typedef struct Code_Fragment {
-  Scope * scope;
-  Value_View children;
-} Code_Fragment;
-typedef dyn_array_type(Code_Fragment) Array_Code_Fragment;
-
 typedef struct Typed_Symbol {
   const Symbol * symbol;
   const Descriptor * descriptor;
@@ -2457,11 +2444,6 @@ static Descriptor descriptor_array_tuple;
 static Descriptor descriptor_array_tuple_ptr;
 static Descriptor descriptor_tuple_pointer;
 static Descriptor descriptor_tuple_pointer_pointer;
-static Descriptor descriptor_code_fragment;
-static Descriptor descriptor_array_code_fragment;
-static Descriptor descriptor_array_code_fragment_ptr;
-static Descriptor descriptor_code_fragment_pointer;
-static Descriptor descriptor_code_fragment_pointer_pointer;
 static Descriptor descriptor_typed_symbol;
 static Descriptor descriptor_array_typed_symbol;
 static Descriptor descriptor_array_typed_symbol_ptr;
@@ -2581,7 +2563,6 @@ static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_pointer_to_type;
 static Descriptor descriptor_mass_eval;
-static Descriptor descriptor_mass_fragment;
 static Descriptor descriptor_mass_inline_module;
 static Descriptor descriptor_mass_c_struct;
 static Descriptor descriptor_mass_exports;
@@ -4699,23 +4680,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
 MASS_DEFINE_TYPE_VALUE(tuple);
 DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple);
 DEFINE_VALUE_IS_AS_HELPERS(Tuple *, tuple_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_code_fragment_ptr, Array_Code_Fragment_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_code_fragment, Array_Code_Fragment)
-MASS_DEFINE_STRUCT_DESCRIPTOR(code_fragment, Code_Fragment,
-  {
-    .descriptor = &descriptor_scope_pointer,
-    .name = slice_literal_fields("scope"),
-    .offset = offsetof(Code_Fragment, scope),
-  },
-  {
-    .descriptor = &descriptor_value_view,
-    .name = slice_literal_fields("children"),
-    .offset = offsetof(Code_Fragment, children),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(code_fragment);
-DEFINE_VALUE_IS_AS_HELPERS(Code_Fragment, code_fragment);
-DEFINE_VALUE_IS_AS_HELPERS(Code_Fragment *, code_fragment_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol_ptr, Array_Typed_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol, Array_Typed_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(typed_symbol, Typed_Symbol,

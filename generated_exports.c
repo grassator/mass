@@ -269,13 +269,6 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Tuple")),
     type_tuple_value
   );
-  Source_Range Code_Fragment__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Code_Fragment__source_range, "Code_Fragment");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Code_Fragment__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Code_Fragment")),
-    type_code_fragment_value
-  );
   Source_Range Descriptor__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Descriptor__source_range, "Descriptor");
   scope_define_value(
@@ -597,22 +590,6 @@ compiler_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_eval, "eval", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_fragment, "fragment", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_mass_context_pointer

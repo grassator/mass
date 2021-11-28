@@ -100,7 +100,6 @@ operator 16 (- x) 'negate
 operator 16 (& x) 'pointer_to
 
 operator 20 (@ x) MASS.eval
-operator 25 (~> x) MASS.fragment
 operator 30 (. x) intrinsic {
   meta :: import("std/meta")
   accessor : MASS.Named_Accessor

@@ -5139,24 +5139,6 @@ mass_handle_goto_operator(
 }
 
 static Value *
-mass_fragment(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args_view
-) {
-  assert(args_view.length == 1);
-  Value *source_value = value_view_get(args_view, 0);
-  const Group_Curly *group = value_as_group_curly(source_value);
-  Code_Fragment *fragment = allocator_allocate(context->allocator, Code_Fragment);
-  *fragment = (Code_Fragment) {
-    .scope = parser->scope,
-    .children = group->children,
-  };
-
-  return value_make(context->allocator, &descriptor_code_fragment, storage_static(fragment), args_view.source_range);
-}
-
-static Value *
 mass_eval(
   Mass_Context *context,
   Parser *parser,
@@ -6303,12 +6285,6 @@ token_parse_block_view(
           context, parser, parse_result->source_range, assignment,
           &descriptor_void, mass_handle_assignment_lazy_proc
         );
-      } else if (value_is_code_fragment(parse_result)) {
-        const Code_Fragment *fragment = value_as_code_fragment(parse_result);
-        Scope *saved_scope = parser->scope;
-        parser->scope = fragment->scope;
-        parse_result = token_parse_block_view(context, parser, fragment->children);
-        parser->scope = saved_scope;
       } else if (parse_result->descriptor == &descriptor_typed_symbol) {
         parse_result = mass_define_stack_value_from_typed_symbol(
           context, parser, value_as_typed_symbol(parse_result), parse_result->source_range

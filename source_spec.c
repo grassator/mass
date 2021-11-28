@@ -1813,19 +1813,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to should be able to handle fragment statement") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "test_fragment :: ~> { return 42 }\n"
-        "checker :: fn() -> (s64) {\n"
-          "test_fragment\n"
-          "21"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should be able to use a while loop") {
       s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "sum_up_to", &test_context,

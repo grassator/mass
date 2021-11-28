@@ -1702,11 +1702,6 @@ main(void) {
     { "Array_Value_Ptr", "items"},
   })));
 
-  export_compiler(push_type(type_struct("Code_Fragment", (Struct_Item[]){
-    { "Scope *", "scope"},
-    { "Value_View", "children"},
-  })));
-
   push_type(type_struct("Typed_Symbol", (Struct_Item[]){
     { "const Symbol *", "symbol"},
     { "const Descriptor *", "descriptor"},
@@ -2065,7 +2060,6 @@ main(void) {
   export_compiler_custom_name("pointer_to", push_type(type_intrinsic("mass_pointer_to")));
   export_compiler_custom_name("pointer_to_type", push_type(type_intrinsic("mass_pointer_to_type")));
   export_compiler_custom_name("eval", push_type(type_intrinsic("mass_eval")));
-  export_compiler_custom_name("fragment", push_type(type_intrinsic("mass_fragment")));
   export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));
   export_compiler_custom_name("c_struct", push_type(type_intrinsic("mass_c_struct")));
   export_compiler_custom_name("exports", push_type(type_intrinsic("mass_exports")));
