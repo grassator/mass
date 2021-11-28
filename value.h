@@ -25,6 +25,8 @@ mass_result_is_error(
 }
 #define mass_has_error(_CONTEXT_) mass_result_is_error((_CONTEXT_)->result)
 
+#define mass_allocate(_CONTEXT_, ...) allocator_allocate((_CONTEXT_)->allocator, __VA_ARGS__)
+
 static inline Function_Parameter
 function_parameter_with_default(
   const Symbol *symbol,

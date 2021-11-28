@@ -519,7 +519,7 @@ anonymous_struct_descriptor_from_tuple(
   }
   c_struct_aligner_end(&struct_aligner);
 
-  tuple_descriptor = allocator_allocate(context->allocator, Descriptor);
+  tuple_descriptor = mass_allocate(context, Descriptor);
   *tuple_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
     .bit_size = {struct_aligner.bit_size},
@@ -1349,7 +1349,7 @@ tokenizer_maybe_push_fake_semicolon(
   if (!has_children) return;
   // :FakeSemicolon
   assert(range_length(source_range.offsets) == 0);
-  Value *token = allocator_allocate(context->allocator, Value);
+  Value *token = mass_allocate(context, Value);
   const Symbol *symbol = context->compilation->common_symbols.operator_semicolon;
   value_init(token, &descriptor_symbol, storage_static(symbol), source_range);
   dyn_array_push(*stack, token);
@@ -1410,7 +1410,7 @@ tokenizer_group_end_paren(
   Value_View children = tokenizer_make_group_children_view(
     context->allocator, stack, parent, parent_value, offset
   );
-  Group_Paren *group = allocator_allocate(context->allocator, Group_Paren);
+  Group_Paren *group = mass_allocate(context, Group_Paren);
   *group = (Group_Paren){.children = children};
   parent_value->storage = storage_static(group);
 
@@ -1432,7 +1432,7 @@ tokenizer_group_end_square(
   Value_View children = tokenizer_make_group_children_view(
     context->allocator, stack, parent, parent_value, offset
   );
-  Group_Square *group = allocator_allocate(context->allocator, Group_Square);
+  Group_Square *group = mass_allocate(context, Group_Square);
   *group = (Group_Square){.children = children};
   parent_value->storage = storage_static(group);
 
@@ -1470,7 +1470,7 @@ tokenizer_group_end_curly(
   Value_View children = tokenizer_make_group_children_view(
     context->allocator, stack, parent, parent_value, offset
   );
-  Group_Square *group = allocator_allocate(context->allocator, Group_Square);
+  Group_Square *group = mass_allocate(context, Group_Square);
   *group = (Group_Square){.children = children};
   parent_value->storage = storage_static(group);
 
@@ -1770,7 +1770,7 @@ mass_quote(
   Value *value = value_view_get(args, 0);
   Quoted quoted = {.value = value};
   Value *result = value_init(
-    allocator_allocate(context->allocator, Value),
+    mass_allocate(context, Value),
     &descriptor_quoted, storage_immediate(&quoted), args.source_range
   );
   return result;
@@ -2240,7 +2240,7 @@ mass_expected_result_ensure_value_or_temp(
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_init(
-        allocator_allocate(context->allocator, Value),
+        mass_allocate(context, Value),
         expected_result->Exact.descriptor, expected_result->Exact.storage, value->source_range
       );
       mass_assign(context, builder, result_value, value, &value->source_range);
@@ -2459,7 +2459,7 @@ mass_exports(
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("exports")));
   Value_View children = value_as_group_curly(value_view_get(args, 1))->children;
 
-  Module_Exports *export = allocator_allocate(context->allocator, Module_Exports);
+  Module_Exports *export = mass_allocate(context, Module_Exports);
   *export = (Module_Exports){0};
   Value *result = value_make(
     context->allocator, &descriptor_module_exports, storage_static(export), args.source_range
@@ -2592,7 +2592,7 @@ token_parse_operator_definition(
     }
   }
 
-  Operator *operator = allocator_allocate(context->allocator, Operator);
+  Operator *operator = mass_allocate(context, Operator);
 
   if (value_is_symbol(body)) {
     const Symbol *alias = value_as_symbol(body);
@@ -2699,7 +2699,7 @@ mass_push_token_matcher(
   void *payload
 ) {
   Token_Statement_Matcher *matcher =
-    allocator_allocate(context->allocator, Token_Statement_Matcher);
+    mass_allocate(context, Token_Statement_Matcher);
   *matcher = (Token_Statement_Matcher){
     .previous = parser->scope->statement_matcher,
     .proc = proc,
@@ -2816,7 +2816,7 @@ token_parse_syntax_definition(
       goto err;
     }
   }
-  Macro *macro = allocator_allocate(context->allocator, Macro);
+  Macro *macro = mass_allocate(context, Macro);
   *macro = (Macro){
     .pattern = pattern,
     .replacement = replacement,
@@ -2846,9 +2846,9 @@ mass_c_struct(
     context, tuple, Tuple_Eval_Mode_Type
   );
   assert(descriptor->tag == Descriptor_Tag_Struct);
-  descriptor->brand = allocator_allocate(context->allocator, Symbol);
+  descriptor->brand = mass_allocate(context, Symbol);
 
-  Value *result = allocator_allocate(context->allocator, Value);
+  Value *result = mass_allocate(context, Value);
   *result = MASS_TYPE_VALUE(descriptor);
 
   return result;
@@ -3041,7 +3041,7 @@ mass_handle_cast_lazy_proc(
         result_storage = value->storage;
       }
       result_value = value_init(
-        allocator_allocate(context->allocator, Value),
+        mass_allocate(context, Value),
         target_descriptor, result_storage, *source_range
       );
       // TODO This is awkward and there might be a better way.
@@ -3089,7 +3089,7 @@ mass_cast_helper(
     expression->descriptor == &descriptor_tuple &&
     mass_value_is_compile_time_known(expression)
   ) {
-    Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+    Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
     *heap_payload = lazy_payload;
 
     return mass_make_lazy_value(
@@ -3102,7 +3102,7 @@ mass_cast_helper(
     return mass_handle_cast_lazy_proc(context, 0, &expected_result, &source_range, &lazy_payload);
   }
 
-  Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+  Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
   *heap_payload = lazy_payload;
 
   return mass_make_lazy_value(
@@ -3266,7 +3266,7 @@ mass_macro_temp_param_lazy_proc(
   // released upon returning.
   Storage stack_storage = reserve_stack_storage(builder, expected_descriptor->bit_size);
   Value *forced = value_init(
-    allocator_allocate(context->allocator, Value),
+    mass_allocate(context, Value),
     expected_descriptor, stack_storage, *source_range
   );
   value_force_exact(context, builder, forced, arg);
@@ -3439,7 +3439,7 @@ call_function_overload(
     Storage return_storage = instance_descriptor->call_setup.caller_return;
     return_storage.flags |= Storage_Flags_Temporary;
     fn_return_value = value_init(
-      allocator_allocate(context->allocator, Value),
+      mass_allocate(context, Value),
       return_descriptor, return_storage, *source_range
     );
   }
@@ -3476,7 +3476,7 @@ call_function_overload(
       if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
         Storage source_storage = reserve_stack_storage(builder, target_arg->descriptor->bit_size);
         source_arg = value_init(
-          allocator_allocate(context->allocator, Value),
+          mass_allocate(context, Value),
           target_arg->descriptor, source_storage, *source_range
         );
       } else {
@@ -3529,7 +3529,7 @@ call_function_overload(
     Value *arg_value;
     if (storage_is_stack(&target_arg->storage)) {
       arg_value = value_init(
-        allocator_allocate(context->allocator, Value),
+        mass_allocate(context, Value),
         stack_descriptor, target_arg->storage, *source_range
       );
     } else if (source_is_stack) {
@@ -3567,7 +3567,7 @@ call_function_overload(
         register_acquire(builder, temp_register);
         register_bitset_set(&temp_register_argument_bitset, temp_register);
         arg_value = value_init(
-          allocator_allocate(context->allocator, Value),
+          mass_allocate(context, Value),
           target_item->descriptor,
           storage_register(temp_register, target_item->descriptor->bit_size),
           source_arg->source_range
@@ -3579,7 +3579,7 @@ call_function_overload(
         //printf(" > stack %i\n", stack_counter++);
         Storage stack_storage = reserve_stack_storage(builder, stack_descriptor->bit_size);
         arg_value = value_init(
-          allocator_allocate(context->allocator, Value),
+          mass_allocate(context, Value),
           stack_descriptor, stack_storage, *source_range
         );
         arg_value->storage.flags |= Storage_Flags_Temporary;
@@ -4072,7 +4072,7 @@ mass_ensure_trampoline(
     Value *runtime_instance = ensure_function_instance(&jit_context, original, args_view);
     if (mass_has_error(context)) return 0;
     assert(runtime_instance->descriptor->tag == Descriptor_Tag_Function_Instance);
-    Function_Info *proxy_info = allocator_allocate(context->allocator, Function_Info);
+    Function_Info *proxy_info = mass_allocate(context, Function_Info);
     *proxy_info = *original_info;
     proxy_info->flags &= ~Function_Info_Flags_Compile_Time;
 
@@ -6826,7 +6826,7 @@ token_define_global_variable(
       mass_assign(context, 0, global_value, value, &expression.source_range);
       if (mass_has_error(context)) return;
     } else {
-      Assignment *assignment_payload = allocator_allocate(context->allocator, Assignment);
+      Assignment *assignment_payload = mass_allocate(context, Assignment);
       *assignment_payload = (Assignment) {
         .target = global_value,
         .source = value,
@@ -6876,7 +6876,7 @@ token_define_local_variable(
   }
 
   Mass_Variable_Definition_Lazy_Payload *variable_payload =
-    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
+    mass_allocate(context, Mass_Variable_Definition_Lazy_Payload);
   *variable_payload = (Mass_Variable_Definition_Lazy_Payload){
     .descriptor = variable_descriptor,
   };
@@ -6890,7 +6890,7 @@ token_define_local_variable(
 
   scope_define_value(parser->scope, parser->epoch, *source_range, value_as_symbol(symbol), variable_value);
 
-  Assignment *assignment_payload = allocator_allocate(context->allocator, Assignment);
+  Assignment *assignment_payload = mass_allocate(context, Assignment);
   *assignment_payload = (Assignment) {
     .target = variable_value,
     .source = value,
@@ -7167,7 +7167,7 @@ mass_inline_module(
   assert(value_match_symbol(value_view_get(args, 0), slice_literal("module")));
   const Group_Curly *curly = value_as_group_curly(value_view_get(args, 1));
 
-  Module *module = allocator_allocate(context->allocator, Module);
+  Module *module = mass_allocate(context, Module);
   *module = (Module) {
     .source_range = args.source_range,
     .own_scope = scope_make(context->allocator, parser->scope),
@@ -7272,7 +7272,7 @@ program_module_from_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
-  Source_File *file = allocator_allocate(context->allocator, Source_File);
+  Source_File *file = mass_allocate(context, Source_File);
   *file = (Source_File) {
     .path = file_path,
   };
@@ -7301,7 +7301,7 @@ program_module_from_file(
     return 0;
   }
 
-  Module *module = allocator_allocate(context->allocator, Module);
+  Module *module = mass_allocate(context, Module);
   *module = (Module) {
     .source_range = {
       .file = file,
@@ -7386,7 +7386,7 @@ mass_run_script(
   Source_Range source_range = root_module->source_range;
   mass_maybe_trim_shebang(&source_range);
 
-  Value_View *tokens = allocator_allocate(context->allocator, Value_View);
+  Value_View *tokens = mass_allocate(context, Value_View);
   *context->result = tokenize(context, source_range, tokens);
   if (mass_has_error(context)) return;
 
