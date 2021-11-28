@@ -11,7 +11,7 @@ PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Mass_Context *context,
   Source_Range source_range,
-  Value_View *out_tokens
+  Array_Value_View *out_statements
 ) {
   Compilation *compilation = context->compilation;
   Slice input = source_range.file->text;
@@ -31,9 +31,6 @@ tokenize(
   u64 marker = offset;
   u64 end_offset = source_range.offsets.to;
 
-  #define TOKENIZER_CURRENT_SLICE()\
-    slice_sub(input, token_start_offset, offset)
-
   #define TOKENIZER_CURRENT_RANGE()\
     (Source_Range){\
       .file = source_range.file,\
@@ -42,6 +39,14 @@ tokenize(
         .to = u64_to_u32(offset),\
       }\
     }
+
+  // Create top-level block
+  tokenizer_group_start_curly(
+    allocator, &stack, &parent_stack, &descriptor_group_curly, TOKENIZER_CURRENT_RANGE()
+  );
+
+  #define TOKENIZER_CURRENT_SLICE()\
+    slice_sub(input, token_start_offset, offset)
 
   #define TOKENIZER_PUSH_LITERAL(_BASE_, _SLICE_)\
     dyn_array_push(stack, \
@@ -61,7 +66,7 @@ tokenize(
           }\
         }\
       };\
-      goto done;\
+      goto defer;\
     } while (0)
 
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
@@ -83,7 +88,7 @@ tokenize(
   for (;;) {
     token_start_offset = offset;
     
-#line 87 "generated_tokenizer.c"
+#line 92 "generated_tokenizer.c"
 {
   char yych;
   unsigned int yyaccept = 0;
@@ -92,7 +97,8 @@ tokenize(
   case '\t':
   case '\v':
   case ' ':  goto yy4;
-  case '\n':  goto yy7;
+  case '\n':
+  case ';':  goto yy7;
   case '\r':  goto yy9;
   case '!':
   case '$':
@@ -104,7 +110,6 @@ tokenize(
   case '-':
   case '.':
   case ':':
-  case ';':
   case '<':
   case '=':
   case '>':
@@ -193,9 +198,9 @@ tokenize(
 yy2:
   ++offset;
 yy3:
-#line 154 "tokenizer.re.c"
+#line 161 "tokenizer.re.c"
   { TOKENIZER_HANDLE_ERROR((Slice){0}); }
-#line 199 "generated_tokenizer.c"
+#line 204 "generated_tokenizer.c"
 yy4:
   yyaccept = 0;
   ++offset;
@@ -209,21 +214,18 @@ yy4:
   default:  goto yy6;
   }
 yy6:
-#line 148 "tokenizer.re.c"
+#line 155 "tokenizer.re.c"
   { continue; }
-#line 215 "generated_tokenizer.c"
+#line 220 "generated_tokenizer.c"
 yy7:
   ++offset;
 yy8:
-#line 130 "tokenizer.re.c"
+#line 140 "tokenizer.re.c"
   {
-        token_start_offset = offset; // :FakeSemicolon
-        tokenizer_maybe_push_fake_semicolon(
-          context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
-        );
+        tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset - 1);
         continue;
       }
-#line 227 "generated_tokenizer.c"
+#line 229 "generated_tokenizer.c"
 yy9:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -247,7 +249,6 @@ yy11:
   case '.':
   case '/':
   case ':':
-  case ';':
   case '<':
   case '=':
   case '>':
@@ -260,9 +261,9 @@ yy11:
   default:  goto yy12;
   }
 yy12:
-#line 127 "tokenizer.re.c"
+#line 137 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 266 "generated_tokenizer.c"
+#line 267 "generated_tokenizer.c"
 yy13:
   yyaccept = 1;
   ++offset;
@@ -278,14 +279,14 @@ yy14:
   goto yy12;
 yy15:
   ++offset;
-#line 119 "tokenizer.re.c"
+#line 124 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(paren); continue; }
-#line 284 "generated_tokenizer.c"
+#line 285 "generated_tokenizer.c"
 yy17:
   ++offset;
-#line 122 "tokenizer.re.c"
+#line 132 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(paren); continue; }
-#line 289 "generated_tokenizer.c"
+#line 290 "generated_tokenizer.c"
 yy19:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -307,13 +308,13 @@ yy20:
   default:  goto yy21;
   }
 yy21:
-#line 101 "tokenizer.re.c"
+#line 106 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_10, digits);
         continue;
       }
-#line 317 "generated_tokenizer.c"
+#line 318 "generated_tokenizer.c"
 yy22:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -401,29 +402,34 @@ yy24:
   default:  goto yy26;
   }
 yy26:
-#line 151 "tokenizer.re.c"
+#line 158 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 407 "generated_tokenizer.c"
+#line 408 "generated_tokenizer.c"
 yy27:
   ++offset;
-#line 120 "tokenizer.re.c"
+#line 125 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(square); continue; }
-#line 412 "generated_tokenizer.c"
+#line 413 "generated_tokenizer.c"
 yy29:
   ++offset;
-#line 123 "tokenizer.re.c"
+#line 133 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(square); continue; }
-#line 417 "generated_tokenizer.c"
+#line 418 "generated_tokenizer.c"
 yy31:
   ++offset;
-#line 121 "tokenizer.re.c"
-  { TOKENIZER_GROUP_START(curly); continue; }
-#line 422 "generated_tokenizer.c"
+#line 126 "tokenizer.re.c"
+  {
+        tokenizer_group_start_curly(
+          allocator, &stack, &parent_stack, &descriptor_group_curly, TOKENIZER_CURRENT_RANGE()
+        );
+        continue;
+      }
+#line 428 "generated_tokenizer.c"
 yy33:
   ++offset;
-#line 124 "tokenizer.re.c"
+#line 134 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(curly); continue; }
-#line 427 "generated_tokenizer.c"
+#line 433 "generated_tokenizer.c"
 yy35:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -454,7 +460,7 @@ yy38:
   }
 yy39:
   ++offset;
-#line 138 "tokenizer.re.c"
+#line 145 "tokenizer.re.c"
   {
         Slice raw_bytes = slice_sub(input, token_start_offset + 1, offset - 1);
         tokenizer_push_string_literal(
@@ -462,7 +468,7 @@ yy39:
         );
         continue;
       }
-#line 466 "generated_tokenizer.c"
+#line 472 "generated_tokenizer.c"
 yy41:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -488,7 +494,6 @@ yy42:
   case '.':
   case '/':
   case ':':
-  case ';':
   case '<':
   case '=':
   case '>':
@@ -560,13 +565,13 @@ yy48:
   default:  goto yy50;
   }
 yy50:
-#line 107 "tokenizer.re.c"
+#line 112 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_2, digits);
         continue;
       }
-#line 570 "generated_tokenizer.c"
+#line 575 "generated_tokenizer.c"
 yy51:
   ++offset;
   yych = offset < end_offset ? input.bytes[offset] : 0;
@@ -597,24 +602,26 @@ yy51:
   default:  goto yy53;
   }
 yy53:
-#line 113 "tokenizer.re.c"
+#line 118 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_16, digits);
         continue;
       }
-#line 607 "generated_tokenizer.c"
+#line 612 "generated_tokenizer.c"
 yy54:
-#line 96 "tokenizer.re.c"
+#line 101 "tokenizer.re.c"
   { break; }
-#line 611 "generated_tokenizer.c"
+#line 616 "generated_tokenizer.c"
 }
-#line 155 "tokenizer.re.c"
+#line 162 "tokenizer.re.c"
 
   }
 
+  offset++;
+  TOKENIZER_GROUP_END(curly);
+
   if (dyn_array_length(parent_stack)) {
-    offset++;
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 
@@ -624,11 +631,12 @@ yy54:
   #undef TOKENIZER_PUSH_SYMBOL
   #undef TOKENIZER_PUSH_LITERAL
 
-  done:
+  defer:
   if (result.tag == Mass_Result_Tag_Success) {
-    *out_tokens = temp_token_array_into_value_view(
-      allocator, dyn_array_raw(stack), u64_to_u32(dyn_array_length(stack)), source_range
-    );
+    assert(dyn_array_length(stack) == 1);
+    Value *root_value = *dyn_array_pop(stack);
+    const Group_Curly *root = value_as_group_curly(root_value);
+    *out_statements = root->statements;
   }
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(stack);

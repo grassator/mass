@@ -677,9 +677,6 @@ typedef struct X64_Mnemonic X64_Mnemonic;
 typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
 typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
-static Mass_Result tokenize
-  (Mass_Context * context, Source_Range source_range, Value_View * out_tokens);
-
 static void push_instruction
   (Code_Block * code_block, Instruction instruction);
 
@@ -981,7 +978,7 @@ typedef struct Group_Paren {
 typedef dyn_array_type(Group_Paren) Array_Group_Paren;
 
 typedef struct Group_Curly {
-  Value_View children;
+  Array_Value_View statements;
 } Group_Curly;
 typedef dyn_array_type(Group_Curly) Array_Group_Curly;
 
@@ -2586,7 +2583,6 @@ static Descriptor descriptor_array_x64_mnemonic;
 static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
-static Descriptor descriptor_tokenize;
 static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
@@ -3007,9 +3003,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_group_curly_ptr, Array_Group_Curly_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_group_curly, Array_Group_Curly)
 MASS_DEFINE_STRUCT_DESCRIPTOR(group_curly, Group_Curly,
   {
-    .descriptor = &descriptor_value_view,
-    .name = slice_literal_fields("children"),
-    .offset = offsetof(Group_Curly, children),
+    .descriptor = &descriptor_array_value_view,
+    .name = slice_literal_fields("statements"),
+    .offset = offsetof(Group_Curly, statements),
   },
 );
 MASS_DEFINE_TYPE_VALUE(group_curly);

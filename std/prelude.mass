@@ -65,7 +65,7 @@ assert :: fn(condition : bool, message := "Assertion failed\n") -> () {
 static_assert :: fn(condition : bool, message : String = "") => () MASS.static_assert
 
 apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) -> (MASS.Module) MASS.inline_module
-apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) -> () MASS.exports
+apply :: fn(symbol :: 'exports, curly : MASS.Group_Square) -> () MASS.exports
 // FIXME the return type here should be (MASS.Intrinsic_Proc) but that does not work atm
 apply :: fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) -> _ MASS.intrinsic
 apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) -> (Type) MASS.c_struct

@@ -238,35 +238,34 @@ spec("source") {
     it("should be able to tokenize an empty string") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "");
 
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Success);
-      check(tokens.length == 0);
+      check(dyn_array_length(statements) == 0);
     }
 
     it("should be able to tokenize a comment") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "// foo\n");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Success);
-      check(tokens.length == 0);
+      check(dyn_array_length(statements) == 0);
     }
 
     it("should be able to turn newlines into fake semicolon tokens on top level") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "foo\n");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Success);
-      check(tokens.length == 2);
-      Value *new_line = value_view_get(tokens, 1);
-      check(value_is_symbol(new_line));
-      spec_check_slice(value_as_symbol(new_line)->name, slice_literal(";"));
+      check(dyn_array_length(statements) == 1);
     }
 
     it("should be able to parse hex integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0xCAFE");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -278,8 +277,10 @@ spec("source") {
 
     it("should be able to parse binary integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0b100");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -291,8 +292,10 @@ spec("source") {
 
     it("should be able to tokenize a sum of integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "12 + foo123");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
@@ -310,8 +313,10 @@ spec("source") {
 
     it("should be able to tokenize groups") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(x)");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -326,8 +331,10 @@ spec("source") {
 
     it("should be able to tokenize strings") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "\"foo 123\"");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *string = value_view_get(tokens, 0);
@@ -336,17 +343,20 @@ spec("source") {
 
     it("should be able to tokenize nested groups with different braces") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "{[]}");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
       Value *curly = value_view_get(tokens, 0);
       check(value_is_group_curly(curly));
-      check(value_as_group_curly(curly)->children.length == 1);
+      Array_Value_View group_statements = value_as_group_curly(curly)->statements;
+      check(dyn_array_length(group_statements) == 1);
       spec_check_slice(source_from_source_range(test_context.compilation, &curly->source_range), slice_literal("{[]}"));
 
-      Value *square = value_view_get(value_as_group_curly(curly)->children, 0);
+      Value *square = value_view_get(*dyn_array_get(group_statements, 0), 0);
       check(value_is_group_square(square));
       check(value_as_group_square(square)->children.length == 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &square->source_range), slice_literal("[]"));
@@ -359,15 +369,16 @@ spec("source") {
         "  return x + 3;\n"
         "}"
       );
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
       check(result.tag == Mass_Result_Tag_Success);
     }
 
     it("should report a failure when encountering a brace that is not closed") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(foo");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
@@ -378,8 +389,8 @@ spec("source") {
 
     it("should report a failure when encountering a mismatched brace") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(foo}");
-      Value_View tokens;
-      Mass_Result result = tokenize(&test_context, source_range, &tokens);
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
@@ -487,7 +498,7 @@ spec("source") {
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Undefined_Variable);
-      spec_check_slice(error->Undefined_Variable.name, slice_literal(";"));
+      spec_check_slice(error->Undefined_Variable.name, slice_literal("if"));
     }
   }
 

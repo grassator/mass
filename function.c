@@ -655,10 +655,11 @@ ensure_function_instance(
 
   Value *parse_result = 0;
   if (value_is_group_curly(literal->body)) {
-    parse_result = token_parse_block_no_scope(context, &body_parser, value_as_group_curly(literal->body));
+    Array_Value_View statements = value_as_group_curly(literal->body)->statements;
+    parse_result = token_parse_block_statements(context, &body_parser, statements);
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = value_as_value_view(literal->body);
-    parse_result = token_parse_block_view(context, &body_parser, *view);
+    parse_result = token_parse_expression(context, &body_parser, *view, &(u32){0}, 0);
   } else if (literal->body->descriptor == &descriptor_lazy_value) {
     parse_result = literal->body;
   } else {

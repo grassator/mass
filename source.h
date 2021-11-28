@@ -185,17 +185,10 @@ value_or_lazy_value_descriptor(
 );
 
 static Value *
-token_parse_block_view(
+token_parse_block_statements(
   Mass_Context *program,
   Parser *parser,
-  Value_View view
-);
-
-static Value *
-token_parse_block_no_scope(
-  Mass_Context *context,
-  Parser *parser,
-  const Group_Curly *group
+  Array_Value_View statements
 );
 
 static Value *

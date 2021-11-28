@@ -9,7 +9,7 @@ PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Mass_Context *context,
   Source_Range source_range,
-  Value_View *out_tokens
+  Array_Value_View *out_statements
 ) {
   Compilation *compilation = context->compilation;
   Slice input = source_range.file->text;
@@ -29,9 +29,6 @@ tokenize(
   u64 marker = offset;
   u64 end_offset = source_range.offsets.to;
 
-  #define TOKENIZER_CURRENT_SLICE()\
-    slice_sub(input, token_start_offset, offset)
-
   #define TOKENIZER_CURRENT_RANGE()\
     (Source_Range){\
       .file = source_range.file,\
@@ -40,6 +37,14 @@ tokenize(
         .to = u64_to_u32(offset),\
       }\
     }
+
+  // Create top-level block
+  tokenizer_group_start_curly(
+    allocator, &stack, &parent_stack, &descriptor_group_curly, TOKENIZER_CURRENT_RANGE()
+  );
+
+  #define TOKENIZER_CURRENT_SLICE()\
+    slice_sub(input, token_start_offset, offset)
 
   #define TOKENIZER_PUSH_LITERAL(_BASE_, _SLICE_)\
     dyn_array_push(stack, \
@@ -59,7 +64,7 @@ tokenize(
           }\
         }\
       };\
-      goto done;\
+      goto defer;\
     } while (0)
 
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
@@ -118,20 +123,22 @@ tokenize(
 
       "(" { TOKENIZER_GROUP_START(paren); continue; }
       "[" { TOKENIZER_GROUP_START(square); continue; }
-      "{" { TOKENIZER_GROUP_START(curly); continue; }
+      "{" {
+        tokenizer_group_start_curly(
+          allocator, &stack, &parent_stack, &descriptor_group_curly, TOKENIZER_CURRENT_RANGE()
+        );
+        continue;
+      }
       ")" { TOKENIZER_GROUP_END(paren); continue; }
       "]" { TOKENIZER_GROUP_END(square); continue; }
       "}" { TOKENIZER_GROUP_END(curly); continue; }
 
-      operator = [+*%/=!@^&$\\:;,?|.~<>-]+|['];
+      operator = [+*%/=!@^&$\\:,?|.~<>-]+|['];
       operator { TOKENIZER_PUSH_SYMBOL(); continue; }
 
-      newline = "\r\n" | "\r" | "\n";
-      newline {
-        token_start_offset = offset; // :FakeSemicolon
-        tokenizer_maybe_push_fake_semicolon(
-          context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
-        );
+      end_of_statement = "\r\n" | "\r" | "\n" | ";";
+      end_of_statement {
+        tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset - 1);
         continue;
       }
 
@@ -155,8 +162,10 @@ tokenize(
     */
   }
 
+  offset++;
+  TOKENIZER_GROUP_END(curly);
+
   if (dyn_array_length(parent_stack)) {
-    offset++;
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 
@@ -166,11 +175,12 @@ tokenize(
   #undef TOKENIZER_PUSH_SYMBOL
   #undef TOKENIZER_PUSH_LITERAL
 
-  done:
+  defer:
   if (result.tag == Mass_Result_Tag_Success) {
-    *out_tokens = temp_token_array_into_value_view(
-      allocator, dyn_array_raw(stack), u64_to_u32(dyn_array_length(stack)), source_range
-    );
+    assert(dyn_array_length(stack) == 1);
+    Value *root_value = *dyn_array_pop(stack);
+    const Group_Curly *root = value_as_group_curly(root_value);
+    *out_statements = root->statements;
   }
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(stack);

@@ -1332,30 +1332,56 @@ typedef struct {
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 
-static inline void
-tokenizer_maybe_push_fake_semicolon(
+static inline Value_View
+tokenizer_make_group_children_view(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Tokenizer_Parent *parent,
+  Value *parent_value,
+  u64 offset
+) {
+  Source_Range parent_range = parent_value->source_range;
+  Source_Range children_range = {
+    .file = parent_range.file,
+    .offsets = { .from = parent_range.offsets.to, u64_to_u32(offset)},
+  };
+  parent_value->source_range.offsets.to = u64_to_u32(offset);
+  Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
+  u64 child_count = dyn_array_length(*stack) - parent->index - 1;
+  stack->data->length = parent->index + 1; // pop the children
+
+  return temp_token_array_into_value_view(
+    allocator, children_values, u64_to_u32(child_count), children_range
+  );
+}
+
+static inline bool
+tokenizer_maybe_push_statement(
   Mass_Context *context,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
-  Source_Range source_range
+  u64 offset
 ) {
-  bool has_children = dyn_array_length(*stack) != 0;
-  if (dyn_array_length(*parent_stack)) {
-    Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
-    if(parent->descriptor != &descriptor_group_curly) return;
-    has_children = parent->index + 1 != dyn_array_length(*stack);
-  }
+  assert(dyn_array_length(*parent_stack));
+  Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
+  if(parent->descriptor != &descriptor_group_curly) return false;
+  bool has_children = parent->index + 1 != dyn_array_length(*stack);
   // Do not treat leading newlines as semicolons
-  if (!has_children) return;
-  // :FakeSemicolon
-  assert(range_length(source_range.offsets) == 0);
-  Value *token = mass_allocate(context, Value);
-  const Symbol *symbol = context->compilation->common_symbols.operator_semicolon;
-  value_init(token, &descriptor_symbol, storage_static(symbol), source_range);
-  dyn_array_push(*stack, token);
+  if (!has_children) return true;
+
+  Value *parent_value = *dyn_array_get(*stack, parent->index);
+
+  Group_Curly *group = (Group_Curly *)value_as_group_curly(parent_value);
+
+  assert(offset);
+  Value_View statement = tokenizer_make_group_children_view(
+    context->allocator, stack, parent, parent_value, offset
+  );
+  dyn_array_push(group->statements, statement);
+  return true;
 }
 
-static inline void
+static inline Value *
 tokenizer_group_start(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
@@ -1372,27 +1398,23 @@ tokenizer_group_start(
     .index = dyn_array_length(*stack)
   });
   dyn_array_push(*stack, value);
+  return value;
 }
 
-static inline Value_View
-tokenizer_make_group_children_view(
+static inline void
+tokenizer_group_start_curly(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
-  Tokenizer_Parent *parent,
-  Value *parent_value,
-  u64 offset
+  Array_Tokenizer_Parent *parent_stack,
+  const Descriptor *group_descriptor,
+  Source_Range source_range
 ) {
-  parent_value->source_range.offsets.to = u64_to_u32(offset);
-  Source_Range children_range = parent_value->source_range;
-  children_range.offsets.to -= 1;
-  children_range.offsets.from += 1;
-  Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
-  u64 child_count = dyn_array_length(*stack) - parent->index - 1;
-  stack->data->length = parent->index + 1; // pop the children
-
-  return temp_token_array_into_value_view(
-    allocator, children_values, u64_to_u32(child_count), children_range
-  );
+  Value *value = tokenizer_group_start(allocator, stack, parent_stack, group_descriptor, source_range);
+  assert(value->storage.tag == Storage_Tag_None);
+  Group_Curly *group = allocator_allocate(allocator, Group_Curly);
+  // TODO use temp allocator first?
+  *group = (Group_Curly){.statements = dyn_array_make(Array_Value_View, .allocator = allocator)};
+  value->storage = storage_immediate(group);
 }
 
 static inline bool
@@ -1446,34 +1468,8 @@ tokenizer_group_end_curly(
   Array_Tokenizer_Parent *parent_stack,
   u64 offset
 ) {
-  if (!dyn_array_length(*parent_stack)) return false;
-  Tokenizer_Parent *parent = dyn_array_pop(*parent_stack);
-  Value *parent_value = *dyn_array_get(*stack, parent->index);
-  if (parent_value->descriptor != &descriptor_group_curly) return false;
-
-  // Newlines at the end of the block do not count as semicolons otherwise this:
-  // { 42
-  // }
-  // is being interpreted as:
-  // { 42 ; }
-  while (parent->index + 1 < dyn_array_length(*stack)) {
-    Value *last = *dyn_array_last(*stack);
-    if (last->descriptor != &descriptor_symbol) break;
-    // :FakeSemicolon
-    // We detect fake semicolons with range_length == 0
-    // so it needs to be created like that in the tokenizer
-    if (range_length(last->source_range.offsets) != 0) break;
-    if (value_as_symbol(last) != context->compilation->common_symbols.operator_semicolon) break;
-    dyn_array_pop(*stack);
-  }
-
-  Value_View children = tokenizer_make_group_children_view(
-    context->allocator, stack, parent, parent_value, offset
-  );
-  Group_Square *group = mass_allocate(context, Group_Square);
-  *group = (Group_Square){.children = children};
-  parent_value->storage = storage_static(group);
-
+  if (!tokenizer_maybe_push_statement(context, stack, parent_stack, offset)) return false;
+  dyn_array_pop(*parent_stack);
   return true;
 }
 
@@ -2616,7 +2612,7 @@ token_parse_while(
 
   Mass_While *lazy_payload = mass_allocate(context, Mass_While);
   *lazy_payload = (Mass_While) {
-    .condition = token_parse_block_view(context, parser, condition_view),
+    .condition = token_parse_expression(context, parser, condition_view, &(u32){0}, 0),
     .body = token_parse_single(context, parser, body_token),
   };
 
@@ -3129,7 +3125,8 @@ mass_handle_macro_call(
   Parser body_parser = *parser;
   body_parser.scope = body_scope;
 
-  Value *body_value = token_parse_block_no_scope(context, &body_parser, value_as_group_curly(literal->body));
+  Array_Value_View statements = value_as_group_curly(literal->body)->statements;
+  Value *body_value = token_parse_block_statements(context, &body_parser, statements);
   if (mass_has_error(context)) goto err;
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
@@ -4017,13 +4014,13 @@ mass_ensure_trampoline(
     .file = allocator_make(context->allocator, Source_File, .text = fixed_buffer_as_slice(buffer)),
     .offsets = {.from = 0, .to = u64_to_u32(buffer->occupied), },
   };
-  Value_View *body = allocator_allocate(context->allocator, Value_View);
-  *body = (Value_View){0};
-  Mass_Result result = tokenize(context, body_range, body);
+  Array_Value_View statements;
+  Mass_Result result = tokenize(context, body_range, &statements);
   if (mass_result_is_error(&result)) {
     panic("This body should always be tokenizable since we constructed it to be");
   }
-  Value *body_value = value_make(context->allocator, &descriptor_value_view, storage_static(body), body_range);
+  Group_Curly body = {.statements = statements};
+  Value *body_value = value_make(context->allocator, &descriptor_group_curly, storage_immediate(&body), body_range);
 
   Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
   *trampoline_literal = (Function_Literal) {
@@ -6293,47 +6290,48 @@ mass_handle_block_lazy_proc(
 }
 
 static Value *
-token_parse_block_view(
+token_parse_block_statements(
   Mass_Context *context,
   Parser *parser,
-  Value_View children_view
+  Array_Value_View statements
 ) {
-  if (!children_view.length) return &void_value;
+  u64 max_statement_count = dyn_array_length(statements);
 
   Value *block_result = &void_value;
+  if (!max_statement_count) return block_result;
+
+  // FIXME handle single statement here
 
   Temp_Mark temp_mark = context_temp_mark(context);
-
   Array_Value_Ptr temp_lazy_statements = dyn_array_make(
     Array_Value_Ptr,
     .allocator = context->temp_allocator,
-    .capacity = 32,
+    .capacity = max_statement_count,
   );
 
-  u32 match_length = 0;
-  for(u32 start_index = 0; start_index < children_view.length; start_index += match_length) {
+  DYN_ARRAY_FOREACH(Value_View, statement, statements) {
     if (mass_has_error(context)) goto defer;
-    Value_View rest = value_view_rest(&children_view, start_index);
-    // Skipping over empty statements
-    const Symbol *semicolon = context->compilation->common_symbols.operator_semicolon;
-    Value *first_remaining = value_view_get(rest, 0);
-    if (value_is_symbol(first_remaining) && value_as_symbol(first_remaining) == semicolon) {
-      match_length = 1;
-      continue;
-    }
+
     Lazy_Value lazy_value = {
       .epoch = parser->epoch,
       .descriptor = &descriptor_void,
     };
-    match_length = token_statement_matcher_in_scopes(context, parser, rest, &lazy_value, parser->scope);
-    if (mass_has_error(context)) goto defer;
 
+    u32 match_length = token_statement_matcher_in_scopes(context, parser, *statement, &lazy_value, parser->scope);
+    if (mass_has_error(context)) goto defer;
     if (match_length) {
+      if (match_length != statement->length) {
+        Value_View remainder = value_view_rest(statement, match_length);
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = remainder.source_range,
+        });
+        goto defer;
+      }
       // If the statement did not assign a proc that means that it does not need
       // to output any instructions and there is nothing to force.
       if (lazy_value.proc) {
         assert(lazy_value.descriptor);
-        Value_View matched_view = value_view_slice(&rest, 0, match_length);
         allocator_allocate_bulk(context->allocator, combined, {
           Lazy_Value lazy_value;
           Value value;
@@ -6342,61 +6340,59 @@ token_parse_block_view(
         Lazy_Value *lazy_value_storage = &combined->lazy_value;
         *lazy_value_storage = lazy_value;
         Storage storage = storage_static(lazy_value_storage);
-        value_init(&combined->value, &descriptor_lazy_value, storage, matched_view.source_range);
+        value_init(&combined->value, &descriptor_lazy_value, storage, statement->source_range);
         dyn_array_push(temp_lazy_statements, &combined->value);
       }
-      continue;
-    }
-    Value *parse_result = token_parse_expression(
-      context, parser, rest, &match_length, context->compilation->common_symbols.operator_semicolon
-    );
-    if (mass_has_error(context)) goto defer;
+    } else {
+      Value *parse_result = token_parse_expression(context, parser, *statement, &match_length, 0);
+      if (mass_has_error(context)) goto defer;
 
-    if (mass_value_is_compile_time_known(parse_result)) {
-      if (value_is_assignment(parse_result)) {
-        // TODO make lazy value accept const payload
-        Assignment *assignment = (Assignment *)value_as_assignment(parse_result);
-        parse_result = mass_make_lazy_value(
-          context, parser, parse_result->source_range, assignment,
-          &descriptor_void, mass_handle_assignment_lazy_proc
-        );
-      } else if (parse_result->descriptor == &descriptor_typed_symbol) {
-        parse_result = mass_define_stack_value_from_typed_symbol(
-          context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
-        );
-      } else if (value_is_module_exports(parse_result)) {
-        Value_View match_view = value_view_slice(&rest, 0, match_length);
-        if (!(parser->flags & Parser_Flags_Global)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Parse,
-            .source_range = match_view.source_range,
-            .detailed_message = slice_literal("Export declarations are only supported at top level"),
-          });
-          goto defer;
-        }
-        if (parser->module->exports.tag != Module_Exports_Tag_Not_Specified) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Parse,
-            .source_range = match_view.source_range,
-            .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
-            .other_source_range = parser->module->exports.source_range,
-          });
-          goto defer;
-        }
-        const Module_Exports *exports = value_as_module_exports(parse_result);
-        parser->module->exports = *exports;
-        continue;
+      if (match_length != statement->length) {
+        Value_View remainder = value_view_rest(statement, match_length);
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = remainder.source_range,
+        });
+        goto defer;
       }
-    }
-    dyn_array_push(temp_lazy_statements, parse_result);
 
-    if (match_length) continue;
-    Value *token = value_view_get(rest, 0);
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = token->source_range,
-    });
-    goto defer;
+      if (mass_value_is_compile_time_known(parse_result)) {
+        if (value_is_assignment(parse_result)) {
+          // TODO make lazy value accept const payload
+          Assignment *assignment = (Assignment *)value_as_assignment(parse_result);
+          parse_result = mass_make_lazy_value(
+            context, parser, parse_result->source_range, assignment,
+            &descriptor_void, mass_handle_assignment_lazy_proc
+          );
+        } else if (parse_result->descriptor == &descriptor_typed_symbol) {
+          parse_result = mass_define_stack_value_from_typed_symbol(
+            context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
+          );
+        } else if (value_is_module_exports(parse_result)) {
+          if (!(parser->flags & Parser_Flags_Global)) {
+            mass_error(context, (Mass_Error) {
+              .tag = Mass_Error_Tag_Parse,
+              .source_range = statement->source_range,
+              .detailed_message = slice_literal("Export declarations are only supported at top level"),
+            });
+            goto defer;
+          }
+          if (parser->module->exports.tag != Module_Exports_Tag_Not_Specified) {
+            mass_error(context, (Mass_Error) {
+              .tag = Mass_Error_Tag_Parse,
+              .source_range = statement->source_range,
+              .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
+              .other_source_range = parser->module->exports.source_range,
+            });
+            goto defer;
+          }
+          const Module_Exports *exports = value_as_module_exports(parse_result);
+          parser->module->exports = *exports;
+          continue;
+        }
+      }
+      dyn_array_push(temp_lazy_statements, parse_result);
+    }
   }
 
   if (mass_has_error(context)) goto defer;
@@ -6428,15 +6424,6 @@ token_parse_block_view(
 }
 
 static inline Value *
-token_parse_block_no_scope(
-  Mass_Context *context,
-  Parser *parser,
-  const Group_Curly *group
-) {
-  return token_parse_block_view(context, parser, group->children);
-}
-
-static inline Value *
 token_parse_block(
   Mass_Context *context,
   Parser *parser,
@@ -6444,7 +6431,7 @@ token_parse_block(
 ) {
   Parser block_parser = *parser;
   block_parser.scope = scope_make(context->allocator, parser->scope);
-  return token_parse_block_no_scope(context, &block_parser, group);
+  return token_parse_block_statements(context, &block_parser, group->statements);
 }
 
 static u32
@@ -6893,7 +6880,7 @@ mass_inline_module(
   };
   // Need a new context here to ensure we are using the runtime program for new modules
   Mass_Context module_context = mass_context_from_compilation(context->compilation);
-  Value *block_result = token_parse_block_view(&module_context, &module_parser, curly->children);
+  Value *block_result = token_parse_block_statements(&module_context, &module_parser, curly->statements);
   value_force_exact(&module_context, 0, &void_value, block_result);
   module_process_exports(&module_context, &module_parser);
 
@@ -6907,15 +6894,15 @@ program_parse(
 ) {
   assert(parser->module);
   Performance_Counter perf = system_performance_counter_start();
-  Value_View tokens;
-  *context->result = tokenize(context, parser->module->source_range, &tokens);
+  Array_Value_View statements;
+  *context->result = tokenize(context, parser->module->source_range, &statements);
   if (mass_has_error(context)) return;
   if (0) {
     u64 usec = system_performance_counter_end(&perf);
     printf("Tokenizer took %"PRIu64" µs\n", usec);
   }
 
-  Value *block_result = token_parse_block_view(context, parser, tokens);
+  Value *block_result = token_parse_block_statements(context, parser, statements);
   compile_time_eval(context, parser, value_view_single(&block_result));
 }
 
@@ -7099,13 +7086,15 @@ mass_run_script(
   Source_Range source_range = root_module->source_range;
   mass_maybe_trim_shebang(&source_range);
 
-  Value_View *tokens = mass_allocate(context, Value_View);
-  *context->result = tokenize(context, source_range, tokens);
+  Array_Value_View statements;
+  *context->result = tokenize(context, source_range, &statements);
   if (mass_has_error(context)) return;
 
+  Group_Curly body = {.statements = statements};
   Value *fake_function_body = value_make(
-    context->allocator, &descriptor_value_view, storage_static(tokens), source_range
+    context->allocator, &descriptor_group_curly, storage_immediate(&body), source_range
   );
+
   Parser parser = {
     .flags = Parser_Flags_None,
     .scope = compilation->root_scope,

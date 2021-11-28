@@ -504,22 +504,6 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    tokenize, "tokenize", &descriptor_mass_result,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("source_range")),
-&descriptor_source_range
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("out_tokens")),
-&descriptor_value_view_pointer
-    )
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None,
     push_instruction, "push_instruction", &descriptor_void,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("code_block")),

@@ -1192,7 +1192,7 @@ main(void) {
   })));
 
   export_compiler(push_type(type_struct("Group_Curly", (Struct_Item[]){
-    { "Value_View", "children" },
+    { "Array_Value_View", "statements" },
   })));
 
   export_compiler(push_type(type_struct("Group_Square", (Struct_Item[]){
@@ -2052,12 +2052,6 @@ main(void) {
     { "const Instruction_Encoding *", "encoding_list" },
     { "u64", "encoding_count" },
   }));
-
-  export_compiler(push_type(type_function(Default, "tokenize", "Mass_Result", (Argument_Type[]){
-    { "Mass_Context *", "context" },
-    { "Source_Range", "source_range" },
-    { "Value_View *", "out_tokens" },
-  })));
 
   export_compiler(push_type(type_function(Default, "push_instruction", "void", (Argument_Type[]){
     {"Code_Block *", "code_block"},
