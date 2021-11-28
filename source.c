@@ -5362,7 +5362,7 @@ mass_handle_dereference_operator(
   if (mass_has_error(context)) return 0;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
   if (descriptor->tag != Descriptor_Tag_Pointer_To) {
-    mass_error(context, (Mass_Error) {
+    return mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
       .Type_Mismatch = {
@@ -5370,7 +5370,6 @@ mass_handle_dereference_operator(
         .actual = descriptor,
       },
     });
-    return 0;
   }
   // FIXME support this for static values
   return mass_make_lazy_value(
@@ -5383,127 +5382,174 @@ mass_handle_dereference_operator(
 }
 
 static Value *
+mass_module_get(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  assert(args_view.length == 2);
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = value_view_get(args_view, 1);
+
+  if (!mass_value_ensure_static_of(context, lhs, &descriptor_module)) return 0;
+  if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
+
+  const Symbol *symbol = value_as_symbol(rhs);
+  const Module *module = value_as_module(lhs);
+  Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, symbol);
+  if (!entry) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Unknown_Field,
+      .source_range = args_view.source_range,
+      .Unknown_Field = { .name = symbol->name, .type = lhs->descriptor, },
+    });
+    return 0;
+  }
+  // FIXME when looking up values from a different file, need to either adjust source
+  //       range or have some other mechanism to track it.
+  return scope_entry_force_value(context, entry);
+}
+
+static Value *
+mass_struct_get(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  assert(args_view.length == 2);
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = value_view_get(args_view, 1);
+
+  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+  const Descriptor *unwrapped_lhs_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
+  assert(unwrapped_lhs_descriptor->tag == Descriptor_Tag_Struct);
+  Array_Struct_Field fields = unwrapped_lhs_descriptor->Struct.fields;
+
+  const Struct_Field *field;
+  if (value_is_i64(rhs)) {
+    u64 index = value_as_i64(rhs)->bits;
+    // FIXME only iterate unnamed fields
+    if (index >= dyn_array_length(fields)) {
+      Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
+      return mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Unknown_Field,
+        .source_range = rhs->source_range,
+        .Unknown_Field = { .name = field_name, .type = unwrapped_lhs_descriptor },
+      });
+    }
+    field = dyn_array_get(fields, index);
+  } else {
+    if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
+    const Symbol *symbol = value_as_symbol(rhs);
+
+    if (!struct_find_field_by_name(unwrapped_lhs_descriptor, symbol->name, &field, &(u64){0})) {
+      return mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Unknown_Field,
+        .source_range = rhs->source_range,
+        .Unknown_Field = { .name = symbol->name, .type = unwrapped_lhs_descriptor, },
+      });
+    }
+  }
+  return mass_struct_field_access(context, parser, lhs, field, &args_view.source_range);
+}
+
+static Value *
+mass_array_like_get(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  assert(args_view.length == 2);
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = token_parse_single(context, parser, value_view_get(args_view, 1));
+
+  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+  const Descriptor *item_descriptor;
+  if (lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+    item_descriptor = lhs_descriptor->Fixed_Size_Array.item;
+  } else if (lhs_descriptor->tag == Descriptor_Tag_Pointer_To) {
+    item_descriptor = lhs_descriptor->Pointer_To.descriptor;
+  } else {
+    panic("UNREACHABLE");
+    return 0;
+  }
+
+  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
+  // TODO this should this only accept i64?
+  if (rhs_descriptor != &descriptor_i64 && !descriptor_is_integer(rhs_descriptor)) {
+    return mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = args_view.source_range,
+      .Type_Mismatch = { .expected = &descriptor_i64, .actual = rhs_descriptor },
+    });
+  }
+
+  Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
+  if (mass_value_is_compile_time_known(lhs) && mass_value_is_compile_time_known(rhs)) {
+    Expected_Result expected_result = expected_result_any(item_descriptor);
+    return mass_handle_array_access_lazy_proc(
+      context, 0, &expected_result, &args_view.source_range, &lazy_payload
+    );
+  }
+  Mass_Array_Access_Lazy_Payload *heap_payload =
+    mass_allocate(context, Mass_Array_Access_Lazy_Payload);
+  *heap_payload = lazy_payload;
+  return mass_make_lazy_value(
+    context, parser, args_view.source_range, heap_payload,
+    item_descriptor, mass_handle_array_access_lazy_proc
+  );
+}
+
+static Value *
+mass_get(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  Value *lhs = token_parse_single(context, parser, value_view_get(args_view, 0));
+  Value *rhs = value_view_get(args_view, 1);
+
+  Value_View parsed_args = {
+    .values = (Value*[]){lhs, rhs},
+    .length = 2,
+    .source_range = args_view.source_range,
+  };
+
+  if (mass_has_error(context)) return 0;
+
+  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+  if (lhs_descriptor == &descriptor_module) {
+    return mass_module_get(context, parser, parsed_args);
+  }
+
+  const Descriptor *unwrapped_lhs_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
+
+  if (unwrapped_lhs_descriptor->tag == Descriptor_Tag_Struct) {
+    return mass_struct_get(context, parser, parsed_args);
+  }
+
+  if (
+    lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
+    lhs_descriptor->tag == Descriptor_Tag_Pointer_To
+  ) {
+    return mass_array_like_get(context, parser, parsed_args);
+  }
+
+  return mass_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Parse,
+    .source_range = lhs->source_range,
+    .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
+  });
+}
+
+static Value *
 mass_handle_dot_operator(
   Mass_Context *context,
   Parser *parser,
   Value_View args_view,
   const Operator *operator
 ) {
-  Value *lhs = token_parse_single(context, parser, value_view_get(args_view, 0));
-  Value *rhs = value_view_get(args_view, 1);
-  if (mass_has_error(context)) return 0;
-
-  const Descriptor *lhs_forced_descriptor = value_or_lazy_value_descriptor(lhs);
-  const Descriptor *unwrapped_descriptor =
-    maybe_unwrap_pointer_descriptor(lhs_forced_descriptor);
-
-  if (
-    unwrapped_descriptor->tag == Descriptor_Tag_Struct ||
-    lhs->descriptor == &descriptor_module
-  ) {
-    if (value_is_i64(rhs)) {
-      u64 index = value_as_i64(rhs)->bits;
-      if (unwrapped_descriptor->tag != Descriptor_Tag_Struct) goto err;
-      if (index >= dyn_array_length(unwrapped_descriptor->Struct.fields)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs->source_range,
-          .Unknown_Field = {
-            .name = source_from_source_range(context->compilation, &rhs->source_range),
-            .type = unwrapped_descriptor,
-          },
-        });
-        return 0;
-      }
-      const Struct_Field *field = dyn_array_get(unwrapped_descriptor->Struct.fields, index);
-      return mass_struct_field_access(context, parser, lhs, field, &args_view.source_range);
-    }
-    if (!value_is_symbol(rhs)) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Invalid_Identifier,
-        .source_range = rhs->source_range,
-        .detailed_message = slice_literal("Right hand side of the . operator on structs must be an identifier"),
-      });
-      return 0;
-    }
-    const Symbol *field_symbol = value_as_symbol(rhs);
-    Slice field_name = field_symbol->name;
-
-    if (lhs_forced_descriptor == &descriptor_module) {
-      if (!mass_value_is_compile_time_known(lhs)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Expected_Static,
-          .source_range = lhs->source_range,
-        });
-        return 0;
-      }
-      const Module *module = value_as_module(lhs);
-      Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, field_symbol);
-      if (!entry) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs->source_range,
-          .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
-        });
-        return 0;
-      }
-      // FIXME when looking up values from a different file, need to either adjust source
-      //       range or have some other mechanism to track it.
-      return scope_entry_force_value(context, entry);
-    } else {
-      const Struct_Field *field;
-      if (!struct_find_field_by_name(unwrapped_descriptor, field_name, &field, &(u64){0})) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs->source_range,
-          .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
-        });
-        return 0;
-      }
-      return mass_struct_field_access(context, parser, lhs, field, &args_view.source_range);
-    }
-  } else if (
-    lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
-    lhs_forced_descriptor->tag == Descriptor_Tag_Pointer_To
-  ) {
-    if (value_is_group_paren(rhs) || value_is_i64(rhs)) {
-      const Descriptor *descriptor = lhs_forced_descriptor;
-      if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
-        descriptor = descriptor->Fixed_Size_Array.item;
-      } else {
-        descriptor = descriptor->Pointer_To.descriptor;
-      }
-      rhs = token_parse_single(context, parser, rhs);
-      Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
-      if (mass_value_is_compile_time_known(lhs)) {
-        Expected_Result expected_result = expected_result_any(descriptor);
-        return mass_handle_array_access_lazy_proc(
-          context, 0, &expected_result, &args_view.source_range, &lazy_payload
-        );
-      }
-      Mass_Array_Access_Lazy_Payload *heap_payload =
-        allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
-      *heap_payload = lazy_payload;
-      return mass_make_lazy_value(
-        context, parser, args_view.source_range, heap_payload, descriptor, mass_handle_array_access_lazy_proc
-      );
-    } else {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = rhs->source_range,
-        .detailed_message =
-          slice_literal("Right hand side of the . operator for an array must be an (expr) or a literal number")
-      });
-      return 0;
-    }
-  }
-  err:
-  mass_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_Parse,
-    .source_range = lhs->source_range,
-    .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
-  });
-  return 0;
+  return mass_get(context, parser, args_view);
 }
 
 static void
