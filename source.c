@@ -5428,8 +5428,19 @@ mass_struct_get(
   const Struct_Field *field;
   if (value_is_i64(rhs)) {
     u64 index = value_as_i64(rhs)->bits;
-    // FIXME only iterate unnamed fields
-    if (index >= dyn_array_length(fields)) {
+    field = 0;
+    DYN_ARRAY_FOREACH(Struct_Field, it, fields) {
+      // Only allow access to unnamed fields via numbers. This is a purely an empirical decision.
+      // Allowing arbitrary fields just by index was very confusing in practice.
+      // A user of the language can always redifine this choice or use a specialized fn.
+      if (it->name.length) continue;
+      if (index == 0) {
+        field = it;
+        break;
+      }
+      index -= 1;
+    }
+    if (!field) {
       Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
       return mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Unknown_Field,
@@ -5437,7 +5448,6 @@ mass_struct_get(
         .Unknown_Field = { .name = field_name, .type = unwrapped_lhs_descriptor },
       });
     }
-    field = dyn_array_get(fields, index);
   } else {
     if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
     const Symbol *symbol = value_as_symbol(rhs);
