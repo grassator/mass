@@ -3380,15 +3380,14 @@ typedef struct {
 } Mass_Function_Call_Lazy_Payload;
 
 static void
-mass_assert_storage_is_valid_in_program(
-  const Compilation *compilation,
-  const Program *program,
-  const Storage *storage
+mass_assert_storage_is_valid_in_context(
+  const Storage *storage,
+  const Mass_Context *context
 ) {
   switch(storage->tag) {
     case Storage_Tag_Immediate:
     case Storage_Tag_Static: {
-      assert(program == compilation->jit.program);
+      assert(context->program == context->compilation->jit.program);
     } break;
     case Storage_Tag_Xmm:
     case Storage_Tag_None:
@@ -3401,7 +3400,7 @@ mass_assert_storage_is_valid_in_program(
       switch(storage->Memory.location.tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
           Label *label = storage->Memory.location.Instruction_Pointer_Relative.label;
-          assert(label->program == program);
+          assert(label->program == context->program);
         } break;
         case Memory_Location_Tag_Indirect:
         case Memory_Location_Tag_Stack: {
@@ -3430,7 +3429,7 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  mass_assert_storage_is_valid_in_program(context->compilation, context->program, &instance->storage);
+  mass_assert_storage_is_valid_in_context(&instance->storage, context);
 
   const Descriptor *return_descriptor = fn_info->returns.descriptor;
   Value *fn_return_value;
