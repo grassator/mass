@@ -1172,6 +1172,27 @@ global_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("bool")),
     type__bool_value
   );
+  Source_Range i8__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&i8__source_range, "i8");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, i8__source_range,
+    mass_ensure_symbol(compilation, slice_literal("i8")),
+    type_i8_value
+  );
+  Source_Range i16__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&i16__source_range, "i16");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, i16__source_range,
+    mass_ensure_symbol(compilation, slice_literal("i16")),
+    type_i16_value
+  );
+  Source_Range i32__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&i32__source_range, "i32");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, i32__source_range,
+    mass_ensure_symbol(compilation, slice_literal("i32")),
+    type_i32_value
+  );
   Source_Range i64__source_range;
   INIT_LITERAL_SOURCE_RANGE(&i64__source_range, "i64");
   scope_define_value(

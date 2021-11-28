@@ -2154,6 +2154,9 @@ main(void) {
     Meta_Type_Flags_No_C_Type
    );
 
+  export_global(set_flags(push_type(type_c_opaque("i8")), Meta_Type_Flags_No_C_Type));
+  export_global(set_flags(push_type(type_c_opaque("i16")), Meta_Type_Flags_No_C_Type));
+  export_global(set_flags(push_type(type_c_opaque("i32")), Meta_Type_Flags_No_C_Type));
   export_global(set_flags(push_type(type_c_opaque("i64")), Meta_Type_Flags_No_C_Type));
 
   #define PROCESS_INTEGER_TYPES(F)\
@@ -2216,6 +2219,9 @@ main(void) {
       // Custom forward declarations
       {
         fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
+        fprintf(file, "typedef struct { u8 bits; } i8;\n\n");
+        fprintf(file, "typedef struct { u16 bits; } i16;\n\n");
+        fprintf(file, "typedef struct { u32 bits; } i32;\n\n");
         fprintf(file, "typedef struct { u64 bits; } i64;\n\n");
       }
 

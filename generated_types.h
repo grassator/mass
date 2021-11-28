@@ -4,6 +4,12 @@
 _Pragma("warning (push)") _Pragma("warning (default: 4820)")
 typedef void(*fn_type_opaque)();
 
+typedef struct { u8 bits; } i8;
+
+typedef struct { u16 bits; } i16;
+
+typedef struct { u32 bits; } i32;
+
 typedef struct { u64 bits; } i64;
 
 // Forward declarations
@@ -823,6 +829,15 @@ typedef dyn_array_type(const Virtual_Memory_Buffer *) Array_Const_Virtual_Memory
 
 typedef dyn_array_type(_Bool *) Array__Bool_Ptr;
 typedef dyn_array_type(const _Bool *) Array_Const__Bool_Ptr;
+
+typedef dyn_array_type(i8 *) Array_i8_Ptr;
+typedef dyn_array_type(const i8 *) Array_Const_i8_Ptr;
+
+typedef dyn_array_type(i16 *) Array_i16_Ptr;
+typedef dyn_array_type(const i16 *) Array_Const_i16_Ptr;
+
+typedef dyn_array_type(i32 *) Array_i32_Ptr;
+typedef dyn_array_type(const i32 *) Array_Const_i32_Ptr;
 
 typedef dyn_array_type(i64 *) Array_i64_Ptr;
 typedef dyn_array_type(const i64 *) Array_Const_i64_Ptr;
@@ -2095,6 +2110,12 @@ typedef dyn_array_type(Virtual_Memory_Buffer) Array_Virtual_Memory_Buffer;
 
 typedef dyn_array_type(_Bool) Array__Bool;
 
+typedef dyn_array_type(i8) Array_i8;
+
+typedef dyn_array_type(i16) Array_i16;
+
+typedef dyn_array_type(i32) Array_i32;
+
 typedef dyn_array_type(i64) Array_i64;
 
 _Pragma("warning (pop)")
@@ -2657,6 +2678,24 @@ static Descriptor descriptor_array__bool_ptr;
 static Descriptor descriptor_array_const__bool_ptr;
 static Descriptor descriptor__bool_pointer;
 static Descriptor descriptor__bool_pointer_pointer;
+static Descriptor descriptor_i8;
+static Descriptor descriptor_array_i8;
+static Descriptor descriptor_array_i8_ptr;
+static Descriptor descriptor_array_const_i8_ptr;
+static Descriptor descriptor_i8_pointer;
+static Descriptor descriptor_i8_pointer_pointer;
+static Descriptor descriptor_i16;
+static Descriptor descriptor_array_i16;
+static Descriptor descriptor_array_i16_ptr;
+static Descriptor descriptor_array_const_i16_ptr;
+static Descriptor descriptor_i16_pointer;
+static Descriptor descriptor_i16_pointer_pointer;
+static Descriptor descriptor_i32;
+static Descriptor descriptor_array_i32;
+static Descriptor descriptor_array_i32_ptr;
+static Descriptor descriptor_array_const_i32_ptr;
+static Descriptor descriptor_i32_pointer;
+static Descriptor descriptor_i32_pointer_pointer;
 static Descriptor descriptor_i64;
 static Descriptor descriptor_array_i64;
 static Descriptor descriptor_array_i64_ptr;
@@ -5838,6 +5877,18 @@ MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool)
 MASS_DEFINE_OPAQUE_C_TYPE(array__bool, Array__Bool)
 DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool);
 DEFINE_VALUE_IS_AS_HELPERS(_Bool *, _bool_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(i8, i8)
+MASS_DEFINE_OPAQUE_C_TYPE(array_i8, Array_i8)
+DEFINE_VALUE_IS_AS_HELPERS(i8, i8);
+DEFINE_VALUE_IS_AS_HELPERS(i8 *, i8_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(i16, i16)
+MASS_DEFINE_OPAQUE_C_TYPE(array_i16, Array_i16)
+DEFINE_VALUE_IS_AS_HELPERS(i16, i16);
+DEFINE_VALUE_IS_AS_HELPERS(i16 *, i16_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(i32, i32)
+MASS_DEFINE_OPAQUE_C_TYPE(array_i32, Array_i32)
+DEFINE_VALUE_IS_AS_HELPERS(i32, i32);
+DEFINE_VALUE_IS_AS_HELPERS(i32 *, i32_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(i64, i64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_i64, Array_i64)
 DEFINE_VALUE_IS_AS_HELPERS(i64, i64);
