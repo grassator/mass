@@ -106,9 +106,9 @@ test_program_source_base(
   INIT_LITERAL_SOURCE_RANGE(&symbol_source_range, "__test_symbol__");
   const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice);
   Scope_Entry *entry = scope_lookup(context->compilation->root_scope, symbol);
-  Value *value = scope_entry_force_value(context->compilation, entry);
+  Value *value = scope_entry_force_value(context, entry);
   if (value && value->descriptor == &descriptor_function_literal) {
-    return ensure_function_instance(context->compilation, context->program, value, (Value_View){0});
+    return ensure_function_instance(context, value, (Value_View){0});
   }
   return value;
 }
@@ -239,7 +239,7 @@ spec("source") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "");
 
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 0);
     }
@@ -247,7 +247,7 @@ spec("source") {
     it("should be able to tokenize a comment") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "// foo\n");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 0);
     }
@@ -255,7 +255,7 @@ spec("source") {
     it("should be able to turn newlines into fake semicolon tokens on top level") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "foo\n");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
       Value *new_line = value_view_get(tokens, 1);
@@ -266,7 +266,7 @@ spec("source") {
     it("should be able to parse hex integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0xCAFE");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -279,7 +279,7 @@ spec("source") {
     it("should be able to parse binary integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0b100");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -292,7 +292,7 @@ spec("source") {
     it("should be able to tokenize a sum of integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "12 + foo123");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
@@ -311,7 +311,7 @@ spec("source") {
     it("should be able to tokenize groups") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(x)");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -327,7 +327,7 @@ spec("source") {
     it("should be able to tokenize strings") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "\"foo 123\"");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *string = value_view_get(tokens, 0);
@@ -337,7 +337,7 @@ spec("source") {
     it("should be able to tokenize nested groups with different braces") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "{[]}");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -360,14 +360,14 @@ spec("source") {
         "}"
       );
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
     }
 
     it("should report a failure when encountering a brace that is not closed") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(foo");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
@@ -379,7 +379,7 @@ spec("source") {
     it("should report a failure when encountering a mismatched brace") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(foo}");
       Value_View tokens;
-      Mass_Result result = tokenize(test_context.compilation, source_range, &tokens);
+      Mass_Result result = tokenize(&test_context, source_range, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Unexpected_Token);
@@ -1159,13 +1159,13 @@ spec("source") {
           "checker", &test_context,
           "my_intrinsic :: fn() intrinsic {\n"
             "lazy_value_proc :: fn("
-              "compilation : &MASS.Compilation,"
+              "context : &MASS.Context,"
               "builder : &MASS.Function_Builder,"
               "expected_result : &MASS.Expected_Result,"
               "source_range : &MASS.Source_Range,"
               "payload : &type_of(())"
             ") -> (&MASS.Value) {\n"
-              "value : &MASS.Value = allocate(compilation.allocator, MASS.Value)\n"
+              "value : &MASS.Value = allocate(context.allocator, MASS.Value)\n"
               "value.source_range = source_range.*\n"
               "value.descriptor = type_of(())\n"
               "value.storage.tag = MASS.Storage_Tag.None\n"
@@ -2694,7 +2694,7 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/folding"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_compilation, test_program, test_program->entry_point, (Value_View){0});
+      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/folding.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2705,7 +2705,7 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/print"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_compilation, test_program, test_program->entry_point, (Value_View){0});
+      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/print.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2727,7 +2727,7 @@ spec("source") {
         "main", &test_context, "fixtures/relocations"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_compilation, test_program, test_program->entry_point, (Value_View){0});
+      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }

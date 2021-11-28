@@ -490,8 +490,8 @@ compiler_scope_define_exports(
     Function_Info_Flags_None,
     tokenize, "tokenize", &descriptor_mass_result,
     function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("compilation")),
-&descriptor_compilation_pointer
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("source_range")),

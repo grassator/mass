@@ -635,7 +635,7 @@ typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
-  (Compilation * compilation, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, void * payload);
+  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, void * payload);
 
 typedef enum Instruction_Extension_Type {
   Instruction_Extension_Type_None = 0,
@@ -694,7 +694,7 @@ typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
 typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
 static Mass_Result tokenize
-  (Compilation * compilation, Source_Range source_range, Value_View * out_tokens);
+  (Mass_Context * context, Source_Range source_range, Value_View * out_tokens);
 
 static void push_instruction
   (Code_Block * code_block, Instruction instruction);
@@ -5829,7 +5829,7 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   &descriptor_value_pointer,
   {
     .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_compilation_pointer,
+    .descriptor = &descriptor_mass_context_pointer,
   },
   {
     .tag = Function_Parameter_Tag_Runtime,

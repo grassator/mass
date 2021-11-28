@@ -24,7 +24,7 @@ mass_descriptor_is_void(
 
 static void
 mass_assign(
-  Compilation *compilation,
+  Mass_Context *context,
   Function_Builder *builder,
   Value *target,
   Value *source,
@@ -41,7 +41,7 @@ load_address(
 
 static Storage
 value_maybe_dereference(
-  Compilation *compilation,
+  Mass_Context *context,
   Function_Builder *builder,
   Value *value
 );
@@ -53,7 +53,7 @@ mass_expected_result_descriptor(
 
 static Value *
 mass_expected_result_ensure_value_or_temp(
-  Compilation *compilation,
+  Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *value
@@ -68,29 +68,14 @@ get_new_epoch() {
 
 static void
 ensure_parameter_descriptors(
-  Compilation *compilation,
+  Mass_Context *context,
   Function_Info *info,
   Scope *arguments_scope
 );
 
-static inline const Symbol *
-mass_ensure_symbol(
-  Compilation *compilation,
-  Slice name
-);
-
-static const Descriptor *
-deduce_runtime_descriptor_for_value(
-  Compilation *compilation,
-  Program *program,
-  Value *value,
-  const Descriptor *maybe_desired_descriptor
-);
-
 static bool
 mass_match_overload_or_error(
-  Compilation *compilation,
-  Program *program,
+  Mass_Context *context,
   Value *target,
   Value_View args_view,
   Overload_Match_Found *match_found
@@ -168,7 +153,7 @@ token_handle_function_call(
 
 static Value *
 value_force(
-  Compilation *compilation,
+  Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *value
@@ -176,7 +161,7 @@ value_force(
 
 static void
 value_force_exact(
-  Compilation *compilation,
+  Mass_Context *context,
   Function_Builder *builder,
   Value *target,
   Value *source
@@ -184,7 +169,7 @@ value_force_exact(
 
 static Value *
 scope_entry_force_value(
-  Compilation *compilation,
+  Mass_Context *context,
   Scope_Entry *entry
 );
 

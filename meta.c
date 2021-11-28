@@ -2029,7 +2029,7 @@ main(void) {
   })));
 
   push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
-    { "Compilation *", "compilation" },
+    { "Mass_Context *", "context" },
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
     { "const Source_Range *", "source_range" },
@@ -2073,7 +2073,7 @@ main(void) {
   }));
 
   export_compiler(push_type(type_function(Default, "tokenize", "Mass_Result", (Argument_Type[]){
-    { "Compilation *", "compilation" },
+    { "Mass_Context *", "context" },
     { "Source_Range", "source_range" },
     { "Value_View *", "out_tokens" },
   })));

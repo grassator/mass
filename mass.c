@@ -132,13 +132,13 @@ int main(s32 argc, char **argv) {
 
   const Symbol *main_symbol = mass_ensure_symbol(&compilation, slice_literal("main"));
   Scope_Entry *entry = scope_lookup(compilation.root_scope, main_symbol);
-  Value *main = scope_entry_force_value(&compilation, entry);
+  Value *main = scope_entry_force_value(&context, entry);
   if (!main) {
     printf("Could not find entry point function `main`");
     return -1;
   }
   context.program->entry_point = main;
-  ensure_function_instance(&compilation, context.program, main, (Value_View){0});
+  ensure_function_instance(&context, main, (Value_View){0});
   if (mass_has_error(&context)) {
     return mass_cli_print_error(&compilation, context.result);
   }

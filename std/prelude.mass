@@ -18,7 +18,7 @@ startup :: fn(callback : fn() -> ()) -> () MASS.startup
 Void :: type_of(())
 debugger :: fn() -> () intrinsic {
   lazy_value_proc :: fn(
-    compilation : &MASS.Compilation,
+    context : &MASS.Context,
     builder : &MASS.Function_Builder,
     expected_result : &MASS.Expected_Result,
     source_range : &MASS.Source_Range,
@@ -38,7 +38,7 @@ debugger :: fn() -> () intrinsic {
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
-    value : &MASS.Value = allocate(compilation.allocator, MASS.Value)
+    value : &MASS.Value = allocate(context.allocator, MASS.Value)
     value.source_range = source_range.*
     value.descriptor = Void
     value.storage.tag = MASS.Storage_Tag.None

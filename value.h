@@ -96,6 +96,12 @@ context_temp_reset(
   compilation_temp_reset(context->compilation);
 }
 
+static inline const Symbol *
+mass_ensure_symbol(
+  Compilation *compilation,
+  Slice name
+);
+
 static inline Value_View
 value_view_single(
   Value **value

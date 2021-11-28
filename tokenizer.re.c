@@ -7,10 +7,11 @@
 
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
-  Compilation *compilation,
+  Mass_Context *context,
   Source_Range source_range,
   Value_View *out_tokens
 ) {
+  Compilation *compilation = context->compilation;
   Slice input = source_range.file->text;
 
   const Allocator *allocator = compilation->allocator;
@@ -64,7 +65,7 @@ tokenize(
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
     dyn_array_push(stack, \
       token_make_symbol_value(\
-        compilation, TOKENIZER_CURRENT_SLICE(), TOKENIZER_CURRENT_RANGE()\
+        context, TOKENIZER_CURRENT_SLICE(), TOKENIZER_CURRENT_RANGE()\
       )\
     )
 
@@ -74,7 +75,7 @@ tokenize(
     )
 
   #define TOKENIZER_GROUP_END(_VARIANT_)\
-    if (!tokenizer_group_end_##_VARIANT_(compilation, &stack, &parent_stack, offset))\
+    if (!tokenizer_group_end_##_VARIANT_(context, &stack, &parent_stack, offset))\
       TOKENIZER_HANDLE_ERROR((Slice){0})
 
   for (;;) {
@@ -129,7 +130,7 @@ tokenize(
       newline {
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
-          compilation, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
+          context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
         );
         continue;
       }
@@ -137,7 +138,7 @@ tokenize(
       ["] ([^"\\] | [\\][^])* ["] {
         Slice raw_bytes = slice_sub(input, token_start_offset + 1, offset - 1);
         tokenizer_push_string_literal(
-          compilation, &string_buffer, &stack, raw_bytes, TOKENIZER_CURRENT_RANGE()
+          context, &string_buffer, &stack, raw_bytes, TOKENIZER_CURRENT_RANGE()
         );
         continue;
       }

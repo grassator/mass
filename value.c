@@ -1035,10 +1035,10 @@ function_literal_info_for_args(
   Value_View args
 ) {
   if (!(literal->flags & Function_Literal_Flags_Generic)) return literal->info;
-  const Mass_Context *context = &literal->context;
 
   // FIXME @ConstCast avoid this
   Function_Literal *mutable_literal = (Function_Literal *)literal;
+  Mass_Context *context = &mutable_literal->context;
 
   if (!dyn_array_is_initialized(mutable_literal->specializations)) {
     mutable_literal->specializations = dyn_array_make(
@@ -1103,7 +1103,7 @@ function_literal_info_for_args(
       .info = 0,
     });
 
-  ensure_parameter_descriptors(context->compilation, specialized_info, literal->own_scope);
+  ensure_parameter_descriptors(context, specialized_info, literal->own_scope);
 
   // :SpecializationInfiniteLoop
   added_specialization->info = specialized_info;
