@@ -6300,8 +6300,6 @@ token_parse_block_statements(
   Value *block_result = &void_value;
   if (!max_statement_count) return block_result;
 
-  // FIXME handle single statement here
-
   Temp_Mark temp_mark = context_temp_mark(context);
   Array_Value_Ptr temp_lazy_statements = dyn_array_make(
     Array_Value_Ptr,
