@@ -103,12 +103,7 @@ operator 16 (- x) 'negate
 operator 16 (& x) 'pointer_to
 
 operator 20 (@ x) MASS.eval
-operator 30 (. x) intrinsic {
-  meta :: import("std/meta")
-  accessor : MASS.Named_Accessor
-  accessor.symbol = meta.reify(arguments.values.0, MASS.Symbol)
-  meta.immediate(context.compilation, accessor, arguments.source_range)
-}
+operator 30 (. x) MASS.named_accessor
 
 pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
 pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to

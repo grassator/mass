@@ -1748,6 +1748,26 @@ token_parse_single(
 }
 
 static Value *
+mass_named_accessor(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args
+) {
+  assert(args.length == 1);
+  Value *symbol_value = value_view_get(args, 0);
+  if (!mass_value_ensure_static_of(context, symbol_value, &descriptor_symbol)) {
+    return 0;
+  }
+
+  Named_Accessor named_accessor = {.symbol = value_as_symbol(symbol_value)};
+  Value *result = value_init(
+    mass_allocate(context, Value),
+    &descriptor_named_accessor, storage_immediate(&named_accessor), args.source_range
+  );
+  return result;
+}
+
+static Value *
 mass_quote(
   Mass_Context *context,
   Parser *parser,
