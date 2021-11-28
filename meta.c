@@ -1992,6 +1992,7 @@ main(void) {
     { "const Symbol *", "using" },
     { "const Symbol *", "_if" },
     { "const Symbol *", "then" },
+    { "const Symbol *", "_while" },
     { "const Symbol *", "_else" },
     { "const Symbol *", "_return" },
     { "const Symbol *", "operator_arrow" },

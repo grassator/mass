@@ -2690,6 +2690,111 @@ mass_push_token_matcher(
   parser->scope->statement_matcher = matcher;
 }
 
+typedef struct {
+  Value *condition;
+  Value *body;
+} Mass_While;
+
+// TODO move this to user land (again)
+static Value *
+mass_handle_while_lazy_proc(
+  Mass_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  const Source_Range *source_range,
+  Mass_While *payload
+) {
+  Program *program = context->program;
+  Label *continue_label =
+    make_label(context->allocator, program, &program->memory.code, slice_literal("continue"));
+
+  push_instruction(&builder->code_block, (Instruction) {
+    .tag = Instruction_Tag_Label,
+    .Label.pointer = continue_label,
+  });
+
+  Expected_Result expected_condition = expected_result_any(&descriptor__bool);
+  Value *condition = value_force(context, builder, &expected_condition, payload->condition);
+  if (mass_has_error(context)) return 0;
+
+  Label *break_label =
+    make_label(context->allocator, program, &program->memory.code, slice_literal("break"));
+
+  encode_inverted_conditional_jump(builder, break_label, &condition->source_range, condition);
+  storage_release_if_temporary(builder, &condition->storage);
+
+  value_force_exact(context, builder, &void_value, payload->body);
+  if (mass_has_error(context)) return 0;
+
+  push_eagerly_encoded_assembly(
+    &builder->code_block, payload->body->source_range,
+    &(Instruction_Assembly){jmp, {code_label32(continue_label)}}
+  );
+
+  push_instruction(&builder->code_block, (Instruction) {
+    .tag = Instruction_Tag_Label,
+    .Label.pointer = break_label,
+  });
+
+  return &void_value;
+}
+
+static u32
+token_parse_while(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View view,
+  Lazy_Value *out_lazy_value,
+  void *payload
+) {
+  if (mass_has_error(context)) return 0;
+
+  u32 peek_index = 0;
+  Value *keyword_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols._while
+  );
+  if (!keyword_token) return 0;
+
+  u32 condition_start_index = peek_index;
+  for (; peek_index < view.length; peek_index += 1) {
+    Value *token = value_view_get(view, peek_index);
+    if (value_is_group_curly(token)) {
+      break;
+    }
+  }
+  Value_View condition_view = value_view_slice(&view, condition_start_index, peek_index);
+  if (peek_index == view.length) {
+    return mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = value_view_rest(&view, peek_index).source_range,
+    });
+  }
+
+  Value *body_token = value_view_next(view, &peek_index);
+  assert(value_is_group_curly(body_token));
+  if (view.length != peek_index) {
+    Value *semicolon = value_view_next(view, &peek_index);
+    const Symbol* symbol = context->compilation->common_symbols.operator_semicolon;
+    if (!value_is_symbol(semicolon) || value_as_symbol(semicolon) != symbol) {
+      return mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = semicolon->source_range,
+      });
+    }
+  }
+
+  Mass_While *lazy_payload = mass_allocate(context, Mass_While);
+  *lazy_payload = (Mass_While) {
+    .condition = token_parse_block_view(context, parser, condition_view),
+    .body = token_parse_single(context, parser, body_token),
+  };
+
+  out_lazy_value->proc = mass_handle_while_lazy_proc;
+  out_lazy_value->payload = lazy_payload;
+
+  return peek_index;
+}
+
 static u32
 token_parse_syntax_definition(
   Mass_Context *context,
@@ -7094,6 +7199,7 @@ scope_define_builtins(
       {.proc = token_parse_statement_label},
       {.proc = token_parse_statement_using},
       {.proc = token_parse_syntax_definition},
+      {.proc = token_parse_while},
       {.proc = token_parse_operator_definition},
     };
     for (u64 i = 0; i < countof(default_statement_matchers) - 1; ++i) {

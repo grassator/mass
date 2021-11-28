@@ -2062,6 +2062,7 @@ typedef struct Common_Symbols {
   const Symbol * using;
   const Symbol * _if;
   const Symbol * then;
+  const Symbol * _while;
   const Symbol * _else;
   const Symbol * _return;
   const Symbol * operator_arrow;
@@ -5661,6 +5662,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("then"),
     .offset = offsetof(Common_Symbols, then),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("_while"),
+    .offset = offsetof(Common_Symbols, _while),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

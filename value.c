@@ -1268,6 +1268,7 @@ compilation_init(
     .underscore = mass_ensure_symbol(compilation, slice_literal("underscore")),
     ._if = mass_ensure_symbol(compilation, slice_literal("if")),
     .then = mass_ensure_symbol(compilation, slice_literal("then")),
+    ._while = mass_ensure_symbol(compilation, slice_literal("while")),
     ._else = mass_ensure_symbol(compilation, slice_literal("else")),
     ._return = mass_ensure_symbol(compilation, slice_literal("return")),
     .operator_arrow = mass_ensure_symbol(compilation, slice_literal("->")),
