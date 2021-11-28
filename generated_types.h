@@ -312,10 +312,6 @@ typedef struct Epoch Epoch;
 typedef dyn_array_type(Epoch *) Array_Epoch_Ptr;
 typedef dyn_array_type(const Epoch *) Array_Const_Epoch_Ptr;
 
-typedef struct Function_Builder Function_Builder;
-typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
-typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
-
 typedef enum Operator_Fixity {
   Operator_Fixity_Infix = 1,
   Operator_Fixity_Prefix = 2,
@@ -429,6 +425,10 @@ typedef dyn_array_type(const Value_Flags *) Array_Const_Value_Flags_Ptr;
 typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
+
+typedef struct Function_Builder Function_Builder;
+typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
+typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
 
 typedef struct Expected_Result Expected_Result;
 typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
@@ -1357,20 +1357,6 @@ typedef struct Epoch {
 } Epoch;
 typedef dyn_array_type(Epoch) Array_Epoch;
 
-typedef struct Function_Builder {
-  Epoch epoch;
-  s32 stack_reserve;
-  u32 max_call_parameters_stack_size;
-  Value * return_value;
-  Code_Block code_block;
-  u64 register_used_bitset;
-  u64 register_volatile_bitset;
-  u64 register_occupied_bitset;
-  Slice source;
-  const Function_Info * function;
-} Function_Builder;
-typedef dyn_array_type(Function_Builder) Array_Function_Builder;
-
 typedef struct Function_Layout {
   s32 stack_reserve;
   u8 stack_allocation_offset_in_prolog;
@@ -1536,6 +1522,20 @@ typedef struct Value {
   Source_Range source_range;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
+
+typedef struct Function_Builder {
+  Epoch epoch;
+  s32 stack_reserve;
+  u32 max_call_parameters_stack_size;
+  Value return_value;
+  Code_Block code_block;
+  u64 register_used_bitset;
+  u64 register_volatile_bitset;
+  u64 register_occupied_bitset;
+  Slice source;
+  const Function_Info * function;
+} Function_Builder;
+typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef enum {
   Expected_Result_Tag_Exact = 0,
@@ -2346,11 +2346,6 @@ static Descriptor descriptor_array_epoch;
 static Descriptor descriptor_array_epoch_ptr;
 static Descriptor descriptor_epoch_pointer;
 static Descriptor descriptor_epoch_pointer_pointer;
-static Descriptor descriptor_function_builder;
-static Descriptor descriptor_array_function_builder;
-static Descriptor descriptor_array_function_builder_ptr;
-static Descriptor descriptor_function_builder_pointer;
-static Descriptor descriptor_function_builder_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
@@ -2439,6 +2434,11 @@ static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
+static Descriptor descriptor_function_builder;
+static Descriptor descriptor_array_function_builder;
+static Descriptor descriptor_array_function_builder_ptr;
+static Descriptor descriptor_function_builder_pointer;
+static Descriptor descriptor_function_builder_pointer_pointer;
 static Descriptor descriptor_expected_result;
 static Descriptor descriptor_array_expected_result;
 static Descriptor descriptor_array_expected_result_ptr;
@@ -3885,63 +3885,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(epoch, Epoch,
 MASS_DEFINE_TYPE_VALUE(epoch);
 DEFINE_VALUE_IS_AS_HELPERS(Epoch, epoch);
 DEFINE_VALUE_IS_AS_HELPERS(Epoch *, epoch_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
-MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
-  {
-    .descriptor = &descriptor_epoch,
-    .name = slice_literal_fields("epoch"),
-    .offset = offsetof(Function_Builder, epoch),
-  },
-  {
-    .descriptor = &descriptor_s32,
-    .name = slice_literal_fields("stack_reserve"),
-    .offset = offsetof(Function_Builder, stack_reserve),
-  },
-  {
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("max_call_parameters_stack_size"),
-    .offset = offsetof(Function_Builder, max_call_parameters_stack_size),
-  },
-  {
-    .descriptor = &descriptor_value_pointer,
-    .name = slice_literal_fields("return_value"),
-    .offset = offsetof(Function_Builder, return_value),
-  },
-  {
-    .descriptor = &descriptor_code_block,
-    .name = slice_literal_fields("code_block"),
-    .offset = offsetof(Function_Builder, code_block),
-  },
-  {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("register_used_bitset"),
-    .offset = offsetof(Function_Builder, register_used_bitset),
-  },
-  {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("register_volatile_bitset"),
-    .offset = offsetof(Function_Builder, register_volatile_bitset),
-  },
-  {
-    .descriptor = &descriptor_u64,
-    .name = slice_literal_fields("register_occupied_bitset"),
-    .offset = offsetof(Function_Builder, register_occupied_bitset),
-  },
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("source"),
-    .offset = offsetof(Function_Builder, source),
-  },
-  {
-    .descriptor = &descriptor_function_info_pointer,
-    .name = slice_literal_fields("function"),
-    .offset = offsetof(Function_Builder, function),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(function_builder);
-DEFINE_VALUE_IS_AS_HELPERS(Function_Builder, function_builder);
-DEFINE_VALUE_IS_AS_HELPERS(Function_Builder *, function_builder_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
 static C_Enum_Item operator_fixity_items[] = {
 { .name = slice_literal_fields("Infix"), .value = 1 },
@@ -4389,6 +4332,63 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
 MASS_DEFINE_TYPE_VALUE(value);
 DEFINE_VALUE_IS_AS_HELPERS(Value, value);
 DEFINE_VALUE_IS_AS_HELPERS(Value *, value_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
+  {
+    .descriptor = &descriptor_epoch,
+    .name = slice_literal_fields("epoch"),
+    .offset = offsetof(Function_Builder, epoch),
+  },
+  {
+    .descriptor = &descriptor_s32,
+    .name = slice_literal_fields("stack_reserve"),
+    .offset = offsetof(Function_Builder, stack_reserve),
+  },
+  {
+    .descriptor = &descriptor_u32,
+    .name = slice_literal_fields("max_call_parameters_stack_size"),
+    .offset = offsetof(Function_Builder, max_call_parameters_stack_size),
+  },
+  {
+    .descriptor = &descriptor_value,
+    .name = slice_literal_fields("return_value"),
+    .offset = offsetof(Function_Builder, return_value),
+  },
+  {
+    .descriptor = &descriptor_code_block,
+    .name = slice_literal_fields("code_block"),
+    .offset = offsetof(Function_Builder, code_block),
+  },
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("register_used_bitset"),
+    .offset = offsetof(Function_Builder, register_used_bitset),
+  },
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("register_volatile_bitset"),
+    .offset = offsetof(Function_Builder, register_volatile_bitset),
+  },
+  {
+    .descriptor = &descriptor_u64,
+    .name = slice_literal_fields("register_occupied_bitset"),
+    .offset = offsetof(Function_Builder, register_occupied_bitset),
+  },
+  {
+    .descriptor = &descriptor_slice,
+    .name = slice_literal_fields("source"),
+    .offset = offsetof(Function_Builder, source),
+  },
+  {
+    .descriptor = &descriptor_function_info_pointer,
+    .name = slice_literal_fields("function"),
+    .offset = offsetof(Function_Builder, function),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_builder);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Builder, function_builder);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Builder *, function_builder_pointer);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result_ptr, Array_Expected_Result_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result, Array_Expected_Result)

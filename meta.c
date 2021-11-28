@@ -1453,20 +1453,6 @@ main(void) {
     { "u64", "as_u64" },
   }));
 
-
-  export_compiler(push_type(type_struct("Function_Builder", (Struct_Item[]){
-    { "Epoch", "epoch" },
-    { "s32", "stack_reserve" },
-    { "u32", "max_call_parameters_stack_size" },
-    { "Value *", "return_value" },
-    { "Code_Block", "code_block" },
-    { "u64", "register_used_bitset" },
-    { "u64", "register_volatile_bitset" },
-    { "u64", "register_occupied_bitset" },
-    { "Slice", "source" },
-    { "const Function_Info *", "function" },
-  })));
-
   push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },
@@ -1596,6 +1582,19 @@ main(void) {
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Source_Range", "source_range" },
+  })));
+
+  export_compiler(push_type(type_struct("Function_Builder", (Struct_Item[]){
+    { "Epoch", "epoch" },
+    { "s32", "stack_reserve" },
+    { "u32", "max_call_parameters_stack_size" },
+    { "Value", "return_value" },
+    { "Code_Block", "code_block" },
+    { "u64", "register_used_bitset" },
+    { "u64", "register_volatile_bitset" },
+    { "u64", "register_occupied_bitset" },
+    { "Slice", "source" },
+    { "const Function_Info *", "function" },
   })));
 
   export_compiler(push_type(type_union("Expected_Result", (Struct_Type[]){

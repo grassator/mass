@@ -1014,33 +1014,6 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Function_Builder">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Function_Builder_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Function_Builder_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
 <Type Name="Array_Function_Layout">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -1405,6 +1378,33 @@
   </Expand>
 </Type>
 <Type Name="Array_Const_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Builder">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Builder_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Builder_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>

@@ -192,13 +192,6 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Instruction_Location")),
     type_instruction_location_value
   );
-  Source_Range Function_Builder__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Function_Builder__source_range, "Function_Builder");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Function_Builder__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Function_Builder")),
-    type_function_builder_value
-  );
   Source_Range Context__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Context__source_range, "Context");
   scope_define_value(
@@ -226,6 +219,13 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Value__source_range,
     mass_ensure_symbol(compilation, slice_literal("Value")),
     type_value_value
+  );
+  Source_Range Function_Builder__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Builder__source_range, "Function_Builder");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Builder__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Builder")),
+    type_function_builder_value
   );
   Source_Range Expected_Result__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Expected_Result__source_range, "Expected_Result");

@@ -3226,7 +3226,7 @@ mass_macro_lazy_proc(
     mass_value_from_expected_result(context->allocator, builder, expected_result, *source_range);
 
   Label *saved_return_label = builder->code_block.end_label;
-  Value *saved_return_value = builder->return_value;
+  Value saved_return_value = builder->return_value;
   {
     builder->code_block.end_label = make_label(
       context->allocator,
@@ -3234,7 +3234,7 @@ mass_macro_lazy_proc(
       &context->program->memory.code,
       slice_literal("macro return")
     );
-    builder->return_value = result_value;
+    builder->return_value = *result_value;
     value_force_exact(context, builder, result_value, body_value);
 
     if (mass_has_error(context)) return 0;
@@ -6760,7 +6760,7 @@ mass_handle_explicit_return_lazy_proc(
   const Source_Range *source_range,
   Value *parse_result
 ) {
-  mass_assign(context, builder, builder->return_value, parse_result, source_range);
+  mass_assign(context, builder, &builder->return_value, parse_result, source_range);
   if (mass_has_error(context)) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
 

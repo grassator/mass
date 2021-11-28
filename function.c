@@ -438,7 +438,7 @@ encode_inverted_conditional_jump(
   Function_Builder *builder,
   Label *to_label,
   const Source_Range *source_range,
-  Value *value
+  const Value *value
 ) {
   if (value->storage.tag == Storage_Tag_Eflags) {
     const X64_Mnemonic *mnemonic = 0;
@@ -611,22 +611,20 @@ ensure_function_instance(
 
   const Descriptor *return_descriptor = fn_info->returns.descriptor;
   Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
-  Value *return_value = value_init(
-    allocator_allocate(context->allocator, Value),
-    return_descriptor, return_storage, fn_info->returns.maybe_type_expression.source_range
-  );
+  Source_Range return_range = fn_info->returns.maybe_type_expression.source_range;
 
   Function_Builder *builder = &(Function_Builder){
     .epoch = body_parser.epoch,
     .function = fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
-    .return_value = return_value,
+    .return_value = {0},
     .code_block = {
       .allocator = context->allocator,
       .start_label = call_label,
       .end_label = make_label(context->allocator, program, &program->memory.code, end_label_name),
     },
   };
+  value_init(&builder->return_value, return_descriptor, return_storage, return_range);
 
   {
     for (u64 i = 0; i < dyn_array_length(call_setup.parameters); ++i) {
@@ -668,7 +666,7 @@ ensure_function_instance(
   }
   if (mass_has_error(context)) return 0;
 
-  value_force_exact(context, builder, return_value, parse_result);
+  value_force_exact(context, builder, &builder->return_value, parse_result);
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
@@ -681,7 +679,7 @@ ensure_function_instance(
     Storage callee_register_storage = storage_register(callee_register, (Bits){64});
     Storage caller_register_storage = storage_register(caller_register, (Bits){64});
     push_eagerly_encoded_assembly(
-      &builder->code_block, return_value->source_range,
+      &builder->code_block, return_range,
       &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
     );
   }
