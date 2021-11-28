@@ -3743,7 +3743,6 @@ hash_map_resize(
   u64 previous_byte_size = entry_byte_size * map->capacity;
   map->capacity_power_of_2++;
   map->capacity = 1llu << map->capacity_power_of_2;
-  map->occupied = 0;
   map->hash_mask = u64_to_s32(map->capacity - 1);
   s8 *entries = (s8 *)map->entries;
   u64 entries_byte_size = entry_byte_size * map->capacity;
@@ -3864,8 +3863,8 @@ struct Hash_Map_Make_Options {
   ) {\
     u64 entry_size = sizeof(map->entries[0]);\
     Hash_Map_Internal *internal = (Hash_Map_Internal *)map;\
-    /* Fast check for 50% occupancy */ \
-    if (((++map->occupied) << 1) > map->capacity) {\
+    /* Check for 75% occupancy */ \
+    if (++map->occupied > map->capacity - map->capacity / 4) {\
       hash_map_resize(internal, entry_size);\
     }\
     u64 index = hash_map_get_insert_index_internal(internal, entry_size, hash);\
