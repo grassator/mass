@@ -85,13 +85,19 @@ mass_error_append_function_signature_string(
     mass_error_append_descriptor(result, arg->descriptor);
   }
   APPEND_LITERAL(")");
+  if (info->flags & Function_Info_Flags_Compile_Time) {
+    APPEND_LITERAL(" => ");
+  } else {
+    APPEND_LITERAL(" -> ");
+  }
   switch(info->returns.tag) {
+    case Function_Return_Tag_Inferred: {
+      APPEND_LITERAL("_");
+    } break;
     case Function_Return_Tag_Exact: {
-      APPEND_LITERAL(" -> ");
       mass_error_append_descriptor(result, info->returns.Exact.descriptor);
     } break;
     case Function_Return_Tag_Generic: {
-      APPEND_LITERAL(" -> ");
       Slice source = source_from_source_range(
         compilation, &info->returns.Generic.type_expression.source_range
       );
@@ -1021,6 +1027,16 @@ function_return_generic(
   };
 }
 
+static inline Function_Return
+function_return_inferred(
+  Source_Range source_range
+) {
+  return (Function_Return) {
+    .tag = Function_Return_Tag_Inferred,
+    .source_range = source_range,
+  };
+}
+
 static inline void
 function_info_init(
   Function_Info *info,
@@ -1313,6 +1329,7 @@ compilation_init(
     ._while = mass_ensure_symbol(compilation, slice_literal("while")),
     ._else = mass_ensure_symbol(compilation, slice_literal("else")),
     ._return = mass_ensure_symbol(compilation, slice_literal("return")),
+    ._ = mass_ensure_symbol(compilation, slice_literal("_")),
     .operator_arrow = mass_ensure_symbol(compilation, slice_literal("->")),
     .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
     .operator_colon = mass_ensure_symbol(compilation, slice_literal(":")),

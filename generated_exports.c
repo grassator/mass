@@ -17,6 +17,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Source_Range")),
     type_source_range_value
   );
+  Source_Range Module__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Module__source_range, "Module");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Module__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Module")),
+    type_module_value
+  );
   Source_Range Value_View__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Value_View__source_range, "Value_View");
   scope_define_value(
@@ -261,6 +268,22 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Lazy_Value__source_range,
     mass_ensure_symbol(compilation, slice_literal("Lazy_Value")),
     type_lazy_value_value
+  );
+  MASS_DEFINE_FUNCTION_TYPE(
+    Function_Info_Flags_None,
+    Mass_Intrinsic_Proc, "Intrinsic_Proc", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("view")),
+&descriptor_value_view
+    )
   );
   Source_Range Tuple__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Tuple__source_range, "Tuple");

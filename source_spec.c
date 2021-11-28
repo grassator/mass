@@ -1143,7 +1143,7 @@ spec("source") {
     it("should be able to allocate and return an immediate value through an intrinsic") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: fn() -> () intrinsic {\n"
+          "my_intrinsic :: fn() -> (s64) intrinsic {\n"
             "meta :: import(\"std/meta\")\n"
             "x := 42\n"
             "meta.immediate(context.compilation, x, arguments.source_range)\n"

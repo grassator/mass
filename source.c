@@ -3124,8 +3124,12 @@ mass_handle_macro_call(
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
   switch(literal->info->returns.tag) {
+    case Function_Return_Tag_Inferred: {
+      // Accept whatever the actual return type is
+    } break;
     case Function_Return_Tag_Exact: {
       const Descriptor *expected = literal->info->returns.Exact.descriptor;
+      // TODO should this actually perform a cast?
       if (!same_type_or_can_implicitly_move_cast(expected, actual_return_descriptor)) {
         return mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
@@ -3554,6 +3558,14 @@ ensure_parameter_descriptors(
   }
 
   switch(info->returns.tag) {
+    case Function_Return_Tag_Inferred: {
+      if (info->flags & Function_Info_Flags_Intrinsic) {
+        // :IntrinsicReturnType
+        // there is no fn body to infer this from so will be handled elsewhere
+      } else {
+        panic("TODO");
+      }
+    } break;
     case Function_Return_Tag_Exact: {
       // Nothing to do, we already know the type
     } break;
@@ -3567,7 +3579,6 @@ ensure_parameter_descriptors(
       };
     } break;
   }
-  assert(info->returns.tag == Function_Return_Tag_Exact);
 
   err:
   context_temp_reset_to_mark(&temp_context, temp_mark);
@@ -3807,6 +3818,7 @@ mass_intrinsic_call(
   Mass_Context *context,
   Parser *parser,
   Value *overload,
+  const Function_Info *info,
   Value_View args_view
 ) {
   // @Volatile :IntrinsicFunctionSignature
@@ -3815,7 +3827,33 @@ mass_intrinsic_call(
   );
   if (mass_has_error(context)) return 0;
 
-  return jitted_code(context, parser, args_view);
+  Value *result = jitted_code(context, parser, args_view);
+  if (!result) return 0;
+  // :IntrinsicReturnType
+  switch(info->returns.tag) {
+    case Function_Return_Tag_Inferred: {
+      // Accept whatever was returned
+      return result;
+    } break;
+    case Function_Return_Tag_Exact: {
+      const Descriptor *expected = info->returns.Exact.descriptor;
+      if (mass_descriptor_is_void(expected)) {
+        return value_make(context->allocator, &descriptor_void, storage_none, info->returns.source_range);
+      }
+      const Descriptor *actual = value_or_lazy_value_descriptor(result);
+      if (!same_type(expected, actual)) {
+        return mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = info->returns.source_range,
+          .Type_Mismatch = { .expected = expected, .actual = actual },
+        });
+      }
+    } break;
+    case Function_Return_Tag_Generic: {
+      panic("Generic returns should have been resolved in `ensure_function_instance`");
+    } break;
+  }
+  return result;
 }
 
 static inline bool
@@ -4098,8 +4136,7 @@ token_handle_function_call(
   if (value_is_function_literal(overload)) {
     const Function_Literal *literal = value_as_function_literal(overload);
     if (value_is_intrinsic(literal->body)) {
-      // FIXME :IntrinsicReturnType Should check the returned result here
-      return mass_intrinsic_call(context, parser, literal->body, args_view);
+      return mass_intrinsic_call(context, parser, literal->body, info, args_view);
     }
     if (literal->flags & Function_Literal_Flags_Macro) {
       return mass_handle_macro_call(context, parser, overload, args_view, source_range);
@@ -5941,6 +5978,11 @@ token_parse_function_literal(
       } else {
         returns = function_return_generic(return_types_view, return_range);
       }
+    } else if (
+      value_is_symbol(token) && value_as_symbol(token) == context->compilation->common_symbols._
+    ) {
+      Source_Range return_range = value_view_slice(&view, peek_index, peek_index).source_range;
+      returns = function_return_inferred(return_range);
     } else {
       Value_View return_types_view = value_view_make_single(context->allocator, token);
       returns = function_return_generic(return_types_view, return_range);
@@ -6404,6 +6446,7 @@ token_parse_statement_using(
   Value_View rest = value_view_match_till_end_of_statement(context, parser, view, &peek_index);
 
   Value *result = compile_time_eval(context, parser, rest);
+  if (mass_has_error(context)) return 0;
   if (!mass_value_ensure_static_of(context, result, &descriptor_module)) {
     goto err;
   }

@@ -1165,12 +1165,11 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-
-  push_type(type_struct("Module", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Module", (Struct_Item[]){
     { "Source_Range", "source_range" },
     { "Scope *", "own_scope" },
     { "Module_Exports", "exports" },
-  }));
+  })));
 
   push_type(type_struct("Parse_Error", (Struct_Item[]){
     { "Slice", "message" },
@@ -1598,11 +1597,14 @@ main(void) {
     { "u64", "resolving" },
   }));
 
-  push_type(type_function(Typedef, "Mass_Intrinsic_Proc", "Value *", (Argument_Type[]){
-    { "Mass_Context *", "context" },
-    { "Parser *", "parser" },
-    { "Value_View", "view" },
-  }));
+  export_compiler_custom_name(
+    "Intrinsic_Proc",
+    push_type(type_function(Typedef, "Mass_Intrinsic_Proc", "Value *", (Argument_Type[]){
+      { "Mass_Context *", "context" },
+      { "Parser *", "parser" },
+      { "Value_View", "view" },
+    }))
+  );
 
   push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Mass_Context *", "context" },
@@ -1633,6 +1635,7 @@ main(void) {
   }));
 
   push_type(add_common_fields(type_union("Function_Return", (Struct_Type[]){
+    struct_empty("Inferred"),
     struct_fields("Generic", (Struct_Item[]){
       { "Value_View", "type_expression" },
     }),
@@ -1973,6 +1976,7 @@ main(void) {
     { "const Symbol *", "_while" },
     { "const Symbol *", "_else" },
     { "const Symbol *", "_return" },
+    { "const Symbol *", "_" },
     { "const Symbol *", "operator_arrow" },
     { "const Symbol *", "operator_at" },
     { "const Symbol *", "operator_colon" },

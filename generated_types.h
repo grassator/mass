@@ -1556,8 +1556,9 @@ function_parameter_as_exact_static(const Function_Parameter *function_parameter)
 }
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
 typedef enum {
-  Function_Return_Tag_Generic = 0,
-  Function_Return_Tag_Exact = 1,
+  Function_Return_Tag_Inferred = 0,
+  Function_Return_Tag_Generic = 1,
+  Function_Return_Tag_Exact = 2,
 } Function_Return_Tag;
 
 typedef struct Function_Return_Generic {
@@ -2027,6 +2028,7 @@ typedef struct Common_Symbols {
   const Symbol * _while;
   const Symbol * _else;
   const Symbol * _return;
+  const Symbol * _;
   const Symbol * operator_arrow;
   const Symbol * operator_at;
   const Symbol * operator_colon;
@@ -4460,8 +4462,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
 MASS_DEFINE_OPAQUE_C_TYPE(function_return_tag, Function_Return_Tag)
 static C_Enum_Item function_return_tag_items[] = {
-{ .name = slice_literal_fields("Generic"), .value = 0 },
-{ .name = slice_literal_fields("Exact"), .value = 1 },
+{ .name = slice_literal_fields("Inferred"), .value = 0 },
+{ .name = slice_literal_fields("Generic"), .value = 1 },
+{ .name = slice_literal_fields("Exact"), .value = 2 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return_generic, Function_Return_Generic,
   {
@@ -5547,6 +5550,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("_return"),
     .offset = offsetof(Common_Symbols, _return),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("_"),
+    .offset = offsetof(Common_Symbols, _),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

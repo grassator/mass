@@ -162,7 +162,7 @@ do {\
   MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_NAME_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Value *info_value = value_init(\
     allocator_allocate(allocator, Value),\
-    &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
+    &descriptor_function_info, storage_static(function), source_range\
   );\
   const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_));\
   scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, fn_symbol, info_value);\

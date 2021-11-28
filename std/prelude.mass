@@ -1,5 +1,5 @@
-import :: fn(path : String) -> (MASS.Scope) MASS.import
-cast :: fn(type : Type, value) MASS.cast
+import :: fn(path : String) -> (MASS.Module) MASS.import
+cast :: fn(type : Type, value) -> _ MASS.cast
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
 
 Void :: type_of(())
@@ -49,7 +49,8 @@ Symbol :: MASS.Symbol
 true :: cast(bool, 1)
 false :: cast(bool, 0)
 
-assert :: fn(condition : bool, message := "Assertion failed\n") {
+// FIXME :NoReturn this is not really a `void`
+assert :: fn(condition : bool, message := "Assertion failed\n") -> () {
   // TODO add something like MASS.intrinsic_assert or MASS.intrinsic_print
   //      that would be safe to call without a risk or circular dependencies
   // TODO also detect these kind of dependencies better
@@ -60,21 +61,23 @@ assert :: fn(condition : bool, message := "Assertion failed\n") {
   }
 }
 
-static_assert :: fn(condition : bool, message : String = "") MASS.static_assert
+// FIXME :NoReturn this is not really a `void`
+static_assert :: fn(condition : bool, message : String = "") => () MASS.static_assert
 
-apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) -> (MASS.Scope) MASS.inline_module
+apply :: fn(symbol :: 'module, curly : MASS.Group_Curly) -> (MASS.Module) MASS.inline_module
 apply :: fn(symbol :: 'exports, curly : MASS.Group_Curly) -> () MASS.exports
-apply :: fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) MASS.intrinsic
+// FIXME the return type here should be (MASS.Intrinsic_Proc) but that does not work atm
+apply :: fn(symbol :: 'intrinsic, curly : MASS.Group_Curly) -> _ MASS.intrinsic
 apply :: fn(symbol :: 'c_struct, curly : MASS.Group_Square) -> (Type) MASS.c_struct
 
 // These need to be an overload of `apply` instead a regular function because
 // it needs to parse the expression inside with the runtime epoch even in the case
 // when it is called from a constant context
 apply :: fn(symbol :: 'type_of, paren : MASS.Group_Paren) -> (Type) MASS.type_of
-apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) -> (Type) MASS.size_of
+apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) -> (i64) MASS.size_of
 
 apply :: macro(type, tuple : MASS.Group_Square) { cast(type', tuple') }
-apply :: fn(x, paren : MASS.Group_Paren) MASS.call
+apply :: fn(x, paren : MASS.Group_Paren) -> _ MASS.call
 
 operator 7 (x == y) 'equal
 operator 7 (x != y) 'not_equal

@@ -1486,6 +1486,9 @@
   </Expand>
 </Type>
 <Type Name="Function_Return">
+  <DisplayString Condition="tag == Function_Return_Tag_Inferred">
+    Inferred
+  </DisplayString>
   <DisplayString Condition="tag == Function_Return_Tag_Generic">
     Generic { Generic }
   </DisplayString>
