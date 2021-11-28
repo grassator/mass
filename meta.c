@@ -249,9 +249,9 @@ print_union_variant_getter(
 ) {
   char *lower_union_name = strtolower(union_name);
   char *lower_variant_name = strtolower(variant_name);
-  fprintf(file, "static inline %s_%s *\n", union_name, variant_name); // type signature
+  fprintf(file, "static inline const %s_%s *\n", union_name, variant_name); // type signature
   fprintf(file, "%s_as_%s", lower_union_name, lower_variant_name); // fn name
-  fprintf(file, "(%s *%s) {\n", union_name, lower_union_name); // args
+  fprintf(file, "(const %s *%s) {\n", union_name, lower_union_name); // args
   fprintf(file, "  assert(%s->tag == %s_Tag_%s);\n", lower_union_name, union_name, variant_name); // body
   fprintf(file, "  return &%s->%s;\n", lower_union_name, variant_name); // body
   fprintf(file, "}\n");

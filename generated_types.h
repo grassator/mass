@@ -940,8 +940,8 @@ typedef struct Module_Exports {
     Module_Exports_Selective Selective;
   };
 } Module_Exports;
-static inline Module_Exports_Selective *
-module_exports_as_selective(Module_Exports *module_exports) {
+static inline const Module_Exports_Selective *
+module_exports_as_selective(const Module_Exports *module_exports) {
   assert(module_exports->tag == Module_Exports_Tag_Selective);
   return &module_exports->Selective;
 }
@@ -1018,23 +1018,23 @@ typedef struct Token_Pattern {
     Token_Pattern_Or Or;
   };
 } Token_Pattern;
-static inline Token_Pattern_Symbol *
-token_pattern_as_symbol(Token_Pattern *token_pattern) {
+static inline const Token_Pattern_Symbol *
+token_pattern_as_symbol(const Token_Pattern *token_pattern) {
   assert(token_pattern->tag == Token_Pattern_Tag_Symbol);
   return &token_pattern->Symbol;
 }
-static inline Token_Pattern_Cached_Symbol *
-token_pattern_as_cached_symbol(Token_Pattern *token_pattern) {
+static inline const Token_Pattern_Cached_Symbol *
+token_pattern_as_cached_symbol(const Token_Pattern *token_pattern) {
   assert(token_pattern->tag == Token_Pattern_Tag_Cached_Symbol);
   return &token_pattern->Cached_Symbol;
 }
-static inline Token_Pattern_Descriptor *
-token_pattern_as_descriptor(Token_Pattern *token_pattern) {
+static inline const Token_Pattern_Descriptor *
+token_pattern_as_descriptor(const Token_Pattern *token_pattern) {
   assert(token_pattern->tag == Token_Pattern_Tag_Descriptor);
   return &token_pattern->Descriptor;
 }
-static inline Token_Pattern_Or *
-token_pattern_as_or(Token_Pattern *token_pattern) {
+static inline const Token_Pattern_Or *
+token_pattern_as_or(const Token_Pattern *token_pattern) {
   assert(token_pattern->tag == Token_Pattern_Tag_Or);
   return &token_pattern->Or;
 }
@@ -1130,18 +1130,18 @@ typedef struct Memory_Location {
     Memory_Location_Stack Stack;
   };
 } Memory_Location;
-static inline Memory_Location_Instruction_Pointer_Relative *
-memory_location_as_instruction_pointer_relative(Memory_Location *memory_location) {
+static inline const Memory_Location_Instruction_Pointer_Relative *
+memory_location_as_instruction_pointer_relative(const Memory_Location *memory_location) {
   assert(memory_location->tag == Memory_Location_Tag_Instruction_Pointer_Relative);
   return &memory_location->Instruction_Pointer_Relative;
 }
-static inline Memory_Location_Indirect *
-memory_location_as_indirect(Memory_Location *memory_location) {
+static inline const Memory_Location_Indirect *
+memory_location_as_indirect(const Memory_Location *memory_location) {
   assert(memory_location->tag == Memory_Location_Tag_Indirect);
   return &memory_location->Indirect;
 }
-static inline Memory_Location_Stack *
-memory_location_as_stack(Memory_Location *memory_location) {
+static inline const Memory_Location_Stack *
+memory_location_as_stack(const Memory_Location *memory_location) {
   assert(memory_location->tag == Memory_Location_Tag_Stack);
   return &memory_location->Stack;
 }
@@ -1197,38 +1197,38 @@ typedef struct Storage {
     Storage_Unpacked Unpacked;
   };
 } Storage;
-static inline Storage_Eflags *
-storage_as_eflags(Storage *storage) {
+static inline const Storage_Eflags *
+storage_as_eflags(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Eflags);
   return &storage->Eflags;
 }
-static inline Storage_Register *
-storage_as_register(Storage *storage) {
+static inline const Storage_Register *
+storage_as_register(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Register);
   return &storage->Register;
 }
-static inline Storage_Xmm *
-storage_as_xmm(Storage *storage) {
+static inline const Storage_Xmm *
+storage_as_xmm(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Xmm);
   return &storage->Xmm;
 }
-static inline Storage_Static *
-storage_as_static(Storage *storage) {
+static inline const Storage_Static *
+storage_as_static(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Static);
   return &storage->Static;
 }
-static inline Storage_Immediate *
-storage_as_immediate(Storage *storage) {
+static inline const Storage_Immediate *
+storage_as_immediate(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Immediate);
   return &storage->Immediate;
 }
-static inline Storage_Memory *
-storage_as_memory(Storage *storage) {
+static inline const Storage_Memory *
+storage_as_memory(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Memory);
   return &storage->Memory;
 }
-static inline Storage_Unpacked *
-storage_as_unpacked(Storage *storage) {
+static inline const Storage_Unpacked *
+storage_as_unpacked(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Unpacked);
   return &storage->Unpacked;
 }
@@ -1283,28 +1283,28 @@ typedef struct Instruction {
     Instruction_Location Location;
   };
 } Instruction;
-static inline Instruction_Label *
-instruction_as_label(Instruction *instruction) {
+static inline const Instruction_Label *
+instruction_as_label(const Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Label);
   return &instruction->Label;
 }
-static inline Instruction_Bytes *
-instruction_as_bytes(Instruction *instruction) {
+static inline const Instruction_Bytes *
+instruction_as_bytes(const Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Bytes);
   return &instruction->Bytes;
 }
-static inline Instruction_Label_Patch *
-instruction_as_label_patch(Instruction *instruction) {
+static inline const Instruction_Label_Patch *
+instruction_as_label_patch(const Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Label_Patch);
   return &instruction->Label_Patch;
 }
-static inline Instruction_Stack_Patch *
-instruction_as_stack_patch(Instruction *instruction) {
+static inline const Instruction_Stack_Patch *
+instruction_as_stack_patch(const Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Stack_Patch);
   return &instruction->Stack_Patch;
 }
-static inline Instruction_Location *
-instruction_as_location(Instruction *instruction) {
+static inline const Instruction_Location *
+instruction_as_location(const Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Location);
   return &instruction->Location;
 }
@@ -1382,13 +1382,13 @@ typedef struct Operator {
     Operator_Intrinsic Intrinsic;
   };
 } Operator;
-static inline Operator_Alias *
-operator_as_alias(Operator *operator) {
+static inline const Operator_Alias *
+operator_as_alias(const Operator *operator) {
   assert(operator->tag == Operator_Tag_Alias);
   return &operator->Alias;
 }
-static inline Operator_Intrinsic *
-operator_as_intrinsic(Operator *operator) {
+static inline const Operator_Intrinsic *
+operator_as_intrinsic(const Operator *operator) {
   assert(operator->tag == Operator_Tag_Intrinsic);
   return &operator->Intrinsic;
 }
@@ -1446,13 +1446,13 @@ typedef struct Overload_Match {
     Overload_Match_Found Found;
   };
 } Overload_Match;
-static inline Overload_Match_Undecidable *
-overload_match_as_undecidable(Overload_Match *overload_match) {
+static inline const Overload_Match_Undecidable *
+overload_match_as_undecidable(const Overload_Match *overload_match) {
   assert(overload_match->tag == Overload_Match_Tag_Undecidable);
   return &overload_match->Undecidable;
 }
-static inline Overload_Match_Found *
-overload_match_as_found(Overload_Match *overload_match) {
+static inline const Overload_Match_Found *
+overload_match_as_found(const Overload_Match *overload_match) {
   assert(overload_match->tag == Overload_Match_Tag_Found);
   return &overload_match->Found;
 }
@@ -1500,13 +1500,13 @@ typedef struct Expected_Result {
     Expected_Result_Flexible Flexible;
   };
 } Expected_Result;
-static inline Expected_Result_Exact *
-expected_result_as_exact(Expected_Result *expected_result) {
+static inline const Expected_Result_Exact *
+expected_result_as_exact(const Expected_Result *expected_result) {
   assert(expected_result->tag == Expected_Result_Tag_Exact);
   return &expected_result->Exact;
 }
-static inline Expected_Result_Flexible *
-expected_result_as_flexible(Expected_Result *expected_result) {
+static inline const Expected_Result_Flexible *
+expected_result_as_flexible(const Expected_Result *expected_result) {
   assert(expected_result->tag == Expected_Result_Tag_Flexible);
   return &expected_result->Flexible;
 }
@@ -1549,8 +1549,8 @@ typedef struct Function_Parameter {
     Function_Parameter_Exact_Static Exact_Static;
   };
 } Function_Parameter;
-static inline Function_Parameter_Exact_Static *
-function_parameter_as_exact_static(Function_Parameter *function_parameter) {
+static inline const Function_Parameter_Exact_Static *
+function_parameter_as_exact_static(const Function_Parameter *function_parameter) {
   assert(function_parameter->tag == Function_Parameter_Tag_Exact_Static);
   return &function_parameter->Exact_Static;
 }
@@ -1602,8 +1602,8 @@ typedef struct Function_Call_Jump {
     Function_Call_Jump_Syscall Syscall;
   };
 } Function_Call_Jump;
-static inline Function_Call_Jump_Syscall *
-function_call_jump_as_syscall(Function_Call_Jump *function_call_jump) {
+static inline const Function_Call_Jump_Syscall *
+function_call_jump_as_syscall(const Function_Call_Jump *function_call_jump) {
   assert(function_call_jump->tag == Function_Call_Jump_Tag_Syscall);
   return &function_call_jump->Syscall;
 }
@@ -1693,28 +1693,28 @@ typedef struct Descriptor {
     Descriptor_Pointer_To Pointer_To;
   };
 } Descriptor;
-static inline Descriptor_Integer *
-descriptor_as_integer(Descriptor *descriptor) {
+static inline const Descriptor_Integer *
+descriptor_as_integer(const Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Integer);
   return &descriptor->Integer;
 }
-static inline Descriptor_Function_Instance *
-descriptor_as_function_instance(Descriptor *descriptor) {
+static inline const Descriptor_Function_Instance *
+descriptor_as_function_instance(const Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Function_Instance);
   return &descriptor->Function_Instance;
 }
-static inline Descriptor_Fixed_Size_Array *
-descriptor_as_fixed_size_array(Descriptor *descriptor) {
+static inline const Descriptor_Fixed_Size_Array *
+descriptor_as_fixed_size_array(const Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
   return &descriptor->Fixed_Size_Array;
 }
-static inline Descriptor_Struct *
-descriptor_as_struct(Descriptor *descriptor) {
+static inline const Descriptor_Struct *
+descriptor_as_struct(const Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Struct);
   return &descriptor->Struct;
 }
-static inline Descriptor_Pointer_To *
-descriptor_as_pointer_to(Descriptor *descriptor) {
+static inline const Descriptor_Pointer_To *
+descriptor_as_pointer_to(const Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Pointer_To);
   return &descriptor->Pointer_To;
 }
@@ -1828,83 +1828,83 @@ typedef struct Mass_Error {
     Mass_Error_Undecidable_Overload Undecidable_Overload;
   };
 } Mass_Error;
-static inline Mass_Error_User_Defined *
-mass_error_as_user_defined(Mass_Error *mass_error) {
+static inline const Mass_Error_User_Defined *
+mass_error_as_user_defined(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_User_Defined);
   return &mass_error->User_Defined;
 }
-static inline Mass_Error_Circular_Dependency *
-mass_error_as_circular_dependency(Mass_Error *mass_error) {
+static inline const Mass_Error_Circular_Dependency *
+mass_error_as_circular_dependency(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Circular_Dependency);
   return &mass_error->Circular_Dependency;
 }
-static inline Mass_Error_Integer_Range *
-mass_error_as_integer_range(Mass_Error *mass_error) {
+static inline const Mass_Error_Integer_Range *
+mass_error_as_integer_range(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Integer_Range);
   return &mass_error->Integer_Range;
 }
-static inline Mass_Error_File_Open *
-mass_error_as_file_open(Mass_Error *mass_error) {
+static inline const Mass_Error_File_Open *
+mass_error_as_file_open(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_File_Open);
   return &mass_error->File_Open;
 }
-static inline Mass_Error_File_Too_Large *
-mass_error_as_file_too_large(Mass_Error *mass_error) {
+static inline const Mass_Error_File_Too_Large *
+mass_error_as_file_too_large(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_File_Too_Large);
   return &mass_error->File_Too_Large;
 }
-static inline Mass_Error_Dynamic_Library_Load *
-mass_error_as_dynamic_library_load(Mass_Error *mass_error) {
+static inline const Mass_Error_Dynamic_Library_Load *
+mass_error_as_dynamic_library_load(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Dynamic_Library_Load);
   return &mass_error->Dynamic_Library_Load;
 }
-static inline Mass_Error_Dynamic_Library_Symbol_Not_Found *
-mass_error_as_dynamic_library_symbol_not_found(Mass_Error *mass_error) {
+static inline const Mass_Error_Dynamic_Library_Symbol_Not_Found *
+mass_error_as_dynamic_library_symbol_not_found(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found);
   return &mass_error->Dynamic_Library_Symbol_Not_Found;
 }
-static inline Mass_Error_Unexpected_Token *
-mass_error_as_unexpected_token(Mass_Error *mass_error) {
+static inline const Mass_Error_Unexpected_Token *
+mass_error_as_unexpected_token(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Unexpected_Token);
   return &mass_error->Unexpected_Token;
 }
-static inline Mass_Error_Operator_Fixity_Conflict *
-mass_error_as_operator_fixity_conflict(Mass_Error *mass_error) {
+static inline const Mass_Error_Operator_Fixity_Conflict *
+mass_error_as_operator_fixity_conflict(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Operator_Fixity_Conflict);
   return &mass_error->Operator_Fixity_Conflict;
 }
-static inline Mass_Error_Undefined_Variable *
-mass_error_as_undefined_variable(Mass_Error *mass_error) {
+static inline const Mass_Error_Undefined_Variable *
+mass_error_as_undefined_variable(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Undefined_Variable);
   return &mass_error->Undefined_Variable;
 }
-static inline Mass_Error_Redefinition *
-mass_error_as_redefinition(Mass_Error *mass_error) {
+static inline const Mass_Error_Redefinition *
+mass_error_as_redefinition(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Redefinition);
   return &mass_error->Redefinition;
 }
-static inline Mass_Error_Unknown_Field *
-mass_error_as_unknown_field(Mass_Error *mass_error) {
+static inline const Mass_Error_Unknown_Field *
+mass_error_as_unknown_field(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Unknown_Field);
   return &mass_error->Unknown_Field;
 }
-static inline Mass_Error_Invalid_Identifier *
-mass_error_as_invalid_identifier(Mass_Error *mass_error) {
+static inline const Mass_Error_Invalid_Identifier *
+mass_error_as_invalid_identifier(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Invalid_Identifier);
   return &mass_error->Invalid_Identifier;
 }
-static inline Mass_Error_Type_Mismatch *
-mass_error_as_type_mismatch(Mass_Error *mass_error) {
+static inline const Mass_Error_Type_Mismatch *
+mass_error_as_type_mismatch(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Type_Mismatch);
   return &mass_error->Type_Mismatch;
 }
-static inline Mass_Error_No_Matching_Overload *
-mass_error_as_no_matching_overload(Mass_Error *mass_error) {
+static inline const Mass_Error_No_Matching_Overload *
+mass_error_as_no_matching_overload(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_No_Matching_Overload);
   return &mass_error->No_Matching_Overload;
 }
-static inline Mass_Error_Undecidable_Overload *
-mass_error_as_undecidable_overload(Mass_Error *mass_error) {
+static inline const Mass_Error_Undecidable_Overload *
+mass_error_as_undecidable_overload(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Undecidable_Overload);
   return &mass_error->Undecidable_Overload;
 }
@@ -1924,8 +1924,8 @@ typedef struct Mass_Result {
     Mass_Result_Error Error;
   };
 } Mass_Result;
-static inline Mass_Result_Error *
-mass_result_as_error(Mass_Result *mass_result) {
+static inline const Mass_Result_Error *
+mass_result_as_error(const Mass_Result *mass_result) {
   assert(mass_result->tag == Mass_Result_Tag_Error);
   return &mass_result->Error;
 }
@@ -2394,6 +2394,7 @@ static Descriptor descriptor_function_info_flags_pointer_pointer;
 static Descriptor descriptor_function_return;
 static Descriptor descriptor_array_function_return;
 static Descriptor descriptor_array_function_return_ptr;
+static Descriptor descriptor_array_const_function_return_ptr;
 static Descriptor descriptor_function_return_pointer;
 static Descriptor descriptor_function_return_pointer_pointer;
 static Descriptor descriptor_function_info;
