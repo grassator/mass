@@ -3517,12 +3517,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_register, Storage_Register,
     .offset = offsetof(Storage_Register, index),
   },
   {
-    .descriptor = &descriptor_u16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("packed"),
     .offset = offsetof(Storage_Register, packed),
   },
   {
-    .descriptor = &descriptor_u16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("offset_in_bits"),
     .offset = offsetof(Storage_Register, offset_in_bits),
   },
@@ -3875,7 +3875,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
     .offset = offsetof(Function_Layout, size_of_prolog),
   },
   {
-    .descriptor = &descriptor_u16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("_padding"),
     .offset = offsetof(Function_Layout, _padding),
   },
@@ -5942,12 +5942,12 @@ DEFINE_VALUE_IS_AS_HELPERS(Range_u8 *, range_u8_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16_ptr, Array_Range_u16_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u16, Range_u16,
   {
-    .descriptor = &descriptor_u16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("from"),
     .offset = offsetof(Range_u16, from),
   },
   {
-    .descriptor = &descriptor_u16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("to"),
     .offset = offsetof(Range_u16, to),
   },
@@ -6006,12 +6006,12 @@ DEFINE_VALUE_IS_AS_HELPERS(Range_s8 *, range_s8_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16_ptr, Array_Range_s16_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s16, Range_s16,
   {
-    .descriptor = &descriptor_s16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("from"),
     .offset = offsetof(Range_s16, from),
   },
   {
-    .descriptor = &descriptor_s16,
+    .descriptor = &descriptor_i16,
     .name = slice_literal_fields("to"),
     .offset = offsetof(Range_s16, to),
   },
