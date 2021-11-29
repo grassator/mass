@@ -768,23 +768,8 @@ print_mass_struct_item(
   Struct_Item *item
 ) {
   fprintf(file, "  {\n");
-  Slice lowercase_type = slice_from_c_string(strtolower(item->type));
-  // TODO support const
-  Slice const_prefix = slice_literal("const ");
-  if (slice_starts_with(lowercase_type, const_prefix)) {
-    lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
-  }
-  Slice original_lowercase_type = lowercase_type;
-  Slice pointer_suffix = slice_literal(" *");
-  while (slice_ends_with(lowercase_type, pointer_suffix)) {
-    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-  }
-  fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
-  lowercase_type = original_lowercase_type;
-  while (slice_ends_with(lowercase_type, pointer_suffix)) {
-    fprintf(file, "_pointer");
-    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-  }
+  fprintf(file, "    .descriptor = &");
+  print_mass_struct_descriptor_type(file, item->type);
   if (item->array_length > 1) fprintf(file, "_%u", item->array_length);
   fprintf(file, ",\n");
   fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
