@@ -888,35 +888,33 @@ mass_assign(
     return;
   }
 
-  if (value_is_i64(source)) {
-    if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      const i64 *literal = value_as_i64(source);
-      if (literal->bits == 0) {
-        Storage zero = imm64(0);
-        move_value(builder, source_range, &target->storage, &zero);
-        return;
-      } else {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = *source_range,
-          .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-          .detailed_message = slice_literal("Trying to assign a non-zero literal number to a pointer"),
-        });
-        return;
+  if (source->descriptor->tag == Descriptor_Tag_Raw) {
+    if (value_is_i64(source)) {
+      if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
+        const i64 *literal = value_as_i64(source);
+        if (literal->bits == 0) {
+          Storage zero = imm64(0);
+          move_value(builder, source_range, &target->storage, &zero);
+          return;
+        } else {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Type_Mismatch,
+            .source_range = *source_range,
+            .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+            .detailed_message = slice_literal("Trying to assign a non-zero literal number to a pointer"),
+          });
+          return;
+        }
       }
-    } else if (descriptor_is_integer(target->descriptor)) {
-      source = token_value_force_immediate_integer(
-        context, source, target->descriptor, source_range
-      );
+    }
+    if (descriptor_is_integer(target->descriptor)) {
+       Mass_Cast_Lazy_Payload lazy_payload = {
+        .target = target->descriptor,
+        .expression = source,
+      };
+      Expected_Result expected_result = expected_result_any(target->descriptor);
+      source = mass_handle_cast_lazy_proc(context, builder, &expected_result, source_range, &lazy_payload);
       if (mass_has_error(context)) return;
-    } else if (source->descriptor != target->descriptor) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = *source_range,
-        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-        .detailed_message = slice_literal("Trying to assign a literal number to a non-integer value"),
-      });
-      return;
     }
   }
 
