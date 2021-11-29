@@ -2631,7 +2631,7 @@ spec("source") {
         "checker", &test_context,
         "STDOUT_FILENO :: 1\n"
         "SYS_WRITE :: 1\n"
-        "write :: fn(descriptor : s32, buffer : &u8, size : u64) "
+        "write :: fn(descriptor : s32, buffer : &i8, size : i64) "
           "-> (s32) syscall(SYS_WRITE)\n"
         "checker :: fn() -> () {\n"
           "hello :: \"Hello, world!\\n\"\n"
@@ -2649,7 +2649,7 @@ spec("source") {
     it("should be able to print out a string") {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "write :: fn(descriptor : s32, buffer : &u8, size : u64) "
+        "write :: fn(descriptor : s32, buffer : &i8, size : i64) "
           "-> (s64) external(\"libc.so.6\", \"write\")\n"
         "STDOUT_FILENO :: 1\n"
         "checker :: fn() -> () {\n"

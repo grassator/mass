@@ -2,6 +2,6 @@ exports [.sys_write, .sys_exit, .STDOUT_FILENO]
 
 STDOUT_FILENO :: 1
 
-sys_write :: fn(descriptor : s32, buffer : &i8, size : u64) -> (s32) syscall(1)
+sys_write :: fn(descriptor : s32, buffer : &i8, size : i64) -> (s32) syscall(1)
 sys_exit :: fn(status : s32) -> (s32) syscall(60)
 

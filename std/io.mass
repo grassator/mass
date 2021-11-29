@@ -9,7 +9,7 @@ exports [.print]
   //cached_stdout_handle = GetStdHandle(cast(s32, -11))
 //})
 
-native_stdout :: fn(buffer : &i8, size : u64) -> () {
+native_stdout :: fn(buffer : &i8, size : i64) -> () {
   if get_target_os() == os.Windows then {
     win32 :: import("std/win32")
     handle := win32.GetStdHandle(cast(s32, -11))
@@ -21,7 +21,7 @@ native_stdout :: fn(buffer : &i8, size : u64) -> () {
 }
 
 print :: macro(string : String) -> () {
-  native_stdout(string.bytes, cast(u64, string.length))
+  native_stdout(string.bytes, string.length)
 }
 
 print :: fn(x : s64) {
@@ -56,5 +56,5 @@ print :: fn(x : s64) {
     buffer.(digit_index) = cast(i8, cast(u8, zero_code) + digit)
     integer = integer / 10
   }
-  native_stdout(&buffer, cast(u64, output_size))
+  native_stdout(&buffer, cast(i64, output_size))
 }
