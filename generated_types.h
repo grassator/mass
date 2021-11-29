@@ -2819,11 +2819,11 @@ static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_register_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Register, 2, &descriptor_register);
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
-static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
+static Descriptor descriptor_i8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_i8);
 static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
-static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
-static Descriptor descriptor_u8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_u8);
-static Descriptor descriptor_u8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_u8);
+static Descriptor descriptor_i8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_i8);
+static Descriptor descriptor_i8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_i8);
+static Descriptor descriptor_i8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_i8);
 static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
 MASS_DEFINE_OPAQUE_C_TYPE(array_bits_ptr, Array_Bits_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_bits, Array_Bits)
@@ -3689,12 +3689,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label, Instruction_Label,
 MASS_DEFINE_TYPE_VALUE(instruction_label);
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_bytes, Instruction_Bytes,
   {
-    .descriptor = &descriptor_u8_15,
+    .descriptor = &descriptor_i8_15,
     .name = slice_literal_fields("memory"),
     .offset = offsetof(Instruction_Bytes, memory),
   },
   {
-    .descriptor = &descriptor_u8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("length"),
     .offset = offsetof(Instruction_Bytes, length),
   },
@@ -3865,12 +3865,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
     .offset = offsetof(Function_Layout, stack_reserve),
   },
   {
-    .descriptor = &descriptor_u8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("stack_allocation_offset_in_prolog"),
     .offset = offsetof(Function_Layout, stack_allocation_offset_in_prolog),
   },
   {
-    .descriptor = &descriptor_u8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("size_of_prolog"),
     .offset = offsetof(Function_Layout, size_of_prolog),
   },
@@ -3890,7 +3890,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
     .offset = offsetof(Function_Layout, end_rva),
   },
   {
-    .descriptor = &descriptor_u8_16,
+    .descriptor = &descriptor_i8_16,
     .name = slice_literal_fields("volatile_register_push_offsets"),
     .offset = offsetof(Function_Layout, volatile_register_push_offsets),
   },
@@ -5807,7 +5807,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding_ptr, Array_Instruction_Enco
 MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding, Array_Instruction_Encoding)
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_encoding, Instruction_Encoding,
   {
-    .descriptor = &descriptor_u8_4,
+    .descriptor = &descriptor_i8_4,
     .name = slice_literal_fields("op_code"),
     .offset = offsetof(Instruction_Encoding, op_code),
   },
@@ -5817,12 +5817,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_encoding, Instruction_Encoding,
     .offset = offsetof(Instruction_Encoding, extension_type),
   },
   {
-    .descriptor = &descriptor_u8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("op_code_extension"),
     .offset = offsetof(Instruction_Encoding, op_code_extension),
   },
   {
-    .descriptor = &descriptor_u8_3,
+    .descriptor = &descriptor_i8_3,
     .name = slice_literal_fields("_op_code_extension_padding"),
     .offset = offsetof(Instruction_Encoding, _op_code_extension_padding),
   },
@@ -5926,12 +5926,12 @@ DEFINE_VALUE_IS_AS_HELPERS(f64 *, f64_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8_ptr, Array_Range_u8_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u8, Range_u8,
   {
-    .descriptor = &descriptor_u8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("from"),
     .offset = offsetof(Range_u8, from),
   },
   {
-    .descriptor = &descriptor_u8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("to"),
     .offset = offsetof(Range_u8, to),
   },
@@ -5990,12 +5990,12 @@ DEFINE_VALUE_IS_AS_HELPERS(Range_u64 *, range_u64_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8_ptr, Array_Range_s8_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s8, Range_s8,
   {
-    .descriptor = &descriptor_s8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("from"),
     .offset = offsetof(Range_s8, from),
   },
   {
-    .descriptor = &descriptor_s8,
+    .descriptor = &descriptor_i8,
     .name = slice_literal_fields("to"),
     .offset = offsetof(Range_s8, to),
   },
@@ -6086,7 +6086,7 @@ DEFINE_VALUE_IS_AS_HELPERS(Range_f64 *, range_f64_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,
   {
-    .descriptor = &descriptor_u8_pointer,
+    .descriptor = &descriptor_i8_pointer,
     .name = slice_literal_fields("bytes"),
     .offset = offsetof(Slice, bytes),
   },

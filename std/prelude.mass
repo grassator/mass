@@ -20,8 +20,8 @@ debugger :: fn() -> () intrinsic {
     {
       instruction : MASS.Instruction
       instruction.tag = MASS.Instruction_Tag.Bytes
-      instruction.Bytes.memory.0 = 0xcc
-      instruction.Bytes.length = 1
+      instruction.Bytes.memory.0 = cast(i8, 0xcc)
+      instruction.Bytes.length = cast(i8, 1)
       MASS.push_instruction(&builder.code_block, instruction);
     }
 

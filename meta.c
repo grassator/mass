@@ -411,6 +411,12 @@ print_mass_struct_descriptor_type(
   while (slice_ends_with(lowercase_type, pointer_suffix)) {
     lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
   }
+  if (
+    slice_equal(lowercase_type, slice_literal("s8")) ||
+    slice_equal(lowercase_type, slice_literal("u8"))
+  ) {
+    lowercase_type = slice_literal("i8");
+  }
   fprintf(file, "descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
   lowercase_type = original_lowercase_type;
   while (slice_ends_with(lowercase_type, pointer_suffix)) {

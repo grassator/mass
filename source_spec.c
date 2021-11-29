@@ -1930,7 +1930,7 @@ spec("source") {
     it("should accept string arguments") {
       const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(string : String) -> (&u8) {\n"
+        "checker :: fn(string : String) -> (&i8) {\n"
           "string.bytes\n"
         "}"
       );
