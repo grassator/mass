@@ -429,6 +429,11 @@ print_mass_struct_descriptor_type(
     slice_equal(lowercase_type, slice_literal("u32"))
   ) {
     lowercase_type = slice_literal("i32");
+  } else if (
+    slice_equal(lowercase_type, slice_literal("s64")) ||
+    slice_equal(lowercase_type, slice_literal("u64"))
+  ) {
+    lowercase_type = slice_literal("i64");
   }
   fprintf(file, "descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
   lowercase_type = original_lowercase_type;

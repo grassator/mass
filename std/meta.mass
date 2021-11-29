@@ -48,7 +48,7 @@ static_value :: fn(
   static_value.storage.tag = MASS.Storage_Tag.Static
   static_value.storage.bit_size = pointee_type.bit_size
 
-  static_assert(unsigned_greater(cast(i64, pointee_type.bit_size.as_u64), 64))
+  static_assert(unsigned_greater(pointee_type.bit_size.as_u64, 64))
   static_value.storage.Static.pointer = pointer
 
   static_value
@@ -61,7 +61,7 @@ immediate :: fn(
 ) -> (&Value) {
   type :: type_of(source)
   static_assert(
-    unsigned_less_equal(cast(i64, type.bit_size.as_u64), 64),
+    unsigned_less_equal(type.bit_size.as_u64, 64),
     "Type is too large to fit into an immediate"
   )
 

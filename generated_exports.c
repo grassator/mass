@@ -763,11 +763,11 @@ compiler_scope_define_exports(
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("byte_size")),
-&descriptor_u64
+&descriptor_i64
     ),
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("byte_alignment")),
-&descriptor_u64
+&descriptor_i64
     )
   );
   MASS_DEFINE_FUNCTION(

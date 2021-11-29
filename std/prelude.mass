@@ -193,8 +193,8 @@ Allocator :: MASS.Allocator
 allocate :: macro(allocator : &MASS.Allocator, type : Type) {
   cast(&type, MASS.allocator_allocate_bytes(
     allocator,
-    type.bit_size.as_u64 / 8,
-    type.bit_alignment.as_u64 / 8
+    unsigned_divide(type.bit_size.as_u64, 8),
+    unsigned_divide(type.bit_alignment.as_u64, 8)
   ))
 }
 
@@ -205,9 +205,9 @@ Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
   t := allocate(context.allocator, MASS.Descriptor)
 
   t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
-  t.bit_size = [item_type.bit_size.as_u64 * cast(u64, length)]
+  t.bit_size = [unsigned_multiply(item_type.bit_size.as_u64, length)]
   t.bit_alignment = item_type.bit_alignment
-  t.Fixed_Size_Array = [item_type, cast(u64, length)]
+  t.Fixed_Size_Array = [item_type, length]
 
   meta.immediate(context.compilation, t, arguments.source_range)
 }
