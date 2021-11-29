@@ -21,7 +21,7 @@ native_stdout :: fn(buffer : &u8, size : u64) -> () {
 }
 
 print :: macro(string : String) -> () {
-  native_stdout(string.bytes, string.length)
+  native_stdout(string.bytes, cast(u64, string.length))
 }
 
 print :: fn(x : s64) {

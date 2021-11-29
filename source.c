@@ -2782,11 +2782,6 @@ static i64 mass_i64_logical_shift_right(i64 num, i64 shift) { return (i64){num.b
 static i64 mass_i64_bitwise_and(i64 a, i64 b) { return (i64){a.bits & b.bits}; }
 static i64 mass_i64_bitwise_or(i64 a, i64 b) { return (i64){a.bits | b.bits}; }
 
-typedef struct {
-  const Descriptor *target;
-  Value *expression;
-} Mass_Cast_Lazy_Payload;
-
 static Value *
 mass_handle_cast_lazy_proc(
   Mass_Context *context,
@@ -4248,7 +4243,6 @@ mass_handle_arithmetic_operation_lazy_proc(
   Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = mass_expected_result_descriptor(expected_result);
-  assert(descriptor_is_integer(descriptor));
 
   const Source_Range result_range = payload->source_range;
 

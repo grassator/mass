@@ -987,8 +987,8 @@ spec("source") {
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,
           "identity :: fn(x) -> (x) { x }\n"
-          "checker :: fn() -> (u64) {\n"
-            "string := identity(\"foo\"); string.length + identity(cast(u64, 39))\n"
+          "checker :: fn() -> (s64) {\n"
+            "string := identity(\"foo\"); cast(s64, string.length) + cast(s64, identity(39))\n"
           "}"
         );
       check(spec_check_mass_result(test_context.result));
@@ -2654,6 +2654,7 @@ spec("source") {
       test_program->entry_point = test_program_external_source_base(
         "main", &test_context, "fixtures/relocations"
       );
+      check(spec_check_mass_result(test_context.result));
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));

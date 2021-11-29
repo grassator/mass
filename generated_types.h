@@ -6091,7 +6091,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,
     .offset = offsetof(Slice, bytes),
   },
   {
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_i64,
     .name = slice_literal_fields("length"),
     .offset = offsetof(Slice, length),
   },

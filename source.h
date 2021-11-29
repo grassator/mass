@@ -3,6 +3,20 @@
 #include "prelude.h"
 #include "value.h"
 
+typedef struct {
+  const Descriptor *target;
+  Value *expression;
+} Mass_Cast_Lazy_Payload;
+
+static Value *
+mass_handle_cast_lazy_proc(
+  Mass_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  const Source_Range *source_range,
+  Mass_Cast_Lazy_Payload *payload
+);
+
 #define PACK_AS_VOID_POINTER(_TARGET_, _SOURCE_)\
   do {\
     static_assert(sizeof(_SOURCE_) <= sizeof(_TARGET_), "Value too large to pack into a pointer");\

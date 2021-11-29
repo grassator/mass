@@ -2189,7 +2189,7 @@ main(void) {
 
   export_global_custom_name("String", set_flags(push_type(type_struct("Slice", (Struct_Item[]){
     { "u8 *", "bytes" },
-    { "u64", "length" },
+    { "i64", "length" },
   })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
 
   const char *this_filename = __FILE__;
