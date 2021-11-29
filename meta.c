@@ -1139,9 +1139,9 @@ set_flags(
 
 int
 main(void) {
-  push_type(type_struct("Bits", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Bits", (Struct_Item[]){
     { "u64", "as_u64" },
-  }));
+  })));
 
   push_type(type_struct("Source_Position", (Struct_Item[]){
     { "u64", "line" },

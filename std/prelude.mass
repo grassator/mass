@@ -168,6 +168,32 @@ logical_shift_right :: MASS.i64_logical_shift_right
 bitwise_or :: MASS.i64_bitwise_or
 bitwise_and :: MASS.i64_bitwise_and
 
+using {
+  Bits :: MASS.Bits
+
+  module {
+    // FIXME there should be better way to provide conversions
+    //       instead of combinatorial explosion of overloads
+
+    // It is is bit awkward that the field is called `as_u64` but the type is actually `i64`
+    less :: fn(x : Bits, y : Bits) => (bool) { unsigned_less(x.as_u64, y.as_u64) }
+    less :: fn(x : Bits, y : i64) => (bool) { unsigned_less(x.as_u64, y) }
+    less :: fn(x : i64, y : Bits) => (bool) { unsigned_less(x, y.as_u64) }
+
+    less_equal :: fn(x : Bits, y : Bits) => (bool) { unsigned_less_equal(x.as_u64, y.as_u64) }
+    less_equal :: fn(x : Bits, y : i64) => (bool) { unsigned_less_equal(x.as_u64, y) }
+    less_equal :: fn(x : i64, y : Bits) => (bool) { unsigned_less_equal(x, y.as_u64) }
+
+    greater :: fn(x : Bits, y : Bits) => (bool) { unsigned_greater(x.as_u64, y.as_u64) }
+    greater :: fn(x : Bits, y : i64) => (bool) { unsigned_greater(x.as_u64, y) }
+    greater :: fn(x : i64, y : Bits) => (bool) { unsigned_greater(x, y.as_u64) }
+
+    greater_equal :: fn(x : Bits, y : Bits) => (bool) { unsigned_greater_equal(x.as_u64, y.as_u64) }
+    greater_equal :: fn(x : Bits, y : i64) => (bool) { unsigned_greater_equal(x.as_u64, y) }
+    greater_equal :: fn(x : i64, y : Bits) => (bool) { unsigned_greater_equal(x, y.as_u64) }
+  }
+}
+
 Allocator :: MASS.Allocator
 
 allocate :: macro(allocator : &MASS.Allocator, type : Type) {

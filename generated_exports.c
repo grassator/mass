@@ -10,6 +10,13 @@ compiler_scope_define_exports(
   const Calling_Convention *calling_convention =
     compilation->jit.program->default_calling_convention;
   (void)calling_convention;
+  Source_Range Bits__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Bits__source_range, "Bits");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Bits__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Bits")),
+    type_bits_value
+  );
   Source_Range Source_Range__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Source_Range__source_range, "Source_Range");
   scope_define_value(
