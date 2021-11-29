@@ -75,6 +75,7 @@ typedef struct {
 } Meta_Integer;
 
 typedef enum {
+  Meta_Type_Tag_Raw,
   Meta_Type_Tag_C_Opaque,
   Meta_Type_Tag_Struct,
   Meta_Type_Tag_Tagged_Union,
@@ -210,7 +211,8 @@ print_c_type_forward_declaration(
     }
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_Integer:
-    case Meta_Type_Tag_C_Opaque: {
+    case Meta_Type_Tag_C_Opaque:
+    case Meta_Type_Tag_Raw: {
       name = type->name;
       break;
     }
@@ -339,6 +341,7 @@ print_c_type(
     }
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_Integer:
+    case Meta_Type_Tag_Raw:
     case Meta_Type_Tag_C_Opaque: {
       if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
         fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->name, type->name);
@@ -532,6 +535,7 @@ print_scope_export(
     case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
+    case Meta_Type_Tag_Raw:
     case Meta_Type_Tag_Struct: {
       print_scope_define(file, type->name, type->export_name);
       break;
@@ -657,6 +661,7 @@ print_natvis(
     case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
+    case Meta_Type_Tag_Raw:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function: {
       // Nothing to do
@@ -717,6 +722,7 @@ print_mass_descriptor_fixed_array_types(
     case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_C_Opaque:
+    case Meta_Type_Tag_Raw:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
     case Meta_Type_Tag_Hash_Map: {
@@ -762,7 +768,8 @@ print_mass_descriptor_and_type_forward_declaration(
     }
     case Meta_Type_Tag_Integer:
     case Meta_Type_Tag_Float:
-    case Meta_Type_Tag_C_Opaque: {
+    case Meta_Type_Tag_C_Opaque:
+    case Meta_Type_Tag_Raw: {
       char *lowercase_name = strtolower(type->name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
@@ -836,11 +843,14 @@ print_mass_descriptor_and_type(
     }
     case Meta_Type_Tag_Float:
     case Meta_Type_Tag_Integer:
+    case Meta_Type_Tag_Raw:
     case Meta_Type_Tag_C_Opaque: {
       if (type->tag == Meta_Type_Tag_Float) {
         fprintf(file, "MASS_DEFINE_FLOAT_C_TYPE(%s, %s)\n", lowercase_name, type->name);
       } else if (type->tag == Meta_Type_Tag_Integer) {
         fprintf(file, "MASS_DEFINE_INTEGER_C_TYPE(%s, %s, %i)\n", lowercase_name, type->name, type->integer.is_signed);
+      } else if (type->tag == Meta_Type_Tag_Raw) {
+        fprintf(file, "MASS_DEFINE_RAW_C_TYPE(%s, %s)\n", lowercase_name, type->name);
       } else {
         fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->name);
       }
@@ -996,6 +1006,12 @@ print_mass_descriptor_and_type(
     .tag = Meta_Type_Tag_Integer,\
     .name = (_NAME_STRING_),\
     .integer.is_signed = (bool)(_SIGNEDNESS_),\
+  }
+
+#define type_raw(_NAME_STRING_)\
+  (Meta_Type){\
+    .tag = Meta_Type_Tag_Raw,\
+    .name = (_NAME_STRING_),\
   }
 
 #define type_enum(_NAME_STRING_, ...)\
@@ -2181,10 +2197,10 @@ main(void) {
     Meta_Type_Flags_No_C_Type
    );
 
-  export_global(set_flags(push_type(type_c_opaque("i8")), Meta_Type_Flags_No_C_Type));
-  export_global(set_flags(push_type(type_c_opaque("i16")), Meta_Type_Flags_No_C_Type));
-  export_global(set_flags(push_type(type_c_opaque("i32")), Meta_Type_Flags_No_C_Type));
-  export_global(set_flags(push_type(type_c_opaque("i64")), Meta_Type_Flags_No_C_Type));
+  export_global(set_flags(push_type(type_raw("i8")), Meta_Type_Flags_No_C_Type));
+  export_global(set_flags(push_type(type_raw("i16")), Meta_Type_Flags_No_C_Type));
+  export_global(set_flags(push_type(type_raw("i32")), Meta_Type_Flags_No_C_Type));
+  export_global(set_flags(push_type(type_raw("i64")), Meta_Type_Flags_No_C_Type));
 
   #define PROCESS_INTEGER_TYPES(F)\
     F(u8, Unsigned) F(u16, Unsigned) F(u32, Unsigned) F(u64, Unsigned)\

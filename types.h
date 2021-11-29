@@ -37,11 +37,9 @@
     .Pointer_To.descriptor = &descriptor_##_NAME_,\
   }
 
-#define MASS_DEFINE_DESCRIPTOR(_TAG_, _NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
-  static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
+#define MASS_DEFINE_DESCRIPTOR_BASE(_TAG_, _NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = (_TAG_),\
-    .brand = &(mass_meta_brand_##_NAME_),\
     .name = slice_literal_fields(#_NAME_),\
     .bit_size = {_BIT_SIZE_},\
     .bit_alignment = (_BIT_ALIGNMENT_),\
@@ -49,6 +47,14 @@
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
+
+#define MASS_DEFINE_DESCRIPTOR(_TAG_, _NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
+  static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
+  MASS_DEFINE_DESCRIPTOR_BASE(\
+    (_TAG_), _NAME_, (_BIT_SIZE_), (_BIT_ALIGNMENT_),\
+    .brand = &(mass_meta_brand_##_NAME_),\
+    __VA_ARGS__\
+  )
 
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(...)\
   MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Raw, __VA_ARGS__)
@@ -116,6 +122,12 @@
 #define MASS_DEFINE_FLOAT_C_TYPE(_NAME_, _C_TYPE_)\
   MASS_DEFINE_DESCRIPTOR(\
     Descriptor_Tag_Float, _NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT\
+  );\
+  MASS_DEFINE_TYPE_VALUE(_NAME_);
+
+#define MASS_DEFINE_RAW_C_TYPE(_NAME_, _C_TYPE_)\
+  MASS_DEFINE_DESCRIPTOR_BASE(\
+    Descriptor_Tag_Raw, _NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT\
   );\
   MASS_DEFINE_TYPE_VALUE(_NAME_);
 
