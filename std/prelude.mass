@@ -148,6 +148,16 @@ signed_divide :: MASS.i64_signed_divide
 unsigned_divide :: MASS.i64_unsigned_divide
 signed_remainder :: MASS.i64_signed_remainder
 unsigned_remainder :: MASS.i64_unsigned_remainder
+
+signed_less :: MASS.i64_signed_less
+unsigned_less :: MASS.i64_unsigned_less
+signed_less_equal :: MASS.i64_signed_less_equal
+unsigned_less_equal :: MASS.i64_unsigned_less_equal
+signed_greater :: MASS.i64_signed_greater
+unsigned_greater :: MASS.i64_unsigned_greater
+signed_greater_equal :: MASS.i64_signed_greater_equal
+unsigned_greater_equal :: MASS.i64_unsigned_greater_equal
+
 // TODO this should return twos complement and still `i64`
 negate :: fn(literal : i64) => (s64) {
   -cast(s64, literal)

@@ -939,6 +939,102 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_signed_less, "i64_signed_less", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_unsigned_less, "i64_unsigned_less", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_signed_less_equal, "i64_signed_less_equal", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_unsigned_less_equal, "i64_unsigned_less_equal", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_signed_greater, "i64_signed_greater", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_unsigned_greater, "i64_unsigned_greater", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_signed_greater_equal, "i64_signed_greater_equal", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    mass_i64_unsigned_greater_equal, "i64_unsigned_greater_equal", &descriptor__bool,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_i64
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_i64
+    )
+  );
+  MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_add, "integer_add", &descriptor_value_pointer,
     function_parameter(

@@ -424,6 +424,11 @@ print_mass_struct_descriptor_type(
     slice_equal(lowercase_type, slice_literal("u16"))
   ) {
     lowercase_type = slice_literal("i16");
+  } else if (
+    slice_equal(lowercase_type, slice_literal("s32")) ||
+    slice_equal(lowercase_type, slice_literal("u32"))
+  ) {
+    lowercase_type = slice_literal("i32");
   }
   fprintf(file, "descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
   lowercase_type = original_lowercase_type;
@@ -2110,6 +2115,24 @@ main(void) {
     const char *internal_name = strjoin("mass_i64_", base);
     export_compiler_custom_name(exported_name, push_type(
       type_function(Compile_Time, internal_name, "i64", (Argument_Type[]){
+        { "i64", "a" },
+        { "i64", "b" },
+      })
+    ));
+  }
+
+  const char *i64_compares[] = {
+    "signed_less", "unsigned_less",
+    "signed_less_equal", "unsigned_less_equal",
+    "signed_greater", "unsigned_greater",
+    "signed_greater_equal", "unsigned_greater_equal",
+  };
+  for (u64 i = 0; i < countof(i64_compares); ++i) {
+    const char *base = i64_compares[i];
+    const char *exported_name = strjoin("i64_", base);
+    const char *internal_name = strjoin("mass_i64_", base);
+    export_compiler_custom_name(exported_name, push_type(
+      type_function(Compile_Time, internal_name, "_Bool", (Argument_Type[]){
         { "i64", "a" },
         { "i64", "b" },
       })

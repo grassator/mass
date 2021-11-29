@@ -776,6 +776,30 @@ static i64 mass_i64_signed_remainder
 static i64 mass_i64_unsigned_remainder
   (i64 a, i64 b);
 
+static _Bool mass_i64_signed_less
+  (i64 a, i64 b);
+
+static _Bool mass_i64_unsigned_less
+  (i64 a, i64 b);
+
+static _Bool mass_i64_signed_less_equal
+  (i64 a, i64 b);
+
+static _Bool mass_i64_unsigned_less_equal
+  (i64 a, i64 b);
+
+static _Bool mass_i64_signed_greater
+  (i64 a, i64 b);
+
+static _Bool mass_i64_unsigned_greater
+  (i64 a, i64 b);
+
+static _Bool mass_i64_signed_greater_equal
+  (i64 a, i64 b);
+
+static _Bool mass_i64_unsigned_greater_equal
+  (i64 a, i64 b);
+
 static Value * mass_integer_add
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2635,6 +2659,14 @@ static Descriptor descriptor_mass_i64_signed_divide;
 static Descriptor descriptor_mass_i64_unsigned_divide;
 static Descriptor descriptor_mass_i64_signed_remainder;
 static Descriptor descriptor_mass_i64_unsigned_remainder;
+static Descriptor descriptor_mass_i64_signed_less;
+static Descriptor descriptor_mass_i64_unsigned_less;
+static Descriptor descriptor_mass_i64_signed_less_equal;
+static Descriptor descriptor_mass_i64_unsigned_less_equal;
+static Descriptor descriptor_mass_i64_signed_greater;
+static Descriptor descriptor_mass_i64_unsigned_greater;
+static Descriptor descriptor_mass_i64_signed_greater_equal;
+static Descriptor descriptor_mass_i64_unsigned_greater_equal;
 static Descriptor descriptor_mass_integer_add;
 static Descriptor descriptor_mass_integer_subtract;
 static Descriptor descriptor_mass_integer_multiply;
@@ -2996,12 +3028,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_view, Value_View,
     .offset = offsetof(Value_View, values),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("length"),
     .offset = offsetof(Value_View, length),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_length_padding"),
     .offset = offsetof(Value_View, _length_padding),
   },
@@ -3163,7 +3195,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(section, Section,
     .offset = offsetof(Section, name),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("base_rva"),
     .offset = offsetof(Section, base_rva),
   },
@@ -3244,12 +3276,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_label_ptr, Array_Label_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_label, Array_Label)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label, Label,
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("resolved"),
     .offset = offsetof(Label, resolved),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("offset_in_section"),
     .offset = offsetof(Label, offset_in_section),
   },
@@ -3436,7 +3468,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_indirect, Memory_Location_Indirect
     .offset = offsetof(Memory_Location_Indirect, base_register),
   },
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("offset"),
     .offset = offsetof(Memory_Location_Indirect, offset),
   },
@@ -3449,7 +3481,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_stack, Memory_Location_Stack,
     .offset = offsetof(Memory_Location_Stack, area),
   },
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("offset"),
     .offset = offsetof(Memory_Location_Stack, offset),
   },
@@ -3535,7 +3567,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_xmm, Storage_Xmm,
     .offset = offsetof(Storage_Xmm, index),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("offset"),
     .offset = offsetof(Storage_Xmm, offset),
   },
@@ -3585,7 +3617,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
     .offset = offsetof(Storage, flags),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Storage, _flags_padding),
   },
@@ -3715,7 +3747,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label_patch, Instruction_Label_Patch,
 MASS_DEFINE_TYPE_VALUE(instruction_label_patch);
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_stack_patch, Instruction_Stack_Patch,
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("mod_r_m_offset_in_previous_instruction"),
     .offset = offsetof(Instruction_Stack_Patch, mod_r_m_offset_in_previous_instruction),
   },
@@ -3860,7 +3892,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_layout_ptr, Array_Function_Layout_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_layout, Array_Function_Layout)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("stack_reserve"),
     .offset = offsetof(Function_Layout, stack_reserve),
   },
@@ -3880,12 +3912,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
     .offset = offsetof(Function_Layout, _padding),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("begin_rva"),
     .offset = offsetof(Function_Layout, begin_rva),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("end_rva"),
     .offset = offsetof(Function_Layout, end_rva),
   },
@@ -3947,7 +3979,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parser, Parser,
     .offset = offsetof(Parser, flags),
   },
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Parser, _flags_padding),
   },
@@ -4205,7 +4237,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
     .offset = offsetof(Value, flags),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Value, _flags_padding),
   },
@@ -4237,12 +4269,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .offset = offsetof(Function_Builder, epoch),
   },
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("stack_reserve"),
     .offset = offsetof(Function_Builder, stack_reserve),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("max_call_parameters_stack_size"),
     .offset = offsetof(Function_Builder, max_call_parameters_stack_size),
   },
@@ -4556,7 +4588,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
     .offset = offsetof(Function_Info, flags),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Function_Info, _flags_padding),
   },
@@ -4608,7 +4640,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .offset = offsetof(Function_Literal, flags),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Function_Literal, _flags_padding),
   },
@@ -4694,7 +4726,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_parameter, Function_Call_Parameter,
     .offset = offsetof(Function_Call_Parameter, flags),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Function_Call_Parameter, _flags_padding),
   },
@@ -4716,12 +4748,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup_ptr, Array_Function_Call_Set
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("parameters_stack_size"),
     .offset = offsetof(Function_Call_Setup, parameters_stack_size),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_parameters_stack_size_padding"),
     .offset = offsetof(Function_Call_Setup, _parameters_stack_size_padding),
   },
@@ -5065,7 +5097,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_operator_fixity_conflict, Mass_Error_Op
     .offset = offsetof(Mass_Error_Operator_Fixity_Conflict, fixity),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_fixity_padding"),
     .offset = offsetof(Mass_Error_Operator_Fixity_Conflict, _fixity_padding),
   },
@@ -5352,7 +5384,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
     .offset = offsetof(Program, os),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_padding_os"),
     .offset = offsetof(Program, _padding_os),
   },
@@ -5391,7 +5423,7 @@ DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention, calling_convention);
 DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention *, calling_convention_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
   token_statement_matcher_proc,
-  &descriptor_u32,
+  &descriptor_i32,
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_mass_context_pointer,
@@ -5795,7 +5827,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operand_encoding, Operand_Encoding,
     .offset = offsetof(Operand_Encoding, type),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("bit_size"),
     .offset = offsetof(Operand_Encoding, bit_size),
   },
@@ -5958,12 +5990,12 @@ DEFINE_VALUE_IS_AS_HELPERS(Range_u16 *, range_u16_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32_ptr, Array_Range_u32_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u32, Range_u32,
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("from"),
     .offset = offsetof(Range_u32, from),
   },
   {
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("to"),
     .offset = offsetof(Range_u32, to),
   },
@@ -6022,12 +6054,12 @@ DEFINE_VALUE_IS_AS_HELPERS(Range_s16 *, range_s16_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32_ptr, Array_Range_s32_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s32, Range_s32,
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("from"),
     .offset = offsetof(Range_s32, from),
   },
   {
-    .descriptor = &descriptor_s32,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("to"),
     .offset = offsetof(Range_s32, to),
   },
