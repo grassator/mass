@@ -9,8 +9,8 @@
 #include "program.c"
 
 typedef struct {
-  s64 x;
-  s64 y;
+  u64 x;
+  u64 y;
 } Test_128bit;
 
 static bool
@@ -31,8 +31,8 @@ spec_check_mass_result_internal(
 #define spec_check_mass_result(_RESULT_)\
   spec_check_mass_result_internal(test_context.compilation, (_RESULT_))
 
-typedef s64 (*Spec_Callback)();
-static s64 spec_callback() { return 42; }
+typedef u64 (*Spec_Callback)();
+static u64 spec_callback() { return 42; }
 
 #define spec_check_slice(_ACTUAL_, _EXPECTED_)\
   do {\
@@ -940,10 +940,10 @@ spec("source") {
     }
 
     it("should be able to accept a function as an argument and call it") {
-      s64 (*checker)(Spec_Callback foo) =
-        (s64 (*)(Spec_Callback))test_program_inline_source_function(
+      u64(*checker)(Spec_Callback foo) =
+        (u64(*)(Spec_Callback))test_program_inline_source_function(
           "foo", &test_context,
-          "foo :: fn(callback : fn() -> (s64)) -> (s64) { callback() }"
+          "foo :: fn(callback : fn() -> (i64)) -> (i64) { callback() }"
         );
       check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 42);
@@ -2376,10 +2376,10 @@ spec("source") {
     }
 
     it("should auto-dereference pointers to struct on field access") {
-      s64(*checker)(Test_128bit*) = (s64(*)(Test_128bit*))test_program_inline_source_function(
+      u64(*checker)(Test_128bit*) = (u64(*)(Test_128bit*))test_program_inline_source_function(
         "checker", &test_context,
-        "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
-        "checker :: fn(input : &Test_128bit) -> (s64) {\n"
+        "Test_128bit :: c_struct [ x : i64, y : i64 ]\n"
+        "checker :: fn(input : &Test_128bit) -> (i64) {\n"
           "input.y\n"
         "}"
       );
@@ -2390,29 +2390,29 @@ spec("source") {
     }
 
     it("should be able to return structs while accepting other arguments") {
-      Test_128bit(*checker)(s64) = (Test_128bit(*)(s64))test_program_inline_source_function(
+      Test_128bit(*checker)(u64, u64) = (Test_128bit(*)(u64, u64))test_program_inline_source_function(
         "return_struct", &test_context,
-        "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
-        "return_struct :: fn(x : s64) -> (Test_128bit) {"
+        "Test_128bit :: c_struct [ x : i64, y : i64 ]\n"
+        "return_struct :: fn(x : i64, y : i64) -> (Test_128bit) {"
           "result : Test_128bit;"
           "result.x = x;"
-          "result.y = x / 2;"
+          "result.y = y;"
           "result"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
 
-      Test_128bit test_128bit = checker(42);
+      Test_128bit test_128bit = checker(42, 21);
       check(test_128bit.x == 42);
       check(test_128bit.y == 21);
     }
 
     it("should correctly handle struct argument fields as arguments to another call") {
-      s64(*checker)(Test_128bit) = (s64(*)(Test_128bit))test_program_inline_source_function(
+      u64(*checker)(Test_128bit) = (u64(*)(Test_128bit))test_program_inline_source_function(
         "checker", &test_context,
-        "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
-        "test_sum :: fn(x : s64, y : s64) -> (s64) { x + y }\n"
-        "checker :: fn(x : Test_128bit) -> (s64) {"
+        "Test_128bit :: c_struct [ x : u64, y : u64 ]\n"
+        "test_sum :: fn(x : u64, y : u64) -> (u64) { x + y }\n"
+        "checker :: fn(x : Test_128bit) -> (u64) {"
           "test_sum(x.x, x.y)"
         "}"
       );
@@ -2439,7 +2439,7 @@ spec("source") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
         "checker", &test_context,
         "foo :: fn() -> (String) { \"foo\" }\n"
-        "checker :: fn() -> (u64) { foo().length }"
+        "checker :: fn() -> (i64) { foo().length }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 3);
@@ -2501,10 +2501,10 @@ spec("source") {
 
   describe("Modules") {
     it("should support importing modules") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "sample_module :: import(\"fixtures/sample_module\")\n"
-        "checker :: fn() -> (s32) { sample_module.the_answer }"
+        "checker :: fn() -> (i64) { sample_module.the_answer }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -2522,9 +2522,9 @@ spec("source") {
     }
 
     it("should support inline modules") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> s64 {"
+        "checker :: fn() -> i64 {"
           "Foo :: module { answer :: 42 }\n"
           "Foo.answer"
         "}\n"
@@ -2650,7 +2650,7 @@ spec("source") {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "write :: fn(descriptor : s32, buffer : &i8, size : i64) "
-          "-> (s64) external(\"libc.so.6\", \"write\")\n"
+          "-> (i64) external(\"libc.so.6\", \"write\")\n"
         "STDOUT_FILENO :: 1\n"
         "checker :: fn() -> () {\n"
           "hello :: \"Hello, world!\\n\"\n"
