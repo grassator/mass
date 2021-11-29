@@ -888,7 +888,7 @@ mass_assign(
     return;
   }
 
-  if (source->descriptor->tag == Descriptor_Tag_Raw) {
+  if (source->descriptor->tag == Descriptor_Tag_Raw && !source->descriptor->brand) {
     if (value_is_i64(source)) {
       if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
         const i64 *literal = value_as_i64(source);
