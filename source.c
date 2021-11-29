@@ -3725,9 +3725,17 @@ mass_match_overload_candidate(
       overload_info = descriptor->Function_Instance.info;
     }
     Mass_Argument_Scoring_Flags scoring_flags = 0;
+
     if (overload_info->flags & Function_Info_Flags_Compile_Time) {
-      if (!args->all_arguments_are_compile_time_known) return;
       scoring_flags |= Mass_Argument_Scoring_Flags_Prefer_Compile_Time;
+      // :CompileTimeFnInJitMode
+      // When we are JIT-compiling a body of a function it is OK to allow
+      // to call a function that requires compile-time known args since
+      // they will be known at a point when this code runs which will
+      // still be at compile time (JIT).
+      if (!context_is_compile_time_eval(context)) {
+        if (!args->all_arguments_are_compile_time_known) return;
+      }
     }
 
     s64 score = calculate_arguments_match_score(
@@ -4156,13 +4164,18 @@ token_handle_function_call(
   }
 
   if (info->flags & Function_Info_Flags_Compile_Time) {
-    if (!mass_can_trampoline_call(info, args_view)) {
-      panic("A compile-time overload should not have been matched if we can't call it");
+    if (mass_can_trampoline_call(info, args_view)) {
+      Value *result = mass_trampoline_call(context, parser, overload, info, args_view);
+      if (mass_has_error(context)) return 0;
+      return result;
+    } else {
+      // :CompileTimeFnInJitMode
+      if (context_is_compile_time_eval(context)) {
+        // Fall through and do a regular call
+      } else {
+        panic("A compile-time overload should not have been matched if we can't call it");
+      }
     }
-
-    Value *result = mass_trampoline_call(context, parser, overload, info, args_view);
-    if (mass_has_error(context)) return 0;
-    return result;
   }
 
   Mass_Function_Call_Lazy_Payload *call_payload =
