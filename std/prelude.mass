@@ -163,26 +163,6 @@ negate :: fn(literal : i64) => (s64) {
   -cast(s64, literal)
 }
 
-i64_is_compile_positive :: macro(x : i64) {
-  static_assert(x & 0x8000_0000_0000_0000 == 0, "i64 value must be positive for this operation")
-}
-
-multiply :: macro(x : i64, y : i64) {
-  i64_is_compile_positive(x)
-  i64_is_compile_positive(y)
-  unsigned_multiply(x, y)
-}
-divide :: macro(x : i64, y : i64) {
-  i64_is_compile_positive(x)
-  i64_is_compile_positive(y)
-  unsigned_divide(x, y)
-}
-remainder :: macro(x : i64, y : i64) {
-  i64_is_compile_positive(x)
-  i64_is_compile_positive(y)
-  unsigned_remainder(x, y)
-}
-
 logical_shift_left :: MASS.i64_logical_shift_left
 logical_shift_right :: MASS.i64_logical_shift_right
 bitwise_or :: MASS.i64_bitwise_or
