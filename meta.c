@@ -1926,7 +1926,7 @@ main(void) {
   }));
 
   push_type(type_hash_map("Trampoline_Map", {
-    .key_type = "const Value *",
+    .key_type = "const Function_Info *",
     .value_type = "const Mass_Trampoline *",
     .hash_function = "hash_pointer",
     .equal_function = "const_void_pointer_equal",

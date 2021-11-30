@@ -2025,7 +2025,7 @@ typedef dyn_array_type(Mass_Trampoline) Array_Mass_Trampoline;
 hash_map_template(Struct_Field_Set, const Struct_Field *, u64, hash_pointer, const_void_pointer_equal)
 hash_map_slice_template(Slice_Set, u64)
 hash_map_slice_template(Symbol_Map, Symbol *)
-hash_map_template(Trampoline_Map, const Value *, const Mass_Trampoline *, hash_pointer, const_void_pointer_equal)
+hash_map_template(Trampoline_Map, const Function_Info *, const Mass_Trampoline *, hash_pointer, const_void_pointer_equal)
 hash_map_template(Scope_Map, const Symbol *, Scope_Entry *, hash_pointer, const_void_pointer_equal)
 hash_map_slice_template(Macro_Replacement_Map, Value_View)
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)

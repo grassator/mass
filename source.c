@@ -3905,7 +3905,7 @@ mass_ensure_trampoline(
   Value_View args_view
 ) {
   const Mass_Trampoline **maybe_trampoline_pointer =
-    hash_map_get(context->compilation->trampoline_map, original);
+    hash_map_get(context->compilation->trampoline_map, original_info);
   if (maybe_trampoline_pointer) {
     return *maybe_trampoline_pointer;
   }
@@ -4057,7 +4057,7 @@ mass_ensure_trampoline(
     ),
     .original_info = original_info,
   };
-  hash_map_set(context->compilation->trampoline_map, original, trampoline);
+  hash_map_set(context->compilation->trampoline_map, original_info, trampoline);
   return trampoline;
 }
 

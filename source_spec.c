@@ -958,6 +958,16 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should correctly call multiple calls to generic compile-time fns") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "my_generic :: fn(x) => (x) { x }\n"
+        "checker :: fn() -> (i64) { my_generic(\"foo\"); my_generic(42) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to accept a function as an argument and call it") {
       u64(*checker)(Spec_Callback foo) =
         (u64(*)(Spec_Callback))test_program_inline_source_function(
