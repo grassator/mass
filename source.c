@@ -1338,15 +1338,20 @@ tokenizer_make_group_children_view(
   Value *parent_value,
   u64 offset
 ) {
-  Source_Range parent_range = parent_value->source_range;
-  Source_Range children_range = {
-    .file = parent_range.file,
-    .offsets = { .from = parent_range.offsets.to, u64_to_u32(offset)},
-  };
-  parent_value->source_range.offsets.to = u64_to_u32(offset);
   Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
   u64 child_count = dyn_array_length(*stack) - parent->index - 1;
   stack->data->length = parent->index + 1; // pop the children
+
+  Source_Range children_range = {
+    .file = parent_value->source_range.file,
+    .offsets = {.from = u64_to_u32(offset), .to = u64_to_u32(offset)},
+  };
+  if (child_count) {
+    Value *first_child = children_values[0];
+    children_range.offsets.from = first_child->source_range.offsets.from;
+  }
+
+  parent_value->source_range.offsets.to = u64_to_u32(offset);
 
   return temp_token_array_into_value_view(
     allocator, children_values, u64_to_u32(child_count), children_range
