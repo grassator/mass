@@ -100,6 +100,9 @@ tokenize(
 
       $ { break; }
 
+      single_line_comment = "//" [^\r\n]*;
+      single_line_comment { continue; }
+
       // @Volatile :TokenizerNumbers
       // integer literals
       decimal = '0' | [1-9][0-9_]*;
@@ -150,8 +153,7 @@ tokenize(
         continue;
       }
 
-      single_line_comment = "//" [^\r\n]*;
-      whitespace = ([ \t\v] | single_line_comment)+;
+      whitespace = [ \t\v]+;
       whitespace { continue; }
 
       identifier = [a-zA-Z_][a-zA-Z_0-9]*; // named definition
@@ -162,12 +164,12 @@ tokenize(
     */
   }
 
-  offset++;
-  TOKENIZER_GROUP_END(curly);
-
-  if (dyn_array_length(parent_stack)) {
+  if (dyn_array_length(parent_stack) != 1) {
+    offset++;
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
+
+  TOKENIZER_GROUP_END(curly);
 
   #undef TOKENIZER_CURRENT_SLICE
   #undef TOKENIZER_CURRENT_RANGE

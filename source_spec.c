@@ -252,6 +252,14 @@ spec("source") {
       check(dyn_array_length(statements) == 0);
     }
 
+    it("should count single-line comment as a statement separator") {
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "  a\n//\nb");
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(dyn_array_length(statements) == 2);
+    }
+
     it("should be able to turn newlines into fake semicolon tokens on top level") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "foo\n");
       Array_Value_View statements;
