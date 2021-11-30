@@ -947,6 +947,17 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should allow using a compile-time overload inside a c compile-time fn") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn() => (i64) { bar(42) }\n"
+        "bar :: fn(x : i64) => (i64) { x }\n"
+        "checker :: fn() -> (i64) { foo() }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to accept a function as an argument and call it") {
       u64(*checker)(Spec_Callback foo) =
         (u64(*)(Spec_Callback))test_program_inline_source_function(
