@@ -3,6 +3,15 @@ cast :: fn(type : Type, value) -> _ MASS.cast
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
 
 Void :: type_of(())
+make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
+  value : &MASS.Value = allocate(allocator, MASS.Value)
+  value.source_range = source_range.*
+  value.descriptor = Void
+  value.storage.tag = MASS.Storage_Tag.None
+  value.storage.bit_size = value.descriptor.bit_size
+  value
+}
+
 debugger :: fn() -> () intrinsic {
   lazy_value_proc :: fn(
     context : &MASS.Context,
@@ -25,12 +34,7 @@ debugger :: fn() -> () intrinsic {
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
-    value : &MASS.Value = allocate(context.allocator, MASS.Value)
-    value.source_range = source_range.*
-    value.descriptor = Void
-    value.storage.tag = MASS.Storage_Tag.None
-    value.storage.bit_size = value.descriptor.bit_size
-    value
+    make_void(context.allocator, source_range)
   }
 
 
