@@ -1089,6 +1089,7 @@ descriptor_pointer_to(
 
 static const Function_Info *
 function_literal_info_for_args(
+  Mass_Context *context,
   const Function_Literal *literal,
   Value_View args
 ) {
@@ -1096,7 +1097,6 @@ function_literal_info_for_args(
 
   // FIXME @ConstCast avoid this
   Function_Literal *mutable_literal = (Function_Literal *)literal;
-  Mass_Context *context = &mutable_literal->context;
 
   if (!dyn_array_is_initialized(mutable_literal->specializations)) {
     mutable_literal->specializations = dyn_array_make(

@@ -1692,7 +1692,6 @@ main(void) {
   push_type(type_struct("Function_Literal", (Struct_Item[]){
     { "Function_Literal_Flags", "flags"},
     { "u32", "_flags_padding"},
-    { "Mass_Context", "context" },
     { "Scope *", "own_scope" },
     { "Function_Info *", "info" },
     { "Value *", "body" },

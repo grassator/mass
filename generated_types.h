@@ -1643,7 +1643,6 @@ typedef dyn_array_type(Function_Specialization) Array_Function_Specialization;
 typedef struct Function_Literal {
   Function_Literal_Flags flags;
   u32 _flags_padding;
-  Mass_Context context;
   Scope * own_scope;
   Function_Info * info;
   Value * body;
@@ -4643,11 +4642,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
     .offset = offsetof(Function_Literal, _flags_padding),
-  },
-  {
-    .descriptor = &descriptor_mass_context,
-    .name = slice_literal_fields("context"),
-    .offset = offsetof(Function_Literal, context),
   },
   {
     .descriptor = &descriptor_scope_pointer,

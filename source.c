@@ -3706,7 +3706,7 @@ mass_match_overload_candidate(
         if (literal->info->flags & Function_Info_Flags_Compile_Time) {
           if (!args->all_arguments_are_compile_time_known) return;
         }
-        overload_info = function_literal_info_for_args(literal, args->view);
+        overload_info = function_literal_info_for_args(context, literal, args->view);
         if (!overload_info) return;
       } else {
         overload_info = literal->info;
@@ -4030,7 +4030,6 @@ mass_ensure_trampoline(
     .info = trampoline_info,
     .body = body_value,
     .own_scope = trampoline_scope,
-    .context = *context,
   };
   Value *literal_value = value_make(
     context->allocator, &descriptor_function_literal, storage_static(trampoline_literal), body_range
@@ -5826,7 +5825,6 @@ mass_make_fake_function_literal(
   *literal = (Function_Literal){
     .info = fn_info,
     .body = body,
-    .context = *context,
     .own_scope = function_scope,
   };
   return literal;
@@ -6081,7 +6079,6 @@ token_parse_function_literal(
       .flags = flags,
       .info = fn_info,
       .body = body_value,
-      .context = *context,
       .own_scope = parser->scope,
     };
     return value_make(context->allocator, &descriptor_function_literal, storage_static(literal), view.source_range);
