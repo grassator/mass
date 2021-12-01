@@ -2218,19 +2218,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should support C-style literal syntax") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "Point :: c_struct [x : s32, y : s32]\n"
-        "test :: fn() -> (s32) {"
-          "p := Point [20, 22]\n"
-          "p.x + p.y"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should support using tuple as a type") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
