@@ -3311,10 +3311,13 @@ call_function_overload(
     ) {
       source_registers_bitset = register_bitset_from_storage(&source_arg->storage);
       if (!(all_used_arguments_register_bitset & source_registers_bitset)) {
-        if (!(temp_register_argument_bitset & source_registers_bitset)) {
-          can_use_source_registers = true;
-        }
+        // Check that we haven't accidentally acquired this register as temp for something else
+        assert(!(temp_register_argument_bitset & source_registers_bitset));
+        can_use_source_registers = true;
       }
+      // Just a sanity check that if a source value is in a register,
+      // that register is tracked by the builder.
+      if (source_registers_bitset) assert(builder->register_occupied_bitset & source_registers_bitset);
     }
 
     Value *arg_value;
@@ -3329,7 +3332,6 @@ call_function_overload(
     } else if (can_use_source_registers) {
       arg_value = source_arg;
       should_assign = false;
-      register_acquire_bitset(builder, source_registers_bitset);
     } else if (
       mass_value_is_compile_time_known(source_arg) &&
       !descriptor_is_implicit_pointer(target_item->descriptor)
