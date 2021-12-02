@@ -220,7 +220,18 @@ value_view_to_value_array(
 static inline bool
 storage_is_stack(
   const Storage *operand
-);
+) {
+  return operand->tag == Storage_Tag_Memory
+    && operand->Memory.location.tag == Memory_Location_Tag_Stack;
+}
+
+static inline bool
+storage_is_label(
+  const Storage *operand
+) {
+  return operand->tag == Storage_Tag_Memory
+    && operand->Memory.location.tag == Memory_Location_Tag_Instruction_Pointer_Relative;
+}
 
 static inline Storage
 storage_stack(
@@ -256,10 +267,46 @@ mass_error_to_string(
   Mass_Error const* error
 );
 
-Value void_value = {
-  .descriptor = &descriptor_void,
-  .storage = { .tag = Storage_Tag_None },
-};
+static inline Value *
+value_init(
+  Value *result,
+  const Descriptor *descriptor,
+  Storage storage,
+  Source_Range source_range
+) {
+  *result = (Value) {
+    .descriptor = descriptor,
+    .storage = storage,
+    .source_range = source_range,
+  };
+  if (descriptor && storage.tag != Storage_Tag_None && !storage_is_label(&storage)) {
+    assert(descriptor->bit_size.as_u64 == storage.bit_size.as_u64);
+  }
+  return result;
+}
+
+static inline Value *
+value_make(
+  const Allocator *allocator,
+  const Descriptor *descriptor,
+  Storage storage,
+  Source_Range source_range
+) {
+  return value_init(
+    allocator_allocate(allocator, Value),
+    descriptor,
+    storage,
+    source_range
+  );
+}
+
+static inline Value *
+mass_make_void(
+  const Allocator *allocator,
+  const Source_Range source_range
+) {
+  return value_make(allocator, &descriptor_void, storage_none, source_range);
+}
 
 static inline bool
 descriptor_is_integer(

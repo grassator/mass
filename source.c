@@ -42,7 +42,9 @@ mass_value_from_expected_result(
       return value_make(allocator, descriptor, storage, source_range);
     } break;
     case Expected_Result_Tag_Flexible: {
-      if (mass_descriptor_is_void(descriptor)) return &void_value;
+      if (mass_descriptor_is_void(descriptor)) {
+        return mass_make_void(allocator, source_range);
+      }
       Storage storage = storage_none;
       if (descriptor->bit_size.as_u64 <= 64) {
         Register reg = register_acquire_temp(builder);
@@ -2540,7 +2542,8 @@ mass_handle_while_lazy_proc(
   encode_inverted_conditional_jump(builder, break_label, &condition->source_range, condition);
   storage_release_if_temporary(builder, &condition->storage);
 
-  value_force_exact(context, builder, &void_value, payload->body);
+  Value *void_value = mass_make_void(context->allocator, *source_range);
+  value_force_exact(context, builder, void_value, payload->body);
   if (mass_has_error(context)) return 0;
 
   push_eagerly_encoded_assembly(
@@ -2553,7 +2556,7 @@ mass_handle_while_lazy_proc(
     .Label.pointer = break_label,
   });
 
-  return &void_value;
+  return void_value;
 }
 
 static u32
@@ -3224,16 +3227,12 @@ call_function_overload(
 
   const Descriptor *return_descriptor = function_return_as_exact(&fn_info->returns)->descriptor;
   Value *fn_return_value;
-  if (mass_descriptor_is_void(return_descriptor)) {
-    fn_return_value = &void_value;
-  } else {
-    Storage return_storage = instance_descriptor->call_setup.caller_return;
+  Storage return_storage = storage_none;
+  if (!mass_descriptor_is_void(return_descriptor)) {
+    return_storage = instance_descriptor->call_setup.caller_return;
     return_storage.flags |= Storage_Flags_Temporary;
-    fn_return_value = value_init(
-      mass_allocate(context, Value),
-      return_descriptor, return_storage, *source_range
-    );
   }
+  fn_return_value = value_make(context->allocator, return_descriptor, return_storage, *source_range);
 
   const Function_Call_Setup *call_setup = &instance_descriptor->call_setup;
 
@@ -4089,7 +4088,7 @@ mass_trampoline_call(
     function_return_as_exact(&trampoline->original_info->returns)->descriptor;
   Value *result;
   if (mass_descriptor_is_void(return_descriptor)) {
-    result = &void_value;
+    result = mass_make_void(context->allocator, args_view.source_range);
   } else {
     const Struct_Field *return_field = dyn_array_last(fields);
     const void *temp_return_memory = args_struct_memory + return_field->offset;
@@ -4807,7 +4806,8 @@ mass_handle_startup_call_lazy_proc(
   ensure_function_instance(&runtime_context, startup_function, (Value_View){0});
 
   dyn_array_push(runtime_context.program->startup_functions, startup_function);
-  return expected_result_validate(expected_result, &void_value);
+  Value *result = mass_make_void(context->allocator, *source_range);
+  return expected_result_validate(expected_result, result);
 
   err:
   mass_error(context, (Mass_Error) {
@@ -4944,7 +4944,7 @@ mass_static_assert(
       },
     });
   }
-  return &void_value;
+  return mass_make_void(context->allocator, args.source_range);
 }
 
 static Value *
@@ -5106,7 +5106,8 @@ mass_handle_assignment_lazy_proc(
     return 0;
   }
 
-  return expected_result_validate(expected_result, &void_value);
+  Value *void_value = mass_make_void(context->allocator, *source_range);
+  return expected_result_validate(expected_result, void_value);
 }
 
 static Value *
@@ -6120,7 +6121,11 @@ token_parse_expression(
   u32 *out_match_length,
   const Symbol *end_symbol
 ) {
-  if(view.length == 0) return &void_value;
+  if(view.length == 0) {
+    // TODO this probably should be special cased in the `()` handling
+    //      and not allow generally empty expressions
+    return mass_make_void(context->allocator, view.source_range);
+  }
   if(view.length == 1) {
     *out_match_length = 1;
     return token_parse_single(context, parser, value_view_get(view, 0));
@@ -6299,8 +6304,11 @@ token_parse_block_statements(
 ) {
   u64 max_statement_count = dyn_array_length(statements);
 
-  Value *block_result = &void_value;
-  if (!max_statement_count) return block_result;
+  if (!max_statement_count) {
+    // FIXME :EmptyBlockSourceRange should have a correct source range
+    return mass_make_void(context->allocator, (Source_Range){0});
+  }
+  Value *block_result = 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
   Array_Value_Ptr temp_lazy_statements = dyn_array_make(
@@ -6415,7 +6423,8 @@ token_parse_block_statements(
       );
     }
   } else {
-    block_result = &void_value;
+    // FIXME :EmptyBlockSourceRange should have a correct source range
+    block_result = mass_make_void(context->allocator, (Source_Range){0});
   }
 
   defer:
@@ -6479,7 +6488,8 @@ mass_handle_explicit_return_lazy_proc(
     &(Instruction_Assembly) {jmp, {return_label}}
   );
 
-  return expected_result_validate(expected_result, &void_value);
+  Value *void_value = mass_make_void(context->allocator, *source_range);
+  return expected_result_validate(expected_result, void_value);
 }
 
 static Value *
@@ -6881,7 +6891,8 @@ mass_inline_module(
   // Need a new context here to ensure we are using the runtime program for new modules
   Mass_Context module_context = mass_context_from_compilation(context->compilation);
   Value *block_result = token_parse_block_statements(&module_context, &module_parser, curly->statements);
-  value_force_exact(&module_context, 0, &void_value, block_result);
+  Value *void_value = mass_make_void(context->allocator, args.source_range);
+  value_force_exact(&module_context, 0, void_value, block_result);
   module_process_exports(&module_context, &module_parser);
 
   return value_make(module_context.allocator, &descriptor_module, storage_static(module), args.source_range);
@@ -6903,6 +6914,7 @@ program_parse(
   }
 
   Value *block_result = token_parse_block_statements(context, parser, statements);
+  if (mass_has_error(context)) return;
   compile_time_eval(context, parser, value_view_single(&block_result));
 }
 
