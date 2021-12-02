@@ -619,11 +619,15 @@ print_natvis(
 ) {
   switch(type->tag) {
     case Meta_Type_Tag_Struct: {
-      print_natvis_array_types(file, type->struct_.name);
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        print_natvis_array_types(file, type->struct_.name);
+      }
       break;
     }
     case Meta_Type_Tag_Tagged_Union: {
-      print_natvis_array_types(file, type->name);
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        print_natvis_array_types(file, type->name);
+      }
 
       fprintf(file, "<Type Name=\"%s\">\n", type->name);
       for (uint64_t i = 0; i < type->union_.item_count; ++i) {
