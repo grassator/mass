@@ -78,9 +78,9 @@ register_acquire_bitset(
   Function_Builder *builder,
   u64 to_acquire_bitset
 ) {
-  assert(!(builder->register_occupied_bitset & to_acquire_bitset));
-  builder->register_occupied_bitset |= to_acquire_bitset;
-  builder->register_used_bitset |= to_acquire_bitset;
+  assert(!(builder->register_occupied_bitset.bits & to_acquire_bitset));
+  builder->register_occupied_bitset.bits |= to_acquire_bitset;
+  builder->register_used_bitset.bits |= to_acquire_bitset;
 }
 
 static inline void
@@ -88,8 +88,8 @@ register_release_bitset(
   Function_Builder *builder,
   Register to_release_bitset
 ) {
-  assert((builder->register_occupied_bitset & to_release_bitset) == to_release_bitset);
-  builder->register_occupied_bitset &= ~to_release_bitset;
+  assert((builder->register_occupied_bitset.bits & to_release_bitset) == to_release_bitset);
+  builder->register_occupied_bitset.bits &= ~to_release_bitset;
 }
 
 static inline Register

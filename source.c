@@ -3253,7 +3253,7 @@ call_function_overload(
     .capacity = 32,
   );
 
-  u64 all_used_arguments_register_bitset = call_setup->parameter_registers_bitset;
+  u64 all_used_arguments_register_bitset = call_setup->parameter_registers_bitset.bits;
   u64 argument_register_bitset = 0;
   u64 copied_straight_to_param_bitset = 0;
   u64 temp_register_argument_bitset = 0;
@@ -3293,7 +3293,7 @@ call_function_overload(
 
     argument_register_bitset |= target_arg_register_bitset;
     bool target_arg_registers_are_free =
-      !(builder->register_occupied_bitset & target_arg_register_bitset);
+      !(builder->register_occupied_bitset.bits & target_arg_register_bitset);
     bool can_assign_straight_to_target = (
       target_arg_registers_are_free &&
       !descriptor_is_implicit_pointer(target_item->descriptor)
@@ -3316,7 +3316,9 @@ call_function_overload(
       }
       // Just a sanity check that if a source value is in a register,
       // that register is tracked by the builder.
-      if (source_registers_bitset) assert(builder->register_occupied_bitset & source_registers_bitset);
+      if (source_registers_bitset) {
+        assert(builder->register_occupied_bitset.bits & source_registers_bitset);
+      }
     }
 
     Value *arg_value;
@@ -3345,7 +3347,7 @@ call_function_overload(
       u64 prohibited_registers
         = temp_register_argument_bitset
         | all_used_arguments_register_bitset
-        | builder->register_occupied_bitset;
+        | builder->register_occupied_bitset.bits;
       u64 allowed_temp_registers = registers_that_can_be_temp & ~prohibited_registers;
       u64 required_register_count = register_bitset_occupied_count(target_arg_register_bitset);
       if (
@@ -3384,7 +3386,7 @@ call_function_overload(
     dyn_array_push(temp_arguments, arg_value);
   }
 
-  u64 target_volatile_registers_bitset = call_setup->calling_convention->register_volatile_bitset;
+  u64 target_volatile_registers_bitset = call_setup->calling_convention->register_volatile_bitset.bits;
   u64 expected_result_bitset = 0;
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
@@ -3399,7 +3401,7 @@ call_function_overload(
 
   u64 saved_registers_from_arguments_bitset = (
     // Need to save registers that are volatile in the callee and are actually used in the caller,
-    (target_volatile_registers_bitset & builder->register_occupied_bitset)
+    (target_volatile_registers_bitset & builder->register_occupied_bitset.bits)
     &
     // but only if we are not using them for optimized arguments assignment.
     (~(copied_straight_to_param_bitset | temp_register_argument_bitset))
@@ -4373,7 +4375,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // @CopyPaste :SaveRDX
       Storage maybe_saved_rdx = storage_none;
       Storage reg_d = storage_register(Register_D, (Bits){64});
-      if (register_bitset_get(builder->register_occupied_bitset, Register_D)) {
+      if (register_bitset_get(builder->register_occupied_bitset.bits, Register_D)) {
         if (
           expected_result->tag != Expected_Result_Tag_Exact ||
           !storage_is_register_index(&expected_result->Exact.storage, Register_D)
@@ -6255,7 +6257,8 @@ mass_handle_block_lazy_proc(
   Expected_Result expected_void = mass_expected_result_exact(&descriptor_void, storage_none);
   for (u64 i = 0; i < statement_count; ++i) {
     if (mass_has_error(context)) return 0;
-    u64 registers_before = builder ? builder->register_occupied_bitset : 0;
+    Register_Bitset registers_before = (Register_Bitset){0};
+    if (builder) registers_before = builder->register_occupied_bitset;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     Source_Range debug_source_range = lazy_statement->source_range;
     Slice debug_source = source_from_source_range(context->compilation, &debug_source_range);
@@ -6272,17 +6275,17 @@ mass_handle_block_lazy_proc(
     // are no stray registers retained across statement boundaries except when a block
     // returns a flexible result from a function call in the last statement.
     if (!builder) continue;
-    u64 registers_after = builder->register_occupied_bitset;
+    Register_Bitset registers_after = builder->register_occupied_bitset;
     if (is_last_statement && expected_result->tag == Expected_Result_Tag_Flexible) {
       if (result_value->storage.tag == Storage_Tag_Register) {
         Register result_register = result_value->storage.Register.index;
-        register_bitset_unset(&registers_after, result_register);
+        register_bitset_unset(&registers_after.bits, result_register);
       }
     }
-    if(registers_before == registers_after) continue;
+    if(registers_before.bits == registers_after.bits) continue;
     for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-      bool before = register_bitset_get(registers_before, reg_index);
-      bool after = register_bitset_get(registers_after, reg_index);
+      bool before = register_bitset_get(registers_before.bits, reg_index);
+      bool after = register_bitset_get(registers_after.bits, reg_index);
       if (before != after) {
         if (after) {
           printf("Unreleased %s\n", register_name(reg_index));

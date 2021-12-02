@@ -420,6 +420,10 @@ typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
+typedef struct Register_Bitset Register_Bitset;
+typedef dyn_array_type(Register_Bitset *) Array_Register_Bitset_Ptr;
+typedef dyn_array_type(const Register_Bitset *) Array_Const_Register_Bitset_Ptr;
+
 typedef struct Function_Builder Function_Builder;
 typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
 typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
@@ -1505,15 +1509,20 @@ typedef struct Value {
 } Value;
 typedef dyn_array_type(Value) Array_Value;
 
+typedef struct Register_Bitset {
+  u64 bits;
+} Register_Bitset;
+typedef dyn_array_type(Register_Bitset) Array_Register_Bitset;
+
 typedef struct Function_Builder {
   Epoch epoch;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   Value return_value;
   Code_Block code_block;
-  u64 register_used_bitset;
-  u64 register_volatile_bitset;
-  u64 register_occupied_bitset;
+  Register_Bitset register_used_bitset;
+  Register_Bitset register_volatile_bitset;
+  Register_Bitset register_occupied_bitset;
   Slice source;
   const Function_Info * function;
 } Function_Builder;
@@ -1686,7 +1695,7 @@ typedef struct Function_Call_Setup {
   Function_Call_Jump jump;
   const Calling_Convention * calling_convention;
   Array_Function_Call_Parameter parameters;
-  u64 parameter_registers_bitset;
+  Register_Bitset parameter_registers_bitset;
   Storage caller_return;
   Storage callee_return;
 } Function_Call_Setup;
@@ -2009,7 +2018,7 @@ typedef struct Program {
 typedef dyn_array_type(Program) Array_Program;
 
 typedef struct Calling_Convention {
-  u64 register_volatile_bitset;
+  Register_Bitset register_volatile_bitset;
   Calling_Convention_Call_Setup_Proc call_setup_proc;
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
@@ -2427,6 +2436,11 @@ static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
+static Descriptor descriptor_register_bitset;
+static Descriptor descriptor_array_register_bitset;
+static Descriptor descriptor_array_register_bitset_ptr;
+static Descriptor descriptor_register_bitset_pointer;
+static Descriptor descriptor_register_bitset_pointer_pointer;
 static Descriptor descriptor_function_builder;
 static Descriptor descriptor_array_function_builder;
 static Descriptor descriptor_array_function_builder_ptr;
@@ -4259,6 +4273,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
 MASS_DEFINE_TYPE_VALUE(value);
 DEFINE_VALUE_IS_AS_HELPERS(Value, value);
 DEFINE_VALUE_IS_AS_HELPERS(Value *, value_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_register_bitset_ptr, Array_Register_Bitset_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_register_bitset, Array_Register_Bitset)
+MASS_DEFINE_STRUCT_DESCRIPTOR(register_bitset, Register_Bitset,
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("bits"),
+    .offset = offsetof(Register_Bitset, bits),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(register_bitset);
+DEFINE_VALUE_IS_AS_HELPERS(Register_Bitset, register_bitset);
+DEFINE_VALUE_IS_AS_HELPERS(Register_Bitset *, register_bitset_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
@@ -4288,17 +4314,17 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .offset = offsetof(Function_Builder, code_block),
   },
   {
-    .descriptor = &descriptor_i64,
+    .descriptor = &descriptor_register_bitset,
     .name = slice_literal_fields("register_used_bitset"),
     .offset = offsetof(Function_Builder, register_used_bitset),
   },
   {
-    .descriptor = &descriptor_i64,
+    .descriptor = &descriptor_register_bitset,
     .name = slice_literal_fields("register_volatile_bitset"),
     .offset = offsetof(Function_Builder, register_volatile_bitset),
   },
   {
-    .descriptor = &descriptor_i64,
+    .descriptor = &descriptor_register_bitset,
     .name = slice_literal_fields("register_occupied_bitset"),
     .offset = offsetof(Function_Builder, register_occupied_bitset),
   },
@@ -4767,7 +4793,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
     .offset = offsetof(Function_Call_Setup, parameters),
   },
   {
-    .descriptor = &descriptor_i64,
+    .descriptor = &descriptor_register_bitset,
     .name = slice_literal_fields("parameter_registers_bitset"),
     .offset = offsetof(Function_Call_Setup, parameter_registers_bitset),
   },
@@ -5402,7 +5428,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
 MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   {
-    .descriptor = &descriptor_i64,
+    .descriptor = &descriptor_register_bitset,
     .name = slice_literal_fields("register_volatile_bitset"),
     .offset = offsetof(Calling_Convention, register_volatile_bitset),
   },

@@ -77,10 +77,10 @@ call_setup_fill_parameter_register_bitset(
   DYN_ARRAY_FOREACH(Function_Call_Parameter, param, setup->parameters) {
     Storage storage = param->storage;
     u64 target_arg_register_bitset = register_bitset_from_storage(&storage);
-    if(setup->parameter_registers_bitset & target_arg_register_bitset) {
+    if(setup->parameter_registers_bitset.bits & target_arg_register_bitset) {
       panic("Found overlapping register usage in call setup");
     }
-    setup->parameter_registers_bitset |= target_arg_register_bitset;
+    setup->parameter_registers_bitset.bits |= target_arg_register_bitset;
   }
 }
 
@@ -120,8 +120,8 @@ calling_convention_x86_64_common_end_proc(
   // :RegisterPushPop
   // pushes change the stack pointer so we need to account for that
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-    if (register_bitset_get(builder->register_used_bitset, reg_index)) {
-      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
+    if (register_bitset_get(builder->register_used_bitset.bits, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset.bits, reg_index)) {
         push_size += register_size;
       }
     }

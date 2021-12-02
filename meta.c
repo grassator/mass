@@ -1585,15 +1585,19 @@ main(void) {
     { "Source_Range", "source_range" },
   })));
 
+  push_type(type_struct("Register_Bitset", (Struct_Item[]){
+    { "u64", "bits" },
+  }));
+
   export_compiler(push_type(type_struct("Function_Builder", (Struct_Item[]){
     { "Epoch", "epoch" },
     { "s32", "stack_reserve" },
     { "u32", "max_call_parameters_stack_size" },
     { "Value", "return_value" },
     { "Code_Block", "code_block" },
-    { "u64", "register_used_bitset" },
-    { "u64", "register_volatile_bitset" },
-    { "u64", "register_occupied_bitset" },
+    { "Register_Bitset", "register_used_bitset" },
+    { "Register_Bitset", "register_volatile_bitset" },
+    { "Register_Bitset", "register_occupied_bitset" },
     { "Slice", "source" },
     { "const Function_Info *", "function" },
   })));
@@ -1724,7 +1728,7 @@ main(void) {
     { "Function_Call_Jump", "jump"},
     { "const Calling_Convention *", "calling_convention" },
     { "Array_Function_Call_Parameter", "parameters" },
-    { "u64", "parameter_registers_bitset" },
+    { "Register_Bitset", "parameter_registers_bitset" },
     { "Storage", "caller_return" },
     { "Storage", "callee_return" },
   }));
@@ -1885,7 +1889,7 @@ main(void) {
   }));
 
   push_type(type_struct("Calling_Convention", (Struct_Item[]){
-    { "u64", "register_volatile_bitset" },
+    { "Register_Bitset", "register_volatile_bitset" },
     { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
   }));
 

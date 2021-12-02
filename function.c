@@ -32,7 +32,7 @@ register_find_available(
   // Start with the registers that we can theoretically use for temp values
   u64 available_bit_set = registers_that_can_be_temp;
   // Narrow it down by the ones that are not in use
-  available_bit_set &= ~builder->register_occupied_bitset;
+  available_bit_set &= ~builder->register_occupied_bitset.bits;
   // Apply any additional constraints from the user
   available_bit_set &= ~disallowed_bit_mask;
 
@@ -392,8 +392,8 @@ fn_encode(
   // Push non-volatile registers (in reverse order)
   u8 push_index = 0;
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-    if (register_bitset_get(builder->register_used_bitset, reg_index)) {
-      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
+    if (register_bitset_get(builder->register_used_bitset.bits, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset.bits, reg_index)) {
         out_layout->volatile_register_push_offsets[push_index++] =
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
         Storage to_save = storage_register(reg_index, (Bits){64});
@@ -421,8 +421,8 @@ fn_encode(
   // :RegisterPushPop
   // Pop non-volatile registers (in original order)
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (register_bitset_get(builder->register_used_bitset, reg_index)) {
-      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
+    if (register_bitset_get(builder->register_used_bitset.bits, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset.bits, reg_index)) {
         Storage to_save = storage_register(reg_index, (Bits){64});
         encode_and_write_assembly(buffer, &(Instruction_Assembly) {pop, {to_save}});
       }
@@ -650,8 +650,7 @@ ensure_function_instance(
       }
     }
   }
-  assert(!(builder->register_occupied_bitset & call_setup.parameter_registers_bitset));
-  builder->register_occupied_bitset |= call_setup.parameter_registers_bitset;
+  register_acquire_bitset(builder, call_setup.parameter_registers_bitset.bits);
 
   Value *parse_result = 0;
   if (value_is_ast_block(literal->body)) {
