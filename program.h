@@ -71,7 +71,7 @@ import_symbol(
 
 static void
 program_jit(
-  Compilation *compilation,
+  Mass_Context *context,
   Jit *jit
 );
 

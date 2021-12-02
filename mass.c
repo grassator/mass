@@ -170,7 +170,7 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Run: {
       Jit jit;
       jit_init(&jit, context.program);
-      program_jit(context.compilation, &jit);
+      program_jit(&context, &jit);
       if (mass_has_error(&context)) {
         return mass_cli_print_error(&compilation, context.result);
       }

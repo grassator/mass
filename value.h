@@ -60,32 +60,10 @@ typedef struct {
 } Temp_Mark;
 
 static inline Temp_Mark
-compilation_temp_mark(
-  Compilation *compilation
-) {
-  return (Temp_Mark){compilation->temp_buffer.occupied};
-}
-
-static inline void
-compilation_temp_reset_to_mark(
-  Compilation *compilation,
-  Temp_Mark mark
-) {
-  compilation->temp_buffer.occupied = mark.occupied;
-}
-
-static inline void
-compilation_temp_reset(
-  Compilation *compilation
-) {
-  compilation->temp_buffer.occupied = 0;
-}
-
-static inline Temp_Mark
 context_temp_mark(
   Mass_Context *context
 ) {
-  return compilation_temp_mark(context->compilation);
+  return (Temp_Mark){context->compilation->temp_buffer.occupied};
 }
 
 static inline void
@@ -93,14 +71,7 @@ context_temp_reset_to_mark(
   Mass_Context *context,
   Temp_Mark mark
 ) {
-  compilation_temp_reset_to_mark(context->compilation, mark);
-}
-
-static inline void
-context_temp_reset(
-  Mass_Context *context
-) {
-  compilation_temp_reset(context->compilation);
+  context->compilation->temp_buffer.occupied = mark.occupied;
 }
 
 static inline const Symbol *

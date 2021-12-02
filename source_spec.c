@@ -124,7 +124,7 @@ test_program_source_function(
   if (!value) return 0;
   static Jit test_jit;
   jit_init(&test_jit, context->program);
-  program_jit(context->compilation, &test_jit);
+  program_jit(context, &test_jit);
   if (mass_has_error(context)) return 0;
   fn_type_opaque fn = value_as_function(test_jit.program, value);
   if (mass_has_error(context)) return 0;

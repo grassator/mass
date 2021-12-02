@@ -1853,7 +1853,7 @@ mass_ensure_jit_function_for_value(
     Label *label = instance->storage.Memory.location.Instruction_Pointer_Relative.label;
     assert(label->program == jit->program);
     if (!label->resolved) {
-      program_jit(context->compilation, jit);
+      program_jit(context, jit);
       if (mass_has_error(context)) return 0;
     }
     if (!label->resolved) {
@@ -2741,7 +2741,7 @@ compile_time_eval(
   calling_convention_x86_64_common_end_proc(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
-  program_jit(context->compilation, jit);
+  program_jit(context, jit);
   if (mass_has_error(context)) return 0;
 
   fn_type_opaque jitted_code = (fn_type_opaque)rip_value_pointer_from_label(eval_label);
@@ -7114,7 +7114,7 @@ mass_run_script(
 
   Jit jit;
   jit_init(&jit, context->program);
-  program_jit(compilation, &jit);
+  program_jit(context, &jit);
   if (mass_has_error(context)) return;
   fn_type_opaque script = value_as_function(jit.program, jit.program->entry_point);
   script();

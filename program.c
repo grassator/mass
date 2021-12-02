@@ -310,16 +310,16 @@ program_jit_call_startup_functions(
 
 static void
 program_jit(
-  Compilation *compilation,
+  Mass_Context *context,
   Jit *jit
 ) {
-  Temp_Mark mark = compilation_temp_mark(compilation);
+  Temp_Mark mark = context_temp_mark(context);
   #if defined(_WIN32)
-  win32_program_jit(compilation, jit);
+  win32_program_jit(context->compilation, jit);
   #elif defined(__linux__) || defined(__MACH__)
-  posix_program_jit(compilation, jit);
+  posix_program_jit(context->compilation, jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif
-  compilation_temp_reset_to_mark(compilation, mark);
+  context_temp_reset_to_mark(context, mark);
 }
