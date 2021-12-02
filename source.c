@@ -1722,7 +1722,7 @@ token_parse_single(
   if (value->descriptor == &descriptor_group_paren) {
     return token_parse_expression(context, parser, value_as_group_paren(value)->children, &(u32){0}, 0);
   } else if (value->descriptor == &descriptor_ast_block) {
-    return token_parse_block(context, parser, value_as_ast_block(value));
+    return token_parse_block(context, parser, value_as_ast_block(value), &value->source_range);
   } else if (value->descriptor == &descriptor_group_square) {
     return token_parse_tuple(context, parser, value_as_group_square(value)->children);
   } else if (value->descriptor == &descriptor_quoted) {
@@ -3124,7 +3124,7 @@ mass_handle_macro_call(
   body_parser.scope = body_scope;
 
   Array_Value_View statements = value_as_ast_block(literal->body)->statements;
-  Value *body_value = token_parse_block_statements(context, &body_parser, statements);
+  Value *body_value = token_parse_block_statements(context, &body_parser, statements, &source_range);
   if (mass_has_error(context)) goto err;
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
@@ -6300,13 +6300,13 @@ static Value *
 token_parse_block_statements(
   Mass_Context *context,
   Parser *parser,
-  Array_Value_View statements
+  Array_Value_View statements,
+  const Source_Range *source_range
 ) {
   u64 max_statement_count = dyn_array_length(statements);
 
   if (!max_statement_count) {
-    // FIXME :EmptyBlockSourceRange should have a correct source range
-    return mass_make_void(context->allocator, (Source_Range){0});
+    return mass_make_void(context->allocator, *source_range);
   }
   Value *block_result = 0;
 
@@ -6410,7 +6410,7 @@ token_parse_block_statements(
     Value *last_result = *dyn_array_last(temp_lazy_statements);
     const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
     if (statement_count == 1) {
-      return last_result;
+      block_result = last_result;
     } else {
       Array_Value_Ptr lazy_statements;
       dyn_array_copy_from_temp(Array_Value_Ptr, context, &lazy_statements, temp_lazy_statements);
@@ -6418,13 +6418,12 @@ token_parse_block_statements(
       void *payload;
       PACK_AS_VOID_POINTER(payload, lazy_statements);
 
-      return mass_make_lazy_value(
+      block_result = mass_make_lazy_value(
         context, parser, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
       );
     }
   } else {
-    // FIXME :EmptyBlockSourceRange should have a correct source range
-    block_result = mass_make_void(context->allocator, (Source_Range){0});
+    block_result = mass_make_void(context->allocator, *source_range);
   }
 
   defer:
@@ -6436,11 +6435,12 @@ static inline Value *
 token_parse_block(
   Mass_Context *context,
   Parser *parser,
-  const Ast_Block *group
+  const Ast_Block *group,
+  const Source_Range *source_range
 ) {
   Parser block_parser = *parser;
   block_parser.scope = scope_make(context->allocator, parser->scope);
-  return token_parse_block_statements(context, &block_parser, group->statements);
+  return token_parse_block_statements(context, &block_parser, group->statements, source_range);
 }
 
 static u32
@@ -6890,7 +6890,8 @@ mass_inline_module(
   };
   // Need a new context here to ensure we are using the runtime program for new modules
   Mass_Context module_context = mass_context_from_compilation(context->compilation);
-  Value *block_result = token_parse_block_statements(&module_context, &module_parser, curly->statements);
+  Value *block_result =
+    token_parse_block_statements(&module_context, &module_parser, curly->statements, &args.source_range);
   Value *void_value = mass_make_void(context->allocator, args.source_range);
   value_force_exact(&module_context, 0, void_value, block_result);
   module_process_exports(&module_context, &module_parser);
@@ -6906,14 +6907,15 @@ program_parse(
   assert(parser->module);
   Performance_Counter perf = system_performance_counter_start();
   Array_Value_View statements;
-  *context->result = tokenize(context, parser->module->source_range, &statements);
+  const Source_Range *program_range = &parser->module->source_range;
+  *context->result = tokenize(context, *program_range, &statements);
   if (mass_has_error(context)) return;
   if (0) {
     u64 usec = system_performance_counter_end(&perf);
     printf("Tokenizer took %"PRIu64" µs\n", usec);
   }
 
-  Value *block_result = token_parse_block_statements(context, parser, statements);
+  Value *block_result = token_parse_block_statements(context, parser, statements, program_range);
   if (mass_has_error(context)) return;
   compile_time_eval(context, parser, value_view_single(&block_result));
 }

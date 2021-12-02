@@ -202,14 +202,16 @@ static Value *
 token_parse_block_statements(
   Mass_Context *program,
   Parser *parser,
-  Array_Value_View statements
+  Array_Value_View statements,
+  const Source_Range *source_range
 );
 
 static Value *
 token_parse_block(
   Mass_Context *program,
   Parser *parser,
-  const Ast_Block *block
+  const Ast_Block *block,
+  const Source_Range *source_range
 );
 
 static Module *

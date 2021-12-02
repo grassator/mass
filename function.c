@@ -656,7 +656,8 @@ ensure_function_instance(
   Value *parse_result = 0;
   if (value_is_ast_block(literal->body)) {
     Array_Value_View statements = value_as_ast_block(literal->body)->statements;
-    parse_result = token_parse_block_statements(context, &body_parser, statements);
+    const Source_Range *body_range = &literal->body->source_range;
+    parse_result = token_parse_block_statements(context, &body_parser, statements, body_range);
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = value_as_value_view(literal->body);
     parse_result = token_parse_expression(context, &body_parser, *view, &(u32){0}, 0);
