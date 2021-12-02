@@ -2139,7 +2139,7 @@ token_handle_user_defined_operator_proc(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   assert(operator->tag == Operator_Tag_Alias);
-  u64 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
+  u32 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
   assert(argument_count == args.length);
 
   Value *fn = mass_context_force_lookup(
@@ -2147,14 +2147,19 @@ token_handle_user_defined_operator_proc(
   );
   if (mass_has_error(context)) return 0;
 
-  Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
-  for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
-    *dyn_array_get(args_array, i) = token_parse_single(context, parser, *dyn_array_get(args_array, i));
-    if (mass_has_error(context)) return 0;
+  Value *parsed_values[2];
+  parsed_values[0] = token_parse_single(context, parser, value_view_get(args, 0));
+  if (argument_count == 2) {
+    parsed_values[1] = token_parse_single(context, parser, value_view_get(args, 1));
   }
-  args = value_view_from_value_array(args_array, &args.source_range);
 
-  return token_handle_function_call(context, parser, fn, args, args.source_range);
+  Value_View parsed_args = (Value_View){
+    .values = parsed_values,
+    .length = argument_count,
+    .source_range = args.source_range,
+  };
+
+  return token_handle_function_call(context, parser, fn, parsed_args, parsed_args.source_range);
 }
 
 static inline Value *
