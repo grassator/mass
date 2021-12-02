@@ -1601,19 +1601,6 @@ value_view_maybe_match_cached_symbol(
   return value;
 }
 
-static inline Value *
-value_view_maybe_match_any_of(
-  Value_View view,
-  u32 *peek_index,
-  const Descriptor *descriptor
-) {
-  Value *value = value_view_peek(view, *peek_index);
-  if (!value) return 0;
-  if (value->descriptor != descriptor) return 0;
-  *peek_index += 1;
-  return value;
-}
-
 static inline void
 context_parse_error(
   Mass_Context *context,
@@ -5983,7 +5970,15 @@ token_parse_function_literal(
     function_info_from_parameters_and_return(context, parser, args_view, returns);
   if (mass_has_error(context)) return 0;
 
-  Value *body_value = value_view_maybe_match_any_of(view, &peek_index, &descriptor_ast_block);
+
+  Value *body_value = value_view_peek(view, peek_index);
+  if (body_value) {
+    if (value_is_ast_block(body_value)) {
+      peek_index += 1;
+    } else {
+      body_value = 0;
+    }
+  }
   if (!body_value) {
     Value_View rest = value_view_match_till_symbol(view, &peek_index, end_symbol);
     if (is_macro) {
