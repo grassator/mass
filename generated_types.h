@@ -66,10 +66,6 @@ typedef struct Group_Square Group_Square;
 typedef dyn_array_type(Group_Square *) Array_Group_Square_Ptr;
 typedef dyn_array_type(const Group_Square *) Array_Const_Group_Square_Ptr;
 
-typedef struct Token_Pattern Token_Pattern;
-typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
-typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
-
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,
   Section_Permissions_Write = 2,
@@ -1030,58 +1026,6 @@ typedef struct Group_Square {
 } Group_Square;
 typedef dyn_array_type(Group_Square) Array_Group_Square;
 
-typedef enum {
-  Token_Pattern_Tag_Invalid = 0,
-  Token_Pattern_Tag_Symbol = 1,
-  Token_Pattern_Tag_Cached_Symbol = 2,
-  Token_Pattern_Tag_Descriptor = 3,
-  Token_Pattern_Tag_Or = 4,
-} Token_Pattern_Tag;
-
-typedef struct Token_Pattern_Symbol {
-  Slice name;
-} Token_Pattern_Symbol;
-typedef struct Token_Pattern_Cached_Symbol {
-  const Symbol * pointer;
-} Token_Pattern_Cached_Symbol;
-typedef struct Token_Pattern_Descriptor {
-  const Descriptor * descriptor;
-} Token_Pattern_Descriptor;
-typedef struct Token_Pattern_Or {
-  const Token_Pattern * a;
-  const Token_Pattern * b;
-} Token_Pattern_Or;
-typedef struct Token_Pattern {
-  Token_Pattern_Tag tag;
-  char _tag_padding[4];
-  union {
-    Token_Pattern_Symbol Symbol;
-    Token_Pattern_Cached_Symbol Cached_Symbol;
-    Token_Pattern_Descriptor Descriptor;
-    Token_Pattern_Or Or;
-  };
-} Token_Pattern;
-static inline const Token_Pattern_Symbol *
-token_pattern_as_symbol(const Token_Pattern *token_pattern) {
-  assert(token_pattern->tag == Token_Pattern_Tag_Symbol);
-  return &token_pattern->Symbol;
-}
-static inline const Token_Pattern_Cached_Symbol *
-token_pattern_as_cached_symbol(const Token_Pattern *token_pattern) {
-  assert(token_pattern->tag == Token_Pattern_Tag_Cached_Symbol);
-  return &token_pattern->Cached_Symbol;
-}
-static inline const Token_Pattern_Descriptor *
-token_pattern_as_descriptor(const Token_Pattern *token_pattern) {
-  assert(token_pattern->tag == Token_Pattern_Tag_Descriptor);
-  return &token_pattern->Descriptor;
-}
-static inline const Token_Pattern_Or *
-token_pattern_as_or(const Token_Pattern *token_pattern) {
-  assert(token_pattern->tag == Token_Pattern_Tag_Or);
-  return &token_pattern->Or;
-}
-typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 typedef struct Section {
   Virtual_Memory_Buffer buffer;
   Slice name;
@@ -2224,12 +2168,6 @@ static Descriptor descriptor_array_group_square;
 static Descriptor descriptor_array_group_square_ptr;
 static Descriptor descriptor_group_square_pointer;
 static Descriptor descriptor_group_square_pointer_pointer;
-static Descriptor descriptor_token_pattern;
-static Descriptor descriptor_array_token_pattern;
-static Descriptor descriptor_array_token_pattern_ptr;
-static Descriptor descriptor_array_const_token_pattern_ptr;
-static Descriptor descriptor_token_pattern_pointer;
-static Descriptor descriptor_token_pattern_pointer_pointer;
 static Descriptor descriptor_section_permissions;
 static Descriptor descriptor_array_section_permissions;
 static Descriptor descriptor_array_section_permissions_ptr;
@@ -3107,85 +3045,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group_square, Group_Square,
 MASS_DEFINE_TYPE_VALUE(group_square);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square *, group_square_pointer);
-/*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern_ptr, Array_Token_Pattern_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern, Array_Token_Pattern)
-MASS_DEFINE_OPAQUE_C_TYPE(token_pattern_tag, Token_Pattern_Tag)
-static C_Enum_Item token_pattern_tag_items[] = {
-{ .name = slice_literal_fields("Invalid"), .value = 0 },
-{ .name = slice_literal_fields("Symbol"), .value = 1 },
-{ .name = slice_literal_fields("Cached_Symbol"), .value = 2 },
-{ .name = slice_literal_fields("Descriptor"), .value = 3 },
-{ .name = slice_literal_fields("Or"), .value = 4 },
-};
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_symbol, Token_Pattern_Symbol,
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("name"),
-    .offset = offsetof(Token_Pattern_Symbol, name),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(token_pattern_symbol);
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_cached_symbol, Token_Pattern_Cached_Symbol,
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("pointer"),
-    .offset = offsetof(Token_Pattern_Cached_Symbol, pointer),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(token_pattern_cached_symbol);
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_descriptor, Token_Pattern_Descriptor,
-  {
-    .descriptor = &descriptor_descriptor_pointer,
-    .name = slice_literal_fields("descriptor"),
-    .offset = offsetof(Token_Pattern_Descriptor, descriptor),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(token_pattern_descriptor);
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_or, Token_Pattern_Or,
-  {
-    .descriptor = &descriptor_token_pattern_pointer,
-    .name = slice_literal_fields("a"),
-    .offset = offsetof(Token_Pattern_Or, a),
-  },
-  {
-    .descriptor = &descriptor_token_pattern_pointer,
-    .name = slice_literal_fields("b"),
-    .offset = offsetof(Token_Pattern_Or, b),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(token_pattern_or);
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern, Token_Pattern,
-  {
-    .name = slice_literal_fields("tag"),
-    .descriptor = &descriptor_token_pattern_tag,
-    .offset = offsetof(Token_Pattern, tag),
-  },
-  {
-    .name = slice_literal_fields("Symbol"),
-    .descriptor = &descriptor_token_pattern_symbol,
-    .offset = offsetof(Token_Pattern, Symbol),
-  },
-  {
-    .name = slice_literal_fields("Cached_Symbol"),
-    .descriptor = &descriptor_token_pattern_cached_symbol,
-    .offset = offsetof(Token_Pattern, Cached_Symbol),
-  },
-  {
-    .name = slice_literal_fields("Descriptor"),
-    .descriptor = &descriptor_token_pattern_descriptor,
-    .offset = offsetof(Token_Pattern, Descriptor),
-  },
-  {
-    .name = slice_literal_fields("Or"),
-    .descriptor = &descriptor_token_pattern_or,
-    .offset = offsetof(Token_Pattern, Or),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(token_pattern);
-DEFINE_VALUE_IS_AS_HELPERS(Token_Pattern, token_pattern);
-DEFINE_VALUE_IS_AS_HELPERS(Token_Pattern *, token_pattern_pointer);
-/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 static C_Enum_Item section_permissions_items[] = {
 { .name = slice_literal_fields("Read"), .value = 1 },

@@ -1262,17 +1262,6 @@ token_make_symbol_value(
   );
 }
 
-static const Token_Pattern token_pattern_comma_operator = {
-  .tag = Token_Pattern_Tag_Symbol,
-  .Symbol.name = slice_literal_fields(","),
-};
-
-static const Token_Pattern token_pattern_semicolon = {
-  .tag = Token_Pattern_Tag_Symbol,
-  .Symbol.name = slice_literal_fields(";"),
-};
-
-
 static inline bool
 value_match_symbol(
   const Value *token,
@@ -1281,33 +1270,6 @@ value_match_symbol(
   if (!value_is_symbol(token)) return false;
   if (!name.length) return true;
   return slice_equal(value_as_symbol(token)->name, name);
-}
-
-static inline bool
-value_match(
-  const Value *value,
-  const Token_Pattern *pattern
-) {
-  if (!value) return false;
-  switch(pattern->tag) {
-    case Token_Pattern_Tag_Invalid: {
-      panic("Invalid pattern tag");
-    } break;
-    case Token_Pattern_Tag_Symbol: {
-      return value_match_symbol(value, pattern->Symbol.name);
-    }
-    case Token_Pattern_Tag_Cached_Symbol: {
-      if (!value_is_symbol(value)) return false;
-      return value_as_symbol(value) == pattern->Cached_Symbol.pointer;
-    }
-    case Token_Pattern_Tag_Descriptor: {
-      return value->descriptor == pattern->Descriptor.descriptor;
-    }
-    case Token_Pattern_Tag_Or: {
-      return value_match(value, pattern->Or.a) || value_match(value, pattern->Or.b);
-    }
-  }
-  return true;
 }
 
 static inline Value_View
@@ -1556,7 +1518,7 @@ typedef struct {
 static Value_View
 token_split_next(
   Value_View_Split_Iterator *it,
-  const Token_Pattern *separator
+  const Symbol *separator
 ) {
   if (it->done) return (Value_View){0};
   u32 start_index = it->index;
@@ -1566,7 +1528,7 @@ token_split_next(
     it->index++
   ) {
     Value *token = value_view_get(it->view, it->index);
-    if (value_match(token, separator)) {
+    if (value_is_symbol(token) && value_as_symbol(token) == separator) {
       Value_View result = value_view_slice(&it->view, start_index, it->index);
       // Skip over the separator
       it->index++;
@@ -2175,7 +2137,7 @@ token_match_call_arguments(
 
   while (!it.done) {
     if (context->result->tag != Mass_Result_Tag_Success) return;
-    Value_View view = token_split_next(&it, &token_pattern_comma_operator);
+    Value_View view = token_split_next(&it, context->compilation->common_symbols.operator_comma);
     Value *parse_result = token_parse_expression(context, parser, view, &(u32){0}, 0);
     dyn_array_push(*out_args, parse_result);
   }
@@ -5911,7 +5873,7 @@ function_info_from_parameters_and_return(
     );
 
     for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
-      Value_View param_view = token_split_next(&it, &token_pattern_comma_operator);
+      Value_View param_view = token_split_next(&it, context->compilation->common_symbols.operator_comma);
       Function_Parameter param = token_match_argument(context, &arg_parser, param_view, fn_info);
       if (mass_has_error(context)) goto defer;
       dyn_array_push(temp_params, param);

@@ -368,57 +368,6 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Token_Pattern">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Token_Pattern_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Token_Pattern_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Token_Pattern">
-  <DisplayString Condition="tag == Token_Pattern_Tag_Invalid">
-    Invalid
-  </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_Symbol">
-    Symbol { Symbol }
-  </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_Cached_Symbol">
-    Cached_Symbol { Cached_Symbol }
-  </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_Descriptor">
-    Descriptor { Descriptor }
-  </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_Or">
-    Or { Or }
-  </DisplayString>
-  <Expand>
-    <Item Name="tag">tag</Item>
-    <Item Name="Symbol" Condition="tag == Token_Pattern_Tag_Symbol">Symbol</Item>
-    <Item Name="Cached_Symbol" Condition="tag == Token_Pattern_Tag_Cached_Symbol">Cached_Symbol</Item>
-    <Item Name="Descriptor" Condition="tag == Token_Pattern_Tag_Descriptor">Descriptor</Item>
-    <Item Name="Or" Condition="tag == Token_Pattern_Tag_Or">Or</Item>
-  </Expand>
-</Type>
 <Type Name="Array_Section">
   <Expand>
     <Item Name="[length]">data->length</Item>

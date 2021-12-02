@@ -1228,23 +1228,6 @@ main(void) {
     { "Value_View", "children" },
   })));
 
-  push_type(type_union("Token_Pattern", (Struct_Type[]){
-    struct_empty("Invalid"),
-    struct_fields("Symbol", (Struct_Item[]){
-      { "Slice", "name" },
-    }),
-    struct_fields("Cached_Symbol", (Struct_Item[]){
-      { "const Symbol *", "pointer" },
-    }),
-    struct_fields("Descriptor", (Struct_Item[]){
-      { "const Descriptor *", "descriptor" },
-    }),
-    struct_fields("Or", (Struct_Item[]){
-      { "const Token_Pattern *", "a" },
-      { "const Token_Pattern *", "b" },
-    }),
-  }));
-
   push_type(type_enum("Section_Permissions", (Enum_Type_Item[]){
     { "Read",    1 << 0 },
     { "Write",   1 << 1 },
