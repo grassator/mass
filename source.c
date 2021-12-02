@@ -2163,13 +2163,12 @@ token_handle_user_defined_operator_proc(
 }
 
 static inline Value *
-mass_make_lazy_value_with_epoch(
+mass_make_lazy_value(
   Mass_Context *context,
   Parser *parser,
   Source_Range source_range,
   void *payload,
   const Descriptor *descriptor,
-  Epoch epoch,
   Lazy_Value_Proc proc
 ) {
   allocator_allocate_bulk(context->allocator, combined, {
@@ -2179,7 +2178,7 @@ mass_make_lazy_value_with_epoch(
 
   Lazy_Value *lazy = &combined->lazy_value;
   *lazy = (Lazy_Value) {
-    .epoch = epoch,
+    .epoch = parser->epoch,
     .descriptor = descriptor,
     .proc = proc,
     .payload = payload,
@@ -2187,20 +2186,6 @@ mass_make_lazy_value_with_epoch(
   return value_init(
     &combined->value,
     &descriptor_lazy_value, storage_static(lazy), source_range
-  );
-}
-
-static inline Value *
-mass_make_lazy_value(
-  Mass_Context *context,
-  Parser *parser,
-  Source_Range source_range,
-  void *payload,
-  const Descriptor *descriptor,
-  Lazy_Value_Proc proc
-) {
-  return mass_make_lazy_value_with_epoch(
-    context, parser, source_range, payload, descriptor, parser->epoch, proc
   );
 }
 
