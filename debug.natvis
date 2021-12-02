@@ -13,4 +13,22 @@
             </ArrayItems>
         </Expand>
     </Type>
+	<Type Name="Register_Bitset">
+		<Expand>
+			<CustomListItems MaxItemsPerView="64">
+				<Variable Name="i" InitialValue="0" />
+				<Variable Name="reg" InitialValue="0" />
+				<Size>32</Size>
+				<Loop>
+					<Exec>reg = 0</Exec>
+					<If Condition="(bits &gt;&gt; i) &amp; 1">
+						<Exec>reg = i + 1</Exec>
+					</If>
+					<Item Condition="reg">(Register)reg</Item>
+					<Item>0</Item>
+					<Exec>i++</Exec>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
 </AutoVisualizer>
