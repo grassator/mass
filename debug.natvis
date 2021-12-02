@@ -24,8 +24,44 @@
 					<If Condition="(bits &gt;&gt; i) &amp; 1">
 						<Exec>reg = i + 1</Exec>
 					</If>
-					<Item Condition="reg">(Register)reg</Item>
-					<Item>0</Item>
+					<Item Condition="reg - 1 == Register_A">"A",sb</Item>
+					<Item Condition="reg - 1 == Register_B">"B",sb</Item>
+					<Item Condition="reg - 1 == Register_C">"C",sb</Item>
+					<Item Condition="reg - 1 == Register_D">"D",sb</Item>
+					<Item Condition="reg - 1 == Register_SI">"SI",sb</Item>
+					<Item Condition="reg - 1 == Register_DI">"DI",sb</Item>
+					<Item Condition="reg - 1 == Register_SP">"SP",sb</Item>
+					<Item Condition="reg - 1 == Register_BP">"BP",sb</Item>
+					
+					<Item Condition="reg - 1 == Register_R8">"R8",sb</Item>
+					<Item Condition="reg - 1 == Register_R9">"R9",sb</Item>
+					<Item Condition="reg - 1 == Register_R10">"R10",sb</Item>
+					<Item Condition="reg - 1 == Register_R11">"R11",sb</Item>
+					<Item Condition="reg - 1 == Register_R12">"R12",sb</Item>
+					<Item Condition="reg - 1 == Register_R13">"R13",sb</Item>
+					<Item Condition="reg - 1 == Register_R14">"R14",sb</Item>
+					<Item Condition="reg - 1 == Register_R15">"R15",sb</Item>
+
+					<!-- @Volatile :RegisterEnumValues -->
+					<Item Condition="reg - 1 == 16">"XMM0",sb</Item>
+					<Item Condition="reg - 1 == 17">"XMM1",sb</Item>
+					<Item Condition="reg - 1 == 18">"XMM2",sb</Item>
+					<Item Condition="reg - 1 == 19">"XMM3",sb</Item>
+					<Item Condition="reg - 1 == 20">"XMM4",sb</Item>
+					<Item Condition="reg - 1 == 21">"XMM5",sb</Item>
+					<Item Condition="reg - 1 == 22">"XMM6",sb</Item>
+					<Item Condition="reg - 1 == 23">"XMM7",sb</Item>
+
+					<Item Condition="reg - 1 == 24">"XMM8",sb</Item>
+					<Item Condition="reg - 1 == 25">"XMM9",sb</Item>
+					<Item Condition="reg - 1 == 26">"XMM10",sb</Item>
+					<Item Condition="reg - 1 == 27">"XMM11",sb</Item>
+					<Item Condition="reg - 1 == 28">"XMM12",sb</Item>
+					<Item Condition="reg - 1 == 29">"XMM13",sb</Item>
+					<Item Condition="reg - 1 == 30">"XMM14",sb</Item>
+					<Item Condition="reg - 1 == 31">"XMM15",sb</Item>
+					
+					<Item>"",sb</Item>
 					<Exec>i++</Exec>
 				</Loop>
 			</CustomListItems>

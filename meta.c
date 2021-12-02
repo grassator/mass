@@ -1265,6 +1265,7 @@ main(void) {
     { "Section", "ro_data" },
   }));
 
+  // @Volatile :RegisterEnumValues
   push_type(type_enum("Register", (Enum_Type_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
