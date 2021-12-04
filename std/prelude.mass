@@ -213,8 +213,17 @@ Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
   length := meta.reify(arguments.values.1, i64).*
   t := allocate(context.allocator, MASS.Descriptor)
 
+  raw_bit_size : i64 = unsigned_multiply(item_type.bit_size.as_u64, length)
+  if raw_bit_size & 0xffff_ffff_8000_0000 != 0 then {
+    error : MASS.Error
+    error.tag = MASS.Error_Tag.Integer_Range
+    error.source_range = arguments.source_range
+    meta.context_error(context, error)
+    return 0
+  } else {}
+
   t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
-  t.bit_size = [unsigned_multiply(item_type.bit_size.as_u64, length)]
+  t.bit_size = [raw_bit_size]
   t.bit_alignment = item_type.bit_alignment
   t.Fixed_Size_Array = [item_type, length]
 
