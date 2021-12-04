@@ -309,73 +309,11 @@ win32_program_test_exception_handler(
               Value *value = scope_entry->value;
               if (value) {
                 if (value->descriptor->name.length) {
-                  // TODO print actual value
+                  // TODO print the actual value
                   printf("%"PRIslice" {0}", SLICE_EXPAND_PRINTF(value->descriptor->name));
                   puts("");
                 }
-                // TODO
-                //print_operand(&value->storage);
-                //puts("");
-                if (value->descriptor == &descriptor_s64) {
-                  // TODO
-                  //switch(value->storage.tag) {
-                    //default:
-                    //case Storage_Tag_None:
-                    //case Storage_Tag_Any:
-                    //case Storage_Tag_Static:
-                    //case Storage_Tag_Eflags:
-                    //case Storage_Tag_Xmm:
-                    //case Storage_Tag_Memory: {
-                      //panic("TODO implement printing this storage type");
-                      //break;
-                    //}
-                    //case Storage_Tag_Register: {
-                      //assert(value->storage.byte_size == 8);
-                      //DWORD64 register_value = 0;
-                      //switch(value->storage.Register.index) {
-                        //case Register_A: register_value = ContextRecord->Rax; break;
-                        //case Register_C: register_value = ContextRecord->Rcx; break;
-                        //case Register_D: register_value = ContextRecord->Rdx; break;
-                        //case Register_B: register_value = ContextRecord->Rbx; break;
-                        //case Register_SP: register_value = ContextRecord->Rsp; break;
-                        //case Register_BP: register_value = ContextRecord->Rbp; break;
-                        //case Register_SI: register_value = ContextRecord->Rsi; break;
-                        //case Register_DI: register_value = ContextRecord->Rdi; break;
-                        //case Register_R8: register_value = ContextRecord->R8; break;
-                        //case Register_R9: register_value = ContextRecord->R9; break;
-                        //case Register_R10: register_value = ContextRecord->R10; break;
-                        //case Register_R11: register_value = ContextRecord->R11; break;
-                        //case Register_R12: register_value = ContextRecord->R12; break;
-                        //case Register_R13: register_value = ContextRecord->R13; break;
-                        //case Register_R14: register_value = ContextRecord->R14; break;
-                        //case Register_R15: register_value = ContextRecord->R15; break;
-                        //case Register_Xmm0:
-                        //case Register_Xmm1:
-                        //case Register_Xmm2:
-                        //case Register_Xmm3:
-                        //case Register_Xmm4:
-                        //case Register_Xmm5:
-                        //case Register_Xmm6:
-                        //case Register_Xmm7:
-                        //case Register_Xmm8:
-                        //case Register_Xmm9:
-                        //case Register_Xmm10:
-                        //case Register_Xmm11:
-                        //case Register_Xmm12:
-                        //case Register_Xmm13:
-                        //case Register_Xmm14:
-                        //case Register_Xmm15:
-                        //default: {
-                          //printf("TODO support XMM registers\n");
-                          //break;
-                        //}
-                      //}
-                      //printf("0x%016llX\n", register_value);
-                    //}
-                  //}
-                } else {
-                  printf("TODO support generic printing of values\n");
-                }
+                printf("TODO support generic printing of values\n");
               } else {
                 printf("No debug information for current IP is available\n");
               }
