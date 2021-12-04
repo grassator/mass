@@ -53,7 +53,6 @@ Symbol :: MASS.Symbol
 true :: cast(bool, 1)
 false :: cast(bool, 0)
 
-// FIXME :NoReturn this is not really a `void`
 assert :: fn(condition : bool, message := "Assertion failed\n") -> () {
   // TODO add something like MASS.intrinsic_assert or MASS.intrinsic_print
   //      that would be safe to call without a risk or circular dependencies
@@ -65,7 +64,6 @@ assert :: fn(condition : bool, message := "Assertion failed\n") -> () {
   }
 }
 
-// FIXME :NoReturn this is not really a `void`
 static_assert :: fn(condition : bool, message : String = "") => () MASS.static_assert
 
 apply :: fn(symbol :: 'module, curly : MASS.Ast_Block) -> (MASS.Module) MASS.inline_module
