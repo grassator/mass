@@ -4664,11 +4664,11 @@ mass_handle_comparison(
   Value *rhs = token_parse_single(context, parser, value_view_get(arguments, 1));
   if (mass_has_error(context)) return 0;
 
-  if (value_is_i64(rhs)) {
+  if (value_is_i64(rhs) && value_or_lazy_value_descriptor(lhs) != &descriptor_i64) {
     rhs = token_value_force_immediate_integer(
       context, rhs, value_or_lazy_value_descriptor(lhs), &arguments.source_range
     );
-  } else if (value_is_i64(lhs)) {
+  } else if (value_is_i64(lhs) && value_or_lazy_value_descriptor(rhs) != &descriptor_i64) {
     lhs = token_value_force_immediate_integer(
       context, lhs, value_or_lazy_value_descriptor(rhs), &arguments.source_range
     );
