@@ -196,7 +196,7 @@ spec("source") {
     it("should be able to set and lookup values") {
       Value *test = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(42), (Source_Range){0}
+        &descriptor_i64, imm64(42), (Source_Range){0}
       );
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
@@ -208,7 +208,7 @@ spec("source") {
     it("should be able to lookup things from parent scopes") {
       Value *global = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(42), (Source_Range){0}
+        &descriptor_i64, imm64(42), (Source_Range){0}
       );
       Scope *root_scope = scope_make(test_context.allocator, 0);
       const Symbol *global_symbol = mass_ensure_symbol(&test_compilation, slice_literal("global"));
@@ -217,14 +217,14 @@ spec("source") {
       const Symbol *test_symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       Value *level_1_test = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(1), (Source_Range){0}
+        &descriptor_i64, imm64(1), (Source_Range){0}
       );
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define_value(scope_level_1, (Epoch){0}, (Source_Range){0}, test_symbol, level_1_test);
 
       Value *level_2_test = value_init(
         allocator_allocate(test_context.allocator, Value),
-        &descriptor_s64, imm64(2), (Source_Range){0}
+        &descriptor_i64, imm64(2), (Source_Range){0}
       );
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define_value(scope_level_2, (Epoch){0}, (Source_Range){0}, test_symbol,  level_2_test);
@@ -1269,18 +1269,6 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Assignment_To_Constant);
     }
-
-    it("should report type mismatch when assigning") {
-      test_program_inline_source_base(
-        "test", &test_context,
-        "test :: fn() -> () { x : s32 = 0; y : s64 = 1; x = y; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_s32);
-      check(error->Type_Mismatch.actual == &descriptor_s64);
-    }
     it("should report an error when LHS of the := is not a symbol") {
       test_program_inline_source_base(
         "main", &test_context,
@@ -1795,14 +1783,14 @@ spec("source") {
     it("should type check macro return value if it is defined") {
       test_program_inline_source_base(
         "checker", &test_context,
-        "oops :: macro() -> (s64) { \"oops\" }\n"
-        "checker :: fn() -> (s64) { oops() }"
+        "oops :: macro() -> (i64) { 42000000000 }\n"
+        "checker :: fn() -> (i16) { oops() }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_s64);
-      check(error->Type_Mismatch.actual == &descriptor_slice);
+      check(error->Type_Mismatch.expected == &descriptor_i16);
+      check(error->Type_Mismatch.actual == &descriptor_i64);
     }
 
     it("should support macro parameters without type assertions") {
