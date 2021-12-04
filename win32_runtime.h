@@ -32,7 +32,7 @@ typedef struct {
   Compilation *compilation;
 } Win32_Exception_Data;
 
-void
+static void
 win32_print_register_state(
   CONTEXT *ContextRecord
 ) {
@@ -105,7 +105,7 @@ typedef struct {
   u32 trampoline_rva;
 } Win32_Jit_Info;
 
-s64
+static s64
 win32_get_function_index_from_address(
   DWORD64 instruction_address,
   Jit *jit
@@ -138,7 +138,7 @@ win32_get_function_index_from_address(
   return -1;
 }
 
-RUNTIME_FUNCTION *
+static RUNTIME_FUNCTION *
 win32_get_runtime_function_callback(
   DWORD64 instruction_address,
   Jit *jit
@@ -150,7 +150,7 @@ win32_get_runtime_function_callback(
 }
 
 
-const Instruction *
+static const Instruction *
 win32_instruction_for_address(
   DWORD64 instruction_address,
   Jit *jit,
@@ -237,7 +237,7 @@ win32_print_stack(
   win32_print_stack(stack_pointer, return_address, compilation, jit);
 }
 
-EXCEPTION_DISPOSITION
+static EXCEPTION_DISPOSITION
 win32_program_test_exception_handler(
   EXCEPTION_RECORD *ExceptionRecord,
   u64 EstablisherFrame,
@@ -501,8 +501,8 @@ win32_section_protect_from(
   }
 }
 
-void *win32_load_library(const char *name) { return LoadLibraryA(name); }
-void *win32_load_symbol(void *handle, const char *name) { return (void *)GetProcAddress(handle, name); }
+static void *win32_load_library(const char *name) { return LoadLibraryA(name); }
+static void *win32_load_symbol(void *handle, const char *name) { return (void *)GetProcAddress(handle, name); }
 
 static const Native_Library_Load_Callbacks win32_library_load_callbacks = {
   .load_library = win32_load_library,
