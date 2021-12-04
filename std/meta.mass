@@ -4,14 +4,10 @@ Value :: MASS.Value
 Source_Range :: MASS.Source_Range
 same_type :: MASS.same_type
 
-compilation_error :: fn(context : &MASS.Compilation, error : MASS.Error) {
-  assert(context.result.tag == MASS.Result_Tag.Success)
-  context.result.tag = MASS.Result_Tag.Error
-  context.result.Error.error = error
-}
-
 context_error :: fn(context : &MASS.Context, error : MASS.Error) {
-  compilation_error(context.compilation, error)
+  assert(context.compilation.result.tag == MASS.Result_Tag.Success)
+  context.compilation.result.tag = MASS.Result_Tag.Error
+  context.compilation.result.Error.error = error
 }
 
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
