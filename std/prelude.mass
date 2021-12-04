@@ -161,10 +161,7 @@ unsigned_greater :: MASS.i64_unsigned_greater
 signed_greater_equal :: MASS.i64_signed_greater_equal
 unsigned_greater_equal :: MASS.i64_unsigned_greater_equal
 
-// TODO this should return twos complement and still `i64`
-negate :: fn(literal : i64) => (s64) {
-  -cast(s64, literal)
-}
+negate :: fn(x : i64) => (i64) { 0 - x }
 
 logical_shift_left :: MASS.i64_logical_shift_left
 logical_shift_right :: MASS.i64_logical_shift_right
