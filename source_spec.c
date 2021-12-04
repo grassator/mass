@@ -1138,8 +1138,7 @@ spec("source") {
       check(checker() == 42);
     }
 
-    // FIXME :IntrinsicReturnType
-    xit("should validate the return type of the intrinsic when specified") {
+    it("should validate the return type of the intrinsic when specified") {
       test_program_inline_source_function(
         "checker", &test_context,
         "intrinsic_id :: fn(x : i64, y : String) -> (i64) intrinsic { arguments.values.1 }\n"
