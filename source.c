@@ -1990,13 +1990,13 @@ token_match_argument(
     maybe_default_value = compile_time_eval(context, parser, default_expression);
     if (is_inferred_type) {
       descriptor = deduce_runtime_descriptor_for_value(context, maybe_default_value, 0);
-      //if (!descriptor) {
-        //mass_error(context, (Mass_Error) {
-          //.tag = Mass_Error_Tag_No_Runtime_Use,
-          //.source_range = maybe_default_value->source_range,
-        //});
-        //goto err;
-      //}
+      if (!descriptor) {
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_No_Runtime_Use,
+          .source_range = maybe_default_value->source_range,
+        });
+        goto err;
+      }
     }
   }
 
