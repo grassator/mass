@@ -1509,36 +1509,6 @@ tokenizer_push_string_literal(
 
 #include "generated_tokenizer.c"
 
-typedef struct {
-  Value_View view;
-  u32 index;
-  bool done;
-} Value_View_Split_Iterator;
-
-static Value_View
-token_split_next(
-  Value_View_Split_Iterator *it,
-  const Symbol *separator
-) {
-  if (it->done) return (Value_View){0};
-  u32 start_index = it->index;
-  for (
-    ;
-    it->index < it->view.length;
-    it->index++
-  ) {
-    Value *token = value_view_get(it->view, it->index);
-    if (value_is_symbol(token) && value_as_symbol(token) == separator) {
-      Value_View result = value_view_slice(&it->view, start_index, it->index);
-      // Skip over the separator
-      it->index++;
-      return result;
-    }
-  }
-  it->done = true;
-  return value_view_rest(&it->view, start_index);
-}
-
 static inline const Descriptor *
 value_ensure_type(
   Mass_Context *context,
@@ -5889,8 +5859,13 @@ function_info_from_parameters_and_return(
       .capacity = 32,
     );
 
-    for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
-      Value_View param_view = token_split_next(&it, context->compilation->common_symbols.operator_comma);
+    const Symbol *comma = context->compilation->common_symbols.operator_comma;
+
+    u32 match_length;
+    for (Value_View rest = args_view; rest.length; rest = value_view_rest(&rest, match_length)) {
+      match_length = 0;
+      Value_View param_view = value_view_match_till_symbol(rest, &match_length, comma);
+      assert(match_length);
       Function_Parameter param = token_match_argument(context, &arg_parser, param_view, fn_info);
       if (mass_has_error(context)) goto defer;
       dyn_array_push(temp_params, param);
