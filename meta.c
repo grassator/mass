@@ -1727,6 +1727,11 @@ main(void) {
     { "Array_Value_Ptr", "items"},
   })));
 
+  export_compiler(push_type(type_struct("List_Node", (Struct_Item[]){
+    { "const List_Node *", "maybe_previous" },
+    { "Value *", "value" },
+  })));
+
   push_type(type_struct("Typed_Symbol", (Struct_Item[]){
     { "const Symbol *", "symbol"},
     { "const Descriptor *", "descriptor"},

@@ -1627,23 +1627,42 @@ token_match_type(
 );
 
 static Value *
+token_parse_single(
+  Mass_Context *context,
+  Parser *parser,
+  Value *value
+);
+
+static Value *
 token_parse_tuple(
   Mass_Context *context,
   Parser *parser,
   Value_View view
 ) {
   Value_View remaining = view;
-  u32 match_length = 0;
 
   Value *result_value = 0;
 
-  // Use temp allocator first for the parse
-  Array_Value_Ptr items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
-  for (; remaining.length; remaining = value_view_rest(&remaining, match_length)) {
-    if (mass_has_error(context)) goto err;
-    const Symbol *end_symbol = context->compilation->common_symbols.operator_comma;
-    Value *item = token_parse_expression(context, parser, remaining, &match_length, end_symbol);
-    dyn_array_push(items, item);
+  Value *list = token_parse_expression(context, parser, remaining, &(u32){0}, 0);
+  if (mass_has_error(context)) return 0;
+
+  Array_Value_Ptr items;
+  if (value_is_list_node(list)) {
+    const List_Node *node = value_as_list_node(list);
+    u64 length = 0;
+    for (const List_Node *it = node; it; it = it->maybe_previous) {
+      length++;
+    }
+    items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator, .capacity = length);
+    items.data->length = length;
+    u64 index = 0;
+    for (const List_Node *it = node; it; it = it->maybe_previous) {
+      index++;
+      *dyn_array_get(items, length - index) = token_parse_single(context, parser, it->value);
+    }
+  } else {
+    items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator, .capacity = 1);
+    dyn_array_push(items, list);
   }
 
   allocator_allocate_bulk(context->allocator, combined, {
@@ -1658,7 +1677,7 @@ token_parse_tuple(
   };
   Storage result_storage = storage_static_heap(tuple, descriptor_tuple.bit_size);
   result_value = value_init(&combined->value, &descriptor_tuple, result_storage, view.source_range);
-  err:
+
   return result_value;
 }
 
@@ -5568,6 +5587,36 @@ mass_handle_dot_operator(
   return mass_get(context, parser, args_view);
 }
 
+static Value *
+mass_handle_comma_operator(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view,
+  const Operator *operator
+) {
+  assert(args_view.length == 2);
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = value_view_get(args_view, 1);
+  const List_Node *previous;
+  if (value_is_list_node(lhs)) {
+    previous = value_as_list_node(lhs);
+  } else {
+    List_Node *node = mass_allocate(context, List_Node);
+    *node = (List_Node) {
+      .value = lhs,
+      .maybe_previous = 0,
+    };
+    previous = node;
+  }
+  List_Node *result = mass_allocate(context, List_Node);
+  *result = (List_Node){
+    .value = rhs,
+    .maybe_previous = previous,
+  };
+
+  return value_make(context->allocator, &descriptor_list_node, storage_static(result), args_view.source_range);
+}
+
 static void
 token_dispatch_operator(
   Mass_Context *context,
@@ -6702,6 +6751,15 @@ scope_define_builtins(
     mass_ensure_symbol(compilation, slice_literal("MASS")), compiler_module_value
   );
 
+  Source_Range comma_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&comma_source_range, ",");
+  scope_define_operator(&context, scope, comma_source_range, slice_literal(","), allocator_make(allocator, Operator,
+    .precedence = 0,
+    .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_comma_operator,
+  ));
   Source_Range dot_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_source_range, ".");
   scope_define_operator(&context, scope, dot_source_range, slice_literal("."), allocator_make(allocator, Operator,

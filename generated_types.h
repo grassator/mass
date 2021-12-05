@@ -527,6 +527,10 @@ typedef struct Tuple Tuple;
 typedef dyn_array_type(Tuple *) Array_Tuple_Ptr;
 typedef dyn_array_type(const Tuple *) Array_Const_Tuple_Ptr;
 
+typedef struct List_Node List_Node;
+typedef dyn_array_type(List_Node *) Array_List_Node_Ptr;
+typedef dyn_array_type(const List_Node *) Array_Const_List_Node_Ptr;
+
 typedef struct Typed_Symbol Typed_Symbol;
 typedef dyn_array_type(Typed_Symbol *) Array_Typed_Symbol_Ptr;
 typedef dyn_array_type(const Typed_Symbol *) Array_Const_Typed_Symbol_Ptr;
@@ -1652,6 +1656,12 @@ typedef struct Tuple {
 } Tuple;
 typedef dyn_array_type(Tuple) Array_Tuple;
 
+typedef struct List_Node {
+  const List_Node * maybe_previous;
+  Value * value;
+} List_Node;
+typedef dyn_array_type(List_Node) Array_List_Node;
+
 typedef struct Typed_Symbol {
   const Symbol * symbol;
   const Descriptor * descriptor;
@@ -2468,6 +2478,11 @@ static Descriptor descriptor_array_tuple;
 static Descriptor descriptor_array_tuple_ptr;
 static Descriptor descriptor_tuple_pointer;
 static Descriptor descriptor_tuple_pointer_pointer;
+static Descriptor descriptor_list_node;
+static Descriptor descriptor_array_list_node;
+static Descriptor descriptor_array_list_node_ptr;
+static Descriptor descriptor_list_node_pointer;
+static Descriptor descriptor_list_node_pointer_pointer;
 static Descriptor descriptor_typed_symbol;
 static Descriptor descriptor_array_typed_symbol;
 static Descriptor descriptor_array_typed_symbol_ptr;
@@ -4692,6 +4707,23 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
 MASS_DEFINE_TYPE_VALUE(tuple);
 DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple);
 DEFINE_VALUE_IS_AS_HELPERS(Tuple *, tuple_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_list_node_ptr, Array_List_Node_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_list_node, Array_List_Node)
+MASS_DEFINE_STRUCT_DESCRIPTOR(list_node, List_Node,
+  {
+    .descriptor = &descriptor_list_node_pointer,
+    .name = slice_literal_fields("maybe_previous"),
+    .offset = offsetof(List_Node, maybe_previous),
+  },
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("value"),
+    .offset = offsetof(List_Node, value),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(list_node);
+DEFINE_VALUE_IS_AS_HELPERS(List_Node, list_node);
+DEFINE_VALUE_IS_AS_HELPERS(List_Node *, list_node_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol_ptr, Array_Typed_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol, Array_Typed_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(typed_symbol, Typed_Symbol,

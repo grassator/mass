@@ -299,6 +299,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Tuple")),
     type_tuple_value
   );
+  Source_Range List_Node__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&List_Node__source_range, "List_Node");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, List_Node__source_range,
+    mass_ensure_symbol(compilation, slice_literal("List_Node")),
+    type_list_node_value
+  );
   Source_Range Descriptor__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Descriptor__source_range, "Descriptor");
   scope_define_value(
