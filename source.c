@@ -1633,6 +1633,35 @@ token_parse_single(
   Value *value
 );
 
+static Array_Value_Ptr
+mass_parse_maybe_list_into_value_array(
+  Mass_Context *context,
+  Parser *parser,
+  Value *list
+) {
+  Array_Value_Ptr result;
+  if (value_is_list_node(list)) {
+    const List_Node *node = value_as_list_node(list);
+    u64 length = 0;
+    for (const List_Node *it = node; it; it = it->maybe_previous) {
+      length++;
+    }
+    result = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator, .capacity = length);
+    result.data->length = length;
+    u64 index = 0;
+    for (const List_Node *it = node; it; it = it->maybe_previous) {
+      index++;
+      *dyn_array_get(result, length - index) = token_parse_single(context, parser, it->value);
+      if (mass_has_error(context)) goto err;
+    }
+  } else {
+    result = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator, .capacity = 1);
+    dyn_array_push(result, list);
+  }
+  err:
+  return result;
+}
+
 static Value *
 token_parse_tuple(
   Mass_Context *context,
@@ -1645,25 +1674,8 @@ token_parse_tuple(
 
   Value *list = token_parse_expression(context, parser, remaining, &(u32){0}, 0);
   if (mass_has_error(context)) return 0;
-
-  Array_Value_Ptr items;
-  if (value_is_list_node(list)) {
-    const List_Node *node = value_as_list_node(list);
-    u64 length = 0;
-    for (const List_Node *it = node; it; it = it->maybe_previous) {
-      length++;
-    }
-    items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator, .capacity = length);
-    items.data->length = length;
-    u64 index = 0;
-    for (const List_Node *it = node; it; it = it->maybe_previous) {
-      index++;
-      *dyn_array_get(items, length - index) = token_parse_single(context, parser, it->value);
-    }
-  } else {
-    items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator, .capacity = 1);
-    dyn_array_push(items, list);
-  }
+  Array_Value_Ptr items = mass_parse_maybe_list_into_value_array(context, parser, list);
+  if (mass_has_error(context)) return 0;
 
   allocator_allocate_bulk(context->allocator, combined, {
     Tuple tuple;
@@ -2123,29 +2135,6 @@ value_force_exact(
   if (mass_descriptor_is_void(target->descriptor)) {
     assert(forced->descriptor == target->descriptor);
     assert(storage_equal(&forced->storage, &target->storage));
-  }
-}
-
-static void
-token_match_call_arguments(
-  Mass_Context *context,
-  Parser *parser,
-  const Group_Paren *args_group,
-  Array_Value_Ptr *out_args
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  dyn_array_clear(*out_args);
-
-  if (args_group->children.length == 0) return;
-
-  Value_View_Split_Iterator it = { .view = args_group->children };
-
-  while (!it.done) {
-    if (context->result->tag != Mass_Result_Tag_Success) return;
-    Value_View view = token_split_next(&it, context->compilation->common_symbols.operator_comma);
-    Value *parse_result = token_parse_expression(context, parser, view, &(u32){0}, 0);
-    dyn_array_push(*out_args, parse_result);
   }
 }
 
@@ -4160,14 +4149,16 @@ token_handle_parsed_function_call(
 
   Value_View args_view;
   if(value_is_group_paren(args_token)) {
-    Array_Value_Ptr temp_args = dyn_array_make(
-      Array_Value_Ptr,
-      .allocator = context->temp_allocator,
-      .capacity = 32,
-    );
-    token_match_call_arguments(context, parser, value_as_group_paren(args_token), &temp_args);
-    if (mass_has_error(context)) goto defer;
-    args_view = value_view_from_value_array(temp_args, &source_range);
+    Value_View children = value_as_group_paren(args_token)->children;
+    if (children.length) {
+      Value *list = token_parse_expression(context, parser, children, &(u32){0}, 0);
+      if (mass_has_error(context)) return 0;
+      Array_Value_Ptr args = mass_parse_maybe_list_into_value_array(context, parser, list);
+      if (mass_has_error(context)) return 0;
+      args_view = value_view_from_value_array(args, &source_range);
+    } else {
+      args_view = (Value_View){.source_range = source_range};
+    }
   } else if (args_token->descriptor == &descriptor_value_view) {
     if (!mass_value_is_compile_time_known(args_token)) {
       mass_error(context, (Mass_Error) {
