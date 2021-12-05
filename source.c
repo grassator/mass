@@ -1289,7 +1289,7 @@ temp_token_array_into_value_view(
 }
 
 typedef struct {
-  const Descriptor *descriptor;
+  Value *value;
   u64 index;
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
@@ -1331,18 +1331,16 @@ tokenizer_maybe_push_statement(
 ) {
   assert(dyn_array_length(*parent_stack));
   Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
-  if(parent->descriptor != &descriptor_ast_block) return false;
+  if(parent->value->descriptor != &descriptor_ast_block) return false;
   bool has_children = parent->index + 1 != dyn_array_length(*stack);
   // Do not treat leading newlines as semicolons
   if (!has_children) return true;
 
-  Value *parent_value = *dyn_array_get(*stack, parent->index);
-
-  Ast_Block *group = (Ast_Block *)value_as_ast_block(parent_value);
+  Ast_Block *group = (Ast_Block *)value_as_ast_block(parent->value);
 
   assert(offset);
   Value_View statement = tokenizer_make_group_children_view(
-    context->allocator, stack, parent, parent_value, offset
+    context->allocator, stack, parent, parent->value, offset
   );
   dyn_array_push(group->statements, statement);
   return true;
@@ -1361,7 +1359,7 @@ tokenizer_group_start(
     group_descriptor, storage_none, source_range
   );
   dyn_array_push(*parent_stack, (Tokenizer_Parent){
-    .descriptor = group_descriptor,
+    .value = value,
     .index = dyn_array_length(*stack)
   });
   dyn_array_push(*stack, value);
