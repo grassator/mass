@@ -583,7 +583,7 @@ typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
 typedef u32 (*Token_Statement_Matcher_Proc)
-  (Mass_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value, void * payload);
+  (Mass_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value);
 
 typedef void (*Mass_Trampoline_Proc)
   (void * payload);
@@ -1387,7 +1387,6 @@ typedef dyn_array_type(Operator) Array_Operator;
 typedef struct Token_Statement_Matcher {
   const Token_Statement_Matcher * previous;
   Token_Statement_Matcher_Proc proc;
-  void * payload;
 } Token_Statement_Matcher;
 typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
@@ -3966,11 +3965,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
     .name = slice_literal_fields("proc"),
     .offset = offsetof(Token_Statement_Matcher, proc),
   },
-  {
-    .descriptor = &descriptor_void_pointer,
-    .name = slice_literal_fields("payload"),
-    .offset = offsetof(Token_Statement_Matcher, payload),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(token_statement_matcher);
 DEFINE_VALUE_IS_AS_HELPERS(Token_Statement_Matcher, token_statement_matcher);
@@ -5349,10 +5343,6 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_lazy_value_pointer,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_void_pointer,
   }
 )
 MASS_DEFINE_FUNCTION_DESCRIPTOR(

@@ -139,7 +139,7 @@ scope_statement_matcher_shallow(
 ) {
   const Token_Statement_Matcher *matcher = scope->statement_matcher;
   for (; matcher; matcher = matcher->previous) {
-    u32 match_length = matcher->proc(context, parser, view, out_lazy_value, matcher->payload);
+    u32 match_length = matcher->proc(context, parser, view, out_lazy_value);
 
     if (mass_has_error(context)) return 0;
     if (match_length) return match_length;
@@ -2230,8 +2230,7 @@ token_parse_operator_definition(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_data
+  Lazy_Value *out_lazy_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -2406,7 +2405,6 @@ mass_push_token_matcher(
   *matcher = (Token_Statement_Matcher){
     .previous = parser->scope->statement_matcher,
     .proc = proc,
-    .payload = payload,
   };
   parser->scope->statement_matcher = matcher;
 }
@@ -2466,8 +2464,7 @@ token_parse_while(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *payload
+  Lazy_Value *out_lazy_value
 ) {
   if (mass_has_error(context)) return 0;
 
@@ -2857,8 +2854,7 @@ token_parse_constant_definitions(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
+  Lazy_Value *out_lazy_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -6389,8 +6385,7 @@ token_parse_statement_using(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
+  Lazy_Value *out_lazy_value
 ) {
   u32 peek_index = 0;
   Value *keyword = value_view_maybe_match_cached_symbol(
@@ -6567,8 +6562,7 @@ token_parse_definition_and_assignment_statements(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
+  Lazy_Value *out_lazy_value
 ) {
   Value_View lhs;
   Value_View rhs;

@@ -1518,7 +1518,6 @@ main(void) {
   push_type(type_struct("Token_Statement_Matcher", (Struct_Item[]){
     { "const Token_Statement_Matcher *", "previous" },
     { "Token_Statement_Matcher_Proc", "proc" },
-    { "void *", "payload" },
   }));
 
   push_type(type_struct("Scope_Entry", (Struct_Item[]){
@@ -1891,7 +1890,6 @@ main(void) {
     { "Parser *", "parser" },
     { "Value_View", "view" },
     { "Lazy_Value *", "out_lazy_value" },
-    { "void *", "payload" },
   }));
 
   push_type(type_function(Typedef, "Mass_Trampoline_Proc", "void", (Argument_Type[]){
