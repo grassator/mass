@@ -2250,9 +2250,7 @@ token_parse_operator_definition(
 
   Value_View rest = value_view_rest(&view, peek_index);
   u32 body_length;
-  Value *body = token_parse_expression(
-    context, parser, rest, &body_length, context->compilation->common_symbols.operator_semicolon
-  );
+  Value *body = token_parse_expression(context, parser, rest, &body_length, 0);
   if (mass_has_error(context)) goto err;
 
   if (!body_length) { context_parse_error(context, parser, view, peek_index); goto err; }
@@ -2500,14 +2498,10 @@ token_parse_while(
   Value *body_token = value_view_next(view, &peek_index);
   assert(value_is_ast_block(body_token));
   if (view.length != peek_index) {
-    Value *semicolon = value_view_next(view, &peek_index);
-    const Symbol* symbol = context->compilation->common_symbols.operator_semicolon;
-    if (!value_is_symbol(semicolon) || value_as_symbol(semicolon) != symbol) {
-      return mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = semicolon->source_range,
-      });
-    }
+    return mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = value_view_rest(&view, peek_index).source_range,
+    });
   }
 
   Mass_While *lazy_payload = mass_allocate(context, Mass_While);

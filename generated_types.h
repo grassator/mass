@@ -2037,7 +2037,6 @@ typedef struct Common_Symbols {
   const Symbol * operator_dot;
   const Symbol * operator_equal;
   const Symbol * operator_fat_arrow;
-  const Symbol * operator_semicolon;
   const Symbol * operator_space;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
@@ -5572,11 +5571,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_fat_arrow"),
     .offset = offsetof(Common_Symbols, operator_fat_arrow),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("operator_semicolon"),
-    .offset = offsetof(Common_Symbols, operator_semicolon),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

@@ -2005,7 +2005,6 @@ main(void) {
     { "const Symbol *", "operator_dot" },
     { "const Symbol *", "operator_equal" },
     { "const Symbol *", "operator_fat_arrow" },
-    { "const Symbol *", "operator_semicolon" },
     { "const Symbol *", "operator_space" },
   }));
 
