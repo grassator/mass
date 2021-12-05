@@ -129,7 +129,7 @@ scope_make(
   return scope;
 }
 
-static inline u32
+static inline bool
 scope_statement_matcher_shallow(
   Mass_Context *context,
   Parser *parser,
@@ -138,16 +138,16 @@ scope_statement_matcher_shallow(
   const Scope *scope
 ) {
   const Token_Statement_Matcher *matcher = scope->statement_matcher;
+  // Do a reverse iteration because we want statements that are defined later
+  // to have higher precedence when parsing
   for (; matcher; matcher = matcher->previous) {
-    u32 match_length = matcher->proc(context, parser, view, out_lazy_value);
-
-    if (mass_has_error(context)) return 0;
-    if (match_length) return match_length;
+    if (matcher->proc(context, parser, view, out_lazy_value)) return true;
+    if (mass_has_error(context)) return true;
   }
-  return 0;
+  return false;
 }
 
-static inline u32
+static inline bool
 token_statement_matcher_in_scopes(
   Mass_Context *context,
   Parser *parser,
@@ -156,12 +156,11 @@ token_statement_matcher_in_scopes(
   const Scope *scope
 ) {
   for (; scope; scope = scope->parent) {
-    // Do a reverse iteration because we want statements that are defined later
-    // to have higher precedence when parsing
-    u32 match_length = scope_statement_matcher_shallow(context, parser, view, out_lazy_value, scope);
-    if (match_length) return match_length;
+    if (scope_statement_matcher_shallow(context, parser, view, out_lazy_value, scope)) {
+      return true;
+    }
   }
-  return 0;
+  return false;
 }
 
 static void
@@ -2225,15 +2224,13 @@ mass_exports(
   return result;
 }
 
-static u32
+static bool
 token_parse_operator_definition(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   u32 peek_index = 0;
   Value *keyword_token = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.operator
@@ -2350,7 +2347,7 @@ token_parse_operator_definition(
   );
 
   err:
-  return peek_index;
+  return true;
 }
 
 static Value *
@@ -2459,15 +2456,13 @@ mass_handle_while_lazy_proc(
   return void_value;
 }
 
-static u32
+static bool
 token_parse_while(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value
 ) {
-  if (mass_has_error(context)) return 0;
-
   u32 peek_index = 0;
   Value *keyword_token = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols._while
@@ -2483,19 +2478,21 @@ token_parse_while(
   }
   Value_View condition_view = value_view_slice(&view, condition_start_index, peek_index);
   if (peek_index == view.length) {
-    return mass_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = value_view_rest(&view, peek_index).source_range,
     });
+    return false;
   }
 
   Value *body_token = value_view_next(view, &peek_index);
   assert(value_is_ast_block(body_token));
   if (view.length != peek_index) {
-    return mass_error(context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = value_view_rest(&view, peek_index).source_range,
     });
+    return false;
   }
 
   Mass_While *lazy_payload = mass_allocate(context, Mass_While);
@@ -2507,7 +2504,7 @@ token_parse_while(
   out_lazy_value->proc = mass_handle_while_lazy_proc;
   out_lazy_value->payload = lazy_payload;
 
-  return peek_index;
+  return true;
 }
 
 static Value *
@@ -2849,21 +2846,19 @@ token_handle_operator(
   return true;
 }
 
-static u32
+static bool
 token_parse_constant_definitions(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
   Lazy_Value *out_lazy_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   Value_View lhs;
   Value_View rhs;
   Value *operator;
 
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
-    return 0;
+    return false;
   }
   if (lhs.length > 1) {
     mass_error(context, (Mass_Error) {
@@ -2890,7 +2885,7 @@ token_parse_constant_definitions(
   scope_define_lazy_compile_time_expression(context, parser, parser->scope, value_as_symbol(symbol), rhs);
 
   err:
-  return view.length;
+  return true;
 }
 
 static Value *
@@ -6262,17 +6257,9 @@ token_parse_block_statements(
       .descriptor = &descriptor_void,
     };
 
-    u32 match_length = token_statement_matcher_in_scopes(context, parser, *statement, &lazy_value, parser->scope);
+    bool matched = token_statement_matcher_in_scopes(context, parser, *statement, &lazy_value, parser->scope);
     if (mass_has_error(context)) goto defer;
-    if (match_length) {
-      if (match_length != statement->length) {
-        Value_View remainder = value_view_rest(statement, match_length);
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = remainder.source_range,
-        });
-        goto defer;
-      }
+    if (matched) {
       // If the statement did not assign a proc that means that it does not need
       // to output any instructions and there is nothing to force.
       if (lazy_value.proc) {
@@ -6289,6 +6276,7 @@ token_parse_block_statements(
         dyn_array_push(temp_lazy_statements, &combined->value);
       }
     } else {
+      u32 match_length = 0;
       Value *parse_result = token_parse_expression(context, parser, *statement, &match_length, 0);
       if (mass_has_error(context)) goto defer;
 
@@ -6380,7 +6368,7 @@ token_parse_block(
   return token_parse_block_statements(context, &block_parser, group->statements, source_range);
 }
 
-static u32
+static bool
 token_parse_statement_using(
   Mass_Context *context,
   Parser *parser,
@@ -6393,7 +6381,6 @@ token_parse_statement_using(
   );
   if (!keyword) return 0;
   Value_View rest = value_view_rest(&view, peek_index);
-  peek_index = view.length;
 
   Value *result = compile_time_eval(context, parser, rest);
   if (mass_has_error(context)) return 0;
@@ -6405,7 +6392,7 @@ token_parse_statement_using(
   mass_copy_scope_exports(parser->scope, module->exports.scope);
 
   err:
-  return peek_index;
+  return true;
 }
 
 static Value *
@@ -6557,7 +6544,7 @@ token_define_local_variable(
   out_lazy_value->payload = assignment_payload;
 }
 
-static u32
+static bool
 token_parse_definition_and_assignment_statements(
   Mass_Context *context,
   Parser *parser,
@@ -6569,7 +6556,7 @@ token_parse_definition_and_assignment_statements(
   Value *operator;
 
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
-    return 0;
+    return false;
   }
   if (lhs.length > 1) {
     mass_error(context, (Mass_Error) {
@@ -6597,7 +6584,7 @@ token_parse_definition_and_assignment_statements(
   }
 
   err:
-  return view.length;
+  return true;
 }
 
 static void

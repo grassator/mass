@@ -1885,7 +1885,7 @@ main(void) {
     { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
   }));
 
-  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u32", (Argument_Type[]){
+  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "_Bool", (Argument_Type[]){
     { "Mass_Context *", "context" },
     { "Parser *", "parser" },
     { "Value_View", "view" },

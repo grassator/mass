@@ -582,7 +582,7 @@ typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
-typedef u32 (*Token_Statement_Matcher_Proc)
+typedef _Bool (*Token_Statement_Matcher_Proc)
   (Mass_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value);
 
 typedef void (*Mass_Trampoline_Proc)
@@ -5327,7 +5327,7 @@ DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention, calling_convention);
 DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention *, calling_convention_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
   token_statement_matcher_proc,
-  &descriptor_i32,
+  &descriptor__bool,
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_mass_context_pointer,
