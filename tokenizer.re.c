@@ -39,9 +39,7 @@ tokenize(
     }
 
   // Create top-level block
-  tokenizer_group_start_curly(
-    allocator, &stack, &parent_stack, &descriptor_ast_block, TOKENIZER_CURRENT_RANGE()
-  );
+  tokenizer_group_start_curly(allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE());
 
   #define TOKENIZER_CURRENT_SLICE()\
     slice_sub(input, token_start_offset, offset)
@@ -127,9 +125,7 @@ tokenize(
       "(" { TOKENIZER_GROUP_START(paren); continue; }
       "[" { TOKENIZER_GROUP_START(square); continue; }
       "{" {
-        tokenizer_group_start_curly(
-          allocator, &stack, &parent_stack, &descriptor_ast_block, TOKENIZER_CURRENT_RANGE()
-        );
+        tokenizer_group_start_curly(allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE());
         continue;
       }
       ")" { TOKENIZER_GROUP_END(paren); continue; }

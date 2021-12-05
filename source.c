@@ -1373,10 +1373,9 @@ tokenizer_group_start_curly(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
-  const Descriptor *group_descriptor,
   Source_Range source_range
 ) {
-  Value *value = tokenizer_group_start(allocator, stack, parent_stack, group_descriptor, source_range);
+  Value *value = tokenizer_group_start(allocator, stack, parent_stack, &descriptor_ast_block, source_range);
   assert(value->storage.tag == Storage_Tag_None);
   Ast_Block *group = allocator_allocate(allocator, Ast_Block);
   // TODO use temp allocator first?
@@ -5883,9 +5882,6 @@ token_parse_function_literal(
 ) {
   u32 peek_index = 0;
   bool is_macro = false;
-  Value *at = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.operator_at
-  );
   Value *keyword = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.fn
   );
@@ -5906,7 +5902,7 @@ token_parse_function_literal(
   Value *arrow = value_view_maybe_match_cached_symbol(
     view, &peek_index, context->compilation->common_symbols.operator_arrow
   );
-  bool is_compile_time = !!at;
+  bool is_compile_time = false;
   if (!arrow) {
     arrow = value_view_maybe_match_cached_symbol(
       view, &peek_index, context->compilation->common_symbols.operator_fat_arrow
