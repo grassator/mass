@@ -6079,7 +6079,7 @@ token_parse_expression(
     .capacity = capacity,
   );
 
-  bool is_previous_an_operator = true;
+  bool is_value_expected = false;
   u32 matched_length = view.length;
 
   for (u32 i = 0; ; ++i) {
@@ -6111,9 +6111,9 @@ token_parse_expression(
       }
     }
 
-    Operator_Fixity fixity_mask = is_previous_an_operator
-      ? Operator_Fixity_Prefix
-      : Operator_Fixity_Infix | Operator_Fixity_Postfix;
+    Operator_Fixity fixity_mask = is_value_expected
+      ? Operator_Fixity_Infix | Operator_Fixity_Postfix
+      : Operator_Fixity_Prefix;
 
     Value *value = value_view_get(view, i);
 
@@ -6130,19 +6130,19 @@ token_parse_expression(
         if (!token_handle_operator(
           context, parser, view, &value_stack, &operator_stack, maybe_operator, value->source_range
         )) goto defer;
-        is_previous_an_operator = (maybe_operator->fixity != Operator_Fixity_Postfix);
+        is_value_expected = (maybe_operator->fixity == Operator_Fixity_Postfix);
         continue;
       }
     }
 
-    if (!is_previous_an_operator) {
+    if (is_value_expected) {
       const Operator *empty_space_operator = &context->compilation->apply_operator;
       if (!token_handle_operator(
         context, parser, view, &value_stack, &operator_stack, empty_space_operator, value->source_range
       )) goto defer;
     }
     dyn_array_push(value_stack, value);
-    is_previous_an_operator = false;
+    is_value_expected = true;
   }
 
   drain:
