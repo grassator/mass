@@ -6290,7 +6290,11 @@ token_parse_block_statements(
       }
 
       if (mass_value_is_compile_time_known(parse_result)) {
-        if (value_is_assignment(parse_result)) {
+        if (parse_result->descriptor == &descriptor_ast_using) {
+          const Module *module = value_as_ast_using(parse_result)->module;
+          mass_copy_scope_exports(parser->scope, module->exports.scope);
+          continue;
+        } else if (parse_result->descriptor == &descriptor_assignment) {
           // TODO make lazy value accept const payload
           Assignment *assignment = (Assignment *)value_as_assignment(parse_result);
           parse_result = mass_make_lazy_value(
@@ -6301,7 +6305,7 @@ token_parse_block_statements(
           parse_result = mass_define_stack_value_from_typed_symbol(
             context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
           );
-        } else if (value_is_module_exports(parse_result)) {
+        } else if (parse_result->descriptor == &descriptor_module_exports) {
           if (!(parser->flags & Parser_Flags_Global)) {
             mass_error(context, (Mass_Error) {
               .tag = Mass_Error_Tag_Parse,
@@ -6368,31 +6372,21 @@ token_parse_block(
   return token_parse_block_statements(context, &block_parser, group->statements, source_range);
 }
 
-static bool
-token_parse_statement_using(
+static Value *
+mass_handle_using_operator(
   Mass_Context *context,
   Parser *parser,
-  Value_View view,
-  Lazy_Value *out_lazy_value
+  Value_View args,
+  const Operator *operator
 ) {
-  u32 peek_index = 0;
-  Value *keyword = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.using
-  );
-  if (!keyword) return 0;
-  Value_View rest = value_view_rest(&view, peek_index);
-
-  Value *result = compile_time_eval(context, parser, rest);
+  assert(args.length == 1);
+  Value *module_value = token_parse_single(context, parser, value_view_get(args, 0));
   if (mass_has_error(context)) return 0;
-  if (!mass_value_ensure_static_of(context, result, &descriptor_module)) {
-    goto err;
-  }
-
-  const Module *module = value_as_module(result);
-  mass_copy_scope_exports(parser->scope, module->exports.scope);
-
-  err:
-  return true;
+  if (!mass_value_ensure_static_of(context, module_value, &descriptor_module)) return 0;
+  const Module *module = value_as_module(module_value);
+  Ast_Using *using = mass_allocate(context, Ast_Using);
+  *using = (Ast_Using) { .module = module };
+  return value_make(context->allocator, &descriptor_ast_using, storage_immediate(using), args.source_range);
 }
 
 static Value *
@@ -6736,6 +6730,7 @@ scope_define_builtins(
     .tag = Operator_Tag_Alias,
     .Alias.handler = mass_handle_assignment_operator,
   ));
+
   Source_Range return_source_range;
   INIT_LITERAL_SOURCE_RANGE(&return_source_range, "return");
   scope_define_operator(&context, scope, return_source_range, slice_literal("return"), allocator_make(allocator, Operator,
@@ -6746,11 +6741,20 @@ scope_define_builtins(
     .Alias.handler = mass_handle_return_operator,
   ));
 
+  Source_Range using_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&using_source_range, "using");
+  scope_define_operator(&context, scope, using_source_range, slice_literal("using"), allocator_make(allocator, Operator,
+    .precedence = 0,
+    .fixity = Operator_Fixity_Prefix,
+    .associativity = Operator_Associativity_Right,
+    .tag = Operator_Tag_Alias,
+    .Alias.handler = mass_handle_using_operator,
+  ));
+
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
       {.proc = token_parse_definition_and_assignment_statements},
-      {.proc = token_parse_statement_using},
       {.proc = token_parse_while},
       {.proc = token_parse_operator_definition},
     };

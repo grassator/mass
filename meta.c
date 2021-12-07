@@ -1228,6 +1228,10 @@ main(void) {
     { "Value_View", "children" },
   })));
 
+  push_type(type_struct("Ast_Using", (Struct_Item[]){
+    { "const Module *", "module" },
+  }));
+
   push_type(type_enum("Section_Permissions", (Enum_Type_Item[]){
     { "Read",    1 << 0 },
     { "Write",   1 << 1 },

@@ -66,6 +66,10 @@ typedef struct Group_Square Group_Square;
 typedef dyn_array_type(Group_Square *) Array_Group_Square_Ptr;
 typedef dyn_array_type(const Group_Square *) Array_Const_Group_Square_Ptr;
 
+typedef struct Ast_Using Ast_Using;
+typedef dyn_array_type(Ast_Using *) Array_Ast_Using_Ptr;
+typedef dyn_array_type(const Ast_Using *) Array_Const_Ast_Using_Ptr;
+
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,
   Section_Permissions_Write = 2,
@@ -1029,6 +1033,11 @@ typedef struct Group_Square {
   Value_View children;
 } Group_Square;
 typedef dyn_array_type(Group_Square) Array_Group_Square;
+
+typedef struct Ast_Using {
+  const Module * module;
+} Ast_Using;
+typedef dyn_array_type(Ast_Using) Array_Ast_Using;
 
 typedef struct Section {
   Virtual_Memory_Buffer buffer;
@@ -2176,6 +2185,11 @@ static Descriptor descriptor_array_group_square;
 static Descriptor descriptor_array_group_square_ptr;
 static Descriptor descriptor_group_square_pointer;
 static Descriptor descriptor_group_square_pointer_pointer;
+static Descriptor descriptor_ast_using;
+static Descriptor descriptor_array_ast_using;
+static Descriptor descriptor_array_ast_using_ptr;
+static Descriptor descriptor_ast_using_pointer;
+static Descriptor descriptor_ast_using_pointer_pointer;
 static Descriptor descriptor_section_permissions;
 static Descriptor descriptor_array_section_permissions;
 static Descriptor descriptor_array_section_permissions_ptr;
@@ -3058,6 +3072,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group_square, Group_Square,
 MASS_DEFINE_TYPE_VALUE(group_square);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square *, group_square_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_ast_using_ptr, Array_Ast_Using_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_ast_using, Array_Ast_Using)
+MASS_DEFINE_STRUCT_DESCRIPTOR(ast_using, Ast_Using,
+  {
+    .descriptor = &descriptor_module_pointer,
+    .name = slice_literal_fields("module"),
+    .offset = offsetof(Ast_Using, module),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(ast_using);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Using, ast_using);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Using *, ast_using_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 static C_Enum_Item section_permissions_items[] = {
 { .name = slice_literal_fields("Read"), .value = 1 },
