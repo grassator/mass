@@ -6117,15 +6117,15 @@ token_parse_expression(
 
     Value *value = value_view_get(view, i);
 
-    if (end_symbol && value_is_symbol(value) && value_as_symbol(value) == end_symbol) {
-      matched_length = i + 1;
-      goto drain;
-    }
-
     if (value_is_symbol(value)) {
-      const Operator *maybe_operator = scope_lookup_operator(
-        context, parser->scope, value_as_symbol(value)->name, fixity_mask
-      );
+      const Symbol *symbol = value_as_symbol(value);
+      if (symbol == end_symbol) {
+        matched_length = i + 1;
+        goto drain;
+      }
+
+      const Operator *maybe_operator =
+        scope_lookup_operator(context, parser->scope, symbol->name, fixity_mask);
       if (maybe_operator) {
         if (!token_handle_operator(
           context, parser, view, &value_stack, &operator_stack, maybe_operator, value->source_range
