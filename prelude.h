@@ -2853,8 +2853,10 @@ virtual_memory_buffer_deinit(
 ) {
 #ifdef _WIN32
   if (buffer->warm_up_thread) {
-    assert(TerminateThread(buffer->warm_up_thread, 0));
+    BOOL result = TerminateThread(buffer->warm_up_thread, 0);
+    assert(result);
     WaitForSingleObject(buffer->warm_up_thread, INFINITE);
+    CloseHandle(buffer->warm_up_event);
   }
   VirtualFree(buffer->memory, 0, MEM_RELEASE);
 #else
