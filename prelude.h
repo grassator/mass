@@ -2869,16 +2869,18 @@ virtual_memory_buffer_ensure_committed(
   u64 size
 ) {
   assert(buffer->capacity >= size);
-  #ifdef _WIN32
   if (size > buffer->committed) {
     u64 required_to_commit = u64_align(size, buffer->commit_step_byte_size);
     void *commit_pointer = buffer->memory + buffer->committed;
     u64 commit_size = required_to_commit - buffer->committed;
-    VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
     buffer->committed = required_to_commit;
-    SetEvent(buffer->warm_up_event);
+    #ifdef _WIN32
+      VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
+      SetEvent(buffer->warm_up_event);
+    #else
+      madvise(commit_pointer, commit_size, MADV_WILLNEED);
+    #endif
   }
-  #endif
 }
 
 /*
