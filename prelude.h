@@ -2876,6 +2876,7 @@ virtual_memory_buffer_ensure_committed(
     u64 commit_size = required_to_commit - buffer->committed;
     VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
     buffer->committed = required_to_commit;
+    SetEvent(buffer->warm_up_event);
   }
   #endif
 }
@@ -2904,9 +2905,7 @@ virtual_memory_buffer_warm_up_proc(
 ) {
   Virtual_Memory_Buffer *buffer = data;
   while (true) {
-    // TODO Does this need proper synchronization?
-    //      Making buffer->committed atomic makes the allocation *really* slow
-    //      so that is not an option unfortunately.
+    WaitForSingleObject(buffer->warm_up_event, INFINITE);
     if (buffer->warmed_up >= buffer->capacity) {
       // There is nothing more to warm up, so can get rid of this thread
       ExitThread(0);
@@ -2919,12 +2918,15 @@ virtual_memory_buffer_warm_up_proc(
     u64 delta = buffer->warmed_up - buffer->committed;
     s8 *start_address = buffer->memory + buffer->warmed_up;
     VirtualAlloc(start_address, delta, MEM_COMMIT, PAGE_READWRITE);
+    // Windows does not seem to be mapping committed pages to a write-protected zero page
+    // like Linux does, so a read access is enough to trigger kernel page fault and
+    // zero-fill of the page memory. It is *really* important that this is *not* a write
+    // because the main thread and this one can be racing each other.
     for (u64 offset = 0; offset < delta; offset += 4096) {
       // `volatile` ensures that the dereference is not optimized away
       volatile u8 *location = ((u8 *)start_address + offset);
       *location;
     }
-    Sleep(1);
   }
 }
 #endif
@@ -2934,6 +2936,13 @@ virtual_memory_buffer_enable_warmup(
   Virtual_Memory_Buffer *buffer
 ) {
 #ifdef _WIN32
+  buffer->warm_up_event = CreateEvent(
+    0,     // default security attributes
+    FALSE, // auto-reset event when a waiting thread is released
+    TRUE,  // start as signalled
+    0      // no object name
+  );
+
   buffer->warm_up_thread = (void *)CreateThread(
     0, 0, virtual_memory_buffer_warm_up_proc, buffer, 0, &(DWORD){0}
   );
