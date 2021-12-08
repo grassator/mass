@@ -640,9 +640,7 @@ ensure_function_instance(
         storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
       }
       const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
-      Value *arg_value = value_make(
-        context->allocator, call_param->descriptor, storage, def_param->source_range
-      );
+      Value *arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->symbol;
       if (param_symbol) {
@@ -713,7 +711,7 @@ program_init_startup_code(
     make_label(context->allocator, program, &program->memory.code, slice_literal("__startup end"));
   Storage storage = code_label32(fn_label);
 
-  Value *function = value_make(context->allocator, descriptor, storage, source_range);
+  Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
     .epoch = get_new_epoch(),

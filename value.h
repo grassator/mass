@@ -30,7 +30,17 @@ mass_result_is_error(
 }
 #define mass_has_error(_CONTEXT_) mass_result_is_error((_CONTEXT_)->result)
 
-#define mass_allocate(_CONTEXT_, ...) allocator_allocate((_CONTEXT_)->allocator, __VA_ARGS__)
+static inline void *
+mass_allocate_bytes(
+  Mass_Context *context,
+  u64 size,
+  u64 alignment
+) {
+  return virtual_memory_buffer_allocate_bytes(&context->compilation->allocation_buffer, size, alignment);
+}
+
+#define mass_allocate(_CONTEXT_, _TYPE_) \
+  ((_TYPE_ *)mass_allocate_bytes((_CONTEXT_), sizeof(_TYPE_), _Alignof(_TYPE_)))
 
 static inline Function_Parameter
 function_parameter_with_default(
@@ -287,13 +297,13 @@ value_init(
 
 static inline Value *
 value_make(
-  const Allocator *allocator,
+  Mass_Context *context,
   const Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
   return value_init(
-    allocator_allocate(allocator, Value),
+    mass_allocate(context, Value),
     descriptor,
     storage,
     source_range
@@ -302,10 +312,10 @@ value_make(
 
 static inline Value *
 mass_make_void(
-  const Allocator *allocator,
+  Mass_Context *context,
   const Source_Range source_range
 ) {
-  return value_make(allocator, &descriptor_void, storage_none, source_range);
+  return value_make(context, &descriptor_void, storage_none, source_range);
 }
 
 static inline bool

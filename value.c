@@ -753,7 +753,7 @@ storage_equal(
 
 static inline Value *
 value_i64(
-  const Allocator *allocator,
+  Mass_Context *context,
   Slice digits,
   Number_Base base,
   Source_Range source_range
@@ -780,7 +780,7 @@ value_i64(
     }
     literal = (i64){ bits };
   }
-  return value_make(allocator, &descriptor_i64, storage_immediate(&literal), source_range);
+  return value_make(context, &descriptor_i64, storage_immediate(&literal), source_range);
 }
 
 static inline Label *
