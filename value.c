@@ -1239,8 +1239,9 @@ compilation_init(
   virtual_memory_buffer_init_at_address(
     &compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024, permanent_arena_address
   );
-  compilation->allocation_buffer.commit_step_byte_size = 1024 * 1024;
+  compilation->allocation_buffer.commit_step_byte_size = 16 * 1024 * 1024;
   compilation->allocator = virtual_memory_buffer_allocator_make(&compilation->allocation_buffer);
+  virtual_memory_buffer_enable_warmup(&compilation->allocation_buffer);
 
   // Get 1 gigabyte of temp space
   virtual_memory_buffer_init_at_address(

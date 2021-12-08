@@ -795,6 +795,78 @@ allocator_reallocate(
     sizeof(_type_)\
   )
 
+////////////////////////////////////////////////////////////////////
+// Threads
+////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  void *native_handle;
+} Thread;
+
+typedef void (*Thread_Proc)(void *);
+
+#ifdef _WIN32
+struct Win32_Thread_Proc_And_Data {
+  Thread_Proc proc;
+  void *data;
+};
+
+DWORD
+thread_make_win32_wrapper_proc(
+  struct Win32_Thread_Proc_And_Data *raw_proc_and_data
+) {
+  Thread_Proc proc = raw_proc_and_data->proc;
+  void *data = raw_proc_and_data->data;
+  allocator_deallocate(
+    allocator_default, raw_proc_and_data, sizeof(struct Win32_Thread_Proc_And_Data)
+  );
+  proc(data);
+  ExitThread(0);
+}
+
+Thread
+thread_make(
+  Thread_Proc proc,
+  void *data
+) {
+  struct Win32_Thread_Proc_And_Data *proc_and_data =
+    allocator_allocate(allocator_default, struct Win32_Thread_Proc_And_Data);
+  proc_and_data->proc = proc;
+  proc_and_data->data = data;
+  HANDLE handle = CreateThread(0, 0, thread_make_win32_wrapper_proc, proc_and_data, 0, &(DWORD){0});
+  return (Thread){.native_handle = handle};
+}
+
+void
+thread_join(
+  Thread thread
+) {
+  WaitForSingleObject(thread.native_handle, INFINITE);
+}
+
+#else // POSIX
+
+#include <pthread.h>
+
+typedef void *(*Thread_Pthread_Proc)(void *);
+
+static inline Thread
+thread_make(
+  Thread_Proc proc,
+  void *data
+) {
+  pthread_t handle;
+  int result = pthread_create(&handle, 0, (Thread_Pthread_Proc)proc, data);
+  return (Thread){.native_handle = (void *)handle};
+}
+
+static inline void
+thread_join(Thread thread) {
+  pthread_join((pthread_t)thread.native_handle, 0);
+}
+static_assert(sizeof(pthread_t) <= sizeof(Thread), "TODO implement thread wrappers");
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // Range
 //////////////////////////////////////////////////////////////////////////////
@@ -2733,7 +2805,11 @@ typedef struct {
   u64 committed;
   u64 commit_step_byte_size;
   s8 *memory;
+  void *warm_up_thread;
+  void *warm_up_event;
+  u64 warmed_up;
 } Virtual_Memory_Buffer;
+
 
 static inline void
 virtual_memory_buffer_init_at_address(
@@ -2763,7 +2839,6 @@ virtual_memory_buffer_init_at_address(
   };
 }
 
-
 static inline void
 virtual_memory_buffer_init(
   Virtual_Memory_Buffer *buffer,
@@ -2777,6 +2852,10 @@ virtual_memory_buffer_deinit(
   Virtual_Memory_Buffer *buffer
 ) {
 #ifdef _WIN32
+  if (buffer->warm_up_thread) {
+    assert(TerminateThread(buffer->warm_up_thread, 0));
+    WaitForSingleObject(buffer->warm_up_thread, INFINITE);
+  }
   VirtualFree(buffer->memory, 0, MEM_RELEASE);
 #else
   munmap(buffer->memory, buffer->capacity);
@@ -2799,6 +2878,66 @@ virtual_memory_buffer_ensure_committed(
     buffer->committed = required_to_commit;
   }
   #endif
+}
+
+/*
+Virtual buffer is committed in steps of `commit_step_byte_size`.
+Each cell in the diagram below represents one such step:
+[ | | | | ]
+
+Each cell can be in one of three states:
+1. Reserved
+2. Marked for warming
+3. Warmed Up (physical page allocated and zeroed)
+
+When "ensure committed" is called we transition from 1. to 2.
+and also signal to the warm up thread that we want to warm up
+the next step of the buffer so that the diagram always looks
+something like this:
+[...|W|M|R|...]
+
+*/
+#ifdef _WIN32
+static DWORD
+virtual_memory_buffer_warm_up_proc(
+  void *data
+) {
+  Virtual_Memory_Buffer *buffer = data;
+  while (true) {
+    // TODO Does this need proper synchronization?
+    //      Making buffer->committed atomic makes the allocation *really* slow
+    //      so that is not an option unfortunately.
+    if (buffer->warmed_up >= buffer->capacity) {
+      // There is nothing more to warm up, so can get rid of this thread
+      ExitThread(0);
+    }
+    if (buffer->warmed_up >= buffer->committed + buffer->commit_step_byte_size) continue;
+    if (buffer->committed < buffer->capacity) {
+      buffer->warmed_up = buffer->committed + buffer->commit_step_byte_size;
+      buffer->warmed_up = u64_min(buffer->warmed_up, buffer->capacity);
+    }
+    u64 delta = buffer->warmed_up - buffer->committed;
+    s8 *start_address = buffer->memory + buffer->warmed_up;
+    VirtualAlloc(start_address, delta, MEM_COMMIT, PAGE_READWRITE);
+    for (u64 offset = 0; offset < delta; offset += 4096) {
+      // `volatile` ensures that the dereference is not optimized away
+      volatile u8 *location = ((u8 *)start_address + offset);
+      *location;
+    }
+    Sleep(1);
+  }
+}
+#endif
+
+static inline void
+virtual_memory_buffer_enable_warmup(
+  Virtual_Memory_Buffer *buffer
+) {
+#ifdef _WIN32
+  buffer->warm_up_thread = (void *)CreateThread(
+    0, 0, virtual_memory_buffer_warm_up_proc, buffer, 0, &(DWORD){0}
+  );
+#endif
 }
 
 static void *
@@ -3947,78 +4086,6 @@ hash_map_destroy_internal(
 
 #define hash_map_set_by_hash(_map_, ...)\
   (_map_)->methods->set_by_hash((_map_), __VA_ARGS__)
-
-////////////////////////////////////////////////////////////////////
-// Threads
-////////////////////////////////////////////////////////////////////
-
-typedef struct {
-  void *native_handle;
-} Thread;
-
-typedef void (*Thread_Proc)(void *);
-
-#ifdef _WIN32
-struct Win32_Thread_Proc_And_Data {
-  Thread_Proc proc;
-  void *data;
-};
-
-DWORD
-thread_make_win32_wrapper_proc(
-  struct Win32_Thread_Proc_And_Data *raw_proc_and_data
-) {
-  Thread_Proc proc = raw_proc_and_data->proc;
-  void *data = raw_proc_and_data->data;
-  allocator_deallocate(
-    allocator_default, raw_proc_and_data, sizeof(struct Win32_Thread_Proc_And_Data)
-  );
-  proc(data);
-  ExitThread(0);
-}
-
-Thread
-thread_make(
-  Thread_Proc proc,
-  void *data
-) {
-  struct Win32_Thread_Proc_And_Data *proc_and_data =
-    allocator_allocate(allocator_default, struct Win32_Thread_Proc_And_Data);
-  proc_and_data->proc = proc;
-  proc_and_data->data = data;
-  HANDLE handle = CreateThread(0, 0, thread_make_win32_wrapper_proc, proc_and_data, 0, &(DWORD){0});
-  return (Thread){.native_handle = handle};
-}
-
-void
-thread_join(
-  Thread thread
-) {
-  WaitForSingleObject(thread.native_handle, INFINITE);
-}
-
-#else // POSIX
-
-#include <pthread.h>
-
-typedef void *(*Thread_Pthread_Proc)(void *);
-
-static inline Thread
-thread_make(
-  Thread_Proc proc,
-  void *data
-) {
-  pthread_t handle;
-  int result = pthread_create(&handle, 0, (Thread_Pthread_Proc)proc, data);
-  return (Thread){.native_handle = (void *)handle};
-}
-
-static inline void
-thread_join(Thread thread) {
-  pthread_join((pthread_t)thread.native_handle, 0);
-}
-static_assert(sizeof(pthread_t) <= sizeof(Thread), "TODO implement thread wrappers");
-#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Printing
