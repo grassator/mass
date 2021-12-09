@@ -1063,9 +1063,12 @@ value_force_lazy_static(
   }
   lazy->resolving = true;
   Value *result = compile_time_eval(&lazy->context, &lazy->parser, lazy->expression);
-  if (!result) return 0;
   lazy->resolving = false;
-  *value = *result;
+  if (result) {
+    *value = *result;
+  } else {
+    memset(value, 0, sizeof(*value));
+  }
   return value;
 }
 
