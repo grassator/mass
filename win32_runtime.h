@@ -247,19 +247,18 @@ win32_program_test_exception_handler(
   Win32_Exception_Data *exception_data = DispatcherContext->HandlerData;
 
   if (!exception_data->jit->is_stack_unwinding_in_progress) {
-    printf("Unhandled Exception: ");
-
+    exception_data->jit->is_stack_unwinding_in_progress = true;
     switch(ExceptionRecord->ExceptionCode) {
       case EXCEPTION_ACCESS_VIOLATION: {
-        printf("Access Violation.\n");
+        printf("Unhandled Exception: Access Violation.\n");
         break;
       }
       case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: {
-        printf("Hardware Array Bounds Check Failed.\n");
+        printf("Unhandled Exception: Hardware Array Bounds Check Failed.\n");
         break;
       }
       case EXCEPTION_BREAKPOINT: {
-        printf("User Breakpoint hit\n");
+        printf("Unhandled Exception: User Breakpoint hit\n");
         char line_buffer[256] = {0};
         for (;;) {
           fputs("mdb> ", stdout);
@@ -329,73 +328,80 @@ win32_program_test_exception_handler(
         return ExceptionContinueExecution;
       }
       case EXCEPTION_DATATYPE_MISALIGNMENT: {
-        printf("Misaligned Read / Write.\n");
+        printf("Unhandled Exception: Misaligned Read / Write.\n");
         break;
       }
       case EXCEPTION_FLT_DENORMAL_OPERAND: {
-        printf("Denormal Float Value Result.\n");
+        printf("Unhandled Exception: Denormal Float Value Result.\n");
         break;
       }
       case EXCEPTION_FLT_DIVIDE_BY_ZERO: {
-        printf("Float Divide By Zero.\n");
+        printf("Unhandled Exception: Float Divide By Zero.\n");
         break;
       }
       case EXCEPTION_FLT_INEXACT_RESULT: {
-        printf("Float Inexact Decimal Fraction.\n");
+        printf("Unhandled Exception: Float Inexact Decimal Fraction.\n");
         break;
       }
       case EXCEPTION_FLT_INVALID_OPERATION: {
-        printf("Float Invalid Operation.\n");
+        printf("Unhandled Exception: Float Invalid Operation.\n");
         break;
       }
       case EXCEPTION_FLT_OVERFLOW: {
-        printf("Float Overflow.\n");
+        printf("Unhandled Exception: Float Overflow.\n");
         break;
       }
       case EXCEPTION_FLT_STACK_CHECK: {
-        printf("Stack Overflow After Float Operation.\n");
+        printf("Unhandled Exception: Stack Overflow After Float Operation.\n");
         break;
       }
       case EXCEPTION_FLT_UNDERFLOW: {
-        printf("Float Underflow.\n");
+        printf("Unhandled Exception: Float Underflow.\n");
         break;
       }
       case EXCEPTION_ILLEGAL_INSTRUCTION: {
-        printf("Illegal Machine Code Instruction.\n");
+        printf("Unhandled Exception: Illegal Machine Code Instruction.\n");
         break;
       }
       case EXCEPTION_IN_PAGE_ERROR: {
-        printf("Read Missing Memory Page.\n");
+        printf("Unhandled Exception: Read Missing Memory Page.\n");
         break;
       }
       case EXCEPTION_INT_DIVIDE_BY_ZERO: {
-        printf("Integer Divide By Zero.\n");
+        printf("Unhandled Exception: Integer Divide By Zero.\n");
         break;
       }
       case EXCEPTION_INT_OVERFLOW: {
-        printf("Integer Overflow.\n");
+        printf("Unhandled Exception: Integer Overflow.\n");
         break;
       }
       case EXCEPTION_INVALID_DISPOSITION: {
-        printf("Invalid Disposition From An Exception Handler.\n");
+        printf("Unhandled Exception: Invalid Disposition From An Exception Handler.\n");
         break;
       }
       case EXCEPTION_NONCONTINUABLE_EXCEPTION: {
-        printf("Continue Execution After Noncontinuable Exception.\n");
+        printf("Unhandled Exception: Continue Execution After Noncontinuable Exception.\n");
         break;
       }
       case EXCEPTION_PRIV_INSTRUCTION: {
-        printf("Instruction Not Allowed In Current CPU Mode.\n");
+        printf("Unhandled Exception: Instruction Not Allowed In Current CPU Mode.\n");
         break;
       }
       case EXCEPTION_SINGLE_STEP: {
-        printf("Single Step Instruction.\n");
+        printf("Unhandled Exception: Single Step Instruction.\n");
         break;
       }
       case EXCEPTION_STACK_OVERFLOW: {
-        printf("Stack Overflow.\n");
-        break;
-      }
+        // If stack overflow happens during compile time JIT execution
+        // and if there is a `setjmp` before such call it should be possible
+        // to use the info in the saved `jmp_buf` to restore the stack to a
+        // somewhat reasonable state and `_resetstkoflw` to restore the guard
+        // page and then continue the execution to properly display the error
+        // to the user
+
+        // Right now we can't do much in this case and just let the system / debugger handle it
+        return ExceptionContinueSearch;
+      } break;
       default: {
         printf("Unknown.\n");
         break;
@@ -408,7 +414,6 @@ win32_program_test_exception_handler(
       exception_data->jit
     );
     win32_print_register_state(ContextRecord);
-    exception_data->jit->is_stack_unwinding_in_progress = true;
   }
 
   return ExceptionContinueSearch;
