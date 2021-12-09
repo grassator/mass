@@ -1539,6 +1539,13 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
+  push_type(type_hash_map("Operator_Symbol_Map", {
+    .key_type = "const Symbol *",
+    .value_type = "const Symbol *",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
+  }));
+
   export_compiler(push_type(type_struct("Scope", (Struct_Item[]){
     { "const Allocator *", "allocator" },
     { "const Scope *", "parent" },
@@ -1993,21 +2000,21 @@ main(void) {
     { "const Symbol *", "statement" },
     { "const Symbol *", "syntax" },
     { "const Symbol *", "underscore" },
-    { "const Symbol *", "using" },
     { "const Symbol *", "_if" },
     { "const Symbol *", "then" },
     { "const Symbol *", "_while" },
     { "const Symbol *", "_else" },
-    { "const Symbol *", "_return" },
     { "const Symbol *", "_" },
     { "const Symbol *", "operator_arrow" },
     { "const Symbol *", "operator_at" },
     { "const Symbol *", "operator_colon" },
     { "const Symbol *", "operator_comma" },
     { "const Symbol *", "operator_dot" },
+    { "const Symbol *", "operator_dot_star" },
     { "const Symbol *", "operator_equal" },
     { "const Symbol *", "operator_fat_arrow" },
     { "const Symbol *", "operator_space" },
+    { "const Symbol *", "operator_quote" },
   }));
 
   export_compiler(push_type(type_struct("Compilation", (Struct_Item[]){
@@ -2024,8 +2031,8 @@ main(void) {
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },
     { "Symbol_Map *", "symbol_cache_map" },
-    { "Symbol_Map *", "prefix_operator_symbol_map" },
-    { "Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
+    { "Operator_Symbol_Map *", "prefix_operator_symbol_map" },
+    { "Operator_Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Descriptor_Pointer_To_Cache_Map *", "descriptor_pointer_to_cache_map"},
     { "Common_Symbols", "common_symbols" },
     { "Operator", "apply_operator" },

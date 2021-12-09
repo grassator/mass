@@ -389,6 +389,8 @@ typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
 
 typedef struct Operator_Map Operator_Map;
 
+typedef struct Operator_Symbol_Map Operator_Symbol_Map;
+
 typedef struct Scope Scope;
 typedef dyn_array_type(Scope *) Array_Scope_Ptr;
 typedef dyn_array_type(const Scope *) Array_Const_Scope_Ptr;
@@ -1409,6 +1411,7 @@ typedef struct Scope_Entry {
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
 hash_map_template(Operator_Map, const Symbol *, Operator *, hash_pointer, const_void_pointer_equal)
+hash_map_template(Operator_Symbol_Map, const Symbol *, const Symbol *, hash_pointer, const_void_pointer_equal)
 typedef struct Scope {
   const Allocator * allocator;
   const Scope * parent;
@@ -2031,21 +2034,21 @@ typedef struct Common_Symbols {
   const Symbol * statement;
   const Symbol * syntax;
   const Symbol * underscore;
-  const Symbol * using;
   const Symbol * _if;
   const Symbol * then;
   const Symbol * _while;
   const Symbol * _else;
-  const Symbol * _return;
   const Symbol * _;
   const Symbol * operator_arrow;
   const Symbol * operator_at;
   const Symbol * operator_colon;
   const Symbol * operator_comma;
   const Symbol * operator_dot;
+  const Symbol * operator_dot_star;
   const Symbol * operator_equal;
   const Symbol * operator_fat_arrow;
   const Symbol * operator_space;
+  const Symbol * operator_quote;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -2063,8 +2066,8 @@ typedef struct Compilation {
   Program * runtime_program;
   Mass_Result * result;
   Symbol_Map * symbol_cache_map;
-  Symbol_Map * prefix_operator_symbol_map;
-  Symbol_Map * infix_or_suffix_operator_symbol_map;
+  Operator_Symbol_Map * prefix_operator_symbol_map;
+  Operator_Symbol_Map * infix_or_suffix_operator_symbol_map;
   Descriptor_Pointer_To_Cache_Map * descriptor_pointer_to_cache_map;
   Common_Symbols common_symbols;
   Operator apply_operator;
@@ -2369,6 +2372,7 @@ static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(operator_map, Operator_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(operator_symbol_map, Operator_Symbol_Map);
 static Descriptor descriptor_scope;
 static Descriptor descriptor_array_scope;
 static Descriptor descriptor_array_scope_ptr;
@@ -5520,11 +5524,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   },
   {
     .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("using"),
-    .offset = offsetof(Common_Symbols, using),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("_if"),
     .offset = offsetof(Common_Symbols, _if),
   },
@@ -5542,11 +5541,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("_else"),
     .offset = offsetof(Common_Symbols, _else),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("_return"),
-    .offset = offsetof(Common_Symbols, _return),
   },
   {
     .descriptor = &descriptor_symbol_pointer,
@@ -5580,6 +5574,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   },
   {
     .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_dot_star"),
+    .offset = offsetof(Common_Symbols, operator_dot_star),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_equal"),
     .offset = offsetof(Common_Symbols, operator_equal),
   },
@@ -5592,6 +5591,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_space"),
     .offset = offsetof(Common_Symbols, operator_space),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_quote"),
+    .offset = offsetof(Common_Symbols, operator_quote),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);
@@ -5666,12 +5670,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .offset = offsetof(Compilation, symbol_cache_map),
   },
   {
-    .descriptor = &descriptor_symbol_map_pointer,
+    .descriptor = &descriptor_operator_symbol_map_pointer,
     .name = slice_literal_fields("prefix_operator_symbol_map"),
     .offset = offsetof(Compilation, prefix_operator_symbol_map),
   },
   {
-    .descriptor = &descriptor_symbol_map_pointer,
+    .descriptor = &descriptor_operator_symbol_map_pointer,
     .name = slice_literal_fields("infix_or_suffix_operator_symbol_map"),
     .offset = offsetof(Compilation, infix_or_suffix_operator_symbol_map),
   },

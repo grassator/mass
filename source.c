@@ -1195,43 +1195,53 @@ scope_define_operator(
   Mass_Context *context,
   Scope *scope,
   Source_Range source_range,
-  Slice name,
+  const Symbol *base_symbol,
   Operator *operator
 ) {
-  Symbol_Map *map = operator->fixity == Operator_Fixity_Prefix
+  Operator_Symbol_Map *map = operator->fixity == Operator_Fixity_Prefix
     ? context->compilation->prefix_operator_symbol_map
     : context->compilation->infix_or_suffix_operator_symbol_map;
-  const Symbol *symbol = mass_ensure_symbol_for_map(context->allocator, map, name);
+  const Symbol *operator_symbol;
+  {
+    const Symbol **maybe_operator_symbol = hash_map_get(map, base_symbol);
+    if (maybe_operator_symbol) {
+      operator_symbol = *maybe_operator_symbol;
+    } else {
+      Symbol *new_symbol = mass_allocate(context, Symbol);
+      *new_symbol = *base_symbol;
+      hash_map_set(map, base_symbol, new_symbol);
+      operator_symbol = new_symbol;
+    }
+  }
 
-  if (scope_lookup_shallow(scope, symbol)) {
+  if (scope_lookup_shallow(scope, operator_symbol)) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Operator_Fixity_Conflict,
       .source_range = source_range,
       .Operator_Fixity_Conflict = {
         .fixity = operator->fixity,
-        .symbol = symbol->name,
+        .symbol = operator_symbol->name,
       },
     });
     return;
   }
 
   Value *operator_value = value_make(context, &descriptor_operator, storage_static(operator), source_range);
-  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, symbol, operator_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, operator_symbol, operator_value);
 }
 
 static inline const Operator *
 scope_lookup_operator(
   Mass_Context *context,
   const Scope *scope,
-  Slice name,
+  const Symbol *base_symbol,
   Operator_Fixity fixity
 ) {
-  Symbol_Map *map = fixity == Operator_Fixity_Prefix
+  Operator_Symbol_Map *map = fixity == Operator_Fixity_Prefix
     ? context->compilation->prefix_operator_symbol_map
     : context->compilation->infix_or_suffix_operator_symbol_map;
 
-  // TODO use symbol lookups instead of string-based ones
-  Symbol *const *operator_symbol_pointer = hash_map_get(map, name);
+  const Symbol **operator_symbol_pointer = hash_map_get(map, base_symbol);
   if (!operator_symbol_pointer) return 0;
   const Symbol *operator_symbol = *operator_symbol_pointer;
   Scope_Entry *maybe_operator_entry = scope_lookup(scope, operator_symbol);
@@ -2332,7 +2342,7 @@ token_parse_operator_definition(
     context,
     parser->scope,
     keyword_token->source_range,
-    value_as_symbol(operator_token)->name,
+    value_as_symbol(operator_token),
     operator
   );
 
@@ -6089,8 +6099,7 @@ token_parse_expression(
         goto drain;
       }
 
-      const Operator *maybe_operator =
-        scope_lookup_operator(context, parser->scope, symbol->name, fixity_mask);
+      const Operator *maybe_operator = scope_lookup_operator(context, parser->scope, symbol, fixity_mask);
       if (maybe_operator) {
         if (!token_handle_operator(
           context, parser, view, &value_stack, &operator_stack, maybe_operator, value->source_range
@@ -6637,87 +6646,114 @@ scope_define_builtins(
 
   Source_Range comma_source_range;
   INIT_LITERAL_SOURCE_RANGE(&comma_source_range, ",");
-  scope_define_operator(&context, scope, comma_source_range, slice_literal(","), allocator_make(allocator, Operator,
-    .precedence = 0,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Left,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_comma_operator,
-  ));
+  scope_define_operator(
+    &context, scope, comma_source_range, compilation->common_symbols.operator_comma,
+    allocator_make(allocator, Operator,
+      .precedence = 0,
+      .fixity = Operator_Fixity_Infix,
+      .associativity = Operator_Associativity_Left,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_comma_operator,
+    )
+  );
   Source_Range dot_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_source_range, ".");
-  scope_define_operator(&context, scope, dot_source_range, slice_literal("."), allocator_make(allocator, Operator,
-    .precedence = 20,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Left,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_dot_operator,
-  ));
+  scope_define_operator(
+    &context, scope, dot_source_range, compilation->common_symbols.operator_dot,
+    allocator_make(allocator, Operator,
+      .precedence = 20,
+      .fixity = Operator_Fixity_Infix,
+      .associativity = Operator_Associativity_Left,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_dot_operator,
+    )
+  );
   {
     Source_Range quote_source_range;
     INIT_LITERAL_SOURCE_RANGE(&quote_source_range, "'");
-    scope_define_operator(&context, scope, quote_source_range, slice_literal("'"), allocator_make(allocator, Operator,
-      .precedence = 30,
-      .fixity = Operator_Fixity_Prefix,
-      .associativity = Operator_Associativity_Right,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_quote,
-    ));
-    scope_define_operator(&context, scope, quote_source_range, slice_literal("'"), allocator_make(allocator, Operator,
-      .precedence = 30,
-      .fixity = Operator_Fixity_Postfix,
-      .associativity = Operator_Associativity_Right,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_unquote,
-    ));
+    scope_define_operator(
+      &context, scope, quote_source_range, compilation->common_symbols.operator_quote,
+      allocator_make(allocator, Operator,
+        .precedence = 30,
+        .fixity = Operator_Fixity_Prefix,
+        .associativity = Operator_Associativity_Right,
+        .tag = Operator_Tag_Alias,
+        .Alias.handler = mass_quote,
+      )
+    );
+    scope_define_operator(
+      &context, scope, quote_source_range, compilation->common_symbols.operator_quote,
+      allocator_make(allocator, Operator,
+        .precedence = 30,
+        .fixity = Operator_Fixity_Postfix,
+        .associativity = Operator_Associativity_Right,
+        .tag = Operator_Tag_Alias,
+        .Alias.handler = mass_unquote,
+      )
+    );
   }
   Source_Range dot_star_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_star_source_range, ".*");
-  scope_define_operator(&context, scope, dot_star_source_range, slice_literal(".*"), allocator_make(allocator, Operator,
-    .precedence = 20,
-    .fixity = Operator_Fixity_Postfix,
-    .associativity = Operator_Associativity_Left,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_dereference_operator,
-  ));
+  scope_define_operator(
+    &context, scope, dot_star_source_range, compilation->common_symbols.operator_dot_star,
+    allocator_make(allocator, Operator,
+      .precedence = 20,
+      .fixity = Operator_Fixity_Postfix,
+      .associativity = Operator_Associativity_Left,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_dereference_operator,
+    )
+  );
   Source_Range colon_source_range;
   INIT_LITERAL_SOURCE_RANGE(&colon_source_range, ":");
-  scope_define_operator(&context, scope, colon_source_range, slice_literal(":"), allocator_make(allocator, Operator,
-    .precedence = 2,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Left,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_typed_symbol_operator,
-  ));
+  scope_define_operator(
+    &context, scope, colon_source_range, compilation->common_symbols.operator_colon,
+    allocator_make(allocator, Operator,
+      .precedence = 2,
+      .fixity = Operator_Fixity_Infix,
+      .associativity = Operator_Associativity_Left,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_typed_symbol_operator,
+    )
+  );
   Source_Range equal_source_range;
   INIT_LITERAL_SOURCE_RANGE(&equal_source_range, "=");
-  scope_define_operator(&context, scope, equal_source_range, slice_literal("="), allocator_make(allocator, Operator,
-    .precedence = 1,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Left,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_assignment_operator,
-  ));
+  scope_define_operator(
+    &context, scope, equal_source_range, compilation->common_symbols.operator_equal,
+    allocator_make(allocator, Operator,
+      .precedence = 1,
+      .fixity = Operator_Fixity_Infix,
+      .associativity = Operator_Associativity_Left,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_assignment_operator,
+    )
+  );
 
   Source_Range return_source_range;
   INIT_LITERAL_SOURCE_RANGE(&return_source_range, "return");
-  scope_define_operator(&context, scope, return_source_range, slice_literal("return"), allocator_make(allocator, Operator,
-    .precedence = 0,
-    .fixity = Operator_Fixity_Prefix,
-    .associativity = Operator_Associativity_Right,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_return_operator,
-  ));
+  scope_define_operator(
+    &context, scope, return_source_range, mass_ensure_symbol(compilation, slice_literal("return")),
+    allocator_make(allocator, Operator,
+      .precedence = 0,
+      .fixity = Operator_Fixity_Prefix,
+      .associativity = Operator_Associativity_Right,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_return_operator,
+    )
+  );
 
   Source_Range using_source_range;
   INIT_LITERAL_SOURCE_RANGE(&using_source_range, "using");
-  scope_define_operator(&context, scope, using_source_range, slice_literal("using"), allocator_make(allocator, Operator,
-    .precedence = 0,
-    .fixity = Operator_Fixity_Prefix,
-    .associativity = Operator_Associativity_Right,
-    .tag = Operator_Tag_Alias,
-    .Alias.handler = mass_handle_using_operator,
-  ));
+  scope_define_operator(
+    &context, scope, using_source_range, mass_ensure_symbol(compilation, slice_literal("using")),
+    allocator_make(allocator, Operator,
+      .precedence = 0,
+      .fixity = Operator_Fixity_Prefix,
+      .associativity = Operator_Associativity_Right,
+      .tag = Operator_Tag_Alias,
+      .Alias.handler = mass_handle_using_operator,
+    )
+  );
 
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
