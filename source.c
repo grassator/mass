@@ -3579,6 +3579,7 @@ mass_match_overload_candidate(
   struct Overload_Match_State *match,
   struct Overload_Match_State *best_conflict_match
 ) {
+  if (mass_has_error(context)) return;
   if (value_is_overload(candidate)) {
     const Overload *overload = value_as_overload(candidate);
     mass_match_overload_candidate(context, overload->value, args, match, best_conflict_match);
@@ -3599,8 +3600,7 @@ mass_match_overload_candidate(
       }
     } else {
       const Descriptor *descriptor = value_or_lazy_value_descriptor(candidate);
-      assert(descriptor->tag == Descriptor_Tag_Function_Instance);
-      overload_info = descriptor->Function_Instance.info;
+      overload_info = descriptor_as_function_instance(descriptor)->info;
     }
     Mass_Argument_Scoring_Flags scoring_flags = 0;
 
