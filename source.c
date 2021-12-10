@@ -2254,17 +2254,15 @@ token_parse_operator_definition(
   // prefix and postfix
   if (definition.length == 2) {
     Value *first =  value_view_get(definition, 0);
-    bool is_first_operator_like = false;
-    if (value_is_symbol(first)) {
-      Slice operator_string = value_as_symbol(first)->name;
-      is_first_operator_like = (
-        operator_string.length &&
-        operator_string.bytes[0] != '_' &&
-        !isalpha(operator_string.bytes[0])
-      );
+    fixity = Operator_Fixity_Prefix;
+    if (value_match_symbol(first, slice_literal("_"))) {
+      fixity = Operator_Fixity_Postfix;
     }
-    fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
     if (fixity == Operator_Fixity_Prefix) {
+      if (!value_match_symbol(value_view_get(definition, 1), slice_literal("_"))) {
+        context_parse_error(context, parser, view, peek_index);
+        goto err;
+      }
       operator_token = value_view_get(definition, 0);
     } else {
       operator_token = value_view_get(definition, 1);
