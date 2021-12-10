@@ -591,11 +591,11 @@ deduce_runtime_descriptor_for_value(
     if (!mass_match_overload_or_error(context, value, args_view, &match_found)) {
       return 0;
     }
-    // @Speed it is probably wasteful to ask for an instance every time here
-    Value *instance = ensure_function_instance(context, match_found.value, args_view);
-    if (mass_has_error(context)) return 0;
-    assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
-    return instance->descriptor;
+    Function_Call_Setup call_setup =
+      context->program->default_calling_convention->call_setup_proc(context->allocator, match_found.info);
+    return descriptor_function_instance(
+      context->allocator, (Slice){0}, match_found.info, call_setup
+    );
   }
 
   return value_or_lazy_value_descriptor(value);
