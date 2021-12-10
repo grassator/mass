@@ -1431,6 +1431,13 @@ same_type_or_can_implicitly_move_cast(
 ) {
   if (same_type(target, source)) return true;
   if (target->tag == Descriptor_Tag_Void) return true;
+  if (target->brand && source->brand && target->brand != source->brand) return false;
+  if (source->tag == Descriptor_Tag_Raw) {
+    if (source->bit_size.as_u64 == target->bit_size.as_u64) {
+      return true;
+    }
+  }
+
   if (target->tag != source->tag) return false;
   if (target->tag == Descriptor_Tag_Pointer_To) {
     if (
@@ -1451,7 +1458,7 @@ same_type_or_can_implicitly_move_cast(
     for (u64 i = 0; i < dyn_array_length(source->Struct.fields); ++i) {
       const Descriptor *source_field = dyn_array_get(source->Struct.fields, i)->descriptor;
       const Descriptor *target_field = dyn_array_get(target->Struct.fields, i)->descriptor;
-      if (!same_type(target_field, source_field)) return false;
+      if (!same_type_or_can_implicitly_move_cast(target_field, source_field)) return false;
     }
     return true;
   }

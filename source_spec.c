@@ -871,13 +871,12 @@ spec("source") {
     }
 
     it("should be able to get the fields of the descriptor provided from type_of") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "foo := 0\n"
+        "foo : i64 = 0\n"
         "id :: fn(x : type_of(foo)) -> (type_of(foo)) { x }\n"
-        "checker :: fn() -> (s64) {"
-          "x : s64 = 42\n"
-          "id(x)"
+        "checker :: fn() -> (i64) {"
+          "id(42)"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
@@ -1294,7 +1293,7 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to define, assign and lookup an s64 variable on the stack") {
+    it("should be able to define, assign and lookup an i64 variable on the stack") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
         "foo :: fn() -> (s64) { y : s64; y = 10; x := 21; x = 32; x + y }"
