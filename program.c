@@ -49,7 +49,14 @@ program_init(
   // :FunctionTableCallbackMax2Gb
   // (640 + 640 + 640 == 1920) < 2048
   #define MAX_PROGRAM_SIZE (MAX_RW_DATA_SIZE + MAX_CODE_SIZE + MAX_RO_DATA_SIZE)
-  virtual_memory_buffer_init(&program->memory.buffer, MAX_PROGRAM_SIZE);
+
+  void *code_address = 0;
+  #if !defined(NDEBUG)
+  static u64 index = 0;
+  code_address = (void *)(0x30000000000 + MAX_PROGRAM_SIZE * (index++));
+  #endif
+
+  virtual_memory_buffer_init_at_address(&program->memory.buffer, MAX_PROGRAM_SIZE, code_address);
   program->memory.buffer.commit_step_byte_size = 1024 * 1024;
 
   u64 offset_in_memory = 0;
