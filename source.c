@@ -5297,11 +5297,10 @@ mass_handle_dereference_operator_lazy_proc(
 }
 
 static Value *
-mass_handle_dereference_operator(
+mass_dereference(
   Mass_Context *context,
   Parser *parser,
-  Value_View args_view,
-  const void *payload
+  Value_View args_view
 ) {
   Value *pointer = token_parse_single(context, parser, value_view_get(args_view, 0));
   if (mass_has_error(context)) return 0;
@@ -6665,18 +6664,6 @@ scope_define_builtins(
       .associativity = Operator_Associativity_Left,
       .tag = Operator_Tag_Alias,
       .Alias.handler = mass_handle_comma_operator,
-    )
-  );
-  Source_Range dot_star_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&dot_star_source_range, ".*");
-  scope_define_operator(
-    &context, scope, dot_star_source_range, compilation->common_symbols.operator_dot_star,
-    allocator_make(allocator, Operator,
-      .precedence = 20,
-      .fixity = Operator_Fixity_Postfix,
-      .associativity = Operator_Associativity_Left,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_dereference_operator,
     )
   );
   Source_Range colon_source_range;

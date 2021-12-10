@@ -8,6 +8,7 @@ operator 30 (x') MASS.unquote
 
 // TODO allow non-intrinsic overloads
 operator 1 (x = y) MASS.assign
+operator 20 (x .*) MASS.dereference
 
 operator 7 (x == y) 'equal
 operator 7 (x != y) 'not_equal
