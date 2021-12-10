@@ -583,10 +583,8 @@ deduce_runtime_descriptor_for_value(
       }
       parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
     }
-    // @CopyPaste in `mass_assign`
-    // TODO @Speed use temp allocator here
     Array_Value_Ptr fake_args =
-      mass_fake_argument_array_from_parameters(context->allocator, parameters);
+      mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
     Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);
 
     Overload_Match_Found match_found;
@@ -916,19 +914,9 @@ mass_assign(
       source->descriptor == &descriptor_function_literal ||
       source->descriptor == &descriptor_overload
     ) {
-      // TODO @Speed use temp allocator here
-      Array_Value_Ptr fake_args = dyn_array_make(
-        Array_Value_Ptr,
-        .allocator = context->allocator,
-        .capacity = dyn_array_length(target_info->parameters),
-      );
-      DYN_ARRAY_FOREACH(Function_Parameter, param, target_info->parameters) {
-        assert(param->tag == Function_Parameter_Tag_Runtime);
-        assert(param->descriptor);
-        Value *fake_value = value_make(context, param->descriptor, storage_none, param->source_range);
-        dyn_array_push(fake_args, fake_value);
-      }
-      Value_View args_view = value_view_from_value_array(fake_args, &source->source_range);
+      Array_Value_Ptr fake_args =
+        mass_fake_argument_array_from_parameters(context->temp_allocator, target_info->parameters);
+      Value_View args_view = value_view_from_value_array(fake_args, &target->source_range);
 
       Overload_Match_Found match_found;
       if (!mass_match_overload_or_error(context, source, args_view, &match_found)) {
