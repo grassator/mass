@@ -1280,7 +1280,8 @@ compilation_init(
   );
   compilation->allocation_buffer.commit_step_byte_size = 16 * 1024 * 1024;
   compilation->allocator = virtual_memory_buffer_allocator_make(&compilation->allocation_buffer);
-  virtual_memory_buffer_enable_warmup(&compilation->allocation_buffer);
+  // FIXME figure out why this hanges `fit` test
+  //virtual_memory_buffer_enable_warmup(&compilation->allocation_buffer);
 
   // Get 1 gigabyte of temp space
   virtual_memory_buffer_init_at_address(
