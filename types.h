@@ -3,6 +3,22 @@
 #include <stddef.h>
 #include <limits.h>
 
+#define MASS_TYPE_VALUE(_DESCRIPTOR_)\
+  (Value) {\
+    .descriptor = &descriptor_descriptor_pointer,\
+    .storage = {\
+      .tag = Storage_Tag_Immediate,\
+      .bit_size = {sizeof(Descriptor *) * CHAR_BIT},\
+      .Immediate.bits = (u64)(_DESCRIPTOR_),\
+    },\
+  }
+
+#define VALUE_STATIC_EPOCH (const Epoch){0}
+
+#define MASS_DEFINE_TYPE_VALUE(_NAME_)\
+  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);\
+  static Value *type_##_NAME_##_pointer_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_##_pointer);
+
 #define _INIT_LITERAL_SOURCE_RANGE_STRINGIFY(X) #X
 #define _INIT_LITERAL_SOURCE_RANGE_PROXY(X) _INIT_LITERAL_SOURCE_RANGE_STRINGIFY(X)
 #define INIT_LITERAL_SOURCE_RANGE(_TO_INIT_, _C_STRING_)\
@@ -94,23 +110,8 @@
     .bit_size = {sizeof(void *) * CHAR_BIT},\
     .bit_alignment = _Alignof(void *) * CHAR_BIT,\
     .Function_Instance = { .info = &descriptor_##_NAME_##__info, .call_setup = 0/*FIXME*/, },\
-  };
-
-#define VALUE_STATIC_EPOCH (const Epoch){0}
-
-#define MASS_TYPE_VALUE(_DESCRIPTOR_)\
-  (Value) {\
-    .descriptor = &descriptor_descriptor_pointer,\
-    .storage = {\
-      .tag = Storage_Tag_Immediate,\
-      .bit_size = {sizeof(Descriptor *) * CHAR_BIT},\
-      .Immediate.bits = (u64)(_DESCRIPTOR_),\
-    },\
-  }
-
-#define MASS_DEFINE_TYPE_VALUE(_NAME_)\
-  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);\
-  static Value *type_##_NAME_##_pointer_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_##_pointer);
+  };\
+  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);
 
 #define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
   MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, __VA_ARGS__);\

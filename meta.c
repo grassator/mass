@@ -455,10 +455,11 @@ print_scope_define_function(
   Function_Type *function = &type->function;
 
   if (function->kind == Function_Kind_Typedef) {
-    fprintf(file, "  MASS_DEFINE_FUNCTION_TYPE(\n");
-  } else {
-    fprintf(file, "  MASS_DEFINE_FUNCTION(\n");
+    print_scope_define(file, type->name, type->export_name);
+    return;
   }
+
+  fprintf(file, "  MASS_DEFINE_FUNCTION(\n");
   fprintf(file, "    Function_Info_Flags_None");
   switch(function->kind) {
     case Function_Kind_Default:
