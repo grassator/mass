@@ -1237,7 +1237,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Recursive_Intrinsic_Use);
+      check(error->tag == Mass_Error_Tag_Circular_Dependency);
     }
 
     it("should report an error when trying to indirectly recurse into the same intrinsic") {
@@ -1249,7 +1249,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Recursive_Intrinsic_Use);
+      check(error->tag == Mass_Error_Tag_Circular_Dependency);
     }
   }
 

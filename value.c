@@ -1154,7 +1154,7 @@ function_literal_info_for_args(
     .descriptors = cache_descriptors,
     .info = specialized_info,
   });
-    
+
   if (mass_has_error(context)) return 0;
 
   return specialized_info;

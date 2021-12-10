@@ -593,7 +593,7 @@ deduce_runtime_descriptor_for_value(
     }
     // @Speed it is probably wasteful to ask for an instance every time here
     Value *instance = ensure_function_instance(context, match_found.value, args_view);
-    if (mass_has_error(context)) panic("UNREACHABLE");
+    if (mass_has_error(context)) return 0;
     assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
     return instance->descriptor;
   }
@@ -3753,12 +3753,16 @@ mass_intrinsic_call(
       }
       const Descriptor *actual = value_or_lazy_value_descriptor(result);
       if (!same_type(expected, actual)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = returns->source_range,
-          .Type_Mismatch = { .expected = expected, .actual = actual },
-        });
-        return 0;
+        const Descriptor *runtime = deduce_runtime_descriptor_for_value(context, result, expected);
+        if (!runtime) return 0;
+        if (!same_type(expected, runtime)) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Type_Mismatch,
+            .source_range = returns->source_range,
+            .Type_Mismatch = { .expected = expected, .actual = actual },
+          });
+          return 0;
+        }
       }
     } break;
     case Function_Return_Tag_Generic: {
