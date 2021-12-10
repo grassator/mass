@@ -2217,7 +2217,12 @@ token_parse_operator_definition(
 
   Value *pattern_token = value_view_next(view, &peek_index);
   if (!value_is_group_paren(pattern_token)) { context_parse_error(context, parser, view, peek_index); goto err; }
-  
+
+  Value *separator_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, mass_ensure_symbol(context->compilation, slice_literal("::"))
+  );
+  if (!separator_token) { context_parse_error(context, parser, view, peek_index); goto err; }
+
   Value *precedence_token = value_view_next(view, &peek_index);
   if (!precedence_token) { context_parse_error(context, parser, view, peek_index); goto err; }
 

@@ -1,42 +1,42 @@
 // `get_intrinsic` is a global because it itself
 // needs to be used to access module exports
 // TODO allow non-intrinsic overloads
-operator(.) 20 __get
+operator(.) :: 20 __get
 
-operator('_) 30 MASS.quote
-operator(_') 30 MASS.unquote
+operator(' _) :: 30 MASS.quote
+operator(_ ') :: 30 MASS.unquote
 
 // TODO allow non-intrinsic overloads
-operator(=) 1 MASS.assign
-operator(_.*) 20 MASS.dereference
+operator(=) :: 1 MASS.assign
+operator(_ .*) :: 20 MASS.dereference
 
-operator(:) 2 MASS.typed_symbol
+operator(:) :: 2 MASS.typed_symbol
 
-operator(@ _) 20 MASS.eval
-operator(. _) 30 MASS.named_accessor
+operator(@ _) :: 20 MASS.eval
+operator(. _) :: 30 MASS.named_accessor
 
-operator(==) 7 'equal
-operator(!=) 7 'not_equal
+operator(==) :: 7 'equal
+operator(!=) :: 7 'not_equal
 
-operator(<) 8 'less
-operator(>) 8 'greater
-operator(<=) 8 'less_equal
-operator(>=) 8 'greater_equal
+operator(<) :: 8 'less
+operator(>) :: 8 'greater
+operator(<=) :: 8 'less_equal
+operator(>=) :: 8 'greater_equal
 
-operator(+) 10 'add
-operator(-) 10 'subtract
+operator(+) :: 10 'add
+operator(-) :: 10 'subtract
 
-operator(*) 15 'multiply
-operator(/) 15 'divide
-operator(%) 15 'remainder
+operator(*) :: 15 'multiply
+operator(/) :: 15 'divide
+operator(%) :: 15 'remainder
 
-operator(<<) 15 'logical_shift_left
-operator(>>) 15 'logical_shift_right
-operator(|) 15 'bitwise_or
-operator(&) 15 'bitwise_and
+operator(<<) :: 15 'logical_shift_left
+operator(>>) :: 15 'logical_shift_right
+operator(|) :: 15 'bitwise_or
+operator(&) :: 15 'bitwise_and
 
-operator(- _) 16 'negate
-operator(& _) 16 'pointer_to
+operator(- _) :: 16 'negate
+operator(& _) :: 16 'pointer_to
 
 
 import :: fn(path : String) -> (MASS.Module) MASS.import

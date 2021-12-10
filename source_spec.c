@@ -1505,8 +1505,8 @@ spec("source") {
     it("should report an error when defining an overloaded infix operator") {
       test_program_inline_source_base(
         "dummy", &test_context,
-        "operator (**) 15 'multiply;"
-        "operator (**) 15 'multiply;"
+        "operator (**) :: 15 'multiply;"
+        "operator (**) :: 15 'multiply;"
         "dummy :: fn() -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1519,8 +1519,8 @@ spec("source") {
     it("should report an error when defining an overloaded infix and postfix operator") {
       test_program_inline_source_base(
         "dummy", &test_context,
-        "operator (**) 15 'multiply;"
-        "operator (_ **) 15 'multiply;"
+        "operator (**) :: 15 'multiply;"
+        "operator (_ **) :: 15 'multiply;"
         "dummy :: fn() -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
