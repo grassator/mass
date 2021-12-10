@@ -440,6 +440,20 @@ encode_inverted_conditional_jump(
   const Source_Range *source_range,
   const Value *value
 ) {
+  if (value->storage.tag == Storage_Tag_Immediate) {
+    u64 bit_size = value->storage.bit_size.as_u64;
+    assert(bit_size <= 64);
+    bool is_zero = memcmp(&value->storage.Immediate.bits, &(u64){0}, bit_size / 8) == 0;
+    if (is_zero) {
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *source_range,
+        &(Instruction_Assembly){jmp, {code_label32(to_label)}}
+      );
+    } else {
+      // nothing to do, just fall through to the next code
+    }
+    return;
+  }
   if (value->storage.tag == Storage_Tag_Eflags) {
     const X64_Mnemonic *mnemonic = 0;
     switch(value->storage.Eflags.compare_type) {
