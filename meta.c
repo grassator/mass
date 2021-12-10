@@ -2091,7 +2091,7 @@ main(void) {
     {"Instruction", "instruction"},
   })));
 
-  export_global_custom_name("get_intrinsic", push_type(type_intrinsic("mass_get")));
+  export_global_custom_name("__get", push_type(type_intrinsic("mass_get")));
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));

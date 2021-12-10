@@ -1341,7 +1341,7 @@ global_scope_define_exports(
   (void)calling_convention;
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_get, "get_intrinsic", &descriptor_value_pointer,
+    mass_get, "__get", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_mass_context_pointer
