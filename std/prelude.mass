@@ -1,7 +1,12 @@
+// `get_intrinsic` is a global because it itself
+// needs to be used to access module exports
+// TODO allow non-intrinsic overloads
+operator 20 (x . y) get_intrinsic
+
 operator 30 ('x) MASS.quote
 operator 30 (x') MASS.unquote
 
-// TODO make this non-intrinsic
+// TODO allow non-intrinsic overloads
 operator 1 (x = y) MASS.assign
 
 operator 7 (x == y) 'equal

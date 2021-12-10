@@ -6667,18 +6667,6 @@ scope_define_builtins(
       .Alias.handler = mass_handle_comma_operator,
     )
   );
-  Source_Range dot_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&dot_source_range, ".");
-  scope_define_operator(
-    &context, scope, dot_source_range, compilation->common_symbols.operator_dot,
-    allocator_make(allocator, Operator,
-      .precedence = 20,
-      .fixity = Operator_Fixity_Infix,
-      .associativity = Operator_Associativity_Left,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_dot_operator,
-    )
-  );
   Source_Range dot_star_source_range;
   INIT_LITERAL_SOURCE_RANGE(&dot_star_source_range, ".*");
   scope_define_operator(

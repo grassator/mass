@@ -700,6 +700,9 @@ typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 static void push_instruction
   (Code_Block * code_block, Instruction instruction);
 
+static Value * mass_get
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_intrinsic
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2626,6 +2629,7 @@ static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_push_instruction;
+static Descriptor descriptor_mass_get;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_assign;
