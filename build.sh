@@ -23,7 +23,7 @@ cd ..
 
 if [[ $RELEASE ]]
 then
-  FLAGS="$FLAGS -O3"
+  FLAGS="$FLAGS -O3 -DNDEBUG"
 else
   FLAGS="$FLAGS -O0"
   if [[ $($CC -v 2>&1) == *"clang version"* ]]
