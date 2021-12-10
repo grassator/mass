@@ -1684,6 +1684,8 @@ main(void) {
     { "None", 0 },
     { "Generic", 1 << 0 },
     { "Macro", 1 << 1 },
+    { "Intrinsic", 1 << 2 },
+    { "Compile_Time", 1 << 3 },
   }));
 
   push_type(type_struct("Function_Specialization", (Struct_Item[]){
@@ -1695,7 +1697,8 @@ main(void) {
     { "Function_Literal_Flags", "flags"},
     { "u32", "_flags_padding"},
     { "Scope *", "own_scope" },
-    { "Function_Info *", "info" },
+    { "Array_Function_Parameter", "parameters"},
+    { "Function_Return", "returns"},
     { "Value *", "body" },
     { "u64 *", "overload_lock_count"},
     { "Array_Value_Ptr", "instances"},

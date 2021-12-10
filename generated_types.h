@@ -481,12 +481,16 @@ typedef enum Function_Literal_Flags {
   Function_Literal_Flags_None = 0,
   Function_Literal_Flags_Generic = 1,
   Function_Literal_Flags_Macro = 2,
+  Function_Literal_Flags_Intrinsic = 4,
+  Function_Literal_Flags_Compile_Time = 8,
 } Function_Literal_Flags;
 
 const char *function_literal_flags_name(Function_Literal_Flags value) {
   if (value == 0) return "Function_Literal_Flags_None";
   if (value == 1) return "Function_Literal_Flags_Generic";
   if (value == 2) return "Function_Literal_Flags_Macro";
+  if (value == 4) return "Function_Literal_Flags_Intrinsic";
+  if (value == 8) return "Function_Literal_Flags_Compile_Time";
   assert(!"Unexpected value for enum Function_Literal_Flags");
   return 0;
 };
@@ -1612,7 +1616,8 @@ typedef struct Function_Literal {
   Function_Literal_Flags flags;
   u32 _flags_padding;
   Scope * own_scope;
-  Function_Info * info;
+  Array_Function_Parameter parameters;
+  Function_Return returns;
   Value * body;
   u64 * overload_lock_count;
   Array_Value_Ptr instances;
@@ -4534,6 +4539,8 @@ static C_Enum_Item function_literal_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Generic"), .value = 1 },
 { .name = slice_literal_fields("Macro"), .value = 2 },
+{ .name = slice_literal_fields("Intrinsic"), .value = 4 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 8 },
 };
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal_Flags, function_literal_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal_Flags *, function_literal_flags_pointer);
@@ -4573,9 +4580,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .offset = offsetof(Function_Literal, own_scope),
   },
   {
-    .descriptor = &descriptor_function_info_pointer,
-    .name = slice_literal_fields("info"),
-    .offset = offsetof(Function_Literal, info),
+    .descriptor = &descriptor_array_function_parameter,
+    .name = slice_literal_fields("parameters"),
+    .offset = offsetof(Function_Literal, parameters),
+  },
+  {
+    .descriptor = &descriptor_function_return,
+    .name = slice_literal_fields("returns"),
+    .offset = offsetof(Function_Literal, returns),
   },
   {
     .descriptor = &descriptor_value_pointer,

@@ -108,7 +108,10 @@ test_program_source_base(
   Scope_Entry *entry = scope_lookup(context->compilation->root_scope, symbol);
   Value *value = scope_entry_force_value(context, entry);
   if (value && value->descriptor == &descriptor_function_literal) {
-    return ensure_function_instance(context, value, (Value_View){0});
+    Array_Function_Parameter parameters = value_as_function_literal(value)->parameters;
+    Array_Value_Ptr fake_args = mass_fake_argument_array_from_parameters(context->allocator, parameters);
+    Value_View args_view = value_view_from_value_array(fake_args, &symbol_source_range);
+    return ensure_function_instance(context, value, args_view);
   }
   return value;
 }

@@ -83,8 +83,9 @@ get_new_epoch() {
 static void
 ensure_parameter_descriptors(
   Mass_Context *context,
-  Function_Info *info,
-  Scope *arguments_scope
+  Scope *arguments_scope,
+  Array_Function_Parameter *parameters,
+  Function_Return *returns
 );
 
 static bool

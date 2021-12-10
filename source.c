@@ -567,7 +567,7 @@ deduce_runtime_descriptor_for_value(
   }
 
   if (value->descriptor == &descriptor_overload || value->descriptor == &descriptor_function_literal) {
-    const Function_Info *target_info;
+    Array_Function_Parameter parameters;
     if (value->descriptor == &descriptor_function_literal) {
       const Function_Literal *literal = value_as_function_literal(value);
       if (literal->flags & Function_Literal_Flags_Macro) {
@@ -576,26 +576,17 @@ deduce_runtime_descriptor_for_value(
       if (literal->flags & Function_Literal_Flags_Generic) {
         return 0;
       }
-      target_info = literal->info;
+      parameters = literal->parameters;
     } else {
       if (!maybe_desired_descriptor || maybe_desired_descriptor->tag != Descriptor_Tag_Function_Instance) {
         return 0;
       }
-      target_info = maybe_desired_descriptor->Function_Instance.info;
+      parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
     }
     // @CopyPaste in `mass_assign`
     // TODO @Speed use temp allocator here
-    Array_Value_Ptr fake_args = dyn_array_make(
-      Array_Value_Ptr,
-      .allocator = context->allocator,
-      .capacity = dyn_array_length(target_info->parameters),
-    );
-    DYN_ARRAY_FOREACH(Function_Parameter, param, target_info->parameters) {
-      assert(param->tag == Function_Parameter_Tag_Runtime);
-      assert(param->descriptor);
-      Value *fake_value = value_make(context, param->descriptor, storage_none, param->source_range);
-      dyn_array_push(fake_args, fake_value);
-    }
+    Array_Value_Ptr fake_args =
+      mass_fake_argument_array_from_parameters(context->allocator, parameters);
     Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);
 
     Overload_Match_Found match_found;
@@ -1776,15 +1767,14 @@ static fn_type_opaque
 mass_ensure_jit_function_for_value(
   Mass_Context *context,
   Value *value,
-  const Source_Range *source_range
+  Value_View args_view
 ) {
   Jit *jit = &context->compilation->jit;
 
   Mass_Context jit_context = *context;
   jit_context.program = jit->program;
 
-  // TODO check function signature
-  Value *instance = ensure_function_instance(&jit_context, value, (Value_View){0});
+  Value *instance = ensure_function_instance(&jit_context, value, args_view);
   if (mass_has_error(context)) return 0;
 
   if (storage_is_label(&instance->storage)) {
@@ -1799,7 +1789,7 @@ mass_ensure_jit_function_for_value(
       // happens when there is a recursive call to intrinsics
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Recursive_Intrinsic_Use,
-        .source_range = *source_range,
+        .source_range = args_view.source_range,
       });
       return 0;
     }
@@ -1814,8 +1804,7 @@ static Function_Parameter
 token_match_argument(
   Mass_Context *context,
   Parser *parser,
-  Value_View view,
-  Function_Info *function
+  Value_View view
 ) {
   Function_Parameter arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
@@ -1915,8 +1904,11 @@ token_match_argument(
       )) {
         Value *constraint = compile_time_eval(context, parser, maybe_type_expression);
         if (mass_has_error(context)) goto err;
+        Value *fake_descriptor_pointer = value_make(
+          context, &descriptor_descriptor_pointer, storage_none, constraint->source_range
+        );
         maybe_type_constraint = (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(
-          context, constraint, &maybe_type_expression.source_range
+          context, constraint, value_view_single(&fake_descriptor_pointer)
         );
         if (mass_has_error(context)) goto err;
       } else {
@@ -2961,9 +2953,9 @@ mass_handle_macro_call(
   // should not have access to locals inside the call scope.
   Scope *body_scope = scope_make(context->allocator, literal->own_scope);
 
-  for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
+  for(u64 i = 0; i < dyn_array_length(literal->parameters); ++i) {
     if (mass_has_error(context)) goto err;
-    Function_Parameter *param = dyn_array_get(literal->info->parameters, i);
+    Function_Parameter *param = dyn_array_get(literal->parameters, i);
     if (param->symbol) {
       Value *arg_value;
       if (i >= args_view.length) {
@@ -3013,12 +3005,12 @@ mass_handle_macro_call(
   if (mass_has_error(context)) goto err;
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
-  switch(literal->info->returns.tag) {
+  switch(literal->returns.tag) {
     case Function_Return_Tag_Inferred: {
       // Accept whatever the actual return type is
     } break;
     case Function_Return_Tag_Exact: {
-      const Descriptor *expected = literal->info->returns.Exact.descriptor;
+      const Descriptor *expected = literal->returns.Exact.descriptor;
       // TODO should this actually perform a cast?
       if (!same_type_or_can_implicitly_move_cast(expected, actual_return_descriptor)) {
         mass_error(context, (Mass_Error) {
@@ -3038,7 +3030,7 @@ mass_handle_macro_call(
     return body_value;
   }
 
-  Source_Range return_range = literal->info->returns.source_range;
+  Source_Range return_range = literal->returns.source_range;
   return mass_make_lazy_value(
     context, parser, return_range, body_value, actual_return_descriptor, mass_macro_lazy_proc
   );
@@ -3406,8 +3398,9 @@ struct Overload_Match_State {
 static void
 ensure_parameter_descriptors(
   Mass_Context *context,
-  Function_Info *info,
-  Scope *arguments_scope
+  Scope *arguments_scope,
+  Array_Function_Parameter *parameters,
+  Function_Return *returns
 ) {
   Mass_Context temp_context = mass_context_from_compilation(context->compilation);
   Parser args_parser = {
@@ -3417,7 +3410,7 @@ ensure_parameter_descriptors(
 
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
 
-  DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
+  DYN_ARRAY_FOREACH(Function_Parameter, param, *parameters) {
     Source_Range source_range = param->source_range;
     if (param->descriptor) {
       Storage storage = storage_immediate(&param->descriptor);
@@ -3432,7 +3425,7 @@ ensure_parameter_descriptors(
     }
   }
 
-  DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
+  DYN_ARRAY_FOREACH(Function_Parameter, param, *parameters) {
     if (param->descriptor) continue;
     const Symbol *symbol = param->symbol;
     Source_Range source_range = param->source_range;
@@ -3446,24 +3439,19 @@ ensure_parameter_descriptors(
     assert(param->descriptor);
   }
 
-  switch(info->returns.tag) {
+  switch(returns->tag) {
     case Function_Return_Tag_Inferred: {
-      if (info->flags & Function_Info_Flags_Intrinsic) {
-        // :IntrinsicReturnType
-        // there is no fn body to infer this from so will be handled elsewhere
-      } else {
-        panic("TODO");
-      }
+      // assume to be handled elsewhere, for example in :IntrinsicReturnType
     } break;
     case Function_Return_Tag_Exact: {
       // Nothing to do, we already know the type
     } break;
     case Function_Return_Tag_Generic: {
       const Descriptor *descriptor =
-        token_match_type(&temp_context, &args_parser, info->returns.Generic.type_expression);
-      info->returns = (Function_Return) {
+        token_match_type(&temp_context, &args_parser, returns->Generic.type_expression);
+      *returns = (Function_Return) {
         .tag = Function_Return_Tag_Exact,
-        .source_range = info->returns.source_range,
+        .source_range = returns->source_range,
         .Exact = { .descriptor = descriptor },
       };
     } break;
@@ -3557,14 +3545,14 @@ calculate_arguments_match_score(
 
 static inline bool
 match_overload_argument_count(
-  const Function_Info *info,
+  Array_Function_Parameter params,
   u64 actual_count
 ) {
-  if (actual_count > dyn_array_length(info->parameters)) return false;
-  if (actual_count == dyn_array_length(info->parameters)) return true;
+  if (actual_count > dyn_array_length(params)) return false;
+  if (actual_count == dyn_array_length(params)) return true;
   // FIXME @Speed cache this as a range
-  for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
-    Function_Parameter *param = dyn_array_get(info->parameters, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(params); ++arg_index) {
+    Function_Parameter *param = dyn_array_get(params, arg_index);
     if (arg_index < actual_count) continue;
     if (!param->maybe_default_value) return false;
   }
@@ -3588,32 +3576,29 @@ mass_match_overload_candidate(
     const Function_Info *overload_info;
     if (value_is_function_literal(candidate)) {
       const Function_Literal *literal = value_as_function_literal(candidate);
-      if (literal->flags & Function_Literal_Flags_Generic) {
-        // :OverloadLock Disallow matching this literal if it was locked for some reason
-        if (*literal->overload_lock_count) {
-          return;
-        }
-        if (!match_overload_argument_count(literal->info, args->view.length)) return;
-        if (literal->info->flags & Function_Info_Flags_Compile_Time) {
+      // :OverloadLock Disallow matching this literal if it was locked for some reason
+      if (*literal->overload_lock_count) {
+        return;
+      }
+      if (literal->flags & Function_Literal_Flags_Compile_Time) {
+        // :CompileTimeFnInJitMode
+        if (!context_is_compile_time_eval(context)) {
           if (!args->all_arguments_are_compile_time_known) return;
         }
-
-        {
-          // :OverloadLock
-          // A literal must be locked here to allow using its overload to be used
-          // inside the function signature. Here's an example:
-          //    pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
-          //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
-          // Without the lock the second literal will infinitely recurse
-          *literal->overload_lock_count += 1;
-          overload_info = function_literal_info_for_args(context, literal, args->view);
-          *literal->overload_lock_count -= 1;
-        }
-
-        if (!overload_info) return;
-      } else {
-        overload_info = literal->info;
       }
+      if (!match_overload_argument_count(literal->parameters, args->view.length)) return;
+      {
+        // :OverloadLock
+        // A literal must be locked here to allow using its overload to be used
+        // inside the function signature. Here's an example:
+        //    pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
+        //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
+        // Without the lock the second literal will infinitely recurse
+        *literal->overload_lock_count += 1;
+        overload_info = function_literal_info_for_args(context, literal, args->view);
+        *literal->overload_lock_count -= 1;
+      }
+      if (!overload_info) return;
     } else {
       const Descriptor *descriptor = value_or_lazy_value_descriptor(candidate);
       overload_info = descriptor_as_function_instance(descriptor)->info;
@@ -3731,33 +3716,44 @@ mass_intrinsic_call(
   Mass_Context *context,
   Parser *parser,
   Value *overload,
-  const Function_Info *info,
+  const Function_Return *returns,
   Value_View args_view
 ) {
+  // FIXME @Speed create a static version of this or cache the `jitted_code` in some other way
+  Array_Function_Parameter parameters =
+    descriptor_as_function_instance(&descriptor_mass_intrinsic_proc)->info->parameters;
+  Array_Value_Ptr intrinsic_args = mass_fake_argument_array_from_parameters(context->allocator, parameters);
+  Value_View intrinsic_args_view = value_view_from_value_array(intrinsic_args, &args_view.source_range);
+
   // @Volatile :IntrinsicFunctionSignature
   Mass_Intrinsic_Proc jitted_code = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
-    context, overload, &args_view.source_range
+    context, overload, intrinsic_args_view
   );
   if (mass_has_error(context)) return 0;
 
   Value *result = jitted_code(context, parser, args_view);
   if (!result) return 0;
+
   // :IntrinsicReturnType
-  switch(info->returns.tag) {
+  switch(returns->tag) {
     case Function_Return_Tag_Inferred: {
       // Accept whatever was returned
       return result;
     } break;
     case Function_Return_Tag_Exact: {
-      const Descriptor *expected = info->returns.Exact.descriptor;
+      const Descriptor *expected = returns->Exact.descriptor;
       if (mass_descriptor_is_void(expected)) {
-        return value_make(context, &descriptor_void, storage_none, info->returns.source_range);
+        if (mass_descriptor_is_void(result->descriptor)) {
+          return result;
+        } else {
+          return value_make(context, &descriptor_void, storage_none, returns->source_range);
+        }
       }
       const Descriptor *actual = value_or_lazy_value_descriptor(result);
       if (!same_type(expected, actual)) {
         mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = info->returns.source_range,
+          .source_range = returns->source_range,
           .Type_Mismatch = { .expected = expected, .actual = actual },
         });
         return 0;
@@ -3774,15 +3770,14 @@ static inline bool
 value_is_intrinsic(
   Value *value
 ) {
-  const Function_Info *info;
   if (value_is_function_literal(value)) {
-    info = value_as_function_literal(value)->info;
-  } else if (value->descriptor->tag == Descriptor_Tag_Function_Instance) {
-    info = value->descriptor->Function_Instance.info;
-  } else {
-    return false;
+    return !!(value_as_function_literal(value)->flags & Function_Literal_Flags_Intrinsic);
   }
-  return !!(info->flags & Function_Info_Flags_Intrinsic);
+  if (value->descriptor->tag == Descriptor_Tag_Function_Instance) {
+    return !!(value->descriptor->Function_Instance.info->flags & Function_Info_Flags_Intrinsic);
+  }
+
+  return false;
 }
 
 static const Mass_Trampoline *
@@ -3874,26 +3869,6 @@ mass_ensure_trampoline(
 
   Source_Range return_range;
   INIT_LITERAL_SOURCE_RANGE(&return_range, "()");
-  Function_Info *trampoline_info = allocator_allocate(context->allocator, Function_Info);
-  trampoline_info->flags = Function_Info_Flags_Compile_Time;
-  trampoline_info->returns = (Function_Return) {
-    .tag = Function_Return_Tag_Exact,
-    .source_range = return_range,
-    .Exact = { .descriptor = &descriptor_void },
-  };
-  trampoline_info->parameters = dyn_array_make(
-    Array_Function_Parameter,
-    .allocator = context->allocator,
-    .capacity = 1
-  );
-  Source_Range args_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&args_source_range, "args");
-  dyn_array_push(trampoline_info->parameters, (Function_Parameter) {
-    .tag = Function_Parameter_Tag_Runtime,
-    .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
-    .descriptor = descriptor_pointer_to(context->compilation, args_struct_descriptor),
-    .source_range = args_source_range,
-  });
 
   Source_Range proxy_source_range;
   INIT_LITERAL_SOURCE_RANGE(&proxy_source_range, "proxy");
@@ -3924,9 +3899,29 @@ mass_ensure_trampoline(
   Ast_Block body = {.statements = statements};
   Value *body_value = value_make(context, &descriptor_ast_block, storage_immediate(&body), body_range);
 
+  Array_Function_Parameter parameters = dyn_array_make(
+    Array_Function_Parameter,
+    .allocator = context->allocator,
+    .capacity = 1
+  );
+  Source_Range args_source_range;
+  INIT_LITERAL_SOURCE_RANGE(&args_source_range, "args");
+  dyn_array_push(parameters, (Function_Parameter) {
+    .tag = Function_Parameter_Tag_Runtime,
+    .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
+    .descriptor = descriptor_pointer_to(context->compilation, args_struct_descriptor),
+    .source_range = args_source_range,
+  });
+
   Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
   *trampoline_literal = (Function_Literal) {
-    .info = trampoline_info,
+    .flags = Function_Literal_Flags_Compile_Time,
+    .parameters = parameters,
+    .returns = {
+      .tag = Function_Return_Tag_Exact,
+      .source_range = return_range,
+      .Exact = { .descriptor = &descriptor_void },
+    },
     .body = body_value,
     .own_scope = trampoline_scope,
     .overload_lock_count = allocator_make(context->allocator, u64, 0),
@@ -3936,10 +3931,11 @@ mass_ensure_trampoline(
   );
 
   Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
+  Value *args_struct_value = value_make(context, args_struct_descriptor, storage_none, args_source_range);
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
     .proc = (Mass_Trampoline_Proc)mass_ensure_jit_function_for_value(
-      &jit_context, literal_value, &args_view.source_range
+      &jit_context, literal_value, value_view_single(&args_struct_value)
     ),
     .original_info = original_info,
   };
@@ -4047,7 +4043,7 @@ token_handle_function_call(
   if (value_is_function_literal(overload)) {
     const Function_Literal *literal = value_as_function_literal(overload);
     if (value_is_intrinsic(literal->body)) {
-      return mass_intrinsic_call(context, parser, literal->body, info, args_view);
+      return mass_intrinsic_call(context, parser, literal->body, &info->returns, args_view);
     }
     if (literal->flags & Function_Literal_Flags_Macro) {
       return mass_handle_macro_call(context, parser, overload, args_view, source_range);
@@ -4690,9 +4686,9 @@ mass_handle_startup_call_lazy_proc(
 ) {
   if(startup_function->descriptor != &descriptor_function_literal) goto err;
   const Function_Literal *literal = value_as_function_literal(startup_function);
-  if (dyn_array_length(literal->info->parameters)) goto err;
-  if (literal->info->returns.tag != Function_Return_Tag_Exact) goto err;
-  const Descriptor *descriptor = function_return_as_exact(&literal->info->returns)->descriptor;
+  if (dyn_array_length(literal->parameters)) goto err;
+  if (literal->returns.tag != Function_Return_Tag_Exact) goto err;
+  const Descriptor *descriptor = function_return_as_exact(&literal->returns)->descriptor;
   if (!mass_descriptor_is_void(descriptor)) goto err;
 
   // This call is executed at compile time, but the actual startup function
@@ -5584,11 +5580,10 @@ token_dispatch_operator(
       result_value = operator->Alias.handler(context, parser, args_view, operator);
     } break;
     case Operator_Tag_Intrinsic: {
-      Mass_Intrinsic_Proc proc = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
-        context, operator->Intrinsic.body, &source_range
-      );
-      if (mass_has_error(context)) return;
-      result_value = proc(context, parser, args_view);
+      static const Function_Return returns = {
+        .tag = Function_Return_Tag_Inferred,
+      };
+      result_value = mass_intrinsic_call(context, parser, operator->Intrinsic.body, &returns, args_view);
     } break;
   }
   if (mass_has_error(context)) return;
@@ -5736,12 +5731,10 @@ mass_make_fake_function_literal(
 ) {
   Scope *function_scope = scope_make(context->allocator, parser->scope);
 
-  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, function_return_exact(returns, *source_range));
-
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
   *literal = (Function_Literal){
-    .info = fn_info,
+    .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
+    .returns = function_return_exact(returns, *source_range),
     .body = body,
     .own_scope = function_scope,
     .overload_lock_count = allocator_make(context->allocator, u64, 0),
@@ -5771,89 +5764,83 @@ mass_intrinsic(
 
   // @Volatile :IntrinsicFunctionSignature
   // These arguments must match how we call it.
-  literal->info->parameters = dyn_array_make(
+  literal->parameters = dyn_array_make(
     Array_Function_Parameter,
     .allocator = context->allocator,
     .capacity = 2
   );
-  dyn_array_push(literal->info->parameters, (Function_Parameter) {
+  dyn_array_push(literal->parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
     .descriptor = &descriptor_mass_context_pointer,
     .source_range = *source_range,
   });
-  dyn_array_push(literal->info->parameters, (Function_Parameter) {
+  dyn_array_push(literal->parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("parser")),
     .descriptor = &descriptor_parser_pointer,
     .source_range = *source_range,
   });
-  dyn_array_push(literal->info->parameters, (Function_Parameter) {
+  dyn_array_push(literal->parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
     .descriptor = &descriptor_value_view,
     .source_range = *source_range,
   });
-  literal->info->flags |= Function_Info_Flags_Intrinsic;
+  literal->flags |= Function_Literal_Flags_Intrinsic;
 
   return value_make(context, &descriptor_function_literal, storage_static(literal), *source_range);
 }
 
-static Function_Info *
-function_info_from_parameters_and_return(
+static Array_Function_Parameter
+mass_parse_function_parameters(
   Mass_Context *context,
   Parser *parser,
-  Value_View args_view,
-  Function_Return returns
+  Value_View args_view
 ) {
   Parser arg_parser = *parser;
   arg_parser.scope = scope_make(context->allocator, parser->scope);
   arg_parser.epoch = get_new_epoch();
 
-  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, returns);
+  Array_Function_Parameter result = (Array_Function_Parameter){&dyn_array_zero_items};
+  if (args_view.length == 0) return result;
 
   Temp_Mark temp_mark = context_temp_mark(context);
 
-  if (args_view.length != 0) {
-    bool previous_argument_has_default_value = false;
+  Array_Function_Parameter temp_params = dyn_array_make(
+    Array_Function_Parameter,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
+  );
 
-    Array_Function_Parameter temp_params = dyn_array_make(
-      Array_Function_Parameter,
-      .allocator = context->temp_allocator,
-      .capacity = 32,
-    );
+  const Symbol *comma = context->compilation->common_symbols.operator_comma;
 
-    const Symbol *comma = context->compilation->common_symbols.operator_comma;
-
-    u32 match_length;
-    for (Value_View rest = args_view; rest.length; rest = value_view_rest(&rest, match_length)) {
-      match_length = 0;
-      Value_View param_view = value_view_match_till_symbol(rest, &match_length, comma);
-      assert(match_length);
-      Function_Parameter param = token_match_argument(context, &arg_parser, param_view, fn_info);
-      if (mass_has_error(context)) goto defer;
-      dyn_array_push(temp_params, param);
-      if (previous_argument_has_default_value) {
-        if (!param.maybe_default_value) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
-            .source_range = param.source_range,
-          });
-          goto defer;
-        }
-      } else {
-        previous_argument_has_default_value = !!param.maybe_default_value;
+  u32 match_length;
+  bool previous_argument_has_default_value = false;
+  for (Value_View rest = args_view; rest.length; rest = value_view_rest(&rest, match_length)) {
+    match_length = 0;
+    Value_View param_view = value_view_match_till_symbol(rest, &match_length, comma);
+    assert(match_length);
+    Function_Parameter param = token_match_argument(context, &arg_parser, param_view);
+    if (mass_has_error(context)) goto defer;
+    dyn_array_push(temp_params, param);
+    if (previous_argument_has_default_value) {
+      if (!param.maybe_default_value) {
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
+          .source_range = param.source_range,
+        });
+        goto defer;
       }
+    } else {
+      previous_argument_has_default_value = !!param.maybe_default_value;
     }
-    dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
   }
-
-  if (mass_has_error(context)) return 0;
+  dyn_array_copy_from_temp(Array_Function_Parameter, context, &result, temp_params);
 
   defer:
   context_temp_reset_to_mark(context, temp_mark);
-  return fn_info;
+  return result;
 }
 
 static Value *
@@ -5933,10 +5920,8 @@ token_parse_function_literal(
   }
 
   Value_View args_view = value_as_group_paren(args)->children;
-  Function_Info *fn_info =
-    function_info_from_parameters_and_return(context, parser, args_view, returns);
+  Array_Function_Parameter parameters = mass_parse_function_parameters(context, parser, args_view);
   if (mass_has_error(context)) return 0;
-
 
   Value *body_value = value_view_peek(view, peek_index);
   if (body_value) {
@@ -5962,17 +5947,49 @@ token_parse_function_literal(
 
   *matched_length = peek_index;
 
-  if (is_compile_time) {
-    fn_info->flags |= Function_Info_Flags_Compile_Time;
-  }
   bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
 
   // TODO should be extracted from the :: if available or maybe stored separately from Descriptor
   Slice name = {0};
 
+  if (body_value && !is_syscall) {
+    Function_Literal_Flags flags = Function_Literal_Flags_None;
+    if (is_compile_time) flags |= Function_Literal_Flags_Compile_Time;
+    if (value_is_intrinsic(body_value)) flags |= Function_Literal_Flags_Intrinsic;
+
+    DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
+      if (param->tag == Function_Parameter_Tag_Generic) {
+        flags |= Function_Literal_Flags_Generic;
+        break;
+      }
+    }
+    if (!(flags & Function_Literal_Flags_Generic)) {
+      ensure_parameter_descriptors(context, parser->scope, &parameters, &returns);
+    }
+
+    if (is_macro) flags |= Function_Literal_Flags_Macro;
+    Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
+    *literal = (Function_Literal){
+      .flags = flags,
+      .parameters = parameters,
+      .returns = returns,
+      .body = body_value,
+      .own_scope = parser->scope,
+      .overload_lock_count = allocator_make(context->allocator, u64, 0),
+    };
+    return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
+  }
+
+  Function_Info *fn_info = mass_allocate(context, Function_Info);
+  function_info_init(fn_info, returns);
+  fn_info->parameters = parameters;
+  if (is_compile_time) fn_info->flags |= Function_Info_Flags_Compile_Time;
+  ensure_parameter_descriptors(context, parser->scope, &fn_info->parameters, &fn_info->returns);
+  if (mass_has_error(context)) return 0;
+
   // TODO support this on non-Linux systems
   if (is_syscall) {
-    ensure_parameter_descriptors(context, fn_info, parser->scope);
+    assert(!is_compile_time);
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
     // TODO this patching after the fact feels awkward and brittle
@@ -5984,36 +6001,7 @@ token_parse_function_literal(
       descriptor_function_instance(context->allocator, name, fn_info, call_setup);
 
     return value_make(context, fn_descriptor, storage_none, view.source_range);
-  } else if (body_value) {
-    Function_Literal_Flags flags = Function_Literal_Flags_None;
-    if (value_is_intrinsic(body_value)) {
-      fn_info->flags |= Function_Info_Flags_Intrinsic;
-    }
-
-    DYN_ARRAY_FOREACH(Function_Parameter, param, fn_info->parameters) {
-      if (param->tag == Function_Parameter_Tag_Generic) {
-        flags |= Function_Literal_Flags_Generic;
-        break;
-      }
-    }
-    if (is_macro) flags |= Function_Literal_Flags_Macro;
-    if (!(flags & Function_Literal_Flags_Generic)) {
-      ensure_parameter_descriptors(context, fn_info, parser->scope);
-      if (mass_has_error(context)) return 0;
-    }
-    Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
-    *literal = (Function_Literal){
-      .flags = flags,
-      .info = fn_info,
-      .body = body_value,
-      .own_scope = parser->scope,
-      .overload_lock_count = allocator_make(context->allocator, u64, 0),
-    };
-    return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
-  } else {
-    ensure_parameter_descriptors(context, fn_info, parser->scope);
-    if (mass_has_error(context)) return 0;
-
+  } else { // only the signature
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
     Function_Call_Setup call_setup =

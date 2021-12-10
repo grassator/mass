@@ -1038,13 +1038,41 @@ descriptor_pointer_to(
   return result;
 }
 
+static Array_Value_Ptr
+mass_fake_argument_array_from_parameters(
+  const Allocator *allocator,
+  Array_Function_Parameter parameters
+) {
+  u64 capacity = dyn_array_length(parameters);
+  if (capacity == 0) {
+    return (Array_Value_Ptr){&dyn_array_zero_items};
+  }
+  Array_Value_Ptr fake_args = dyn_array_make(Array_Value_Ptr, .allocator = allocator, .capacity = capacity);
+  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
+    assert(param->tag == Function_Parameter_Tag_Runtime);
+    assert(param->descriptor);
+    Value *fake_value = value_init(
+      allocator_allocate(allocator, Value),
+      param->descriptor, storage_none, param->source_range
+    );
+    dyn_array_push(fake_args, fake_value);
+  }
+  return fake_args;
+}
+
 static const Function_Info *
 function_literal_info_for_args(
   Mass_Context *context,
   const Function_Literal *literal,
   Value_View args
 ) {
-  if (!(literal->flags & Function_Literal_Flags_Generic)) return literal->info;
+  if (!(literal->flags & Function_Literal_Flags_Generic)) {
+    if (dyn_array_is_initialized(literal->specializations)) {
+      assert(dyn_array_length(literal->specializations) == 1);
+      return dyn_array_get(literal->specializations, 0)->info;
+    }
+    // fall through, let the specialization happen
+  }
 
   // FIXME @ConstCast avoid this
   Function_Literal *mutable_literal = (Function_Literal *)literal;
@@ -1058,6 +1086,7 @@ function_literal_info_for_args(
   }
 
   DYN_ARRAY_FOREACH(Function_Specialization, specialization, mutable_literal->specializations) {
+    if (dyn_array_length(specialization->descriptors) != args.length) continue;
     for (u64 i = 0; i < dyn_array_length(specialization->descriptors); ++i) {
       const Descriptor *cached_descriptor = *dyn_array_get(specialization->descriptors, i);
       const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(value_view_get(args, i));
@@ -1067,11 +1096,9 @@ function_literal_info_for_args(
     not_matched:;
   }
 
-  Function_Info *specialized_info = allocator_allocate(context->allocator, Function_Info);
-  *specialized_info = *mutable_literal->info;
-  specialized_info->parameters = dyn_array_make(Array_Function_Parameter,
+  Array_Function_Parameter specialized_params = dyn_array_make(Array_Function_Parameter,
     .allocator = context->allocator,
-    .capacity = dyn_array_length(mutable_literal->info->parameters),
+    .capacity = dyn_array_length(literal->parameters),
   );
 
   Array_Const_Descriptor_Ptr cache_descriptors = dyn_array_make(
@@ -1080,10 +1107,16 @@ function_literal_info_for_args(
     .allocator = context->allocator,
   );
 
-  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->info->parameters); ++arg_index) {
-    const Function_Parameter *param = dyn_array_get(literal->info->parameters, arg_index);
-    Function_Parameter *specialized_param =
-      dyn_array_push(specialized_info->parameters, *param);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->parameters); ++arg_index) {
+    const Function_Parameter *param = dyn_array_get(literal->parameters, arg_index);
+    Function_Parameter *specialized_param = dyn_array_push(specialized_params, *param);
+    if (arg_index >= args.length) {
+      if (!specialized_param->maybe_default_value) {
+        panic("Calls to fns that don't have defaults to fill in missing args must be handled earlier");
+      }
+      assert(specialized_param->descriptor);
+      continue;
+    }
     const Descriptor *actual_descriptor =
       value_or_lazy_value_descriptor(value_view_get(args, arg_index));
     // In the presence of implicit casts it is unclear if this should use declared types or not.
@@ -1102,7 +1135,20 @@ function_literal_info_for_args(
     }
   }
 
-  ensure_parameter_descriptors(context, specialized_info, literal->own_scope);
+  // FIXME this should be returned from `ensure_parameter_descriptors`
+  Function_Info *specialized_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(specialized_info, literal->returns);
+  if (literal->flags & Function_Literal_Flags_Intrinsic) {
+    specialized_info->flags |= Function_Info_Flags_Intrinsic;
+  }
+  if (literal->flags & Function_Literal_Flags_Compile_Time) {
+    specialized_info->flags |= Function_Info_Flags_Compile_Time;
+  }
+  specialized_info->parameters = specialized_params;
+
+  ensure_parameter_descriptors(
+    context, literal->own_scope, &specialized_info->parameters, &specialized_info->returns
+  );
 
   dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
     .descriptors = cache_descriptors,
