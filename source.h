@@ -37,7 +37,7 @@ mass_descriptor_is_void(
 }
 
 static void
-mass_assign(
+mass_assign_helper(
   Mass_Context *context,
   Function_Builder *builder,
   Value *target,

@@ -706,6 +706,9 @@ static Value * mass_intrinsic
 static Value * mass_call
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_assign
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_named_accessor
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2619,6 +2622,7 @@ static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
+static Descriptor descriptor_mass_assign;
 static Descriptor descriptor_mass_named_accessor;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_pointer_to;

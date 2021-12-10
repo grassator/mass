@@ -2093,6 +2093,7 @@ main(void) {
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
+  export_compiler_custom_name("assign", push_type(type_intrinsic("mass_assign")));
   export_compiler_custom_name("named_accessor", push_type(type_intrinsic("mass_named_accessor")));
   export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
   export_compiler_custom_name("pointer_to", push_type(type_intrinsic("mass_pointer_to")));

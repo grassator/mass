@@ -309,7 +309,7 @@ assign_from_static(
 
       // It is important to call assign here to make sure we recursively handle
       // any complex types such as structs and arrays
-      mass_assign(context, builder, static_pointer, &static_source_value, source_range);
+      mass_assign_helper(context, builder, static_pointer, &static_source_value, source_range);
       if (mass_has_error(context)) return true;
     }
     assert(storage_is_label(&static_pointer->storage));
@@ -721,7 +721,7 @@ assign_tuple(
         ),
         .source_range = target->source_range,
       };
-      mass_assign(context, builder, &target_field, field_source, source_range);
+      mass_assign_helper(context, builder, &target_field, field_source, source_range);
       if (mass_has_error(context)) goto err;
     }
   } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
@@ -751,7 +751,7 @@ assign_tuple(
         ),
         .source_range = target->source_range,
       };
-      mass_assign(context, builder, &target_field, tuple_item, source_range);
+      mass_assign_helper(context, builder, &target_field, tuple_item, source_range);
       if (mass_has_error(context)) goto err;
     }
   } else {
@@ -821,7 +821,7 @@ load_address(
 }
 
 static void
-mass_assign(
+mass_assign_helper(
   Mass_Context *context,
   Function_Builder *builder,
   Value *target,
@@ -848,7 +848,7 @@ mass_assign(
 
   if (descriptor_is_implicit_pointer(source->descriptor)) {
     Value *ref_source = value_indirect_from_pointer(context, builder, source);
-    mass_assign(context, builder, target, ref_source, source_range);
+    mass_assign_helper(context, builder, target, ref_source, source_range);
     storage_release_if_temporary(builder, &ref_source->storage);
     return;
   }
@@ -862,7 +862,7 @@ mass_assign(
       source->descriptor == &descriptor_tuple
     ) {
       Value *referenced_target = value_indirect_from_pointer(context, builder, target);
-      mass_assign(context, builder, referenced_target, source, source_range);
+      mass_assign_helper(context, builder, referenced_target, source, source_range);
       storage_release_if_temporary(builder, &referenced_target->storage);
       return;
     } else {
@@ -970,7 +970,7 @@ mass_assign(
         ),
         .source_range = target->source_range,
       };
-      mass_assign(context, builder, &target_field, &source_field, source_range);
+      mass_assign_helper(context, builder, &target_field, &source_field, source_range);
       if (mass_has_error(context)) return;
     }
     storage_release_if_temporary(builder, &source_array_storage);
@@ -996,7 +996,7 @@ mass_assign(
         ),
         .source_range = target->source_range,
       };
-      mass_assign(context, builder, &target_field, &source_field, source_range);
+      mass_assign_helper(context, builder, &target_field, &source_field, source_range);
       if (mass_has_error(context)) return;
     }
     return;
@@ -1988,7 +1988,7 @@ mass_expected_result_ensure_value_or_temp(
         mass_allocate(context, Value),
         expected_result->Exact.descriptor, expected_result->Exact.storage, value->source_range
       );
-      mass_assign(context, builder, result_value, value, &value->source_range);
+      mass_assign_helper(context, builder, result_value, value, &value->source_range);
       if (mass_has_error(context)) return 0;
       // @Hack there should be a better and more robust way to do this
       if (
@@ -2607,10 +2607,10 @@ compile_time_eval(
   Storage out_storage = storage_indirect(result_descriptor->bit_size, out_register);
   Value *out_value = value_make(&eval_context, result_descriptor, out_storage, *source_range);
 
-  mass_assign(&eval_context, &eval_builder, &out_value_register, &result_address, source_range);
+  mass_assign_helper(&eval_context, &eval_builder, &out_value_register, &result_address, source_range);
   if (mass_has_error(context)) return 0;
 
-  mass_assign(&eval_context, &eval_builder, out_value, forced_value, source_range);
+  mass_assign_helper(&eval_context, &eval_builder, out_value, forced_value, source_range);
   if (mass_has_error(context)) return 0;
 
   calling_convention_x86_64_common_end_proc(jit->program, &eval_builder);
@@ -2726,7 +2726,7 @@ mass_handle_tuple_cast_lazy_proc(
   assert(expected_descriptor == payload->target);
   assert(payload->target->tag == Descriptor_Tag_Struct);
   Value *result = mass_value_from_expected_result(context, builder, expected_result, *source_range);
-  mass_assign(context, builder, result, payload->expression, source_range);
+  mass_assign_helper(context, builder, result, payload->expression, source_range);
   return result;
 }
 
@@ -3245,7 +3245,7 @@ call_function_overload(
       }
     };
     if (should_assign) {
-      mass_assign(context, builder, arg_value, source_arg, source_range);
+      mass_assign_helper(context, builder, arg_value, source_arg, source_range);
       if (mass_has_error(context)) return 0;
     }
     dyn_array_push(temp_arguments, arg_value);
@@ -3311,7 +3311,7 @@ call_function_overload(
         &(Instruction_Assembly){lea, {target_storage, source_storage}}
       );
     } else {
-      mass_assign(context, builder, param, source_arg, source_range);
+      mass_assign_helper(context, builder, param, source_arg, source_range);
       if (mass_has_error(context)) return 0;
     }
   }
@@ -5026,17 +5026,13 @@ mass_define_stack_value_from_typed_symbol(
 }
 
 static Value *
-mass_handle_assignment_operator(
+mass_assign(
   Mass_Context *context,
   Parser *parser,
-  Value_View operands,
-  const Operator *operator
+  Value_View operands
 ) {
   Value *target = token_parse_single(context, parser, value_view_get(operands, 0));
   Value *source = token_parse_single(context, parser, value_view_get(operands, 1));
-
-
-  if (mass_has_error(context)) return 0;
 
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
@@ -6388,7 +6384,7 @@ mass_handle_explicit_return_lazy_proc(
   const Source_Range *source_range,
   Value *parse_result
 ) {
-  mass_assign(context, builder, &builder->return_value, parse_result, source_range);
+  mass_assign_helper(context, builder, &builder->return_value, parse_result, source_range);
   if (mass_has_error(context)) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
 
@@ -6452,7 +6448,7 @@ token_define_global_variable(
     global_value = value_make(context, descriptor, global_storage, expression.source_range);
 
     if (mass_value_is_compile_time_known(value)) {
-      mass_assign(context, 0, global_value, value, &expression.source_range);
+      mass_assign_helper(context, 0, global_value, value, &expression.source_range);
       if (mass_has_error(context)) return;
     } else {
       Assignment *assignment_payload = mass_allocate(context, Assignment);
@@ -6731,18 +6727,6 @@ scope_define_builtins(
       .associativity = Operator_Associativity_Left,
       .tag = Operator_Tag_Alias,
       .Alias.handler = mass_handle_typed_symbol_operator,
-    )
-  );
-  Source_Range equal_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&equal_source_range, "=");
-  scope_define_operator(
-    &context, scope, equal_source_range, compilation->common_symbols.operator_equal,
-    allocator_make(allocator, Operator,
-      .precedence = 1,
-      .fixity = Operator_Fixity_Infix,
-      .associativity = Operator_Associativity_Left,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_assignment_operator,
     )
   );
 

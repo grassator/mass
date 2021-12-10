@@ -80,6 +80,9 @@ apply :: fn(symbol :: 'size_of, paren : MASS.Group_Paren) -> (i64) MASS.size_of
 
 apply :: fn(x, paren : MASS.Group_Paren) -> _ MASS.call
 
+// TODO make this non-intrinsic
+operator 1 (x = y) MASS.assign
+
 operator 7 (x == y) 'equal
 operator 7 (x != y) 'not_equal
 
