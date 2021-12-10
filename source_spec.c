@@ -1748,6 +1748,16 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should support compile-time comparsion operations") {
+      bool (*checker)() = (bool (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "RESULT :: 42 == 42\n"
+        "checker :: fn() -> (bool) { RESULT }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker());
+    }
   }
 
   describe("Macro") {
