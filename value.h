@@ -269,7 +269,7 @@ storage_equal(
   const Storage *b
 );
 
-#define storage_none ((Storage){.tag = Storage_Tag_None })
+#define storage_none ((const Storage){.tag = Storage_Tag_None })
 
 static Fixed_Buffer *
 mass_error_to_string(

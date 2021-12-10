@@ -3711,6 +3711,34 @@ mass_match_overload_or_error(
   return false;
 }
 
+static inline Value_View
+mass_intrinsic_fake_arg_view() {
+  static Value_View args_view = {0};
+  if (!args_view.length) { // not initialized
+    Array_Function_Parameter parameters =
+      descriptor_as_function_instance(&descriptor_mass_intrinsic_proc)->info->parameters;
+    static Value arg_values[3] = {
+      {.storage = {.tag = Storage_Tag_None }},
+      {.storage = {.tag = Storage_Tag_None }},
+      {.storage = {.tag = Storage_Tag_None }},
+    };
+    assert(dyn_array_length(parameters) == countof(arg_values));
+    arg_values[0].descriptor = dyn_array_get(parameters, 0)->descriptor;
+    arg_values[1].descriptor = dyn_array_get(parameters, 1)->descriptor;
+    arg_values[2].descriptor = dyn_array_get(parameters, 2)->descriptor;
+    static Value *arg_value_pointers[countof(arg_values)] = {
+      &arg_values[0], &arg_values[1], &arg_values[2],
+    };
+
+    args_view = (Value_View) {
+      .values = arg_value_pointers,
+      .length = countof(arg_value_pointers),
+    };
+    INIT_LITERAL_SOURCE_RANGE(&args_view.source_range, "context, parser, arguments");
+  }
+  return args_view;
+}
+
 static inline Value *
 mass_intrinsic_call(
   Mass_Context *context,
@@ -3719,15 +3747,9 @@ mass_intrinsic_call(
   const Function_Return *returns,
   Value_View args_view
 ) {
-  // FIXME @Speed create a static version of this or cache the `jitted_code` in some other way
-  Array_Function_Parameter parameters =
-    descriptor_as_function_instance(&descriptor_mass_intrinsic_proc)->info->parameters;
-  Array_Value_Ptr intrinsic_args = mass_fake_argument_array_from_parameters(context->allocator, parameters);
-  Value_View intrinsic_args_view = value_view_from_value_array(intrinsic_args, &args_view.source_range);
-
   // @Volatile :IntrinsicFunctionSignature
   Mass_Intrinsic_Proc jitted_code = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
-    context, overload, intrinsic_args_view
+    context, overload, mass_intrinsic_fake_arg_view()
   );
   if (mass_has_error(context)) return 0;
 
