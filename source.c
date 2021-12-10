@@ -4373,16 +4373,13 @@ mass_handle_arithmetic_operation(
   if (mass_has_error(context)) return 0;
 
   const Descriptor *result_descriptor = value_or_lazy_value_descriptor(lhs);
-  if (value_is_i64(rhs)) {
-    rhs = token_value_force_immediate_integer(
-      context, rhs, result_descriptor, &arguments.source_range
-    );
-  } else if (value_is_i64(lhs)) {
+  if (!descriptor_is_integer(value_or_lazy_value_descriptor(rhs))) {
+    rhs = mass_cast_helper(context, parser, result_descriptor, rhs, rhs->source_range);
+  } else if (!descriptor_is_integer(value_or_lazy_value_descriptor(lhs))) {
     result_descriptor = value_or_lazy_value_descriptor(rhs);
-    lhs = token_value_force_immediate_integer(
-      context, lhs, result_descriptor, &arguments.source_range
-    );
+    lhs = mass_cast_helper(context, parser, result_descriptor, lhs, lhs->source_range);
   }
+  assert(descriptor_is_integer(result_descriptor));
   assert(same_type(value_or_lazy_value_descriptor(lhs), value_or_lazy_value_descriptor(rhs)));
 
   Mass_Arithmetic_Operator_Lazy_Payload stack_lazy_payload =
