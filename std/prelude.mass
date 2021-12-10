@@ -1,3 +1,6 @@
+operator 30 ('x) MASS.quote
+operator 30 (x') MASS.unquote
+
 // TODO make this non-intrinsic
 operator 1 (x = y) MASS.assign
 
