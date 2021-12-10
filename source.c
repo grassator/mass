@@ -2241,7 +2241,6 @@ token_parse_operator_definition(
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
   Value *operator_token;
-  Value *arguments[2] = {0};
   Operator_Fixity fixity = Operator_Fixity_Prefix;
   u16 argument_count = 1;
 
@@ -2251,40 +2250,30 @@ token_parse_operator_definition(
     bool is_first_operator_like = false;
     if (value_is_symbol(first)) {
       Slice operator_string = value_as_symbol(first)->name;
-      is_first_operator_like = operator_string.length && !isalpha(operator_string.bytes[0]);
+      is_first_operator_like = (
+        operator_string.length &&
+        operator_string.bytes[0] != '_' &&
+        !isalpha(operator_string.bytes[0])
+      );
     }
     fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
     if (fixity == Operator_Fixity_Prefix) {
       operator_token = value_view_get(definition, 0);
-      arguments[0] = value_view_get(definition, 1);
     } else {
       operator_token = value_view_get(definition, 1);
-      arguments[0] = value_view_get(definition, 0);
     }
-  } else if (definition.length == 3) { // infix
+  } else if (definition.length == 1) { // infix
     argument_count = 2;
     fixity = Operator_Fixity_Infix;
-    operator_token = value_view_get(definition, 1);
-    arguments[0] = value_view_get(definition, 0);
-    arguments[1] = value_view_get(definition, 2);
+    operator_token = value_view_get(definition, 0);
   } else {
     operator_token = 0;
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = pattern_token->source_range,
-      .detailed_message ="Expected the pattern to have two (for prefix / postfix) or three tokens"
+      .detailed_message ="Expected the pattern to have 2 tokens for prefix / postfix or 1 for infix operators"
     });
     goto err;
-  }
-
-  for (u8 i = 0; i < argument_count; ++i) {
-    if (!value_is_symbol(arguments[i])) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Invalid_Identifier,
-        .source_range = arguments[i]->source_range,
-      });
-      goto err;
-    }
   }
 
   Operator *operator = mass_allocate(context, Operator);
