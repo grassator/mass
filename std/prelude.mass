@@ -10,6 +10,8 @@ operator 30 (x') MASS.unquote
 operator 1 (x = y) MASS.assign
 operator 20 (x .*) MASS.dereference
 
+operator 2 (x : y) MASS.typed_symbol
+
 operator 7 (x == y) 'equal
 operator 7 (x != y) 'not_equal
 

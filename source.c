@@ -4923,11 +4923,10 @@ mass_handle_apply_operator(
 }
 
 static Value *
-mass_handle_typed_symbol_operator(
+mass_typed_symbol(
   Mass_Context *context,
   Parser *parser,
-  Value_View operands,
-  const Operator *operator
+  Value_View operands
 ) {
   Value *lhs_value = value_view_get(operands, 0);
   Value *rhs_value = token_parse_single(context, parser, value_view_get(operands, 1));
@@ -6664,18 +6663,6 @@ scope_define_builtins(
       .associativity = Operator_Associativity_Left,
       .tag = Operator_Tag_Alias,
       .Alias.handler = mass_handle_comma_operator,
-    )
-  );
-  Source_Range colon_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&colon_source_range, ":");
-  scope_define_operator(
-    &context, scope, colon_source_range, compilation->common_symbols.operator_colon,
-    allocator_make(allocator, Operator,
-      .precedence = 2,
-      .fixity = Operator_Fixity_Infix,
-      .associativity = Operator_Associativity_Left,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_typed_symbol_operator,
     )
   );
 

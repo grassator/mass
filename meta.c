@@ -2100,6 +2100,7 @@ main(void) {
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
   export_compiler_custom_name("dereference", push_type(type_intrinsic("mass_dereference")));
   export_compiler_custom_name("named_accessor", push_type(type_intrinsic("mass_named_accessor")));
+  export_compiler_custom_name("typed_symbol", push_type(type_intrinsic("mass_typed_symbol")));
   export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
   export_compiler_custom_name("pointer_to", push_type(type_intrinsic("mass_pointer_to")));
   export_compiler_custom_name("pointer_to_type", push_type(type_intrinsic("mass_pointer_to_type")));
