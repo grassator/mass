@@ -1408,60 +1408,6 @@ spec("source") {
         check(checker(128u, 3u) == 128u);
       }
     }
-
-    it("should have an add function") {
-      s64(*checker)() = (s64(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) { x := 40; add(x, 2) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should have a subtract function") {
-      s64(*checker)() = (s64(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) { subtract(cast(s64, 44), 2) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should have a multiply function") {
-      s64(*checker)() = (s64(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) { multiply(cast(s64, 21), 2) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should have a divide function") {
-      s64(*checker)() = (s64(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) { divide(cast(s64, 84), 2) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should have a remainder function") {
-      s64(*checker)() = (s64(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) { remainder(cast(s64, 142), 100) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should support a u8 version of the remainder") {
-      u8(*checker)() = (u8(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (u8) { remainder(cast(u8, 142), 100) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
   }
 
   describe("Operators") {
