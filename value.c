@@ -1102,20 +1102,13 @@ function_literal_info_for_args(
     }
   }
 
-  // :SpecializationInfiniteLoop
-  // The specialization is pushed to cache before the parameters are processed
-  // so that function that would recursively call themselves in hopes to match
-  // another overload do not end up infinitely looping.
-  Function_Specialization *added_specialization =
-    dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
-      .descriptors = cache_descriptors,
-      .info = 0,
-    });
-
   ensure_parameter_descriptors(context, specialized_info, literal->own_scope);
 
-  // :SpecializationInfiniteLoop
-  added_specialization->info = specialized_info;
+  dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
+    .descriptors = cache_descriptors,
+    .info = specialized_info,
+  });
+    
   if (mass_has_error(context)) return 0;
 
   return specialized_info;

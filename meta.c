@@ -1697,6 +1697,7 @@ main(void) {
     { "Scope *", "own_scope" },
     { "Function_Info *", "info" },
     { "Value *", "body" },
+    { "u64 *", "overload_lock_count"},
     { "Array_Value_Ptr", "instances"},
     { "Array_Function_Specialization", "specializations"},
   }));

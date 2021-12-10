@@ -3589,11 +3589,27 @@ mass_match_overload_candidate(
     if (value_is_function_literal(candidate)) {
       const Function_Literal *literal = value_as_function_literal(candidate);
       if (literal->flags & Function_Literal_Flags_Generic) {
+        // :OverloadLock Disallow matching this literal if it was locked for some reason
+        if (*literal->overload_lock_count) {
+          return;
+        }
         if (!match_overload_argument_count(literal->info, args->view.length)) return;
         if (literal->info->flags & Function_Info_Flags_Compile_Time) {
           if (!args->all_arguments_are_compile_time_known) return;
         }
-        overload_info = function_literal_info_for_args(context, literal, args->view);
+
+        {
+          // :OverloadLock
+          // A literal must be locked here to allow using its overload to be used
+          // inside the function signature. Here's an example:
+          //    pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
+          //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
+          // Without the lock the second literal will infinitely recurse
+          *literal->overload_lock_count += 1;
+          overload_info = function_literal_info_for_args(context, literal, args->view);
+          *literal->overload_lock_count -= 1;
+        }
+
         if (!overload_info) return;
       } else {
         overload_info = literal->info;
@@ -3913,6 +3929,7 @@ mass_ensure_trampoline(
     .info = trampoline_info,
     .body = body_value,
     .own_scope = trampoline_scope,
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
   Value *literal_value = value_make(
     context, &descriptor_function_literal, storage_static(trampoline_literal), body_range
@@ -5727,6 +5744,7 @@ mass_make_fake_function_literal(
     .info = fn_info,
     .body = body,
     .own_scope = function_scope,
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
   return literal;
 }
@@ -5989,6 +6007,7 @@ token_parse_function_literal(
       .info = fn_info,
       .body = body_value,
       .own_scope = parser->scope,
+      .overload_lock_count = allocator_make(context->allocator, u64, 0),
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {

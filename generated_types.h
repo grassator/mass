@@ -1614,6 +1614,7 @@ typedef struct Function_Literal {
   Scope * own_scope;
   Function_Info * info;
   Value * body;
+  u64 * overload_lock_count;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
 } Function_Literal;
@@ -4580,6 +4581,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("body"),
     .offset = offsetof(Function_Literal, body),
+  },
+  {
+    .descriptor = &descriptor_i64_pointer,
+    .name = slice_literal_fields("overload_lock_count"),
+    .offset = offsetof(Function_Literal, overload_lock_count),
   },
   {
     .descriptor = &descriptor_array_value_ptr,
