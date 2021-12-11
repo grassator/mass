@@ -152,6 +152,8 @@ program_patch_labels(
     s32 diff = s64_to_s32(target_rva - from_rva);
     memcpy(info->patch32_at, &diff, sizeof(diff));
   }
+  // The code is not expected to be moved. So once the patches are applied, they can be discarded
+  dyn_array_clear(program->patch_info_array);
 }
 
 static Import_Library *
