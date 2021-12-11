@@ -496,6 +496,9 @@ storage_with_offset_and_bit_size(
   Bits bit_size
 ) {
   Storage result = *base;
+  // Do not inherit flags as it causes issue when a struct or an array
+  // is iterated over. In this case storage might be released multiple times.
+  result.flags = 0;
   result.bit_size = bit_size;
   u64 byte_size = bit_size.as_u64 / 8;
   switch(base->tag) {
