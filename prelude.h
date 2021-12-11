@@ -251,6 +251,19 @@ atomic_u64_load(
   return atomic_load(&value->raw);
   #endif
 }
+
+static inline u64
+atomic_u64_compare_exchange(
+  Atomic_u64 *value,
+  u64 expected,
+  u64 desired
+) {
+  #if defined(_MSC_VER) && !defined(__clang__)
+  return InterlockedCompareExchange64(&value->raw, desired, expected);
+  #else
+  return atomic_compare_exchange_strong(&value->raw, &expected, desired);
+  #endif
+}
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2807,7 +2820,7 @@ typedef struct {
   s8 *memory;
   void *warm_up_thread;
   void *warm_up_event;
-  u64 warmed_up;
+  Atomic_u64 warmed_up;
 } Virtual_Memory_Buffer;
 
 
@@ -2853,7 +2866,7 @@ virtual_memory_buffer_deinit(
 ) {
 #ifdef _WIN32
   if (buffer->warm_up_thread) {
-    buffer->warmed_up = UINT64_MAX;
+    atomic_u64_exchange(&buffer->warmed_up, UINT64_MAX);
     SetEvent(buffer->warm_up_event);
     WaitForSingleObject(buffer->warm_up_thread, INFINITE);
     CloseHandle(buffer->warm_up_event);
@@ -2910,17 +2923,23 @@ virtual_memory_buffer_warm_up_proc(
   Virtual_Memory_Buffer *buffer = data;
   while (true) {
     WaitForSingleObject(buffer->warm_up_event, INFINITE);
-    if (buffer->warmed_up >= buffer->capacity) {
+    u64 original_warmed_up = atomic_u64_load(&buffer->warmed_up);
+    if (original_warmed_up >= buffer->capacity) {
       // There is nothing more to warm up, so can get rid of this thread
       ExitThread(0);
     }
-    if (buffer->warmed_up >= buffer->committed + buffer->commit_step_byte_size) continue;
+    if (original_warmed_up >= buffer->committed + buffer->commit_step_byte_size) continue;
+    u64 warmed_up;
     if (buffer->committed < buffer->capacity) {
-      buffer->warmed_up = buffer->committed + buffer->commit_step_byte_size;
-      buffer->warmed_up = u64_min(buffer->warmed_up, buffer->capacity);
+      warmed_up = buffer->committed + buffer->commit_step_byte_size;
+      warmed_up = u64_min(warmed_up, buffer->capacity);
+      // We do not care if this fails, just not that we overwrite the value
+      atomic_u64_compare_exchange(&buffer->warmed_up, original_warmed_up, warmed_up);
+    } else {
+      warmed_up = original_warmed_up;
     }
-    u64 delta = buffer->warmed_up - buffer->committed;
-    s8 *start_address = buffer->memory + buffer->warmed_up;
+    u64 delta = warmed_up - buffer->committed;
+    s8 *start_address = buffer->memory + warmed_up;
     VirtualAlloc(start_address, delta, MEM_COMMIT, PAGE_READWRITE);
     // Windows does not seem to be mapping committed pages to a write-protected zero page
     // like Linux does, so a read access is enough to trigger kernel page fault and
