@@ -2853,8 +2853,8 @@ virtual_memory_buffer_deinit(
 ) {
 #ifdef _WIN32
   if (buffer->warm_up_thread) {
-    BOOL result = TerminateThread(buffer->warm_up_thread, 0);
-    assert(result);
+    buffer->warmed_up = UINT64_MAX;
+    SetEvent(buffer->warm_up_event);
     WaitForSingleObject(buffer->warm_up_thread, INFINITE);
     CloseHandle(buffer->warm_up_event);
   }
