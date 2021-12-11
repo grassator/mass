@@ -86,7 +86,7 @@ register_acquire_bitset(
 static inline void
 register_release_bitset(
   Function_Builder *builder,
-  Register to_release_bitset
+  u64 to_release_bitset
 ) {
   assert((builder->register_occupied_bitset.bits & to_release_bitset) == to_release_bitset);
   builder->register_occupied_bitset.bits &= ~to_release_bitset;
