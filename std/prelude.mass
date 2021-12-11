@@ -182,7 +182,7 @@ add_or_subtract :: fn(
     temp_rhs_register := temp_rhs_storage.Register.index
     expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
 
-    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.lhs)
+    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
 
     if context.compilation.result.tag != MASS.Result_Tag.Success then {
       return 0
