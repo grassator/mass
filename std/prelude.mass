@@ -168,25 +168,9 @@ add_or_subtract :: fn(
     raw_payload : &Void
   ) -> (&MASS.Value) {
     payload := cast(&Payload, raw_payload)
-    // TODO figure out why this fails
-    //Storage temp_lhs_storage = storage_register_temp(builder, descriptor->bit_size);
-
-    temp_lhs_register := MASS.register_acquire_temp(builder)
-    temp_lhs_storage : MASS.Storage
-    {
-      temp_lhs_storage.flags = MASS.Storage_Flags.Temporary
-      temp_lhs_storage.tag = MASS.Storage_Tag.Register
-      temp_lhs_storage.bit_size = [64]
-      temp_lhs_storage.Register.index = temp_lhs_register
-      temp_lhs_storage.Register.packed = cast(i16, 0)
-      temp_lhs_storage.Register.offset_in_bits = cast(i16, 0)
-    }
-    expected_lhs : MASS.Expected_Result
-    {
-      expected_lhs.tag = MASS.Expected_Result_Tag.Exact
-      expected_lhs.Exact.descriptor = i64
-      expected_lhs.Exact.storage = temp_lhs_storage
-    }
+    temp_lhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
+    temp_lhs_register := temp_lhs_storage.Register.index
+    expected_lhs := MASS.expected_result_exact(i64, temp_lhs_storage)
 
     temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
 
@@ -194,25 +178,11 @@ add_or_subtract :: fn(
       return 0
     } else {}
 
+    temp_rhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
+    temp_rhs_register := temp_rhs_storage.Register.index
+    expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
 
-    temp_rhs_register := MASS.register_acquire_temp(builder)
-    temp_rhs_storage : MASS.Storage
-    {
-      temp_rhs_storage.flags = MASS.Storage_Flags.Temporary
-      temp_rhs_storage.tag = MASS.Storage_Tag.Register
-      temp_rhs_storage.bit_size = [64]
-      temp_rhs_storage.Register.index = temp_rhs_register
-      temp_rhs_storage.Register.packed = cast(i16, 0)
-      temp_rhs_storage.Register.offset_in_bits = cast(i16, 0)
-    }
-    expected_rhs : MASS.Expected_Result
-    {
-      expected_rhs.tag = MASS.Expected_Result_Tag.Exact
-      expected_rhs.Exact.descriptor = i64
-      expected_rhs.Exact.storage = temp_rhs_storage
-    }
-
-    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
+    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.lhs)
 
     if context.compilation.result.tag != MASS.Result_Tag.Success then {
       return 0
