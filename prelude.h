@@ -3768,72 +3768,58 @@ bucket_buffer_allocator_make(
 // Hash
 //////////////////////////////////////////////////////////////////////////////
 
-static const s32 hash_byte_start = 7;
-
-static inline s32
+static inline u64
 hash_u64(
   u64 x
 ) {
   x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
   x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
   x = x ^ (x >> 31);
-  return (s32)x;
-}
-
-static inline s32
-hash_s32(
-  s32 value
-) {
-  u32 x = (u32)value;
-  x ^= x >> 16;
-  x *= 0x7feb352d;
-  x ^= x >> 15;
-  x *= 0x846ca68b;
-  x ^= x >> 16;
   return x;
 }
 
-static inline s32
+static inline u64
 hash_pointer(
   const void *address
 ) {
   return hash_u64((u64)address);
 }
 
-static inline s32
-hash_byte(
-  s32 previous,
-  s8 byte
-) {
-  return (u32)previous * 31 + byte;
-}
-
-static inline s32
+static inline u64
 hash_bytes(
   const void *address,
   u64 size
 ) {
-  const s8 *bytes = address;
-  const s8 *end = bytes + size;
-  s32 hash = hash_byte_start;
-  while (bytes != end) hash = hash_byte(hash, *bytes++);
-  return hash;
+  u64 result = hash_u64(size);
+  if (!size) return result;
+  const u8 *chunk_address = address;
+  const u8 *end_address = chunk_address + size;
+  // TODO probably would be better to align the start address and do u64 loads instead of memcpy
+  for (; chunk_address + 8 < end_address; chunk_address += 8) {
+    u64 chunk;
+    memcpy(&chunk, chunk_address, 8);
+    result ^= hash_u64(chunk);
+  }
+  if (chunk_address != end_address) {
+    u64 chunk = 0;
+    memcpy(&chunk, chunk_address, end_address - chunk_address);
+    result ^= hash_u64(chunk);
+  }
+  return result;
 }
 
-static inline s32
+static inline u64
 hash_slice(
   Slice slice
 ) {
   return hash_bytes(slice.bytes, slice.length);
 }
 
-s32
+static inline u64
 hash_c_string(
   const char *string
 ) {
-  s32 hash = hash_byte_start;
-  while (*string) hash = hash_byte(hash, *string++);
-  return hash;
+  return hash_bytes(string, strlen(string));
 }
 
 static inline bool
@@ -3851,7 +3837,7 @@ const_void_pointer_equal(
 typedef struct {
   bool occupied;
   bool tombstone;
-  s32 hash;
+  u64 hash;
 } Hash_Map_Entry_Bookkeeping;
 
 #define hash_map_type_internal(_hash_map_type_, _key_type_, _value_type_)\
@@ -3862,16 +3848,18 @@ typedef struct {
     _value_type_ *(*get)(_hash_map_type_ *, _key_type_);\
     _value_type_ *(*set)(_hash_map_type_ *, _key_type_, _value_type_);\
     void (*delete)(_hash_map_type_ *, _key_type_);\
-    _value_type_ *(*get_by_hash)(_hash_map_type_ *, s32, _key_type_);\
-    _value_type_ *(*set_by_hash)(_hash_map_type_ *, s32, _key_type_, _value_type_);\
-    void (*delete_by_hash)(_hash_map_type_ *, s32, _key_type_);\
+    _value_type_ *(*get_by_hash)(_hash_map_type_ *, u64, _key_type_);\
+    _value_type_ *(*set_by_hash)(_hash_map_type_ *, u64, _key_type_, _value_type_);\
+    void (*delete_by_hash)(_hash_map_type_ *, u64, _key_type_);\
   } _hash_map_type_##__Methods;\
   \
   typedef struct _hash_map_type_##__Entry {\
     /* Needs to be synced with Hash_Map_Entry_Bookkeeping and is provided for convinence */\
     union {\
-      bool occupied;\
-      bool tombstone;\
+      struct {\
+        bool occupied;\
+        bool tombstone;\
+      };\
       Hash_Map_Entry_Bookkeeping bookkeeping;\
     };\
     _key_type_ key;\
@@ -3881,8 +3869,8 @@ typedef struct {
   typedef struct _hash_map_type_ {\
     const _hash_map_type_##__Methods *methods;\
     const Allocator *allocator;\
-    s32 hash_mask;\
-    u32 capacity_power_of_2;\
+    u64 hash_mask;\
+    u64 capacity_power_of_2;\
     u64 capacity;\
     u64 occupied;\
     _hash_map_type_##__Entry *entries;\
@@ -3894,14 +3882,14 @@ static inline u64
 hash_map_get_insert_index_internal(
   Hash_Map_Internal *map,
   u64 entry_byte_size,
-  s32 hash
+  u64 hash
 ) {
   for (;;) {
-    s32 hash_index = hash & map->hash_mask;
+    u64 hash_index = hash & map->hash_mask;
     Hash_Map_Entry_Bookkeeping *bookkeeping =
-      (void *)((s8 *)map->entries + hash_index * entry_byte_size);
+      (void *)((u8 *)map->entries + hash_index * entry_byte_size);
     if (!bookkeeping->occupied) return hash_index;
-    hash = hash_s32(hash);
+    hash = hash_u64(hash);
   }
 }
 
@@ -3959,12 +3947,13 @@ struct Hash_Map_Make_Options {
     }\
     u64 entry_byte_size = sizeof(map->entries[0]);\
     u64 entry_array_byte_size = entry_byte_size * capacity;\
+    assert(capacity);\
     *map = (_hash_map_type_) {\
       .methods = _hash_map_type_##__methods,\
       .allocator = options->allocator,\
       .capacity_power_of_2 = capacity_power_of_2,\
       .capacity = capacity,\
-      .hash_mask = u64_to_s32(capacity - 1),\
+      .hash_mask = capacity - 1,\
       .occupied = 0,\
       .entries = allocator_allocate_bytes(options->allocator, entry_array_byte_size, 16),\
     };\
@@ -3975,23 +3964,23 @@ struct Hash_Map_Make_Options {
   static inline _hash_map_type_##__Entry *\
   _hash_map_type_##__get_by_hash_internal(\
     _hash_map_type_ *map,\
-    s32 hash,\
+    u64 hash,\
     _key_type_ key\
   ) {\
     for (;;) {\
-      s32 hash_index = hash & map->hash_mask;\
+      u64 hash_index = hash & map->hash_mask;\
       _hash_map_type_##__Entry *entry = &map->entries[hash_index];\
       if (!entry->occupied) return 0;\
       if (!entry->bookkeeping.tombstone && _key_equality_fn_(key, entry->key)) return entry; \
-      hash = hash_s32(hash);\
+      hash = hash_u64(hash);\
     }\
   }\
-  static s32 (*_hash_map_type_##__hash)(_key_type_ key) = _key_hash_fn_;\
+  static u64(*_hash_map_type_##__hash)(_key_type_ key) = _key_hash_fn_;\
   \
   static inline _value_type_ *\
   _hash_map_type_##__get_by_hash(\
     _hash_map_type_ *map,\
-    s32 hash,\
+    u64 hash,\
     _key_type_ key\
   ) {\
     _hash_map_type_##__Entry *entry =\
@@ -4010,7 +3999,7 @@ struct Hash_Map_Make_Options {
   static inline void\
   _hash_map_type_##__delete_by_hash(\
     _hash_map_type_ *map,\
-    s32 hash,\
+    u64 hash,\
     _key_type_ key\
   ) {\
     _hash_map_type_##__Entry *entry = _hash_map_type_##__get_by_hash_internal(map, hash, key);\
@@ -4028,7 +4017,7 @@ struct Hash_Map_Make_Options {
   static inline _value_type_ *\
   _hash_map_type_##__set_by_hash(\
     _hash_map_type_ *map,\
-    s32 hash,\
+    u64 hash,\
     _key_type_ key,\
     _value_type_ value\
   ) {\

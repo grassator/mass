@@ -1201,7 +1201,7 @@ mass_ensure_symbol_for_map(
   Symbol_Map *map,
   Slice name
 ) {
-  s32 hash = Symbol_Map__hash(name);
+  u64 hash = Symbol_Map__hash(name);
   const Symbol *symbol = 0;
   if (!symbol) {
     Symbol **cache_entry = hash_map_get_by_hash(map, hash, name);
