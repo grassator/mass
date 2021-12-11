@@ -1816,10 +1816,11 @@ spec("source") {
     }
 
     it("should be able to run a long compile-time loop") {
-      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+      u64(*checker)() = (u64(*)())test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(x : s64) -> (s64) {\n"
-          "i := 0\n"
+        "checker :: fn() -> (i64) {\n"
+          "using unsigned\n"
+          "i : i64 = 0\n"
           "while i < 1000000 { i = i + 1 }\n"
           "i\n"
         "}"
@@ -1831,8 +1832,8 @@ spec("source") {
     it("should report an error for macro external functions") {
       test_program_inline_source_base(
         "test", &test_context,
-        "ExitProcess :: macro(x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
-        "test :: fn() -> (s64) { ExitProcess(42) }"
+        "ExitProcess :: macro(x : i64) -> (i64) external(\"kernel32.dll\", \"ExitProcess\")\n"
+        "test :: fn() -> (i64) { ExitProcess(42) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;

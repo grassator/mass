@@ -1338,7 +1338,7 @@ main(void) {
     { "Array_Import_Symbol", "symbols" },
   }));
 
-  push_type(type_enum("Compare_Type", (Enum_Type_Item[]){
+  export_compiler(push_type(type_enum("Compare_Type", (Enum_Type_Item[]){
     { "Equal", 1 },
     { "Not_Equal", 2 },
 
@@ -1353,7 +1353,7 @@ main(void) {
 
     { "Signed_Greater", 9 },
     { "Signed_Greater_Equal", 10 },
-  }));
+  })));
 
   push_type(type_enum("Stack_Area", (Enum_Type_Item[]){
     { "Local", 0 },
@@ -1375,10 +1375,10 @@ main(void) {
     }),
   }));
 
-  push_type(type_enum("Storage_Flags", (Enum_Type_Item[]){
+  export_compiler(push_type(type_enum("Storage_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Temporary", 1 << 0 },
-  }));
+  })));
 
   export_compiler(push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
     struct_empty("None"),
@@ -2134,6 +2134,56 @@ main(void) {
     type_function(Default, "same_type", "_Bool", (Argument_Type[]){
       { "const Descriptor *", "a" },
       { "const Descriptor *", "b" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "register_acquire_temp", "Register", (Argument_Type[]){
+      { "Function_Builder *", "builder" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "register_release", "void", (Argument_Type[]){
+      { "Function_Builder *", "builder" },
+      { "Register", "reg" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "storage_register_temp", "Storage", (Argument_Type[]){
+      { "Function_Builder *", "builder" },
+      { "Bits", "bit_size" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "storage_release_if_temporary", "void", (Argument_Type[]){
+      { "Function_Builder *", "builder" },
+      { "const Storage *", "storage" },
+    })
+  ));
+
+  export_compiler_custom_name("expected_result_exact", push_type(
+    type_function(Default, "mass_expected_result_exact", "Expected_Result", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+      { "Storage", "storage" },
+    })
+  ));
+
+  export_compiler_custom_name("value_force", push_type(
+    type_function(Default, "value_force", "Value *", (Argument_Type[]){
+      { "Mass_Context *", "context" },
+      { "Function_Builder *", "builder" },
+      { "const Expected_Result *", "expected_result" },
+      { "Value *", "value" },
+    })
+  ));
+
+  export_compiler_custom_name("mod_reg_rm", push_type(
+    type_function(Default, "mod_reg_rm", "i8", (Argument_Type[]){
+      { "Register", "a" },
+      { "Register", "b" },
     })
   ));
 

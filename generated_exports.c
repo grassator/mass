@@ -94,6 +94,20 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Syscall")),
     type_syscall_value
   );
+  Source_Range Compare_Type__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Compare_Type__source_range, "Compare_Type");
+  scope_define_enum(
+    compilation, scope, Compare_Type__source_range,
+    slice_literal("Compare_Type"), type_compare_type_value,
+    compare_type_items, countof(compare_type_items)
+  );
+  Source_Range Storage_Flags__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Storage_Flags__source_range, "Storage_Flags");
+  scope_define_enum(
+    compilation, scope, Storage_Flags__source_range,
+    slice_literal("Storage_Flags"), type_storage_flags_value,
+    storage_flags_items, countof(storage_flags_items)
+  );
   Source_Range Storage__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Storage__source_range, "Storage");
   scope_define_value(
@@ -877,6 +891,94 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("b")),
 &descriptor_descriptor_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    register_acquire_temp, "register_acquire_temp", &descriptor_register,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("builder")),
+&descriptor_function_builder_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    register_release, "register_release", &descriptor_void,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("builder")),
+&descriptor_function_builder_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("reg")),
+&descriptor_register
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    storage_register_temp, "storage_register_temp", &descriptor_storage,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("builder")),
+&descriptor_function_builder_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("bit_size")),
+&descriptor_bits
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    storage_release_if_temporary, "storage_release_if_temporary", &descriptor_void,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("builder")),
+&descriptor_function_builder_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("storage")),
+&descriptor_storage_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_expected_result_exact, "expected_result_exact", &descriptor_expected_result,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("descriptor")),
+&descriptor_descriptor_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("storage")),
+&descriptor_storage
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    value_force, "value_force", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("builder")),
+&descriptor_function_builder_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("expected_result")),
+&descriptor_expected_result_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("value")),
+&descriptor_value_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mod_reg_rm, "mod_reg_rm", &descriptor_i8,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("a")),
+&descriptor_register
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("b")),
+&descriptor_register
     )
   );
   MASS_DEFINE_FUNCTION(

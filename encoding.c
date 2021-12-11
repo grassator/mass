@@ -35,6 +35,22 @@ typedef struct {
   Instruction_Label_Patch label_patches[2];
 } Eager_Encoding_Result;
 
+// TODO implement this in the userland
+static i8
+mod_reg_rm(
+  Register a,
+  Register b
+) {
+  u8 r_m = (u8)a;
+  u8 reg = (u8)b;
+  u8 mod = MOD_Register;
+  return (i8){(u8)(
+    (mod << 6) |
+    ((reg & 0b111) << 3) |
+    ((r_m & 0b111))
+  )};
+}
+
 static Eager_Encoding_Result
 eager_encode_instruction_assembly(
   const Instruction_Assembly *assembly,

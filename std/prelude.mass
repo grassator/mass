@@ -150,6 +150,227 @@ using make_arithmetic_operations_module(u16)
 using make_arithmetic_operations_module(u32)
 using make_arithmetic_operations_module(u64)
 
+add_or_subtract :: fn(
+  context : &MASS.Context,
+  parser : &MASS.Parser,
+  arguments : MASS.Value_View,
+  op_code : i8
+) -> (&MASS.Value) {
+  meta :: import("std/meta")
+
+  Payload :: c_struct [ lhs : &MASS.Value, rhs : &MASS.Value, op_code : i8 ]
+
+  lazy_value_proc :: fn(
+    context : &MASS.Context,
+    builder : &MASS.Function_Builder,
+    expected_result : &MASS.Expected_Result,
+    source_range : &MASS.Source_Range,
+    raw_payload : &Void
+  ) -> (&MASS.Value) {
+    payload := cast(&Payload, raw_payload)
+    // TODO figure out why this fails
+    //Storage temp_lhs_storage = storage_register_temp(builder, descriptor->bit_size);
+
+    temp_lhs_register := MASS.register_acquire_temp(builder)
+    temp_lhs_storage : MASS.Storage
+    {
+      temp_lhs_storage.flags = MASS.Storage_Flags.Temporary
+      temp_lhs_storage.tag = MASS.Storage_Tag.Register
+      temp_lhs_storage.bit_size = [64]
+      temp_lhs_storage.Register.index = temp_lhs_register
+      temp_lhs_storage.Register.packed = cast(i16, 0)
+      temp_lhs_storage.Register.offset_in_bits = cast(i16, 0)
+    }
+    expected_lhs : MASS.Expected_Result
+    {
+      expected_lhs.tag = MASS.Expected_Result_Tag.Exact
+      expected_lhs.Exact.descriptor = i64
+      expected_lhs.Exact.storage = temp_lhs_storage
+    }
+
+    temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
+
+    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+      return 0
+    } else {}
+
+
+    temp_rhs_register := MASS.register_acquire_temp(builder)
+    temp_rhs_storage : MASS.Storage
+    {
+      temp_rhs_storage.flags = MASS.Storage_Flags.Temporary
+      temp_rhs_storage.tag = MASS.Storage_Tag.Register
+      temp_rhs_storage.bit_size = [64]
+      temp_rhs_storage.Register.index = temp_rhs_register
+      temp_rhs_storage.Register.packed = cast(i16, 0)
+      temp_rhs_storage.Register.offset_in_bits = cast(i16, 0)
+    }
+    expected_rhs : MASS.Expected_Result
+    {
+      expected_rhs.tag = MASS.Expected_Result_Tag.Exact
+      expected_rhs.Exact.descriptor = i64
+      expected_rhs.Exact.storage = temp_rhs_storage
+    }
+
+    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
+
+    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+      return 0
+    } else {}
+
+    {
+      instruction : MASS.Instruction
+      instruction.tag = MASS.Instruction_Tag.Location
+      instruction.Location.source_range = source_range.*
+    }
+
+    {
+      mod_reg_rm := MASS.mod_reg_rm(temp_lhs_register, temp_rhs_register)
+
+      instruction : MASS.Instruction
+      instruction.tag = MASS.Instruction_Tag.Bytes
+      instruction.Bytes.memory.0 = cast(i8, 0x48)
+      instruction.Bytes.memory.1 = payload.op_code
+      instruction.Bytes.memory.2 = cast(i8, mod_reg_rm)
+      instruction.Bytes.length = cast(i8, 3)
+      MASS.push_instruction(&builder.code_block, instruction);
+    }
+
+    MASS.register_release(builder, temp_rhs_register);
+
+    temp_lhs
+  }
+
+  payload := allocate(context.allocator, Payload)
+  payload.* = [arguments.values.0, arguments.values.1, op_code]
+
+  lazy_value := allocate(context.allocator, MASS.Lazy_Value)
+  lazy_value.epoch = parser.epoch
+  lazy_value.descriptor = i64
+  lazy_value.proc = lazy_value_proc
+  lazy_value.payload = payload
+
+  meta.static_value(context.compilation, lazy_value, arguments.source_range)
+}
+
+add :: fn(x : i64, y : i64) -> (i64) intrinsic {
+  add_or_subtract(context, parser, arguments, cast(i8, 0x01))
+}
+
+subtract :: fn(x : i64, y : i64) -> (i64) intrinsic {
+  add_or_subtract(context, parser, arguments, cast(i8, 0x29))
+}
+
+unsigned_less :: fn(x : i64, y : i64) -> (bool) intrinsic {
+  meta :: import("std/meta")
+
+  Payload :: c_struct [ lhs : &MASS.Value, rhs : &MASS.Value ]
+
+  lazy_value_proc :: fn(
+    context : &MASS.Context,
+    builder : &MASS.Function_Builder,
+    expected_result : &MASS.Expected_Result,
+    source_range : &MASS.Source_Range,
+    raw_payload : &Void
+  ) -> (&MASS.Value) {
+    payload := cast(&Payload, raw_payload)
+    // TODO figure out why this fails
+    //Storage temp_lhs_storage = storage_register_temp(builder, descriptor->bit_size);
+
+    temp_lhs_register := MASS.register_acquire_temp(builder)
+    temp_lhs_storage : MASS.Storage
+    {
+      temp_lhs_storage.flags = MASS.Storage_Flags.Temporary
+      temp_lhs_storage.tag = MASS.Storage_Tag.Register
+      temp_lhs_storage.bit_size = [64]
+      temp_lhs_storage.Register.index = temp_lhs_register
+      temp_lhs_storage.Register.packed = cast(i16, 0)
+      temp_lhs_storage.Register.offset_in_bits = cast(i16, 0)
+    }
+    expected_lhs : MASS.Expected_Result
+    {
+      expected_lhs.tag = MASS.Expected_Result_Tag.Exact
+      expected_lhs.Exact.descriptor = i64
+      expected_lhs.Exact.storage = temp_lhs_storage
+    }
+
+    temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
+
+    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+      return 0
+    } else {}
+
+
+    temp_rhs_register := MASS.register_acquire_temp(builder)
+    temp_rhs_storage : MASS.Storage
+    {
+      temp_rhs_storage.flags = MASS.Storage_Flags.Temporary
+      temp_rhs_storage.tag = MASS.Storage_Tag.Register
+      temp_rhs_storage.bit_size = [64]
+      temp_rhs_storage.Register.index = temp_rhs_register
+      temp_rhs_storage.Register.packed = cast(i16, 0)
+      temp_rhs_storage.Register.offset_in_bits = cast(i16, 0)
+    }
+    expected_rhs : MASS.Expected_Result
+    {
+      expected_rhs.tag = MASS.Expected_Result_Tag.Exact
+      expected_rhs.Exact.descriptor = i64
+      expected_rhs.Exact.storage = temp_rhs_storage
+    }
+
+    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
+
+    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+      return 0
+    } else {}
+
+    {
+      instruction : MASS.Instruction
+      instruction.tag = MASS.Instruction_Tag.Location
+      instruction.Location.source_range = source_range.*
+    }
+
+    {
+      mod_reg_rm := MASS.mod_reg_rm(temp_lhs_register, temp_rhs_register)
+
+      instruction : MASS.Instruction
+      instruction.tag = MASS.Instruction_Tag.Bytes
+      instruction.Bytes.memory.0 = cast(i8, 0x48)
+      instruction.Bytes.memory.1 = cast(i8, 0x39)
+      instruction.Bytes.memory.2 = cast(i8, mod_reg_rm)
+      instruction.Bytes.length = cast(i8, 3)
+      MASS.push_instruction(&builder.code_block, instruction)
+    }
+
+    MASS.register_release(builder, temp_rhs_register)
+    MASS.register_release(builder, temp_lhs_register)
+
+
+    value : &MASS.Value = allocate(context.allocator, MASS.Value)
+    value.source_range = source_range.*
+    value.descriptor = bool
+    value.storage.tag = MASS.Storage_Tag.Eflags
+    value.storage.bit_size = value.descriptor.bit_size
+    value.storage.Eflags.compare_type = MASS.Compare_Type.Unsigned_Below
+    value
+  }
+
+  payload := allocate(context.allocator, Payload)
+  payload.* = [arguments.values.0, arguments.values.1]
+
+  lazy_value := allocate(context.allocator, MASS.Lazy_Value)
+  lazy_value.epoch = parser.epoch
+  lazy_value.descriptor = bool
+  lazy_value.proc = lazy_value_proc
+  lazy_value.payload = payload
+
+  meta.static_value(context.compilation, lazy_value, arguments.source_range)
+}
+
+unsigned :: module {
+  less :: unsigned_less
+}
+
 memory_equal :: fn(x, y : x) -> (bool) MASS.generic_equal
 memory_not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
 equal :: memory_equal

@@ -772,6 +772,27 @@ static const Descriptor * descriptor_pointer_to
 static _Bool same_type
   (const Descriptor * a, const Descriptor * b);
 
+static Register register_acquire_temp
+  (Function_Builder * builder);
+
+static void register_release
+  (Function_Builder * builder, Register reg);
+
+static Storage storage_register_temp
+  (Function_Builder * builder, Bits bit_size);
+
+static void storage_release_if_temporary
+  (Function_Builder * builder, const Storage * storage);
+
+static Expected_Result mass_expected_result_exact
+  (const Descriptor * descriptor, Storage storage);
+
+static Value * value_force
+  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, Value * value);
+
+static i8 mod_reg_rm
+  (Register a, Register b);
+
 static i64 mass_i64_logical_shift_left
   (i64 a, i64 b);
 
@@ -2659,6 +2680,13 @@ static Descriptor descriptor_mass_static_assert;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_same_type;
+static Descriptor descriptor_register_acquire_temp;
+static Descriptor descriptor_register_release;
+static Descriptor descriptor_storage_register_temp;
+static Descriptor descriptor_storage_release_if_temporary;
+static Descriptor descriptor_mass_expected_result_exact;
+static Descriptor descriptor_value_force;
+static Descriptor descriptor_mod_reg_rm;
 static Descriptor descriptor_mass_i64_logical_shift_left;
 static Descriptor descriptor_mass_i64_logical_shift_right;
 static Descriptor descriptor_mass_i64_bitwise_and;
