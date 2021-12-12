@@ -311,12 +311,34 @@ compare :: fn(
   meta.static_value(context.compilation, lazy_value, arguments.source_range)
 }
 
-unsigned_less :: fn(x : i64, y : i64) -> (bool) intrinsic {
-  compare(context, parser, arguments, MASS.Compare_Type.Unsigned_Below)
+make_i64_comparison_fn :: macro(compare_type) {
+  fn(x : i64, y : i64) -> (bool) intrinsic {
+    compare(context, parser, arguments, compare_type)
+  }
 }
+
+unsigned_less :: make_i64_comparison_fn(MASS.Compare_Type.Unsigned_Below)
+unsigned_less_equal :: make_i64_comparison_fn(MASS.Compare_Type.Unsigned_Below_Equal)
+unsigned_greater :: make_i64_comparison_fn(MASS.Compare_Type.Unsigned_Above)
+unsigned_greater_equal :: make_i64_comparison_fn(MASS.Compare_Type.Unsigned_Above_Equal)
+
+signed_less :: make_i64_comparison_fn(MASS.Compare_Type.Less)
+signed_less_equal :: make_i64_comparison_fn(MASS.Compare_Type.Less_Equal)
+signed_greater :: make_i64_comparison_fn(MASS.Compare_Type.Greater)
+signed_greater_equal :: make_i64_comparison_fn(MASS.Compare_Type.Greater_Equal)
 
 unsigned :: module {
   less :: unsigned_less
+  less_equal :: unsigned_less_equal
+  greater :: unsigned_greater
+  greater_equal :: unsigned_greater_equal
+}
+
+signed :: module {
+  less :: signed_less
+  less_equal :: signed_less_equal
+  greater :: signed_greater
+  greater_equal :: signed_greater_equal
 }
 
 memory_equal :: fn(x, y : x) -> (bool) MASS.generic_equal
