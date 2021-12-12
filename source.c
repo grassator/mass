@@ -1928,7 +1928,9 @@ token_match_argument(
 
   Value *maybe_default_value = 0;
   if (default_expression.length) {
-    maybe_default_value = compile_time_eval(context, parser, default_expression);
+    maybe_default_value = token_parse_expression(context, parser, default_expression, &(u32){0}, 0);
+    if (mass_has_error(context)) goto err;
+    if (!mass_value_ensure_static(context, maybe_default_value)) goto err;
     if (is_inferred_type) {
       descriptor = deduce_runtime_descriptor_for_value(context, maybe_default_value, 0);
       if (!descriptor) {
