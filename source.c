@@ -5941,9 +5941,17 @@ token_parse_function_literal(
       });
       return 0;
     }
-    if (rest.length) body_value = compile_time_eval(context, parser, rest);
+    if (rest.length) body_value = token_parse_expression(context, parser, rest, &(u32){0}, 0);
   }
   if (mass_has_error(context)) return 0;
+
+  if (body_value && !mass_value_is_compile_time_known(body_value)) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Expected_Static,
+      .source_range = body_value->source_range,
+    });
+    return 0;
+  }
 
   *matched_length = peek_index;
 
