@@ -970,11 +970,14 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should correctly call multiple calls to generic compile-time fns") {
+    it("should support multiple calls to generic compile-time fns with different typed args") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "my_generic :: fn(x) => (x) { x }\n"
-        "checker :: fn() -> (i64) { my_generic(\"foo\"); my_generic(42) }"
+        "checker :: fn() -> (i64) {\n"
+          "my_generic([1, 2])\n"
+          "my_generic(42)\n"
+        "}"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);

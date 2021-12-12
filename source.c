@@ -896,7 +896,7 @@ mass_assign_helper(
     }
   }
 
-  if (source->descriptor == &descriptor_tuple) {
+  if (value_is_tuple(source)) {
     assign_tuple(context, builder, target, source, source_range);
     return;
   }
