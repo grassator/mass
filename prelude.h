@@ -1512,8 +1512,17 @@ slice_print(
   printf("%"PRIslice, SLICE_EXPAND_PRINTF(slice));
 }
 
+static inline u8
+slice_get_byte(
+  const Slice *slice,
+  u64 index
+) {
+  assert(index < slice->length);
+  return (u8)slice->bytes[index];
+}
+
 /// Input slice is expected to just contain the number without any surrounding whitespace.
-s64
+static s64
 slice_parse_s64(
   Slice slice,
   bool *ok
@@ -1541,7 +1550,7 @@ slice_parse_s64(
   return integer;
 }
 
-u64
+static u64
 slice_parse_u64(
   Slice slice,
   bool *ok
@@ -1563,7 +1572,7 @@ slice_parse_u64(
   return integer;
 }
 
-s8
+static inline s8
 hex_parse_digit(
   s8 byte,
   bool *ok
@@ -1578,7 +1587,7 @@ hex_parse_digit(
 
 /// Input slice is expected to just contain the number without
 /// any surrounding whitespace or 0x prefix.
-u64
+static inline u64
 slice_parse_hex(
   Slice slice,
   bool *ok
@@ -1598,7 +1607,7 @@ slice_parse_hex(
   return integer;
 }
 
-u64
+static inline u64
 slice_parse_binary(
   Slice slice,
   bool *ok
