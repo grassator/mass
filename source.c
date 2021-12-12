@@ -1032,10 +1032,23 @@ value_force_lazy_static(
     return 0;
   }
   lazy->resolving = true;
-  Value *result = compile_time_eval(&lazy->context, &lazy->parser, lazy->expression);
+  Value *result = token_parse_expression(&lazy->context, &lazy->parser, lazy->expression, &(u32){0}, 0);
   lazy->resolving = false;
   if (result) {
     *value = *result;
+    if (!mass_value_is_compile_time_known(result)) {
+      bool is_function = (
+        value->descriptor->tag == Descriptor_Tag_Function_Instance &&
+        storage_is_label(&value->storage)
+      );
+      if (!is_function) {
+        mass_error(&lazy->context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Expected_Static,
+          .source_range = value->source_range,
+        });
+        return 0;
+      }
+    }
   } else {
     memset(value, 0, sizeof(*value));
   }

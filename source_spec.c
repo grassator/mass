@@ -1604,11 +1604,11 @@ spec("source") {
       Value *status = test_program_inline_source_base(
         "STATUS_CODE", &test_context,
         "STATUS_CODE :: the_answer();"
-        "the_answer :: fn() -> (s8) { 42 }"
+        "the_answer :: fn() => (i64) { 42 }"
       );
 
       check(status);
-      check(*value_as_s8(status) == 42);
+      check(value_as_i64(status)->bits == 42);
     }
 
     it("should be able to to do nested compile time calls") {
@@ -1616,13 +1616,12 @@ spec("source") {
         "RESULT", &test_context,
         "RESULT :: get_a();"
         "B :: get_b();"
-        "get_a :: fn() -> (s8) { B };"
-        "get_b :: fn() -> (s8) { 42 }"
+        "get_a :: fn() => (i64) { B };"
+        "get_b :: fn() => (i64) { 42 }"
       );
 
       check(result);
-      check(descriptor_is_integer(result->descriptor));
-      check(*value_as_s8(result) == 42);
+      check(value_as_i64(result)->bits == 42);
     }
 
     it("should support compile time blocks") {
@@ -1844,12 +1843,12 @@ spec("source") {
     }
 
     it("should be able to parse and run macro id function at compile time") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "FOO :: 42\n"
-        "id :: macro(x : s64) -> (s64) { x }\n"
+        "id :: macro(x : i64) -> (i64) { x }\n"
         "BAR :: id(FOO)\n"
-        "test :: fn() -> (s64) { BAR }"
+        "test :: fn() -> (i64) { BAR }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
