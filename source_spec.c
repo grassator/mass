@@ -746,10 +746,12 @@ spec("source") {
     it("should support overload resolution based on fields in the tuple") {
       s64(*checker)() = (s64(*)())test_program_inline_source_function(
         "checker", &test_context,
+        "Bar :: c_struct[x:i64]\n"
         "foo :: fn(x : [s64]) -> (s64) { 21 }\n"
-        "foo :: fn(x : [String]) -> (s64) { 42 }\n"
+        "foo :: fn(x : [Bar]) -> (s64) { 42 }\n"
         "checker :: fn() -> (s64) {\n"
-          "foo([\"bar\"])\n"
+          "bar : Bar = [1]\n"
+          "foo([bar])\n"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
