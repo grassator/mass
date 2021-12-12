@@ -2081,6 +2081,31 @@ value_force_exact(
   }
 }
 
+static inline Value *
+mass_forward_call_to_alias(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args,
+  const Symbol *alias
+) {
+  Source_Range source_range = args.source_range;
+
+  // TODO can we cache this somehow?
+  Scope_Entry *entry = scope_lookup(parser->scope, alias);
+  if (!entry) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Undefined_Variable,
+      .source_range = args.source_range,
+      .Undefined_Variable = {.name = alias->name},
+      .detailed_message = slice_literal("Could not find target when forwarding a call"),
+    });
+    return 0;
+  }
+
+  Value *target = scope_entry_force_value(context, entry);
+  return token_handle_function_call(context, parser, target, args, source_range);
+}
+
 static Value *
 token_handle_user_defined_operator_proc(
   Mass_Context *context,
@@ -2093,11 +2118,6 @@ token_handle_user_defined_operator_proc(
   u32 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
   assert(argument_count == args.length);
 
-  Value *fn = mass_context_force_lookup(
-    context, parser, parser->scope, operator->Alias.symbol, &args.source_range
-  );
-  if (mass_has_error(context)) return 0;
-
   Value *parsed_values[2];
   parsed_values[0] = token_parse_single(context, parser, value_view_get(args, 0));
   if (argument_count == 2) {
@@ -2109,8 +2129,7 @@ token_handle_user_defined_operator_proc(
     .length = argument_count,
     .source_range = args.source_range,
   };
-
-  return token_handle_function_call(context, parser, fn, parsed_args, parsed_args.source_range);
+  return mass_forward_call_to_alias(context, parser, parsed_args, operator->Alias.symbol);
 }
 
 static inline Value *
@@ -4893,29 +4912,14 @@ mass_call(
   );
 }
 
-static Value *
+static inline Value *
 mass_handle_apply_operator(
   Mass_Context *context,
   Parser *parser,
-  Value_View operands_view,
+  Value_View operands,
   const Operator *operator
 ) {
-  Source_Range source_range = operands_view.source_range;
-
-  // TODO can we cache this somehow
-  Scope_Entry *apply_entry = scope_lookup(parser->scope, context->compilation->common_symbols.apply);
-  if (!apply_entry) {
-    Value *rhs_value = value_view_get(operands_view, 1);
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = rhs_value->source_range,
-      .detailed_message = slice_literal("Expected an operator"),
-    });
-    return 0;
-  }
-
-  Value *apply_function = scope_entry_force_value(context, apply_entry);
-  return token_handle_function_call(context, parser, apply_function, operands_view, source_range);
+  return mass_forward_call_to_alias(context, parser, operands, context->compilation->common_symbols.apply);
 }
 
 static Value *
