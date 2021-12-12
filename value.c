@@ -1092,7 +1092,7 @@ function_literal_info_for_args(
     if (dyn_array_length(specialization->descriptors) != args.length) continue;
     for (u64 i = 0; i < dyn_array_length(specialization->descriptors); ++i) {
       const Descriptor *cached_descriptor = *dyn_array_get(specialization->descriptors, i);
-      const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(value_view_get(args, i));
+      const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(value_view_get(&args, i));
       if (!same_type(cached_descriptor, actual_descriptor)) goto not_matched;
     }
     return specialization->info;
@@ -1121,7 +1121,7 @@ function_literal_info_for_args(
       continue;
     }
     const Descriptor *actual_descriptor =
-      value_or_lazy_value_descriptor(value_view_get(args, arg_index));
+      value_or_lazy_value_descriptor(value_view_get(&args, arg_index));
     // In the presence of implicit casts it is unclear if this should use declared types or not.
     // On one hand with actual types we might generate identical copies, on the other hand
     // searching for a match becomes faster. Do not know what is better.

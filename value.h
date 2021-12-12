@@ -117,24 +117,24 @@ value_view_make_single(
 
 static inline Value *
 value_view_peek(
-  Value_View view,
+  const Value_View *view,
   u64 index
 ) {
-  return index < view.length ? view.values[index] : 0;
+  return index < view->length ? view->values[index] : 0;
 }
 
 static inline Value *
 value_view_get(
-  Value_View view,
+  const Value_View *view,
   u64 index
 ) {
-  assert(index < view.length);
-  return view.values[index];
+  assert(index < view->length);
+  return view->values[index];
 }
 
 static inline Value *
 value_view_next(
-  Value_View view,
+  const Value_View *view,
   u32 *peek_index
 ) {
   Value *peek = value_view_peek(view, *peek_index);
@@ -144,10 +144,10 @@ value_view_next(
 
 static inline Value *
 value_view_last(
-  Value_View view
+  const Value_View *view
 ) {
-  assert(view.length);
-  return value_view_get(view, view.length - 1);
+  assert(view->length);
+  return value_view_get(view, view->length - 1);
 }
 
 static Value_View

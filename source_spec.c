@@ -279,7 +279,7 @@ spec("source") {
       Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      Value *token = value_view_get(tokens, 0);
+      Value *token = value_view_get(&tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0xCAFE"));
       check(value_is_i64(token));
       const i64 *literal = value_as_i64(token);
@@ -294,7 +294,7 @@ spec("source") {
       Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      Value *token = value_view_get(tokens, 0);
+      Value *token = value_view_get(&tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0b100"));
       check(value_is_i64(token));
       const i64 *literal = value_as_i64(token);
@@ -310,14 +310,14 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
-      Value *a_num = value_view_get(tokens, 0);
+      Value *a_num = value_view_get(&tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &a_num->source_range), slice_literal("12"));
 
-      Value *plus = value_view_get(tokens, 1);
+      Value *plus = value_view_get(&tokens, 1);
       check(value_is_symbol(plus));
       spec_check_slice(value_as_symbol(plus)->name, slice_literal("+"));
 
-      Value *id = value_view_get(tokens, 2);
+      Value *id = value_view_get(&tokens, 2);
       check(value_is_symbol(id));
       spec_check_slice(source_from_source_range(test_context.compilation, &id->source_range), slice_literal("foo123"));
     }
@@ -331,12 +331,12 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      Value *paren = value_view_get(tokens, 0);
+      Value *paren = value_view_get(&tokens, 0);
       check(value_is_group_paren(paren));
       check(value_as_group_paren(paren)->children.length == 1);
       spec_check_slice(source_from_source_range(test_context.compilation, &paren->source_range), slice_literal("(x)"));
 
-      Value *id = value_view_get(value_as_group_paren(paren)->children, 0);
+      Value *id = value_view_get(&value_as_group_paren(paren)->children, 0);
       check(value_is_symbol(id));
     }
 
@@ -348,7 +348,7 @@ spec("source") {
       Value_View tokens = *dyn_array_get(statements, 0);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      Value *string = value_view_get(tokens, 0);
+      Value *string = value_view_get(&tokens, 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &string->source_range), slice_literal("\"foo 123\""));
     }
 
@@ -361,13 +361,13 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      Value *block = value_view_get(tokens, 0);
+      Value *block = value_view_get(&tokens, 0);
       check(value_is_ast_block(block));
       Array_Value_View group_statements = value_as_ast_block(block)->statements;
       check(dyn_array_length(group_statements) == 1);
       spec_check_slice(source_from_source_range(test_context.compilation, &block->source_range), slice_literal("{[]}"));
 
-      Value *square = value_view_get(*dyn_array_get(group_statements, 0), 0);
+      Value *square = value_view_get(dyn_array_get(group_statements, 0), 0);
       check(value_is_group_square(square));
       check(value_as_group_square(square)->children.length == 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &square->source_range), slice_literal("[]"));

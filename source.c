@@ -1520,7 +1520,7 @@ value_view_match_till_symbol(
 ) {
   u32 start_index = *peek_index;
   for (; *peek_index < view.length; *peek_index += 1) {
-    Value *token = value_view_get(view, *peek_index);
+    Value *token = value_view_get(&view, *peek_index);
     if (value_is_symbol(token) && value_as_symbol(token) == symbol) {
       *peek_index += 1;
       return value_view_slice(&view, start_index, *peek_index - 1);
@@ -1535,7 +1535,7 @@ value_view_maybe_match_cached_symbol(
   u32 *peek_index,
   const Symbol *cached_symbol
 ) {
-  Value *value = value_view_peek(view, *peek_index);
+  Value *value = value_view_peek(&view, *peek_index);
   if (!value) return 0;
   if (value->descriptor != &descriptor_symbol) return 0;
   if (value_as_symbol(value) != cached_symbol) return 0;
@@ -1664,7 +1664,7 @@ mass_named_accessor(
   Value_View args
 ) {
   assert(args.length == 1);
-  Value *symbol_value = value_view_get(args, 0);
+  Value *symbol_value = value_view_get(&args, 0);
   if (!mass_value_ensure_static_of(context, symbol_value, &descriptor_symbol)) {
     return 0;
   }
@@ -1684,7 +1684,7 @@ mass_quote(
   Value_View args
 ) {
   assert(args.length == 1);
-  Value *value = value_view_get(args, 0);
+  Value *value = value_view_get(&args, 0);
   Quoted quoted = {.value = value};
   Value *result = value_init(
     mass_allocate(context, Value),
@@ -1700,7 +1700,7 @@ mass_unquote(
   Value_View args
 ) {
   assert(args.length == 1);
-  return token_parse_single(context, parser, value_view_get(args, 0));
+  return token_parse_single(context, parser, value_view_get(&args, 0));
 }
 
 static Value *
@@ -1737,7 +1737,7 @@ token_maybe_split_on_operator(
   u32 rhs_start = 0;
   bool found = false;
   for (u32 i = 0; i < view.length; ++i) {
-    Value *token = value_view_get(view, i);
+    Value *token = value_view_get(&view, i);
     if (value_match_symbol(token, operator)) {
       *operator_token = token;
       lhs_end = i;
@@ -1818,7 +1818,7 @@ token_match_argument(
       goto err;
     }
     // TODO @CopyPaste
-    if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
+    if (definition.length != 1 || !value_is_symbol(value_view_get(&definition, 0))) {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
@@ -1826,7 +1826,7 @@ token_match_argument(
       });
       goto err;
     }
-    Value *name_token = value_view_get(definition, 0);
+    Value *name_token = value_view_get(&definition, 0);
     Value *static_value = token_parse_expression(context, parser, static_expression, &(u32){0}, 0);
     if (mass_has_error(context)) goto err;
     if (!mass_value_ensure_static(context, static_value)) goto err;
@@ -1875,7 +1875,7 @@ token_match_argument(
   bool generic = false;
   Mass_Type_Constraint_Proc maybe_type_constraint = 0;
   if (is_inferred_type) {
-    if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
+    if (definition.length != 1 || !value_is_symbol(value_view_get(&definition, 0))) {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
@@ -1883,7 +1883,7 @@ token_match_argument(
       });
       goto err;
     }
-    name_token = value_view_get(definition, 0);
+    name_token = value_view_get(&definition, 0);
   } else {
     Value_View name_tokens;
     Value *operator;
@@ -1916,7 +1916,7 @@ token_match_argument(
       });
       goto err;
     }
-    name_token = value_view_get(name_tokens, 0);
+    name_token = value_view_get(&name_tokens, 0);
     if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
@@ -2119,9 +2119,9 @@ token_handle_user_defined_operator_proc(
   assert(argument_count == args.length);
 
   Value *parsed_values[2];
-  parsed_values[0] = token_parse_single(context, parser, value_view_get(args, 0));
+  parsed_values[0] = token_parse_single(context, parser, value_view_get(&args, 0));
   if (argument_count == 2) {
-    parsed_values[1] = token_parse_single(context, parser, value_view_get(args, 1));
+    parsed_values[1] = token_parse_single(context, parser, value_view_get(&args, 1));
   }
 
   Value_View parsed_args = (Value_View){
@@ -2194,8 +2194,8 @@ mass_exports(
   Value_View args
 ) {
   assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(args, 0), slice_literal("exports")));
-  Value *tuple_value = token_parse_single(context, parser, value_view_get(args, 1));
+  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("exports")));
+  Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 1));
   if (mass_has_error(context)) return 0;
   if (!mass_value_ensure_static_of(context, tuple_value, &descriptor_tuple)) {
     return 0;
@@ -2243,7 +2243,7 @@ token_parse_operator_definition(
   );
   if (!keyword_token) return 0;
 
-  Value *pattern_token = value_view_next(view, &peek_index);
+  Value *pattern_token = value_view_next(&view, &peek_index);
   if (!value_is_group_paren(pattern_token)) { context_parse_error(context, parser, view, peek_index); goto err; }
 
   Value *separator_token = value_view_maybe_match_cached_symbol(
@@ -2251,7 +2251,7 @@ token_parse_operator_definition(
   );
   if (!separator_token) { context_parse_error(context, parser, view, peek_index); goto err; }
 
-  Value *precedence_token = value_view_next(view, &peek_index);
+  Value *precedence_token = value_view_next(&view, &peek_index);
   if (!precedence_token) { context_parse_error(context, parser, view, peek_index); goto err; }
 
   Value_View rest = value_view_rest(&view, peek_index);
@@ -2281,24 +2281,24 @@ token_parse_operator_definition(
 
   // prefix and postfix
   if (definition.length == 2) {
-    Value *first =  value_view_get(definition, 0);
+    Value *first =  value_view_get(&definition, 0);
     fixity = Operator_Fixity_Prefix;
     if (value_match_symbol(first, slice_literal("_"))) {
       fixity = Operator_Fixity_Postfix;
     }
     if (fixity == Operator_Fixity_Prefix) {
-      if (!value_match_symbol(value_view_get(definition, 1), slice_literal("_"))) {
+      if (!value_match_symbol(value_view_get(&definition, 1), slice_literal("_"))) {
         context_parse_error(context, parser, view, peek_index);
         goto err;
       }
-      operator_token = value_view_get(definition, 0);
+      operator_token = value_view_get(&definition, 0);
     } else {
-      operator_token = value_view_get(definition, 1);
+      operator_token = value_view_get(&definition, 1);
     }
   } else if (definition.length == 1) { // infix
     argument_count = 2;
     fixity = Operator_Fixity_Infix;
-    operator_token = value_view_get(definition, 0);
+    operator_token = value_view_get(&definition, 0);
   } else {
     operator_token = 0;
     mass_error(context, (Mass_Error) {
@@ -2357,7 +2357,7 @@ mass_import(
   Value_View args
 ) {
   if (args.length != 1) goto parse_err;
-  Value *file_path_value = value_view_get(args, 0);
+  Value *file_path_value = value_view_get(&args, 0);
   if (file_path_value->descriptor != &descriptor_slice) goto parse_err;
   Slice file_path = *value_as_slice(file_path_value);
 
@@ -2471,7 +2471,7 @@ token_parse_while(
 
   u32 condition_start_index = peek_index;
   for (; peek_index < view.length; peek_index += 1) {
-    Value *token = value_view_get(view, peek_index);
+    Value *token = value_view_get(&view, peek_index);
     if (value_is_ast_block(token)) {
       break;
     }
@@ -2485,7 +2485,7 @@ token_parse_while(
     return false;
   }
 
-  Value *body_token = value_view_next(view, &peek_index);
+  Value *body_token = value_view_next(&view, &peek_index);
   assert(value_is_ast_block(body_token));
   if (view.length != peek_index) {
     mass_error(context, (Mass_Error) {
@@ -2514,9 +2514,9 @@ mass_c_struct(
   Value_View args
 ) {
   assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(args, 0), slice_literal("c_struct")));
+  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("c_struct")));
 
-  Value *tuple_value = token_parse_single(context, parser, value_view_get(args, 1));
+  Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 1));
   const Tuple *tuple = value_as_tuple(tuple_value);
 
   Descriptor *descriptor = anonymous_struct_descriptor_from_tuple(
@@ -2797,9 +2797,9 @@ mass_cast(
   if (mass_has_error(context)) return 0;
   assert(args_view.length == 2);
   const Descriptor *target_descriptor = value_ensure_type(
-    context, value_view_get(args_view, 0), args_view.source_range
+    context, value_view_get(&args_view, 0), args_view.source_range
   );
-  Value *expression = value_view_get(args_view, 1);
+  Value *expression = value_view_get(&args_view, 1);
   return mass_cast_helper(context, parser, target_descriptor, expression, args_view.source_range);
 }
 
@@ -2867,7 +2867,7 @@ token_parse_constant_definitions(
     });
     goto err;
   }
-  Value *symbol = value_view_get(view, 0);
+  Value *symbol = value_view_get(&view, 0);
   if (value_is_group_paren(symbol)) {
     symbol = token_parse_single(context, parser, symbol);
     if (mass_has_error(context)) goto err;
@@ -2970,7 +2970,7 @@ mass_handle_macro_call(
       if (i >= args_view.length) {
         arg_value = param->maybe_default_value;
       } else {
-        arg_value = value_view_get(args_view, i);
+        arg_value = value_view_get(&args_view, i);
       }
 
       Epoch arg_epoch =
@@ -3507,7 +3507,7 @@ calculate_arguments_match_score(
       if (!param->maybe_default_value) return -1;
       source_arg = param->maybe_default_value;
     } else {
-      source_arg = value_view_get(args_view, arg_index);
+      source_arg = value_view_get(&args_view, arg_index);
     }
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
@@ -3656,7 +3656,7 @@ mass_match_overload(
     .all_arguments_are_compile_time_known = true,
   };
   for (u64 i = 0; i < args_view.length; ++i) {
-    if (!mass_value_is_compile_time_known(value_view_get(args_view, i))) {
+    if (!mass_value_is_compile_time_known(value_view_get(&args_view, i))) {
       args.all_arguments_are_compile_time_known = false;
       break;
     }
@@ -3865,7 +3865,7 @@ mass_ensure_trampoline(
     .capacity = args_view.length,
   );
   for (u64 i = 0; i < args_view.length; ++i) {
-    Value *item = value_view_get(args_view, i);
+    Value *item = value_view_get(&args_view, i);
     const Descriptor *field_descriptor = item->descriptor;
     assert(item->descriptor != &descriptor_lazy_value);
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
@@ -4002,7 +4002,7 @@ mass_trampoline_call(
   Array_Struct_Field fields = trampoline->args_descriptor->Struct.fields;
   assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < args_view.length; ++i) {
-    Value *item = value_view_get(args_view, i);
+    Value *item = value_view_get(&args_view, i);
     assert(mass_value_is_compile_time_known(item));
     const Struct_Field *field = dyn_array_get(fields, i);
     u64 offset = field->offset;
@@ -4045,7 +4045,7 @@ mass_can_trampoline_call(
   Value_View args_view
 ) {
   for (u64 i = 0; i < args_view.length; ++i) {
-    Value *arg = value_view_get(args_view, i);
+    Value *arg = value_view_get(&args_view, i);
 
     if (!mass_value_is_compile_time_known(arg)) return false;
 
@@ -4389,8 +4389,8 @@ mass_handle_arithmetic_operation(
   Value_View arguments,
   Mass_Arithmetic_Operator operator
 ) {
-  Value *lhs = token_parse_single(context, parser, value_view_get(arguments, 0));
-  Value *rhs = token_parse_single(context, parser, value_view_get(arguments, 1));
+  Value *lhs = token_parse_single(context, parser, value_view_get(&arguments, 0));
+  Value *rhs = token_parse_single(context, parser, value_view_get(&arguments, 1));
 
   if (mass_has_error(context)) return 0;
 
@@ -4635,8 +4635,8 @@ mass_handle_comparison(
   Lazy_Value_Proc lazy_value_proc,
   Compare_Type compare_type
 ) {
-  Value *lhs = token_parse_single(context, parser, value_view_get(arguments, 0));
-  Value *rhs = token_parse_single(context, parser, value_view_get(arguments, 1));
+  Value *lhs = token_parse_single(context, parser, value_view_get(&arguments, 0));
+  Value *rhs = token_parse_single(context, parser, value_view_get(&arguments, 1));
   if (mass_has_error(context)) return 0;
 
   if (value_is_i64(rhs) && value_or_lazy_value_descriptor(lhs) != &descriptor_i64) {
@@ -4741,7 +4741,7 @@ mass_startup(
   Value_View arguments
 ) {
   assert(arguments.length == 1);
-  Value *startup_function = value_view_get(arguments, 0);
+  Value *startup_function = value_view_get(&arguments, 0);
 
   return mass_make_lazy_value(
     context, parser,
@@ -4769,11 +4769,11 @@ mass_type_of(
   Parser *parser,
   Value_View args
 ) {
-  assert(value_match_symbol(value_view_get(args, 0), slice_literal("type_of")));
+  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("type_of")));
   assert(args.length == 2);
   Parser_Flags saved_flags = parser->flags;
   parser->flags |= Parser_Flags_Type_Only;
-  Value *expression = token_parse_single(context, parser, value_view_last(args));
+  Value *expression = token_parse_single(context, parser, value_view_last(&args));
   parser->flags = saved_flags;
 
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
@@ -4787,9 +4787,9 @@ mass_size_of(
   Parser *parser,
   Value_View args
 ) {
-  assert(value_match_symbol(value_view_get(args, 0), slice_literal("size_of")));
+  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("size_of")));
   assert(args.length == 2);
-  Value *expression = token_parse_single(context, parser, value_view_last(args));
+  Value *expression = token_parse_single(context, parser, value_view_last(&args));
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 
@@ -4834,13 +4834,13 @@ mass_static_assert(
 ) {
   // TODO Resolve optional arguments before calling the intrinsic
   assert(args.length == 1 || args.length == 2);
-  Value *condition_value = value_view_get(args, 0);
+  Value *condition_value = value_view_get(&args, 0);
 
   bool condition = *value_as__bool(condition_value);
   if (!condition) {
     Slice detailed_message;
     if (args.length == 2) {
-      detailed_message = *value_as_slice(value_view_get(args, 1));
+      detailed_message = *value_as_slice(value_view_get(&args, 1));
     } else {
       detailed_message = (Slice){0};
     }
@@ -4864,7 +4864,7 @@ mass_pointer_to(
   Value_View args
 ) {
   assert(args.length == 1);
-  Value *pointee = value_view_get(args, 0);
+  Value *pointee = value_view_get(&args, 0);
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee_descriptor);
   if (mass_value_is_compile_time_known(pointee)) {
@@ -4888,7 +4888,7 @@ mass_pointer_to_type(
   Value_View args_view
 ) {
   assert(args_view.length == 1);
-  Value *type_value = value_view_get(args_view, 0);
+  Value *type_value = value_view_get(&args_view, 0);
   const Descriptor *descriptor = value_ensure_type(context, type_value, args_view.source_range);
   if (mass_has_error(context)) return 0;
   const Descriptor *pointer_descriptor = descriptor_pointer_to(context->compilation, descriptor);
@@ -4905,8 +4905,8 @@ mass_call(
   Value_View args_view
 ) {
   assert(args_view.length == 2);
-  Value *lhs_value = value_view_get(args_view, 0);
-  Value *rhs_value = value_view_get(args_view, 1);
+  Value *lhs_value = value_view_get(&args_view, 0);
+  Value *rhs_value = value_view_get(&args_view, 1);
   return token_handle_parsed_function_call(
     context, parser, lhs_value, rhs_value, args_view.source_range
   );
@@ -4928,8 +4928,8 @@ mass_typed_symbol(
   Parser *parser,
   Value_View operands
 ) {
-  Value *lhs_value = value_view_get(operands, 0);
-  Value *rhs_value = token_parse_single(context, parser, value_view_get(operands, 1));
+  Value *lhs_value = value_view_get(&operands, 0);
+  Value *rhs_value = token_parse_single(context, parser, value_view_get(&operands, 1));
   Source_Range source_range = operands.source_range;
 
   if (!value_is_symbol(lhs_value)) {
@@ -5028,8 +5028,8 @@ mass_assign(
   Parser *parser,
   Value_View operands
 ) {
-  Value *target = token_parse_single(context, parser, value_view_get(operands, 0));
-  Value *source = token_parse_single(context, parser, value_view_get(operands, 1));
+  Value *target = token_parse_single(context, parser, value_view_get(&operands, 0));
+  Value *source = token_parse_single(context, parser, value_view_get(&operands, 1));
 
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
@@ -5053,7 +5053,7 @@ mass_eval(
   Value_View args_view
 ) {
   assert(args_view.length == 1);
-  Value *body = value_view_get(args_view, 0);
+  Value *body = value_view_get(&args_view, 0);
   if (value_is_group_paren(body) || value_is_ast_block(body)) {
     return compile_time_eval(context, parser, args_view);
   } else {
@@ -5301,7 +5301,7 @@ mass_dereference(
   Parser *parser,
   Value_View args_view
 ) {
-  Value *pointer = token_parse_single(context, parser, value_view_get(args_view, 0));
+  Value *pointer = token_parse_single(context, parser, value_view_get(&args_view, 0));
   if (mass_has_error(context)) return 0;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
   if (descriptor->tag != Descriptor_Tag_Pointer_To) {
@@ -5332,8 +5332,8 @@ mass_module_get(
   Value_View args_view
 ) {
   assert(args_view.length == 2);
-  Value *lhs = value_view_get(args_view, 0);
-  Value *rhs = value_view_get(args_view, 1);
+  Value *lhs = value_view_get(&args_view, 0);
+  Value *rhs = value_view_get(&args_view, 1);
 
   if (!mass_value_ensure_static_of(context, lhs, &descriptor_module)) return 0;
   if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
@@ -5361,8 +5361,8 @@ mass_struct_get(
   Value_View args_view
 ) {
   assert(args_view.length == 2);
-  Value *lhs = value_view_get(args_view, 0);
-  Value *rhs = value_view_get(args_view, 1);
+  Value *lhs = value_view_get(&args_view, 0);
+  Value *rhs = value_view_get(&args_view, 1);
 
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
   const Descriptor *unwrapped_lhs_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
@@ -5416,8 +5416,8 @@ mass_array_like_get(
   Value_View args_view
 ) {
   assert(args_view.length == 2);
-  Value *lhs = value_view_get(args_view, 0);
-  Value *rhs = token_parse_single(context, parser, value_view_get(args_view, 1));
+  Value *lhs = value_view_get(&args_view, 0);
+  Value *rhs = token_parse_single(context, parser, value_view_get(&args_view, 1));
 
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
   const Descriptor *item_descriptor;
@@ -5463,8 +5463,8 @@ mass_get(
   Parser *parser,
   Value_View args_view
 ) {
-  Value *lhs = token_parse_single(context, parser, value_view_get(args_view, 0));
-  Value *rhs = value_view_get(args_view, 1);
+  Value *lhs = token_parse_single(context, parser, value_view_get(&args_view, 0));
+  Value *rhs = value_view_get(&args_view, 1);
 
   Value_View parsed_args = {
     .values = (Value*[]){lhs, rhs},
@@ -5518,8 +5518,8 @@ mass_handle_comma_operator(
   const Operator *operator
 ) {
   assert(args_view.length == 2);
-  Value *lhs = value_view_get(args_view, 0);
-  Value *rhs = value_view_get(args_view, 1);
+  Value *lhs = value_view_get(&args_view, 0);
+  Value *rhs = value_view_get(&args_view, 1);
   const List_Node *previous;
   if (value_is_list_node(lhs)) {
     previous = value_as_list_node(lhs);
@@ -5751,9 +5751,9 @@ mass_intrinsic(
   Value_View args_view
 ) {
   assert(args_view.length == 2);
-  assert(value_match_symbol(value_view_get(args_view, 0), slice_literal("intrinsic")));
+  assert(value_match_symbol(value_view_get(&args_view, 0), slice_literal("intrinsic")));
 
-  Value *body = value_view_get(args_view, 1);
+  Value *body = value_view_get(&args_view, 1);
   if (!value_is_ast_block(body)) {
     context_parse_error(context, parser, args_view, 1);
     return 0;
@@ -5866,7 +5866,7 @@ token_parse_function_literal(
   }
   if (!keyword) return 0;
 
-  Value *args = value_view_next(view, &peek_index);
+  Value *args = value_view_next(&view, &peek_index);
   if (!value_is_group_paren(args)) {
     context_parse_error(context, parser, view, peek_index);
     return 0;
@@ -5894,7 +5894,7 @@ token_parse_function_literal(
 
   Function_Return returns;
   if (arrow) {
-    Value *token = value_view_next(view, &peek_index);
+    Value *token = value_view_next(&view, &peek_index);
     if (!token) {
       context_parse_error(context, parser, view, peek_index);
       return 0;
@@ -5925,7 +5925,7 @@ token_parse_function_literal(
   Array_Function_Parameter parameters = mass_parse_function_parameters(context, parser, args_view);
   if (mass_has_error(context)) return 0;
 
-  Value *body_value = value_view_peek(view, peek_index);
+  Value *body_value = value_view_peek(&view, peek_index);
   if (body_value) {
     if (value_is_ast_block(body_value)) {
       peek_index += 1;
@@ -6044,7 +6044,7 @@ token_parse_expression(
   }
   if(view.length == 1) {
     *out_match_length = 1;
-    return token_parse_single(context, parser, value_view_get(view, 0));
+    return token_parse_single(context, parser, value_view_get(&view, 0));
   }
 
   Value *result = 0;
@@ -6100,7 +6100,7 @@ token_parse_expression(
       ? Operator_Fixity_Infix | Operator_Fixity_Postfix
       : Operator_Fixity_Prefix;
 
-    Value *value = value_view_get(view, i);
+    Value *value = value_view_get(&view, i);
 
     if (value_is_symbol(value)) {
       const Symbol *symbol = value_as_symbol(value);
@@ -6364,7 +6364,7 @@ mass_handle_using_operator(
   const Operator *operator
 ) {
   assert(args.length == 1);
-  Value *module_value = token_parse_single(context, parser, value_view_get(args, 0));
+  Value *module_value = token_parse_single(context, parser, value_view_get(&args, 0));
   if (mass_has_error(context)) return 0;
   if (!mass_value_ensure_static_of(context, module_value, &descriptor_module)) return 0;
   const Module *module = value_as_module(module_value);
@@ -6402,7 +6402,7 @@ mass_handle_return_operator(
   const Operator *operator
 ) {
   assert(args.length == 1);
-  Value *return_value = token_parse_single(context, parser, value_view_get(args, 0));
+  Value *return_value = token_parse_single(context, parser, value_view_get(&args, 0));
 
   return mass_make_lazy_value(
     context, parser, args.source_range, return_value, &descriptor_void,
@@ -6544,7 +6544,7 @@ token_parse_definition_and_assignment_statements(
     });
     goto err;
   }
-  Value *name_token = value_view_get(view, 0);
+  Value *name_token = value_view_get(&view, 0);
 
   if (!value_is_symbol(name_token)) {
     mass_error(context, (Mass_Error) {
@@ -6750,8 +6750,8 @@ mass_inline_module(
   Value_View args
 ) {
   assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(args, 0), slice_literal("module")));
-  const Ast_Block *curly = value_as_ast_block(value_view_get(args, 1));
+  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("module")));
+  const Ast_Block *curly = value_as_ast_block(value_view_get(&args, 1));
 
   Module *module = mass_allocate(context, Module);
   *module = (Module) {
