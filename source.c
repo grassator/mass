@@ -2832,8 +2832,9 @@ token_parse_constant_definitions(
   }
   Value *symbol = value_view_get(view, 0);
   if (value_is_group_paren(symbol)) {
-    symbol = compile_time_eval(context, parser, value_as_group_paren(symbol)->children);
+    symbol = token_parse_single(context, parser, symbol);
     if (mass_has_error(context)) goto err;
+    if (!mass_value_ensure_static_of(context, symbol, &descriptor_symbol)) goto err;
   }
 
   if (!value_is_symbol(symbol)) {
