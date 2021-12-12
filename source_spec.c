@@ -1029,7 +1029,7 @@ spec("source") {
           "checker", &test_context,
           "identity :: fn(x) -> (x) { x }\n"
           "checker :: fn() -> (s64) {\n"
-            "string := identity(\"foo\"); cast(s64, string.length) + cast(s64, identity(39))\n"
+            "data := identity([.foo = 3]); data.foo + identity(39)\n"
           "}"
         );
       check(spec_check_mass_result(test_context.result));
