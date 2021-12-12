@@ -1718,9 +1718,7 @@ token_match_type(
   Parser *parser,
   Value_View view
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Value *type_value = compile_time_eval(context, parser, view);
+  Value *type_value = token_parse_expression(context, parser, view, &(u32){0}, 0);
   return value_ensure_type(context, type_value, view.source_range);
 }
 
