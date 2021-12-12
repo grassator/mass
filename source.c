@@ -253,15 +253,6 @@ token_value_force_immediate_integer(
         panic("Integers larger than 64 bits are not supported");
         return 0;
       }
-      case Literal_Cast_Result_Unsigned_Target_For_Negative_Literal: {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Integer_Range,
-          .source_range = *source_range,
-          .Integer_Range = { .descriptor = target_descriptor },
-          .detailed_message = slice_literal("Can not convert a negative literal to an unsigned number"),
-        });
-        return 0;
-      }
     }
     panic("Unexpected literal cast result");
   } else {

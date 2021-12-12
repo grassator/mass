@@ -1379,7 +1379,6 @@ typedef enum {
   Literal_Cast_Result_Target_Not_An_Integer,
   Literal_Cast_Result_Target_Too_Small,
   Literal_Cast_Result_Target_Too_Big,
-  Literal_Cast_Result_Unsigned_Target_For_Negative_Literal,
 } Literal_Cast_Result;
 
 static Literal_Cast_Result
