@@ -256,7 +256,24 @@ x86_64_system_v_parameter_for_classification(
       assert (gpr->index + classification->eightbyte_count <= gpr->count);
       if (classification->eightbyte_count == 1) {
         Register reg = gpr->items[gpr->index++];
-        storage = storage_register(reg, classification->descriptor->bit_size);
+        storage = (Storage) {
+          .tag = Storage_Tag_Register,
+          .flags = Storage_Flags_None,
+          .bit_size = classification->descriptor->bit_size,
+          .Register.index = reg
+        };
+        switch(classification->descriptor->bit_size.as_u64) {
+          case 64:
+          case 32:
+          case 16:
+          case 8: {
+            storage.Register.packed = false;
+          } break;
+          default: {
+            storage.Register.packed = true;
+            storage.Register.offset_in_bits = 0;
+          } break;
+        }
       } else if (classification->eightbyte_count == 2) {
         storage = (Storage) {
           .tag = Storage_Tag_Unpacked,
@@ -840,14 +857,20 @@ calling_convention_x86_64_windows_call_setup_proc(
       result.callee_return = common_storage;
       result.caller_return = common_storage;
     } else {
-      if (bit_size.as_u64 > 64) {
-        is_indirect_return = true;
-        result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
-        result.callee_return = storage_indirect(return_descriptor->bit_size, Register_C);
-      } else {
-        Storage common_storage = storage_register(Register_A, bit_size);
-        result.callee_return = common_storage;
-        result.caller_return = common_storage;
+      switch(bit_size.as_u64) {
+        case 64:
+        case 32:
+        case 16:
+        case 8: {
+          Storage common_storage = storage_register(Register_A, bit_size);
+          result.callee_return = common_storage;
+          result.caller_return = common_storage;
+        } break;
+        default: {
+          is_indirect_return = true;
+          result.caller_return = storage_indirect(return_descriptor->bit_size, Register_A);
+          result.callee_return = storage_indirect(return_descriptor->bit_size, Register_C);
+        } break;
       }
     }
   }
@@ -871,8 +894,22 @@ calling_convention_x86_64_windows_call_setup_proc(
       .descriptor = param->descriptor,
     };
 
-    bool is_large_argument = item.descriptor->bit_size.as_u64 > 64;
-    if (is_large_argument) {
+    bool should_pass_as_an_implicit_pointer;
+    {
+      switch(item.descriptor->bit_size.as_u64) {
+        case 64:
+        case 32:
+        case 16:
+        case 8: {
+          should_pass_as_an_implicit_pointer = false;
+        } break;
+        default: {
+          should_pass_as_an_implicit_pointer = true;
+        } break;
+      }
+    }
+
+    if (should_pass_as_an_implicit_pointer) {
       Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
       *descriptor = (Descriptor) {
         .tag = Descriptor_Tag_Pointer_To,

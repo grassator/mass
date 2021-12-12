@@ -12,6 +12,14 @@ typedef struct {
   u64 x;
   u64 y;
 } Test_128bit;
+static_assert(sizeof(Test_128bit) == 16, "Expected a 128bit struct");
+
+typedef struct {
+  u8 x;
+  u8 y;
+  u8 z;
+} Test_24bit;
+static_assert(sizeof(Test_24bit) == 3, "Expected a 24bit struct");
 
 static bool
 spec_check_mass_result_internal(
@@ -2340,6 +2348,28 @@ spec("source") {
 
       Test_128bit test_128bit = {.x = 21, .y = 42};
       check(checker(&test_128bit));
+    }
+
+    it("should support passing arguments that are not power-of-2size and fit into a register") {
+      u8(*checker)(Test_24bit) = (u8(*)(Test_24bit))test_program_inline_source_function(
+        "checker", &test_context,
+        "Test_24bit :: c_struct [ x : i8, y : i8, z : i8 ]\n"
+        "checker :: fn(input : Test_24bit) -> (i8) { input.y }"
+      );
+      check(spec_check_mass_result(test_context.result));
+
+      Test_24bit test_24bit = { .x = 3, .y = 42, .z = 78 };
+      check(checker(test_24bit) == 42);
+    }
+
+    it("should support returning values that are not power-of-2 size and fit into a register") {
+      Test_24bit(*checker)() = (Test_24bit(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "Test_24bit :: c_struct [ x : i8, y : i8, z : i8 ]\n"
+        "checker :: fn() -> (Test_24bit) { [ cast(i8, 3), cast(i8, 42), cast(i8, 78) ] }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker().y == 42);
     }
 
     it("should be able to return structs while accepting other arguments") {
