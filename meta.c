@@ -2180,10 +2180,18 @@ main(void) {
     })
   ));
 
+  // FIXME implement this in userland
   export_compiler_custom_name("mod_reg_rm", push_type(
     type_function(Default, "mod_reg_rm", "i8", (Argument_Type[]){
       { "Register", "a" },
       { "Register", "b" },
+    })
+  ));
+
+  export_compiler_custom_name("value_view_get", push_type(
+    type_function(Compile_Time, "value_view_get", "Value *", (Argument_Type[]){
+      { "const Value_View *", "view" },
+      { "u64", "index" },
     })
   ));
 

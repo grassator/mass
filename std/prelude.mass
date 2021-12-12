@@ -211,8 +211,10 @@ add_or_subtract :: fn(
     temp_lhs
   }
 
+  view_get :: MASS.value_view_get
+
   payload := allocate(context.allocator, Payload)
-  payload.* = [arguments.values.0, arguments.values.1, op_code]
+  payload.* = [view_get(&arguments, 0), view_get(&arguments, 1), op_code]
 
   lazy_value := allocate(context.allocator, MASS.Lazy_Value)
   lazy_value.epoch = parser.epoch
@@ -298,9 +300,10 @@ compare :: fn(
     value.storage.Eflags.compare_type = payload.compare_type
     value
   }
+  view_get :: MASS.value_view_get
 
   payload := allocate(context.allocator, Payload)
-  payload.* = [arguments.values.0, arguments.values.1, compare_type]
+  payload.* = [view_get(&arguments, 0), view_get(&arguments, 1), compare_type]
 
   lazy_value := allocate(context.allocator, MASS.Lazy_Value)
   lazy_value.epoch = parser.epoch
@@ -421,8 +424,9 @@ allocate :: macro(allocator : &MASS.Allocator, type : Type) {
 
 Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
   meta :: import("std/meta")
-  item_type := meta.reify(arguments.values.0, Type).*
-  length := meta.reify(arguments.values.1, i64).*
+  view_get :: MASS.value_view_get
+  item_type := meta.reify(view_get(&arguments, 0), Type).*
+  length := meta.reify(view_get(&arguments, 1), i64).*
   t := allocate(context.allocator, MASS.Descriptor)
 
   raw_bit_size : i64 = unsigned_multiply(item_type.bit_size.as_u64, length)
