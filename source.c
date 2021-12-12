@@ -4838,14 +4838,12 @@ mass_pointer_to(
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee_descriptor);
   if (mass_value_is_compile_time_known(pointee)) {
-    if (context_is_compile_time_eval(context)) {
-      const void *source_memory =
-        get_static_storage_with_bit_size(&pointee->storage, pointee_descriptor->bit_size);
-      Value *result = value_make(
-        context, descriptor, storage_immediate(&source_memory), args.source_range
-      );
-      return result;
-    }
+    const void *source_memory =
+      get_static_storage_with_bit_size(&pointee->storage, pointee_descriptor->bit_size);
+    Value *result = value_make(
+      context, descriptor, storage_immediate(&source_memory), args.source_range
+    );
+    return result;
   }
 
   return mass_make_lazy_value(
