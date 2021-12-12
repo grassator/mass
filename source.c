@@ -5,10 +5,9 @@
 #include "generated_exports.c"
 
 static inline bool
-mass_value_ensure_static_of(
+mass_value_ensure_static(
   Mass_Context *context,
-  Value *value,
-  const Descriptor *expected_descriptor
+  Value *value
 ) {
   if (!mass_value_is_compile_time_known(value)) {
     mass_error(context, (Mass_Error) {
@@ -17,6 +16,16 @@ mass_value_ensure_static_of(
     });
     return false;
   }
+  return true;
+}
+
+static inline bool
+mass_value_ensure_static_of(
+  Mass_Context *context,
+  Value *value,
+  const Descriptor *expected_descriptor
+) {
+  if (!mass_value_ensure_static(context, value)) return false;
   if (!same_type(value->descriptor, expected_descriptor)) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
@@ -1824,8 +1833,9 @@ token_match_argument(
       goto err;
     }
     Value *name_token = value_view_get(definition, 0);
-    Value *static_value = compile_time_eval(context, parser, static_expression);
+    Value *static_value = token_parse_expression(context, parser, static_expression, &(u32){0}, 0);
     if (mass_has_error(context)) goto err;
+    if (!mass_value_ensure_static(context, static_value)) goto err;
     return (Function_Parameter) {
       .tag = Function_Parameter_Tag_Exact_Static,
       .Exact_Static = {
