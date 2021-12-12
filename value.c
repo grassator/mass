@@ -1120,13 +1120,14 @@ function_literal_info_for_args(
       assert(specialized_param->descriptor);
       continue;
     }
-    const Descriptor *actual_descriptor =
-      value_or_lazy_value_descriptor(value_view_get(&args, arg_index));
-    // In the presence of implicit casts it is unclear if this should use declared types or not.
-    // On one hand with actual types we might generate identical copies, on the other hand
-    // searching for a match becomes faster. Do not know what is better.
-    dyn_array_push(cache_descriptors, actual_descriptor);
+    Value *arg = value_view_get(&args, arg_index);
+    const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(arg);
     if(param->tag == Function_Parameter_Tag_Generic) {
+      if (!(literal->flags & Function_Literal_Flags_Compile_Time)) {
+        actual_descriptor = deduce_runtime_descriptor_for_value(context, arg, 0);
+        // TODO cleanup memory?
+        if (!actual_descriptor) return 0;
+      }
       if (param->maybe_type_constraint) {
         actual_descriptor = param->maybe_type_constraint(actual_descriptor);
         if (!actual_descriptor) {
@@ -1136,6 +1137,10 @@ function_literal_info_for_args(
       }
       specialized_param->descriptor = actual_descriptor;
     }
+    // In the presence of implicit casts it is unclear if this should use declared types or not.
+    // On one hand with actual types we might generate identical copies, on the other hand
+    // searching for a match becomes faster. Do not know what is better.
+    dyn_array_push(cache_descriptors, actual_descriptor);
   }
 
   // FIXME this should be returned from `ensure_parameter_descriptors`

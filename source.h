@@ -166,6 +166,13 @@ token_handle_function_call(
   Source_Range source_range
 );
 
+static const Descriptor *
+deduce_runtime_descriptor_for_value(
+  Mass_Context *context,
+  Value *value,
+  const Descriptor *maybe_desired_descriptor
+);
+
 static Value *
 value_force(
   Mass_Context *context,

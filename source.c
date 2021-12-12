@@ -389,13 +389,6 @@ value_indirect_from_pointer(
   }
 }
 
-static const Descriptor *
-deduce_runtime_descriptor_for_value(
-  Mass_Context *context,
-  Value *value,
-  const Descriptor *maybe_desired_descriptor
-);
-
 typedef struct {
   u64 bit_size;
   u64 bit_alignment;
