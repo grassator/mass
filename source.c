@@ -1894,8 +1894,9 @@ token_match_argument(
       if (token_maybe_split_on_operator(
         definition, slice_literal("~"), &name_tokens, &maybe_type_expression, &operator
       )) {
-        Value *constraint = compile_time_eval(context, parser, maybe_type_expression);
+        Value *constraint = token_parse_expression(context, parser, maybe_type_expression, &(u32){0}, 0);
         if (mass_has_error(context)) goto err;
+        if (!mass_value_ensure_static(context, constraint)) goto err;
         Value *fake_descriptor_pointer = value_make(
           context, &descriptor_descriptor_pointer, storage_none, constraint->source_range
         );
