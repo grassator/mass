@@ -1032,8 +1032,9 @@ value_force_lazy_static(
 ) {
   // TODO figure out how to get rid of this cast
   Lazy_Static_Value *lazy = (Lazy_Static_Value *)value_as_lazy_static_value(value);
+  Mass_Context *context = &lazy->context;
   if (lazy->resolving) {
-    mass_error(&lazy->context, (Mass_Error) {
+    mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Circular_Dependency,
       .source_range = value->source_range,
       .Circular_Dependency = { .name = name },
@@ -1041,23 +1042,16 @@ value_force_lazy_static(
     return 0;
   }
   lazy->resolving = true;
-  Value *result = token_parse_expression(&lazy->context, &lazy->parser, lazy->expression, &(u32){0}, 0);
+  Value *result = token_parse_expression(context, &lazy->parser, lazy->expression, &(u32){0}, 0);
   lazy->resolving = false;
+  if (mass_has_error(context)) return 0;
   if (result) {
     *value = *result;
-    if (!mass_value_is_compile_time_known(result)) {
-      bool is_function = (
-        value->descriptor->tag == Descriptor_Tag_Function_Instance &&
-        storage_is_label(&value->storage)
-      );
-      if (!is_function) {
-        mass_error(&lazy->context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Expected_Static,
-          .source_range = value->source_range,
-        });
-        return 0;
-      }
-    }
+    bool is_function = (
+      value->descriptor->tag == Descriptor_Tag_Function_Instance &&
+      storage_is_label(&value->storage)
+    );
+    if (!is_function && !mass_value_ensure_static(context, value)) return 0;
   } else {
     memset(value, 0, sizeof(*value));
   }
@@ -4125,14 +4119,7 @@ token_handle_parsed_function_call(
       args_view = (Value_View){.source_range = source_range};
     }
   } else if (args_token->descriptor == &descriptor_value_view) {
-    if (!mass_value_is_compile_time_known(args_token)) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Expected_Static,
-        .source_range = source_range,
-        .detailed_message = slice_literal("Expected a static Value_View"),
-      });
-      goto defer;
-    }
+    if (!mass_value_ensure_static(context, args_token)) goto defer;
     args_view = *value_as_value_view(args_token);
   } else {
     mass_error(context, (Mass_Error) {
@@ -5952,14 +5939,7 @@ token_parse_function_literal(
     if (rest.length) body_value = token_parse_expression(context, parser, rest, &(u32){0}, 0);
   }
   if (mass_has_error(context)) return 0;
-
-  if (body_value && !mass_value_is_compile_time_known(body_value)) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Expected_Static,
-      .source_range = body_value->source_range,
-    });
-    return 0;
-  }
+  if (body_value && !mass_value_ensure_static(context, body_value)) return 0;
 
   *matched_length = peek_index;
 
