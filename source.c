@@ -5422,6 +5422,7 @@ mass_array_like_get(
   assert(args_view.length == 2);
   Value *lhs = value_view_get(&args_view, 0);
   Value *rhs = token_parse_single(context, parser, value_view_get(&args_view, 1));
+  if (mass_has_error(context)) return 0;
 
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
   const Descriptor *item_descriptor;
