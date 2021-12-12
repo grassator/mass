@@ -1374,14 +1374,6 @@ mass_context_from_compilation(
   };
 }
 
-static inline bool
-same_value_type(
-  const Value *a,
-  const Value *b
-) {
-  return same_type(a->descriptor, b->descriptor);
-}
-
 typedef enum {
   Literal_Cast_Result_Success,
   Literal_Cast_Result_Target_Not_An_Integer,
