@@ -5481,10 +5481,7 @@ mass_get(
     return mass_struct_get(context, parser, parsed_args);
   }
 
-  if (
-    lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
-    lhs_descriptor->tag == Descriptor_Tag_Pointer_To
-  ) {
+  if (lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
     return mass_array_like_get(context, parser, parsed_args);
   }
 
