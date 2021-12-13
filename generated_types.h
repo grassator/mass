@@ -1027,7 +1027,7 @@ typedef enum {
 } Module_Exports_Tag;
 
 typedef struct Module_Exports_Selective {
-  Array_Value_Ptr symbols;
+  const Tuple * tuple;
 } Module_Exports_Selective;
 typedef struct Module_Exports {
   Module_Exports_Tag tag;
@@ -2997,9 +2997,9 @@ static C_Enum_Item module_exports_tag_items[] = {
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(module_exports_selective, Module_Exports_Selective,
   {
-    .descriptor = &descriptor_array_value_ptr,
-    .name = slice_literal_fields("symbols"),
-    .offset = offsetof(Module_Exports_Selective, symbols),
+    .descriptor = &descriptor_tuple_pointer,
+    .name = slice_literal_fields("tuple"),
+    .offset = offsetof(Module_Exports_Selective, tuple),
   },
 );
 MASS_DEFINE_TYPE_VALUE(module_exports_selective);

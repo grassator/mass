@@ -1188,7 +1188,7 @@ main(void) {
     struct_empty("Not_Specified"),
     struct_empty("All"),
     struct_fields("Selective", (Struct_Item[]){
-      { "Array_Value_Ptr", "symbols" },
+      { "const Tuple *", "tuple" },
     }),
   }), (Struct_Item[]){
     { "Scope *", "scope" },

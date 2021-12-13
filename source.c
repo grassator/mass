@@ -2196,24 +2196,9 @@ mass_exports(
   Module_Exports *export = mass_allocate(context, Module_Exports);
   *export = (Module_Exports) {
     .tag = Module_Exports_Tag_Selective,
-    .Selective = {
-      .symbols = dyn_array_make(Array_Value_Ptr, .capacity = dyn_array_length(tuple->items)),
-    },
+    .Selective = { .tuple = tuple },
     .source_range = args.source_range,
   };
-
-  for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
-    Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
-    if (!mass_value_ensure_static_of(context, tuple_item, &descriptor_named_accessor)) {
-      return 0;
-    }
-    // TODO support renaming and wildcard exports
-    const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
-    Value *symbol_value = value_make(
-      context, &descriptor_symbol_pointer, storage_immediate(&symbol), tuple_item->source_range
-    );
-    dyn_array_push(export->Selective.symbols, symbol_value);
-  }
 
   Value *result = value_make(
     context, &descriptor_module_exports, storage_static(export), args.source_range
@@ -6726,28 +6711,35 @@ module_process_exports(
     case Module_Exports_Tag_Not_Specified: // Export everything when no explicit exports specified
     case Module_Exports_Tag_All: {
       module->exports.scope = module->own_scope;
-      break;
-    }
+    } break;
     case Module_Exports_Tag_Selective: {
       module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
-      Array_Value_Ptr symbols = module->exports.Selective.symbols;
-      for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
-        Value **symbol_pointer = dyn_array_get(symbols, i);
-        const Symbol *symbol = value_as_symbol(*symbol_pointer);
+
+      const Tuple *tuple = module->exports.Selective.tuple;
+      for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
+        Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+        if (!mass_value_ensure_static_of(context, tuple_item, &descriptor_named_accessor)) {
+          return;
+        }
+        // TODO support renaming and wildcard exports
+        const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
         Scope_Entry *entry = scope_lookup_shallow(module->own_scope, symbol);
         if (!entry) {
           mass_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Undefined_Variable,
-            .source_range = (*symbol_pointer)->source_range,
+            .source_range = tuple_item->source_range,
             .Undefined_Variable = {.name = symbol->name},
           });
         }
-
-        Value_View expr = value_view_single(symbol_pointer);
+        Value *symbol_value = value_make(
+          context, &descriptor_symbol, storage_static(symbol), tuple_item->source_range
+        );
+        Value **expr_values = mass_allocate(context, Value *);
+        *expr_values = symbol_value;
+        Value_View expr = value_view_single(expr_values);
         scope_define_lazy_compile_time_expression(context, parser, module->exports.scope, symbol, expr);
       }
-      break;
-    }
+    } break;
   }
 }
 
