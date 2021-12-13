@@ -974,6 +974,19 @@ spec("source") {
       check(checker(spec_callback) == 42);
     }
 
+    // :TemporaryCallTarget
+    it("should be able to call a function returned from another fn") {
+      u64(*checker)() = (u64(*)())test_program_inline_source_function(
+          "foo", &test_context,
+          "callback :: fn() -> (i64) { 42 }\n"
+          "make_callback :: fn() -> (fn() -> (i64)) { callback }\n"
+          // FIXME figure out why extra braces are needed
+          "foo :: fn() -> (i64) { (make_callback())() }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should support referencing the type of one argument in the return type") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(

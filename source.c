@@ -3090,17 +3090,23 @@ call_function_overload(
   const Source_Range *source_range,
   Mass_Function_Call_Lazy_Payload *payload
 ) {
-  Value *to_call = payload->overload;
   Array_Value_Ptr arguments = payload->args;
 
-  Value_View args_view = value_view_from_value_array(arguments, source_range);
-  Value *instance = ensure_function_instance(context, to_call, args_view);
+  Expected_Result instance_expected_result = expected_result_any(0);
+  Value *runtime_value = value_force(context, builder, &instance_expected_result, payload->overload);
   if (mass_has_error(context)) return 0;
-  assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
-  const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
-  const Function_Info *fn_info = instance_descriptor->info;
 
-  mass_assert_storage_is_valid_in_context(&instance->storage, context);
+  Value_View args_view = value_view_from_value_array(arguments, source_range);
+  runtime_value = ensure_function_instance(context, runtime_value, args_view);
+  if (mass_has_error(context)) return 0;
+
+  mass_assert_storage_is_valid_in_context(&runtime_value->storage, context);
+
+  const Descriptor *runtime_descriptor = value_or_lazy_value_descriptor(runtime_value);
+  assert(runtime_descriptor->tag == Descriptor_Tag_Function_Instance);
+
+  const Descriptor_Function_Instance *instance_descriptor = &runtime_descriptor->Function_Instance;
+  const Function_Info *fn_info = instance_descriptor->info;
 
   const Descriptor *return_descriptor = function_return_as_exact(&fn_info->returns)->descriptor;
   Value *fn_return_value;
@@ -3112,6 +3118,26 @@ call_function_overload(
   fn_return_value = value_make(context, return_descriptor, return_storage, *source_range);
 
   const Function_Call_Setup *call_setup = &instance_descriptor->call_setup;
+
+  // :TemporaryCallTarget
+  // When call target is temporary it might reside in a register that is used for argument passing.
+  // To make sure the target is not overwritten with the argument we move it to an empty register.
+  // :InstructionQuality The move described above is not always necessary
+  Storage call_target_storage = storage_none;
+  if (call_setup->jump.tag == Function_Call_Jump_Tag_Call) {
+    if (runtime_value->storage.tag == Storage_Tag_Register) {
+      call_target_storage = reserve_stack_storage(builder, (Bits){64});
+      call_target_storage.flags |= Storage_Flags_Temporary;
+      assert(runtime_value->storage.bit_size.as_u64 == 64);
+      move_value(builder, source_range, &call_target_storage, &runtime_value->storage);
+      storage_release_if_temporary(builder, &runtime_value->storage);
+      runtime_value = 0;
+    } else {
+      call_target_storage = runtime_value->storage;
+    }
+  } else {
+    assert(runtime_value->storage.tag == Storage_Tag_None);
+  }
 
   Temp_Mark temp_mark = context_temp_mark(context);
   Array_Value_Ptr temp_arguments = dyn_array_make(
@@ -3335,24 +3361,23 @@ call_function_overload(
 
   switch(call_setup->jump.tag) {
     case Function_Call_Jump_Tag_Call: {
-      if (instance->storage.tag == Storage_Tag_Static || instance->storage.tag == Storage_Tag_Immediate) {
+      if (storage_is_label(&call_target_storage)) {
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range,
+          &(Instruction_Assembly){call, {call_target_storage}}
+        );
+      } else {
         Register temp_reg = register_acquire_temp(builder);
         Storage reg = storage_register(temp_reg, (Bits){64});
-        move_value(builder, source_range, &reg, &instance->storage);
+        move_value(builder, source_range, &reg, &call_target_storage);
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
           &(Instruction_Assembly){call, {reg}}
         );
         register_release(builder, temp_reg);
-      } else {
-        push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range,
-          &(Instruction_Assembly){call, {instance->storage}}
-        );
       }
     } break;
     case Function_Call_Jump_Tag_Syscall: {
-      assert(instance->storage.tag == Storage_Tag_None);
       Storage syscal_number_storage = storage_register(Register_A, (Bits){64});
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
@@ -3364,6 +3389,7 @@ call_function_overload(
       );
     } break;
   }
+  storage_release_if_temporary(builder, &call_target_storage);
 
   register_release_bitset(builder, argument_register_bitset | temp_register_argument_bitset);
 
