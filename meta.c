@@ -1364,6 +1364,7 @@ main(void) {
   push_type(type_union("Memory_Location", (Struct_Type[]){
     struct_fields("Instruction_Pointer_Relative", (Struct_Item[]){
       { "Label *", "label" },
+      { "s64", "offset" },
     }),
     struct_fields("Indirect", (Struct_Item[]){
       { "Register", "base_register" },

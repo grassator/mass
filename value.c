@@ -549,7 +549,7 @@ storage_with_offset_and_bit_size(
     case Storage_Tag_Memory: {
       switch(result.Memory.location.tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          panic("TODO support offset for instruction-pointer relative addresses");
+          result.Memory.location.Instruction_Pointer_Relative.offset += diff;
         } break;
         case Memory_Location_Tag_Indirect: {
           result.Memory.location.Indirect.offset += diff;
@@ -926,13 +926,14 @@ rip_value_pointer_from_label(
 
 
 static inline void *
-rip_value_pointer(
-  Value *value
+rip_value_pointer_from_storage(
+  const Storage *storage
 ) {
-  assert(storage_is_label(&value->storage));
-  return rip_value_pointer_from_label(
-    value->storage.Memory.location.Instruction_Pointer_Relative.label
-  );
+  assert(storage_is_label(storage));
+  const Label *label = storage->Memory.location.Instruction_Pointer_Relative.label;
+  assert(label->resolved);
+  u8 *base = rip_value_pointer_from_label(label);
+  return base + storage->Memory.location.Instruction_Pointer_Relative.offset;
 }
 
 static inline Descriptor *

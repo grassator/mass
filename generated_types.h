@@ -1160,6 +1160,7 @@ typedef enum {
 
 typedef struct Memory_Location_Instruction_Pointer_Relative {
   Label * label;
+  s64 offset;
 } Memory_Location_Instruction_Pointer_Relative;
 typedef struct Memory_Location_Indirect {
   Register base_register;
@@ -3435,6 +3436,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_instruction_pointer_relative, Memo
     .descriptor = &descriptor_label_pointer,
     .name = slice_literal_fields("label"),
     .offset = offsetof(Memory_Location_Instruction_Pointer_Relative, label),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("offset"),
+    .offset = offsetof(Memory_Location_Instruction_Pointer_Relative, offset),
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_location_instruction_pointer_relative);

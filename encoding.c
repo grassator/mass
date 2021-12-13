@@ -148,6 +148,9 @@ eager_encode_instruction_assembly(
         enum { Sib_Index_None = 0b100,};
         switch(location.tag) {
           case Memory_Location_Tag_Instruction_Pointer_Relative: {
+            if (storage->Memory.location.Instruction_Pointer_Relative.offset) {
+              panic("TODO support encoding a relative pointer with an offset");
+            }
             r_m = 0b101;
             mod = 0b00;
             break;
@@ -275,6 +278,9 @@ eager_encode_instruction_assembly(
     switch(location->tag) {
       case Memory_Location_Tag_Instruction_Pointer_Relative: {
         Label *label = location->Instruction_Pointer_Relative.label;
+        if (storage->Memory.location.Instruction_Pointer_Relative.offset) {
+          panic("TODO support encoding a relative pointer with an offset");
+        }
         u8 offset_in_instruction = result.bytes.length;
         result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
           .offset = offset_in_instruction,
@@ -315,6 +321,9 @@ eager_encode_instruction_assembly(
     const Storage *storage = &assembly->operands[storage_index];
     if (storage_is_label(storage)) {
       Label *label = storage->Memory.location.Instruction_Pointer_Relative.label;
+      if (storage->Memory.location.Instruction_Pointer_Relative.offset) {
+        panic("TODO support encoding a relative pointer with an offset");
+      }
       u8 offset_in_instruction = result.bytes.length;
       result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
         .offset = offset_in_instruction,

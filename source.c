@@ -323,9 +323,7 @@ assign_from_static(
     }
     return true;
   } else if (storage_is_label(&target->storage)) {
-    void *section_memory = rip_value_pointer_from_label(
-      target->storage.Memory.location.Instruction_Pointer_Relative.label
-    );
+    void *section_memory = rip_value_pointer_from_storage(&target->storage);
     const void *source_memory =
       storage_static_memory_with_bit_size(&source->storage, source->storage.bit_size);
     memcpy(section_memory, source_memory, source->storage.bit_size.as_u64 / 8);
@@ -1777,7 +1775,7 @@ mass_ensure_jit_function_for_value(
       });
       return 0;
     }
-    return (fn_type_opaque)rip_value_pointer_from_label(label);
+    return (fn_type_opaque)rip_value_pointer_from_storage(&instance->storage);
   } else {
     void const * const *address_memory = storage_static_memory_with_bit_size(&instance->storage, (Bits){64});
     return (fn_type_opaque)*address_memory;
