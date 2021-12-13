@@ -1460,12 +1460,12 @@ tokenizer_push_string_literal(
     Value static_pointer_value;
   });
   {
-    // TODO This should be an array of `i8`
     Descriptor *bits_descriptor = &combined->bits_descriptor;
     *bits_descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Raw,
+      .tag = Descriptor_Tag_Fixed_Size_Array,
       .bit_size = {length * CHAR_BIT},
-      .bit_alignment = { CHAR_BIT },
+      .bit_alignment = descriptor_i8.bit_alignment,
+      .Fixed_Size_Array = { .item = &descriptor_i8, .length = length },
     };
     hash_map_set(context->compilation->static_pointer_map, bytes, &combined->static_pointer_value);
     value_init(&combined->static_pointer_value, bits_descriptor, storage_none, source_range);
