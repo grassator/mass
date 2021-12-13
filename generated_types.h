@@ -626,7 +626,7 @@ typedef struct Jit Jit;
 typedef dyn_array_type(Jit *) Array_Jit_Ptr;
 typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
 
-typedef struct Static_Pointer_Map Static_Pointer_Map;
+typedef struct Static_Pointer_Length_Map Static_Pointer_Length_Map;
 
 typedef struct Descriptor_Pointer_To_Cache_Map Descriptor_Pointer_To_Cache_Map;
 
@@ -2073,7 +2073,7 @@ typedef struct Jit {
 } Jit;
 typedef dyn_array_type(Jit) Array_Jit;
 
-hash_map_template(Static_Pointer_Map, const void *, Value *, hash_pointer, const_void_pointer_equal)
+hash_map_template(Static_Pointer_Length_Map, const void *, u64, hash_pointer, const_void_pointer_equal)
 hash_map_template(Descriptor_Pointer_To_Cache_Map, const Descriptor *, const Descriptor *, hash_pointer, const_void_pointer_equal)
 typedef struct Common_Symbols {
   const Symbol * apply;
@@ -2111,7 +2111,7 @@ typedef struct Compilation {
   Allocator * allocator;
   Jit jit;
   Module compiler_module;
-  Static_Pointer_Map * static_pointer_map;
+  Static_Pointer_Length_Map * static_pointer_length_map;
   Imported_Module_Map * module_map;
   Trampoline_Map * trampoline_map;
   Scope * root_scope;
@@ -2622,7 +2622,7 @@ static Descriptor descriptor_array_jit;
 static Descriptor descriptor_array_jit_ptr;
 static Descriptor descriptor_jit_pointer;
 static Descriptor descriptor_jit_pointer_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_map, Static_Pointer_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_length_map, Static_Pointer_Length_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_pointer_to_cache_map, Descriptor_Pointer_To_Cache_Map);
 static Descriptor descriptor_common_symbols;
 static Descriptor descriptor_array_common_symbols;
@@ -5719,9 +5719,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .offset = offsetof(Compilation, compiler_module),
   },
   {
-    .descriptor = &descriptor_static_pointer_map_pointer,
-    .name = slice_literal_fields("static_pointer_map"),
-    .offset = offsetof(Compilation, static_pointer_map),
+    .descriptor = &descriptor_static_pointer_length_map_pointer,
+    .name = slice_literal_fields("static_pointer_length_map"),
+    .offset = offsetof(Compilation, static_pointer_length_map),
   },
   {
     .descriptor = &descriptor_imported_module_map_pointer,

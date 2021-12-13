@@ -1260,7 +1260,7 @@ compilation_init(
 ) {
   *compilation = (Compilation) {
     .module_map = hash_map_make(Imported_Module_Map),
-    .static_pointer_map = hash_map_make(Static_Pointer_Map),
+    .static_pointer_length_map = hash_map_make(Static_Pointer_Length_Map),
     .symbol_cache_map = hash_map_make(Symbol_Map, .initial_capacity = 256),
     .trampoline_map = hash_map_make(Trampoline_Map, .initial_capacity = 256),
     .prefix_operator_symbol_map = hash_map_make(Operator_Symbol_Map, .initial_capacity = 128),
@@ -1348,7 +1348,7 @@ compilation_deinit(
   Compilation *compilation
 ) {
   hash_map_destroy(compilation->module_map);
-  hash_map_destroy(compilation->static_pointer_map);
+  hash_map_destroy(compilation->static_pointer_length_map);
   hash_map_destroy(compilation->symbol_cache_map);
   hash_map_destroy(compilation->prefix_operator_symbol_map);
   hash_map_destroy(compilation->infix_or_suffix_operator_symbol_map);

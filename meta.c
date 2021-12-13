@@ -1981,9 +1981,9 @@ main(void) {
     { "void *", "platform_specific_payload" },
   }));
 
-  push_type(type_hash_map("Static_Pointer_Map", {
+  push_type(type_hash_map("Static_Pointer_Length_Map", {
     .key_type = "const void *",
-    .value_type = "Value *",
+    .value_type = "u64",
     .hash_function = "hash_pointer",
     .equal_function = "const_void_pointer_equal",
   }));
@@ -2030,7 +2030,7 @@ main(void) {
     { "Allocator *", "allocator" },
     { "Jit", "jit" },
     { "Module", "compiler_module" },
-    { "Static_Pointer_Map *", "static_pointer_map" },
+    { "Static_Pointer_Length_Map *", "static_pointer_length_map" },
     { "Imported_Module_Map *", "module_map" },
     { "Trampoline_Map *", "trampoline_map" },
     { "Scope *", "root_scope" },

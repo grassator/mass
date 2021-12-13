@@ -283,49 +283,59 @@ assign_from_static(
     !context_is_compile_time_eval(context) &&
     source->descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
-    // If a static value contains a pointer, we expect an entry in a special map used to track
-    // whether the target memory is also already copied to the compiled binary.
-    // This is done to only include static values actually used at runtime.
     void *source_memory = *(void **)storage_static_memory_with_bit_size(&source->storage, (Bits){64});
-    Value *static_pointer = *hash_map_get(context->compilation->static_pointer_map, source_memory);
-    if (static_pointer->storage.tag == Storage_Tag_None) {
-      Section *section = (static_pointer->flags & Value_Flags_Constant)
-       ? &context->program->memory.ro_data
-       : &context->program->memory.rw_data;
-      u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
-      u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
-
-      // TODO this should also be deduped
-      Label *label = allocate_section_memory(
-        context->allocator, context->program, section, byte_size, alignment
+    // If a `static_pointer_length_map` contains the pointer, it is actually a C-like array
+    // and the length (item count) is the value from the map.
+    u64 *maybe_custom_array_length =
+      hash_map_get(context->compilation->static_pointer_length_map, source_memory);
+    const Descriptor *pointee_descriptor = source->descriptor->Pointer_To.descriptor;
+    if (maybe_custom_array_length) {
+      pointee_descriptor = descriptor_array_of(
+        context->allocator, pointee_descriptor, *maybe_custom_array_length
       );
-      static_pointer->storage = data_label32(label, static_pointer->descriptor->bit_size);
-
-      Value static_source_value = {
-        .descriptor = static_pointer->descriptor,
-        .storage = storage_static_heap(source_memory, static_pointer->descriptor->bit_size),
-        .source_range = *source_range,
-      };
-
-      // It is important to call assign here to make sure we recursively handle
-      // any complex types such as structs and arrays
-      mass_assign_helper(context, builder, static_pointer, &static_source_value, source_range);
-      if (mass_has_error(context)) return true;
     }
-    assert(storage_is_label(&static_pointer->storage));
+    Bits bit_size = pointee_descriptor->bit_size;
+
+    Section *section = (source->flags & Value_Flags_Constant)
+      ? &context->program->memory.ro_data
+      : &context->program->memory.rw_data;
+    u64 byte_size = descriptor_byte_size(pointee_descriptor);
+    u64 alignment = descriptor_byte_alignment(pointee_descriptor);
+
+    // TODO This can probably be deduped for `ro_data` items
+    Label *label = allocate_section_memory(
+      context->allocator, context->program, section, byte_size, alignment
+    );
+    Value *target_program_value = value_make(
+      context, pointee_descriptor, data_label32(label, bit_size), *source_range
+    );
+
+    Value static_source_value = {
+      .descriptor = pointee_descriptor,
+      .storage = storage_static_heap(source_memory, bit_size),
+      .source_range = *source_range,
+    };
+
+    // It is important to call assign here to make sure we recursively handle
+    // any complex types such as structs and arrays
+    mass_assign_helper(context, builder, target_program_value, &static_source_value, source_range);
+    if (mass_has_error(context)) return true;
+
+    assert(storage_is_label(&target_program_value->storage));
     if (storage_is_label(&target->storage)) {
       dyn_array_push(context->program->relocations, (Relocation) {
         .patch_at = target->storage,
-        .address_of = static_pointer->storage,
+        .address_of = target_program_value->storage,
       });
     } else {
-      load_address(builder, source_range, target, static_pointer->storage);
+      load_address(builder, source_range, target, target_program_value->storage);
     }
     return true;
   } else if (storage_is_label(&target->storage)) {
     void *section_memory = rip_value_pointer_from_storage(&target->storage);
     const void *source_memory =
       storage_static_memory_with_bit_size(&source->storage, source->storage.bit_size);
+    // TODO the actual copying probably should be deferred till we are ready to write out code
     memcpy(section_memory, source_memory, source->storage.bit_size.as_u64 / 8);
     return true;
   }
@@ -1457,19 +1467,9 @@ tokenizer_push_string_literal(
     Descriptor bits_descriptor;
     Slice slice;
     Value string_value;
-    Value static_pointer_value;
   });
-  {
-    Descriptor *bits_descriptor = &combined->bits_descriptor;
-    *bits_descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Fixed_Size_Array,
-      .bit_size = {length * CHAR_BIT},
-      .bit_alignment = descriptor_i8.bit_alignment,
-      .Fixed_Size_Array = { .item = &descriptor_i8, .length = length },
-    };
-    hash_map_set(context->compilation->static_pointer_map, bytes, &combined->static_pointer_value);
-    value_init(&combined->static_pointer_value, bits_descriptor, storage_none, source_range);
-  }
+
+  hash_map_set(context->compilation->static_pointer_length_map, bytes, length);
 
   Slice *string = &combined->slice;
   *string = (Slice){bytes, length};
