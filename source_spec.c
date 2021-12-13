@@ -980,8 +980,7 @@ spec("source") {
           "foo", &test_context,
           "callback :: fn() -> (i64) { 42 }\n"
           "make_callback :: fn() -> (fn() -> (i64)) { callback }\n"
-          // FIXME figure out why extra braces are needed
-          "foo :: fn() -> (i64) { (make_callback())() }"
+          "foo :: fn() -> (i64) { make_callback()() }"
         );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
