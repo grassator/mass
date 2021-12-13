@@ -4770,14 +4770,22 @@ mass_startup(
 }
 
 static const Descriptor *
-user_presentable_descriptor_for(
-  Value *expression
+mass_type_only_token_parse_expression(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View expression
 ) {
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
-  if (descriptor_is_implicit_pointer(descriptor)) {
-    descriptor = descriptor->Pointer_To.descriptor;
+  Parser_Flags saved_flags = parser->flags;
+  parser->flags |= Parser_Flags_Type_Only;
+  Value *value = token_parse_expression(context, parser, expression, &(u32){0}, 0);
+  parser->flags = saved_flags;
+  if (mass_has_error(context)) return 0;
+
+  const Descriptor *user_presentable_descriptor = value_or_lazy_value_descriptor(value);
+  if (descriptor_is_implicit_pointer(user_presentable_descriptor)) {
+    user_presentable_descriptor = user_presentable_descriptor->Pointer_To.descriptor;
   }
-  return descriptor;
+  return user_presentable_descriptor;
 }
 
 static Value *
@@ -4787,13 +4795,8 @@ mass_type_of(
   Value_View args
 ) {
   assert(args.length == 1);
-
-  Parser_Flags saved_flags = parser->flags;
-  parser->flags |= Parser_Flags_Type_Only;
-  Value *expression = token_parse_single(context, parser, value_view_get(&args, 0));
-  parser->flags = saved_flags;
-
-  const Descriptor *descriptor = user_presentable_descriptor_for(expression);
+  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, args);
+  if (mass_has_error(context)) return 0;
   return value_make(context, &descriptor_descriptor_pointer, storage_immediate(&descriptor), args.source_range);
 }
 
@@ -4804,18 +4807,10 @@ mass_size_of(
   Value_View args
 ) {
   assert(args.length == 1);
-  Value *expression = token_parse_single(context, parser, value_view_get(&args, 0));
-  const Descriptor *descriptor = user_presentable_descriptor_for(expression);
-  u64 byte_size = descriptor_byte_size(descriptor);
-
-  allocator_allocate_bulk(context->allocator, combined, {
-    Value value;
-  });
-
-  i64 literal = { .bits = byte_size };
-  return value_init(
-    &combined->value, &descriptor_i64, storage_immediate(&literal), args.source_range
-  );
+  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, args);
+  if (mass_has_error(context)) return 0;
+  i64 literal = { .bits = descriptor_byte_size(descriptor) };
+  return value_make(context, &descriptor_i64, storage_immediate(&literal), args.source_range);
 }
 
 static Value *
