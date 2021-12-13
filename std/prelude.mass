@@ -43,6 +43,20 @@ import :: fn(path : String) -> (MASS.Module) MASS.import
 cast :: fn(type : Type, value) -> _ MASS.cast
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
 
+is_pointer_type :: fn(type : Type) => (Type) {
+  if type.tag == MASS.Descriptor_Tag.Pointer_To then type else 0
+}
+
+// TODO runtime version should be implemented in the userland
+unchecked_get_at_index :: fn(
+  x ~ is_pointer_type,
+  offset : i64
+) -> (x.Pointer_To.descriptor) MASS.unchecked_get_at_index
+unchecked_get_at_index :: fn(
+  x ~ is_pointer_type,
+  offset : i64
+) => (x.Pointer_To.descriptor) MASS.unchecked_get_at_index
+
 Void :: type_of(())
 make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
   value : &MASS.Value = allocate(allocator, MASS.Value)

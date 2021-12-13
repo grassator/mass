@@ -721,6 +721,9 @@ static Value * mass_unquote
 static Value * mass_dereference
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_array_like_get
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_named_accessor
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2667,6 +2670,7 @@ static Descriptor descriptor_mass_assign;
 static Descriptor descriptor_mass_quote;
 static Descriptor descriptor_mass_unquote;
 static Descriptor descriptor_mass_dereference;
+static Descriptor descriptor_mass_array_like_get;
 static Descriptor descriptor_mass_named_accessor;
 static Descriptor descriptor_mass_typed_symbol;
 static Descriptor descriptor_mass_import;
