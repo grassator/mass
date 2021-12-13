@@ -419,25 +419,6 @@ spec("source") {
     }
   }
 
-  #if defined(_WIN32)
-  describe("Win32: Structured Exceptions") {
-    it("should be unwind stack on hardware exception on Windows") {
-      fn_type_opaque checker = test_program_external_source_function(
-        "main", &test_context, "fixtures\\error_runtime_divide_by_zero"
-      );
-      check(spec_check_mass_result(test_context.result));
-      volatile bool caught_exception = false;
-      __try {
-        checker();
-      }
-      __except(EXCEPTION_EXECUTE_HANDLER) {
-        caught_exception = true;
-      }
-      check(caught_exception);
-    }
-  }
-  #endif
-
   describe("if / else") {
     it("should be able to parse and run if expression") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
@@ -2602,9 +2583,39 @@ spec("source") {
       write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }
   }
+
+
+
+  #if defined(_WIN32)
+  describe("Windows") {
+    it("should be unwind stack on hardware exception on Windows") {
+      fn_type_opaque checker = test_program_external_source_function(
+        "main", &test_context, "fixtures\\error_runtime_divide_by_zero"
+      );
+      check(spec_check_mass_result(test_context.result));
+      volatile bool caught_exception = false;
+      __try {
+        checker();
+      }
+      __except(EXCEPTION_EXECUTE_HANDLER) {
+        caught_exception = true;
+      }
+      check(caught_exception);
+    }
+    it("should be able to determine the OS type") {
+      Os(*checker)(void) = (Os(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (i32) { get_target_os()}\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == Os_Windows);
+    }
+  }
+  #endif
+
   #if defined(__linux__)
-  describe("Syscall") {
-    it("should be able to print out a string") {
+  describe("Linux") {
+    it("should be able to call a syscall") {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "STDOUT_FILENO :: 1\n"
@@ -2618,6 +2629,14 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       checker();
+    }
+    it("should be able to determine the OS type") {
+      Os(*checker)(void) = (Os(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (i32) { get_target_os()}\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == Os_Linux);
     }
   }
   #endif
