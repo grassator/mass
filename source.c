@@ -2504,10 +2504,10 @@ mass_c_struct(
   Parser *parser,
   Value_View args
 ) {
-  assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("c_struct")));
+  assert(args.length == 1);
 
-  Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 1));
+  Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 0));
+  if (!mass_value_ensure_static_of(context, tuple_value, &descriptor_tuple)) return 0;
   const Tuple *tuple = value_as_tuple(tuple_value);
 
   Descriptor *descriptor = anonymous_struct_descriptor_from_tuple(
@@ -4786,15 +4786,14 @@ mass_type_of(
   Parser *parser,
   Value_View args
 ) {
-  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("type_of")));
-  assert(args.length == 2);
+  assert(args.length == 1);
+
   Parser_Flags saved_flags = parser->flags;
   parser->flags |= Parser_Flags_Type_Only;
-  Value *expression = token_parse_single(context, parser, value_view_last(&args));
+  Value *expression = token_parse_single(context, parser, value_view_get(&args, 0));
   parser->flags = saved_flags;
 
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
-
   return value_make(context, &descriptor_descriptor_pointer, storage_immediate(&descriptor), args.source_range);
 }
 
@@ -4804,9 +4803,8 @@ mass_size_of(
   Parser *parser,
   Value_View args
 ) {
-  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("size_of")));
-  assert(args.length == 2);
-  Value *expression = token_parse_single(context, parser, value_view_last(&args));
+  assert(args.length == 1);
+  Value *expression = token_parse_single(context, parser, value_view_get(&args, 0));
   const Descriptor *descriptor = user_presentable_descriptor_for(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 
@@ -5769,14 +5767,10 @@ mass_intrinsic(
   Parser *parser,
   Value_View args_view
 ) {
-  assert(args_view.length == 2);
-  assert(value_match_symbol(value_view_get(&args_view, 0), slice_literal("intrinsic")));
+  assert(args_view.length == 1);
 
-  Value *body = value_view_get(&args_view, 1);
-  if (!value_is_ast_block(body)) {
-    context_parse_error(context, parser, args_view, 1);
-    return 0;
-  }
+  Value *body = value_view_get(&args_view, 0);
+  if (!mass_value_ensure_static_of(context, body, &descriptor_ast_block)) return 0;
   const Source_Range *source_range = &args_view.source_range;
 
   Function_Literal *literal = mass_make_fake_function_literal(
@@ -6768,9 +6762,10 @@ mass_inline_module(
   Parser *parser,
   Value_View args
 ) {
-  assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("module")));
-  const Ast_Block *curly = value_as_ast_block(value_view_get(&args, 1));
+  assert(args.length == 1);
+  Value *arg_value = value_view_get(&args, 0);
+  if (!mass_value_ensure_static_of(context, arg_value, &descriptor_ast_block)) return 0;
+  const Ast_Block *curly = value_as_ast_block(arg_value);
 
   Module *module = mass_allocate(context, Module);
   *module = (Module) {
