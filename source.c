@@ -6962,6 +6962,7 @@ mass_run_script(
   Slice file_path
 ) {
   Compilation *compilation = context->compilation;
+  context->program = compilation->jit.program;
   Module *root_module = program_module_from_file(context, file_path, compilation->root_scope);
   if (mass_has_error(context)) return;
 
@@ -6995,10 +6996,9 @@ mass_run_script(
   context->program->entry_point = entry;
   if (mass_has_error(context)) return;
 
-  Jit jit;
-  jit_init(&jit, context->program);
-  program_jit(context, &jit);
+  program_jit(context, &compilation->jit);
   if (mass_has_error(context)) return;
-  fn_type_opaque script = value_as_function(jit.program, jit.program->entry_point);
+  fn_type_opaque script =
+    value_as_function(compilation->jit.program, compilation->jit.program->entry_point);
   script();
 }
