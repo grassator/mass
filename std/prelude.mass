@@ -47,6 +47,12 @@ is_pointer_type :: fn(type : Type) => (Type) {
   if type.tag == MASS.Descriptor_Tag.Pointer_To then type else 0
 }
 
+string_get :: fn(string : String, offset : i64) => (i8) {
+  using unsigned
+  assert(offset < string.length);
+  unchecked_get_at_index(string.bytes, offset)
+}
+
 // TODO runtime version should be implemented in the userland
 unchecked_get_at_index :: fn(
   x ~ is_pointer_type,

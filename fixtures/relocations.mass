@@ -1,4 +1,4 @@
-global_char_pointer :: &unchecked_get_at_index("a".bytes, 0)
+global_char_pointer :: &string_get("a", 0)
 global_static_string :: "b"
 
 test :: fn() -> (String) { [global_char_pointer, 1] }

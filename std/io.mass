@@ -39,7 +39,7 @@ print :: fn(x : s64) {
 
   buffer : i8*64
   output_size := if integer < 0 then {
-    minus_code :: "-".bytes.0
+    minus_code :: string_get("-", 0)
     buffer.0 = minus_code
     integer = 0 - integer
     count + 1
@@ -52,7 +52,7 @@ print :: fn(x : s64) {
     integer_index = integer_index + 1
     digit := cast(u8, integer % 10)
     digit_index := output_size - integer_index
-    zero_code :: "0".bytes.0
+    zero_code :: string_get("0", 0)
     buffer.(digit_index) = cast(i8, cast(u8, zero_code) + digit)
     integer = integer / 10
   }
