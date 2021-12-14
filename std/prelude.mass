@@ -57,7 +57,8 @@ cast :: fn(type : Type, value) -> _ MASS.cast
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
 
 is_pointer_type :: fn(type : Type) => (Type) {
-  if type.tag == MASS.Descriptor_Tag.Pointer_To then type else 0
+  // Must be an explicit dereference - the auto-deference implementation below uses this helper
+  if (type.*).tag == MASS.Descriptor_Tag.Pointer_To then type else 0
 }
 
 string_get :: fn(string : String, offset : i64) => (i8) {
@@ -75,6 +76,16 @@ unchecked_get_at_index :: fn(
   x ~ is_pointer_type,
   offset : i64
 ) => (x.Pointer_To.descriptor) MASS.unchecked_get_at_index
+
+// Auto-dereferencing pointers. This is a very generic fn, meaning that a user can easily
+// greate a more specic overload even for pointer types.
+get :: fn(x ~ is_pointer_type, rhs) -> _ intrinsic {
+  sliced_args := arguments
+  sliced_args.length = cast(i32, 1)
+  deref := MASS.dereference(context, parser, sliced_args)
+  arguments.values.* = deref
+  __get(context, parser, arguments)
+}
 
 Void :: type_of(())
 make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {

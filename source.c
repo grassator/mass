@@ -5482,9 +5482,11 @@ mass_get(
     return mass_module_get(context, parser, parsed_args);
   }
 
-  const Descriptor *unwrapped_lhs_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
+  if (descriptor_is_implicit_pointer(lhs_descriptor)) {
+    lhs_descriptor = descriptor_as_pointer_to(lhs_descriptor)->descriptor;
+  }
 
-  if (unwrapped_lhs_descriptor->tag == Descriptor_Tag_Struct) {
+  if (lhs_descriptor->tag == Descriptor_Tag_Struct) {
     return mass_struct_get(context, parser, parsed_args);
   }
 
@@ -5492,12 +5494,9 @@ mass_get(
     return mass_array_like_get(context, parser, parsed_args);
   }
 
-  mass_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_Parse,
-    .source_range = lhs->source_range,
-    .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
-  });
-  return 0;
+  // TODO make a common symbol
+  const Symbol *symbol = mass_ensure_symbol(context->compilation, slice_literal("get"));
+  return mass_forward_call_to_alias(context, parser, parsed_args, symbol);
 }
 
 static Value *
