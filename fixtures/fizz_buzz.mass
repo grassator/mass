@@ -7,14 +7,14 @@ fizz_buzz :: fn() {
     if i % 3 == 0 then {
       print_number = false
       io.print("fizz")
-    } else {}
+    }
     if i % 5 == 0 then {
       print_number = false
       io.print("buzz")
-    } else {}
+    }
     if print_number then {
       io.print(i)
-    } else {}
+    }
     io.print(" ")
     i = i + 1
   }

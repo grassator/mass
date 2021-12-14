@@ -503,6 +503,19 @@ spec("source") {
       check(checker(-2) == 0);
     }
 
+    it("should be able to parse and run an `if` statement without an `else` block") {
+      s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
+        "is_positive", &test_context,
+        "is_positive :: fn(x : s32) -> (s8) {\n"
+          "if x < 10 then { return 0 }\n"
+          "1"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(42) == 1);
+      check(checker(-2) == 0);
+    }
+
     it("should report an error for an `if` statement without a body or a condition") {
       test_program_inline_source_base(
         "main", &test_context,
@@ -808,7 +821,7 @@ spec("source") {
     it("should be able to have an explicit return") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(x : s32) -> (s32) { if x > 0 then { return x } else {}; 0 }"
+        "checker :: fn(x : s32) -> (s32) { if x > 0 then { return x }; 0 }"
       );
       check(spec_check_mass_result(test_context.result));
       s32 actual = checker(42);
@@ -1766,7 +1779,7 @@ spec("source") {
     it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "id :: macro(x : i64) -> (i64) { if x == 3 then { return 42 } else {}; x }\n"
+        "id :: macro(x : i64) -> (i64) { if x == 3 then { return 42 }; x }\n"
         "checker :: fn() -> (i64) { id(3) }"
       );
       check(spec_check_mass_result(test_context.result));

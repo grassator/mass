@@ -210,7 +210,7 @@ add_or_subtract :: fn(
 
     if context.compilation.result.tag != MASS.Result_Tag.Success then {
       return 0
-    } else {}
+    }
 
     temp_rhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
     temp_rhs_register := temp_rhs_storage.Register.index
@@ -220,7 +220,7 @@ add_or_subtract :: fn(
 
     if context.compilation.result.tag != MASS.Result_Tag.Success then {
       return 0
-    } else {}
+    }
 
     {
       instruction : MASS.Instruction
@@ -293,7 +293,7 @@ compare :: fn(
 
     if context.compilation.result.tag != MASS.Result_Tag.Success then {
       return 0
-    } else {}
+    }
 
     temp_rhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
     temp_rhs_register := temp_rhs_storage.Register.index
@@ -302,7 +302,7 @@ compare :: fn(
 
     if context.compilation.result.tag != MASS.Result_Tag.Success then {
       return 0
-    } else {}
+    }
 
     {
       instruction : MASS.Instruction
@@ -470,7 +470,7 @@ Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
     error.source_range = arguments.source_range
     meta.context_error(context, error)
     return 0
-  } else {}
+  }
 
   t.tag = MASS.Descriptor_Tag.Fixed_Array
   t.bit_size = [raw_bit_size]

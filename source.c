@@ -5718,8 +5718,12 @@ token_parse_if_expression(
   Value *value_else;
   {
     Value_View else_view = value_view_slice(&view, peek_index, view.length);
-    u32 else_length;
-    value_else = token_parse_expression(context, parser, else_view, &else_length, end_symbol);
+    u32 else_length = else_view.length;
+    if (else_length) {
+      value_else = token_parse_expression(context, parser, else_view, &else_length, end_symbol);
+    } else {
+      value_else = mass_make_void(context, else_view.source_range);
+    }
     peek_index += else_length;
     if (mass_has_error(context)) return 0;
   }
