@@ -3141,7 +3141,6 @@ call_function_overload(
   );
 
   u64 all_used_arguments_register_bitset = call_setup->parameter_registers_bitset.bits;
-  u64 argument_register_bitset = 0;
   u64 copied_straight_to_param_bitset = 0;
   u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
@@ -3190,7 +3189,6 @@ call_function_overload(
       can_use_source_arg_as_is = false;
     }
 
-    argument_register_bitset |= target_arg_register_bitset;
     bool target_arg_registers_are_free =
       !(builder->register_occupied_bitset.bits & target_arg_register_bitset);
     bool can_assign_straight_to_target = (
@@ -3297,7 +3295,7 @@ call_function_overload(
   }
 
   register_release_bitset(builder, saved_registers_from_arguments_bitset);
-  u64 spilled_param_register_bitset = argument_register_bitset & ~copied_straight_to_param_bitset;
+  u64 spilled_param_register_bitset = all_used_arguments_register_bitset & ~copied_straight_to_param_bitset;
   register_acquire_bitset(builder, spilled_param_register_bitset);
 
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
@@ -3358,7 +3356,7 @@ call_function_overload(
   }
   storage_release_if_temporary(builder, &call_target_storage);
 
-  register_release_bitset(builder, argument_register_bitset | temp_register_argument_bitset);
+  register_release_bitset(builder, all_used_arguments_register_bitset | temp_register_argument_bitset);
 
   u64 return_value_bitset = register_bitset_from_storage(&fn_return_value->storage);
 
