@@ -5327,6 +5327,27 @@ mass_dereference(
   );
 }
 
+static const Descriptor *
+mass_constraint_pointer_type(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Pointer_To ? descriptor : 0;
+}
+
+static const Descriptor *
+mass_constraint_fixed_array_type(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Fixed_Size_Array ? descriptor : 0;
+}
+
+static const Descriptor *
+mass_constraint_struct_type(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Struct ? descriptor : 0;
+}
+
 static Value *
 mass_module_get(
   Mass_Context *context,

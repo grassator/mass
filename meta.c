@@ -2124,6 +2124,21 @@ main(void) {
       { "u64", "byte_alignment" },
     })
   ));
+  export_compiler_custom_name("constraint_pointer_type", push_type(
+    type_function(Default, "mass_constraint_pointer_type", "const Descriptor *", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+    })
+  ));
+  export_compiler_custom_name("constraint_struct_type", push_type(
+    type_function(Default, "mass_constraint_struct_type", "const Descriptor *", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+    })
+  ));
+  export_compiler_custom_name("constraint_fixed_array_type", push_type(
+    type_function(Default, "mass_constraint_fixed_array_type", "const Descriptor *", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+    })
+  ));
 
   export_compiler(push_type(
     type_function(Default, "descriptor_pointer_to", "const Descriptor *", (Argument_Type[]){

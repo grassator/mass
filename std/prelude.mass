@@ -56,10 +56,9 @@ import :: fn(path : String) -> (MASS.Module) MASS.import
 cast :: fn(type : Type, value) -> _ MASS.cast
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
 
-is_pointer_type :: fn(type : Type) => (Type) {
-  // Must be an explicit dereference - the auto-deference implementation below uses this helper
-  if (type.*).tag == MASS.Descriptor_Tag.Pointer_To then type else 0
-}
+is_pointer_type :: MASS.constraint_pointer_type
+is_fixed_array_type :: MASS.constraint_fixed_array_type
+is_struct_type :: MASS.constraint_struct_type
 
 string_get :: fn(string : String, offset : i64) => (i8) {
   using unsigned

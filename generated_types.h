@@ -769,6 +769,15 @@ static Value * mass_static_assert
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
+static const Descriptor * mass_constraint_pointer_type
+  (const Descriptor * descriptor);
+
+static const Descriptor * mass_constraint_struct_type
+  (const Descriptor * descriptor);
+
+static const Descriptor * mass_constraint_fixed_array_type
+  (const Descriptor * descriptor);
+
 static const Descriptor * descriptor_pointer_to
   (Compilation * compilation, const Descriptor * descriptor);
 
@@ -2689,6 +2698,9 @@ static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_startup;
 static Descriptor descriptor_mass_static_assert;
 static Descriptor descriptor_allocator_allocate_bytes;
+static Descriptor descriptor_mass_constraint_pointer_type;
+static Descriptor descriptor_mass_constraint_struct_type;
+static Descriptor descriptor_mass_constraint_fixed_array_type;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_same_type;
 static Descriptor descriptor_register_acquire_temp;
