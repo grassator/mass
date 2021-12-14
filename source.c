@@ -549,6 +549,11 @@ deduce_runtime_descriptor_for_value(
   Value *value,
   const Descriptor *maybe_desired_descriptor
 ) {
+  const Descriptor *original_descriptor = value_or_lazy_value_descriptor(value);
+  if (descriptor_is_implicit_pointer(original_descriptor)) {
+    return descriptor_as_pointer_to(original_descriptor)->descriptor;
+  }
+
   if (!mass_value_is_compile_time_known(value)) {
     return value_or_lazy_value_descriptor(value);
   }
