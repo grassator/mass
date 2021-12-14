@@ -201,6 +201,16 @@ mass_expected_result_exact(
   Storage storage
 );
 
+static inline Value *
+mass_make_lazy_value(
+  Mass_Context *context,
+  Parser *parser,
+  Source_Range source_range,
+  void *payload,
+  const Descriptor *descriptor,
+  Lazy_Value_Proc proc
+);
+
 static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value

@@ -1067,6 +1067,53 @@ mass_fake_argument_array_from_parameters(
   return fake_args;
 }
 
+static const Descriptor *
+mass_deduce_function_return_type(
+  Mass_Context *context,
+  const Function_Literal *literal,
+  Array_Function_Parameter parameters
+) {
+  Scope *body_scope = scope_make(context->allocator, literal->own_scope);
+  Parser body_parser = {
+    .flags = Parser_Flags_None,
+    .scope = body_scope,
+    .epoch = get_new_epoch(),
+    .module = 0, // FIXME provide module here
+  };
+
+  // FIXME explain!!!!
+  for (u64 i = 0; i < dyn_array_length(parameters); ++i) {
+    const Function_Parameter *def_param = dyn_array_get(parameters, i);
+    assert(def_param->descriptor);
+    assert(def_param->symbol);
+    Value *arg_value;
+    const Descriptor *descriptor = def_param->descriptor;
+    const Source_Range *source_range = &def_param->source_range;
+    switch(def_param->tag) {
+      case Function_Parameter_Tag_Generic:
+      case Function_Parameter_Tag_Runtime: {
+        // FIXME explain 0
+        arg_value = mass_make_lazy_value(context, &body_parser, *source_range, 0, descriptor, 0);
+      } break;
+      case Function_Parameter_Tag_Exact_Static: {
+        Storage storage = def_param->Exact_Static.storage;
+        arg_value = value_make(context, descriptor, storage, *source_range);
+      } break;
+      default: {
+        arg_value = 0;
+        panic("UNREACHEABLE");
+      } break;
+    }
+    arg_value->flags |= Value_Flags_Constant;
+    scope_define_value(body_scope, body_parser.epoch, *source_range, def_param->symbol, arg_value);
+  }
+  assert(value_is_ast_block(literal->body));
+  const Ast_Block *block = value_as_ast_block(literal->body);
+  Value *lazy_value = token_parse_block(context, &body_parser, block, &literal->body->source_range);
+  if (mass_has_error(context)) return 0;
+  return value_or_lazy_value_descriptor(lazy_value);
+}
+
 static const Function_Info *
 function_literal_info_for_args(
   Mass_Context *context,
@@ -1161,6 +1208,15 @@ function_literal_info_for_args(
   ensure_parameter_descriptors(
     context, literal->own_scope, &specialized_info->parameters, &specialized_info->returns
   );
+
+  if (specialized_info->returns.tag == Function_Return_Tag_Inferred) {
+    if (!(literal->flags & Function_Literal_Flags_Intrinsic)) {
+      const Descriptor *return_descriptor =
+        mass_deduce_function_return_type(context, literal, specialized_params);
+      if (mass_has_error(context)) return 0;
+      specialized_info->returns = function_return_exact(return_descriptor, literal->returns.source_range);
+    }
+  }
 
   dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
     .descriptors = cache_descriptors,

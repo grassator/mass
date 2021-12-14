@@ -832,6 +832,15 @@ spec("source") {
       check(checker(42) == 42);
     }
 
+    it("should support inferred return types for a non-recursive fn with no explicit returns") {
+      u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x: i64) -> _ { x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(42) == 42);
+    }
+
     it("should report an error when non-type id is being used as a type") {
       test_program_inline_source_base(
         "main", &test_context,
