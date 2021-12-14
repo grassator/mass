@@ -3186,28 +3186,6 @@ call_function_overload(
       !descriptor_is_implicit_pointer(target_item->descriptor)
     );
 
-    bool can_use_source_registers = false;
-    u64 source_registers_bitset = 0;
-    if (
-      source_arg->descriptor != &descriptor_lazy_value &&
-      !mass_descriptor_is_void(source_arg->descriptor) &&
-      source_arg->storage.tag != Storage_Tag_Static &&
-      source_arg->storage.tag != Storage_Tag_Immediate &&
-      !descriptor_is_implicit_pointer(target_item->descriptor)
-    ) {
-      source_registers_bitset = register_bitset_from_storage(&source_arg->storage);
-      if (!(all_used_arguments_register_bitset & source_registers_bitset)) {
-        // Check that we haven't accidentally acquired this register as temp for something else
-        assert(!(temp_register_argument_bitset & source_registers_bitset));
-        can_use_source_registers = true;
-      }
-      // Just a sanity check that if a source value is in a register,
-      // that register is tracked by the builder.
-      if (source_registers_bitset) {
-        assert(builder->register_occupied_bitset.bits & source_registers_bitset);
-      }
-    }
-
     Value *arg_value;
     if (storage_is_stack(&target_arg->storage)) {
       arg_value = value_init(
@@ -3215,9 +3193,6 @@ call_function_overload(
         stack_descriptor, target_arg->storage, *source_range
       );
     } else if (source_is_stack) {
-      arg_value = source_arg;
-      should_assign = false;
-    } else if (can_use_source_registers) {
       arg_value = source_arg;
       should_assign = false;
     } else if (
@@ -3240,8 +3215,9 @@ call_function_overload(
       if (
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
-        !descriptor_is_implicit_pointer(target_item->descriptor)&&
         required_register_count == 1 &&
+        !descriptor_is_implicit_pointer(target_item->descriptor) &&
+        !(target_item->flags & Function_Call_Parameter_Flags_Uninitialized) &&
         register_bitset_occupied_count(allowed_temp_registers) > 1
       ) {
         Register temp_register = register_find_available(builder, prohibited_registers);
