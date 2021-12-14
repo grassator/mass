@@ -3200,6 +3200,8 @@ call_function_overload(
       !descriptor_is_implicit_pointer(target_item->descriptor)
     );
 
+    static const bool SHOULD_OPTIMIZE = true;
+
     Value *arg_value;
     bool should_assign = true;
     // If target parameter storage is stack, then copying directly is *always*
@@ -3209,10 +3211,10 @@ call_function_overload(
         mass_allocate(context, Value),
         stack_descriptor, target_param->storage, *source_range
       );
-    } else if (can_use_source_arg_as_is) {
+    } else if (SHOULD_OPTIMIZE && can_use_source_arg_as_is) {
       arg_value = source_arg;
       should_assign = false;
-    } else if (can_assign_straight_to_target) {
+    } else if (SHOULD_OPTIMIZE && can_assign_straight_to_target) {
       arg_value = target_param;
       copied_straight_to_param_bitset |= target_param_register_bitset;
       register_acquire_bitset(builder, target_param_register_bitset);
@@ -3224,6 +3226,7 @@ call_function_overload(
       u64 allowed_temp_registers = registers_that_can_be_temp & ~prohibited_registers;
       u64 required_register_count = register_bitset_occupied_count(target_param_register_bitset);
       if (
+        SHOULD_OPTIMIZE &&
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
         required_register_count == 1 &&
