@@ -841,8 +841,18 @@ spec("source") {
       check(checker(42) == 42);
     }
 
+    // FIXME there seem to be multiple problems with an explicit return at the end of the function
+    xit("should support inferred return types for a non-recursive fn with an explicit return at the end") {
+      u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x: i64) -> _ { return x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(42) == 42);
+    }
+
     // :RecursiveInferredType
-    it("should report an error when trying to infer a a type of a recursive fn") {
+    it("should report an error when trying to infer a type of a recursive fn") {
       test_program_inline_source_base(
         "checker", &test_context,
         "checker :: fn(x: i64) -> _ { checker(1) }"
