@@ -688,7 +688,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   bool is_indirect_return = false;
-  const Descriptor *return_descriptor = function_return_as_exact(&function->returns)->descriptor;
+  const Descriptor *return_descriptor = function->return_descriptor;
   if (mass_descriptor_is_void(return_descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
@@ -791,7 +791,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Syscall},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
-  const Descriptor *return_descriptor = function_return_as_exact(&function->returns)->descriptor;
+  const Descriptor *return_descriptor = function->return_descriptor;
   if (mass_descriptor_is_void(return_descriptor)) {
     result.callee_return = storage_none;
     result.caller_return = storage_none;
@@ -864,7 +864,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     .jump = {.tag = Function_Call_Jump_Tag_Call},
     .calling_convention = &calling_convention_x86_64_windows,
   };
-  const Descriptor *return_descriptor = function_return_as_exact(&function->returns)->descriptor;
+  const Descriptor *return_descriptor = function->return_descriptor;
   bool is_indirect_return = false;
   if (mass_descriptor_is_void(return_descriptor)) {
     result.callee_return = storage_none;

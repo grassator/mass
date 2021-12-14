@@ -90,20 +90,7 @@ mass_error_append_function_signature_string(
   } else {
     APPEND_LITERAL(" -> ");
   }
-  switch(info->returns.tag) {
-    case Function_Return_Tag_Inferred: {
-      APPEND_LITERAL("_");
-    } break;
-    case Function_Return_Tag_Exact: {
-      mass_error_append_descriptor(result, info->returns.Exact.descriptor);
-    } break;
-    case Function_Return_Tag_Generic: {
-      Slice source = source_from_source_range(
-        compilation, &info->returns.Generic.type_expression.source_range
-      );
-      APPEND_SLICE(source);
-    } break;
-  }
+  mass_error_append_descriptor(result, info->return_descriptor);
 }
 
 static Fixed_Buffer *
@@ -276,10 +263,7 @@ same_function_signature(
   const Function_Info *a_info,
   const Function_Info *b_info
 ) {
-  // TODO should the generics / inferred be handled here
-  if (a_info->returns.tag != b_info->returns.tag) return false;
-  if (a_info->returns.tag != Function_Return_Tag_Exact) return false;
-  if (!same_type(a_info->returns.Exact.descriptor, b_info->returns.Exact.descriptor)) {
+  if (!same_type(a_info->return_descriptor, b_info->return_descriptor)) {
     return false;
   }
 
@@ -995,11 +979,11 @@ function_return_inferred(
 static inline void
 function_info_init(
   Function_Info *info,
-  Function_Return returns
+  const Descriptor* return_descriptor
 ) {
   *info = (Function_Info) {
     .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .returns = returns,
+    .return_descriptor = return_descriptor,
   };
 }
 

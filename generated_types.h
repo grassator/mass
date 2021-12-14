@@ -1667,7 +1667,7 @@ typedef struct Function_Info {
   Function_Info_Flags flags;
   u32 _flags_padding;
   Array_Function_Parameter parameters;
-  Function_Return returns;
+  const Descriptor * return_descriptor;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
@@ -4627,9 +4627,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
     .offset = offsetof(Function_Info, parameters),
   },
   {
-    .descriptor = &descriptor_function_return,
-    .name = slice_literal_fields("returns"),
-    .offset = offsetof(Function_Info, returns),
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("return_descriptor"),
+    .offset = offsetof(Function_Info, return_descriptor),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_info);

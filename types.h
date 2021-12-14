@@ -101,7 +101,7 @@
   };\
   static Function_Info descriptor_##_NAME_##__info = {\
     .flags = Function_Info_Flags_None,\
-    .returns = {.tag = Function_Return_Tag_Exact, .Exact.descriptor = (_RETURN_DESCRIPTOR_) },\
+    .return_descriptor = (_RETURN_DESCRIPTOR_),\
     .parameters = {(Dyn_Array_Internal *)&descriptor_##_NAME_##__parameters,}\
   };\
   static Descriptor descriptor_##_NAME_ = {\
@@ -160,11 +160,7 @@
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
   *function = (Function_Info){\
     .flags = (_FLAGS_),\
-    .returns = {\
-      .tag = Function_Return_Tag_Exact,\
-      .source_range = return_range,\
-      .Exact.descriptor = (_RETURN_DESCRIPTOR_),\
-    },\
+    .return_descriptor = (_RETURN_DESCRIPTOR_),\
     .parameters = parameters,\
   };
 

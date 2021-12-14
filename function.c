@@ -674,9 +674,9 @@ ensure_function_instance(
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
 
-  const Descriptor *return_descriptor = function_return_as_exact(&fn_info->returns)->descriptor;
+  const Descriptor *return_descriptor = fn_info->return_descriptor;
   Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
-  Source_Range return_range = fn_info->returns.source_range;
+  Source_Range return_range = literal->header.returns.source_range;
 
   Function_Builder *builder = &(Function_Builder){
     .epoch = body_parser.epoch,
@@ -763,7 +763,7 @@ program_init_startup_code(
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   Source_Range source_range;
   INIT_LITERAL_SOURCE_RANGE(&source_range, "__startup");
-  function_info_init(fn_info, function_return_exact(&descriptor_void, source_range));
+  function_info_init(fn_info, &descriptor_void);
   const Calling_Convention *calling_convention =
     context->compilation->runtime_program->default_calling_convention;
   Slice fn_name = slice_literal("__startup");

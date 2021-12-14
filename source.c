@@ -2564,7 +2564,7 @@ compile_time_eval(
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
-  function_info_init(&fn_info, function_return_exact(result_descriptor, *source_range));
+  function_info_init(&fn_info, result_descriptor);
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Section *section = &jit->program->memory.code;
@@ -3106,7 +3106,7 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &runtime_descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  const Descriptor *return_descriptor = function_return_as_exact(&fn_info->returns)->descriptor;
+  const Descriptor *return_descriptor = fn_info->return_descriptor;
   Value *fn_return_value;
   Storage return_storage = storage_none;
   if (!mass_descriptor_is_void(return_descriptor)) {
@@ -3480,34 +3480,27 @@ mass_function_info_init_for_header_and_maybe_body(
     case Function_Return_Tag_Inferred: {
       if (header->flags & Function_Header_Flags_Intrinsic) {
         // Handled in :IntrinsicReturnType
-        out_info->returns = header->returns;
+        out_info->return_descriptor = 0;
       } else {
         // :OverloadLock :RecursiveInferredType
         // TODO This overload lock correctly catches recursive fns with inferred type,
         //      but the resulting error message is about an unmatched overload which is confusing.
         //      Perhaps a better option would be to propagate a reason for an overload.
         *header->overload_lock_count += 1;
-        const Descriptor *return_descriptor =
+        out_info->return_descriptor =
           mass_infer_function_return_type(context, out_info, arguments_scope, maybe_body);
-        if (mass_has_error(context)) return;
-        out_info->returns = function_return_exact(
-          return_descriptor, header->returns.source_range
-        );
         *header->overload_lock_count -= 1;
+        if (mass_has_error(context)) return;
       }
     } break;
     case Function_Return_Tag_Exact: {
       // Nothing to do, we already know the type
-      out_info->returns = header->returns;
+      out_info->return_descriptor = header->returns.Exact.descriptor;
     } break;
     case Function_Return_Tag_Generic: {
       const Descriptor *descriptor =
         token_match_type(&temp_context, &args_parser, header->returns.Generic.type_expression);
-      out_info->returns = (Function_Return) {
-        .tag = Function_Return_Tag_Exact,
-        .source_range = header->returns.source_range,
-        .Exact = { .descriptor = descriptor },
-      };
+      out_info->return_descriptor = descriptor;
     } break;
   }
 
@@ -3798,7 +3791,7 @@ mass_intrinsic_call(
   Mass_Context *context,
   Parser *parser,
   Value *overload,
-  const Function_Return *returns,
+  const Descriptor *expected_descriptor,
   Value_View args_view
 ) {
   // @Volatile :IntrinsicFunctionSignature
@@ -3811,37 +3804,20 @@ mass_intrinsic_call(
   if (!result) return 0;
 
   // :IntrinsicReturnType
-  switch(returns->tag) {
-    case Function_Return_Tag_Inferred: {
-      // Accept whatever was returned
-      return result;
-    } break;
-    case Function_Return_Tag_Exact: {
-      const Descriptor *expected = returns->Exact.descriptor;
-      if (mass_descriptor_is_void(expected)) {
-        if (mass_descriptor_is_void(result->descriptor)) {
-          return result;
-        } else {
-          return value_make(context, &descriptor_void, storage_none, returns->source_range);
-        }
+  if (expected_descriptor) {
+    const Descriptor *actual = value_or_lazy_value_descriptor(result);
+    if (!same_type(expected_descriptor, actual)) {
+      const Descriptor *runtime = deduce_runtime_descriptor_for_value(context, result, expected_descriptor);
+      if (!runtime) return 0;
+      if (!same_type(expected_descriptor, runtime)) {
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = args_view.source_range,
+          .Type_Mismatch = { .expected = expected_descriptor, .actual = actual },
+        });
+        return 0;
       }
-      const Descriptor *actual = value_or_lazy_value_descriptor(result);
-      if (!same_type(expected, actual)) {
-        const Descriptor *runtime = deduce_runtime_descriptor_for_value(context, result, expected);
-        if (!runtime) return 0;
-        if (!same_type(expected, runtime)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Type_Mismatch,
-            .source_range = returns->source_range,
-            .Type_Mismatch = { .expected = expected, .actual = actual },
-          });
-          return 0;
-        }
-      }
-    } break;
-    case Function_Return_Tag_Generic: {
-      panic("Generic returns should have been resolved in `ensure_function_instance`");
-    } break;
+    }
   }
   return result;
 }
@@ -3923,14 +3899,13 @@ mass_ensure_trampoline(
     });
   }
 
-  assert(original_info->returns.tag == Function_Return_Tag_Exact);
-  const Descriptor *return_descriptor = original_info->returns.Exact.descriptor;
+  const Descriptor *return_descriptor = original_info->return_descriptor;
   u64 return_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, return_descriptor);
   {
     dyn_array_push(fields, (Struct_Field) {
       .name = slice_literal("returns"),
       .descriptor = return_descriptor,
-      .source_range = original_info->returns.source_range,
+      .source_range = args_view.source_range,
       .offset = return_byte_offset,
     });
   }
@@ -4061,8 +4036,7 @@ mass_trampoline_call(
   }
 
   trampoline->proc(args_struct_memory);
-  const Descriptor *return_descriptor =
-    function_return_as_exact(&trampoline->original_info->returns)->descriptor;
+  const Descriptor *return_descriptor = trampoline->original_info->return_descriptor;
   Value *result;
   if (mass_descriptor_is_void(return_descriptor)) {
     result = mass_make_void(context, args_view.source_range);
@@ -4125,7 +4099,7 @@ token_handle_function_call(
   if (value_is_function_literal(overload)) {
     const Function_Literal *literal = value_as_function_literal(overload);
     if (value_is_intrinsic(literal->body)) {
-      return mass_intrinsic_call(context, parser, literal->body, &info->returns, args_view);
+      return mass_intrinsic_call(context, parser, literal->body, info->return_descriptor, args_view);
     }
     if (literal->header.flags & Function_Header_Flags_Macro) {
       return mass_handle_macro_call(context, parser, overload, args_view, source_range);
@@ -4154,7 +4128,7 @@ token_handle_function_call(
     .args = value_view_to_value_array(context->allocator, args_view),
   };
 
-  const Descriptor *lazy_descriptor = function_return_as_exact(&info->returns)->descriptor;
+  const Descriptor *lazy_descriptor = info->return_descriptor;
   Value *result = mass_make_lazy_value(
     context, parser, source_range, call_payload, lazy_descriptor, call_function_overload
   );
@@ -5639,10 +5613,10 @@ token_dispatch_operator(
       result_value = operator->Alias.handler(context, parser, args_view, operator);
     } break;
     case Operator_Tag_Intrinsic: {
-      static const Function_Return returns = {
-        .tag = Function_Return_Tag_Inferred,
-      };
-      result_value = mass_intrinsic_call(context, parser, operator->Intrinsic.body, &returns, args_view);
+      const Descriptor *expected_descriptor = 0; // inferred
+      result_value = mass_intrinsic_call(
+        context, parser, operator->Intrinsic.body, expected_descriptor, args_view
+      );
     } break;
   }
   if (mass_has_error(context)) return;

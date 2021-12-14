@@ -1679,7 +1679,7 @@ main(void) {
     { "Function_Info_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Array_Function_Parameter", "parameters" },
-    { "Function_Return", "returns" },
+    { "const Descriptor *", "return_descriptor" },
   }));
 
   push_type(type_enum("Function_Header_Flags", (Enum_Type_Item[]){
