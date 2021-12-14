@@ -80,12 +80,12 @@ get_new_epoch() {
   return epoch;
 }
 
-static void
-ensure_parameter_descriptors(
+static Function_Info *
+mass_function_info_for_header(
   Mass_Context *context,
   Scope *arguments_scope,
-  Array_Function_Parameter *parameters,
-  Function_Return *returns
+  const Function_Header *header,
+  Value *maybe_body
 );
 
 static bool

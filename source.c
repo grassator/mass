@@ -578,7 +578,7 @@ deduce_runtime_descriptor_for_value(
   }
 
   if (value->descriptor == &descriptor_overload || value->descriptor == &descriptor_function_literal) {
-    Array_Function_Parameter parameters;
+    const Function_Info *info;
     if (value->descriptor == &descriptor_function_literal) {
       const Function_Literal *literal = value_as_function_literal(value);
       if (literal->header.flags & Function_Header_Flags_Macro) {
@@ -587,15 +587,15 @@ deduce_runtime_descriptor_for_value(
       if (literal->header.flags & Function_Header_Flags_Generic) {
         return 0;
       }
-      parameters = literal->header.parameters;
+      info = mass_function_info_for_header(context, literal->own_scope, &literal->header, literal->body);
     } else {
       if (!maybe_desired_descriptor || maybe_desired_descriptor->tag != Descriptor_Tag_Function_Instance) {
         return 0;
       }
-      parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
+      info = maybe_desired_descriptor->Function_Instance.info;
     }
     Array_Value_Ptr fake_args =
-      mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
+      mass_fake_argument_array_from_parameters(context->temp_allocator, info->parameters);
     Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);
 
     Overload_Match_Found match_found;
@@ -2982,7 +2982,7 @@ mass_handle_macro_call(
         // TODO should this be forced or is first access ok?
         param_value = mass_make_lazy_value(
           context, parser, param->source_range,
-          arg_value, param->descriptor,
+          arg_value, value_or_lazy_value_descriptor(arg_value),
           mass_macro_temp_param_lazy_proc
         );
       }
@@ -3002,7 +3002,8 @@ mass_handle_macro_call(
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
   switch(literal->header.returns.tag) {
-    case Function_Return_Tag_Inferred: {
+    case Function_Return_Tag_Inferred:
+    case Function_Return_Tag_Generic: {
       // Accept whatever the actual return type is
     } break;
     case Function_Return_Tag_Exact: {
@@ -3016,9 +3017,6 @@ mass_handle_macro_call(
         });
         return 0;
       }
-    } break;
-    case Function_Return_Tag_Generic: {
-      panic("TODO");
     } break;
   }
 
@@ -3403,12 +3401,12 @@ struct Overload_Match_State {
   s64 score;
 };
 
-static void
-ensure_parameter_descriptors(
+static Function_Info *
+mass_function_info_for_header(
   Mass_Context *context,
   Scope *arguments_scope,
-  Array_Function_Parameter *parameters,
-  Function_Return *returns
+  const Function_Header *header,
+  Value *maybe_body
 ) {
   Mass_Context temp_context = mass_context_from_compilation(context->compilation);
   Parser args_parser = {
@@ -3416,16 +3414,34 @@ ensure_parameter_descriptors(
     .scope = scope_make(temp_context.temp_allocator, arguments_scope),
   };
 
+  Function_Info *info = mass_allocate(context, Function_Info);
+  *info = (Function_Info) {
+    .flags = Function_Info_Flags_None,
+    .parameters = dyn_array_make(
+      Array_Function_Parameter,
+      .allocator = context->allocator,
+      .capacity = dyn_array_length(header->parameters),
+    ),
+  };
+  if (header->flags & Function_Header_Flags_Intrinsic) {
+    info->flags |= Function_Info_Flags_Intrinsic;
+  }
+  if (header->flags & Function_Header_Flags_Compile_Time) {
+    info->flags |= Function_Info_Flags_Compile_Time;
+  }
+
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
 
-  DYN_ARRAY_FOREACH(Function_Parameter, param, *parameters) {
+  DYN_ARRAY_FOREACH(Function_Parameter, param, header->parameters) {
     Source_Range source_range = param->source_range;
-    if (param->descriptor) {
-      Storage storage = storage_immediate(&param->descriptor);
+    if (param->descriptor || param->maybe_default_value) {
+      const Descriptor *descriptor = param->descriptor;
+      if (!descriptor) {
+        descriptor = deduce_runtime_descriptor_for_value(context, param->maybe_default_value, 0);
+      }
+      Storage storage = storage_immediate(&descriptor);
       Value *param_value = value_make(&temp_context, &descriptor_descriptor_pointer, storage, source_range);
-      scope_define_value(
-        args_parser.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value
-      );
+      scope_define_value(args_parser.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value);
     } else {
       scope_define_lazy_compile_time_expression(
         &temp_context, &args_parser, args_parser.scope, param->symbol, param->maybe_type_expression
@@ -3433,33 +3449,59 @@ ensure_parameter_descriptors(
     }
   }
 
-  DYN_ARRAY_FOREACH(Function_Parameter, param, *parameters) {
-    if (param->descriptor) continue;
-    const Symbol *symbol = param->symbol;
-    Source_Range source_range = param->source_range;
-    Value *type_value =
-      mass_context_force_lookup(&temp_context, &args_parser, args_parser.scope, symbol, &source_range);
-    if (mass_has_error(&temp_context)) goto err;
-    param->descriptor = value_ensure_type(
-      &temp_context, type_value, source_range
-    );
-    if (mass_has_error(&temp_context)) goto err;
-    assert(param->descriptor);
+  DYN_ARRAY_FOREACH(Function_Parameter, param, header->parameters) {
+    Function_Parameter *info_param = dyn_array_push(info->parameters, *param);
+    switch(param->tag) {
+      case Function_Parameter_Tag_Runtime:
+      case Function_Parameter_Tag_Generic: {
+        const Descriptor *descriptor = param->descriptor;
+        if (!param->descriptor) {
+          const Symbol *symbol = param->symbol;
+          Source_Range source_range = param->source_range;
+          Value *type_value =
+            mass_context_force_lookup(&temp_context, &args_parser, args_parser.scope, symbol, &source_range);
+          if (mass_has_error(&temp_context)) goto err;
+          descriptor = value_ensure_type(&temp_context, type_value, source_range);
+          if (mass_has_error(&temp_context)) goto err;
+        }
+        info_param->descriptor = descriptor;
+      } break;
+      case Function_Parameter_Tag_Exact_Static: {
+        // Nothing to do
+      } break;
+    }
   }
 
-  switch(returns->tag) {
+  switch(header->returns.tag) {
     case Function_Return_Tag_Inferred: {
-      // assume to be handled elsewhere, for example in :IntrinsicReturnType
+      if (header->flags & Function_Header_Flags_Intrinsic) {
+        // Handled in :IntrinsicReturnType
+        info->returns = header->returns;
+      } else {
+        // :OverloadLock :RecursiveInferredType
+        // TODO This overload lock correctly catches recursive fns with inferred type,
+        //      but the resulting error message is about an unmatched overload which is confusing.
+        //      Perhaps a better option would be to propagate a reason for an overload.
+        *header->overload_lock_count += 1;
+        const Descriptor *return_descriptor =
+          mass_infer_function_return_type(context, info, arguments_scope, maybe_body);
+        if (mass_has_error(context)) return 0;
+        info->returns = function_return_exact(
+          return_descriptor, header->returns.source_range
+        );
+        *header->overload_lock_count -= 1;
+      }
     } break;
     case Function_Return_Tag_Exact: {
       // Nothing to do, we already know the type
+      info->returns = header->returns;
     } break;
     case Function_Return_Tag_Generic: {
       const Descriptor *descriptor =
-        token_match_type(&temp_context, &args_parser, returns->Generic.type_expression);
-      *returns = (Function_Return) {
+        token_match_type(&temp_context, &args_parser, header->returns.Generic.type_expression);
+      info->returns = (Function_Return) {
         .tag = Function_Return_Tag_Exact,
-        .source_range = returns->source_range,
+        .source_range = header->returns.source_range,
         .Exact = { .descriptor = descriptor },
       };
     } break;
@@ -3467,6 +3509,7 @@ ensure_parameter_descriptors(
 
   err:
   context_temp_reset_to_mark(&temp_context, temp_mark);
+  return info;
 }
 
 typedef struct {
@@ -3585,7 +3628,7 @@ mass_match_overload_candidate(
     if (value_is_function_literal(candidate)) {
       const Function_Literal *literal = value_as_function_literal(candidate);
       // :OverloadLock Disallow matching this literal if it was locked for some reason
-      if (*literal->overload_lock_count) {
+      if (*literal->header.overload_lock_count) {
         return;
       }
       if (literal->header.flags & Function_Header_Flags_Compile_Time) {
@@ -3602,9 +3645,9 @@ mass_match_overload_candidate(
         //    pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
         //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
         // Without the lock the second literal will infinitely recurse
-        *literal->overload_lock_count += 1;
+        *literal->header.overload_lock_count += 1;
         overload_info = function_literal_info_for_args(context, literal, args->view);
-        *literal->overload_lock_count -= 1;
+        *literal->header.overload_lock_count -= 1;
       }
       if (!overload_info) return;
     } else {
@@ -3957,10 +4000,10 @@ mass_ensure_trampoline(
         .source_range = return_range,
         .Exact = { .descriptor = &descriptor_void },
       },
+      .overload_lock_count = allocator_make(context->allocator, u64, 0),
     },
     .body = body_value,
     .own_scope = trampoline_scope,
-    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
   Value *literal_value = value_make(
     context, &descriptor_function_literal, storage_static(trampoline_literal), body_range
@@ -5750,10 +5793,10 @@ mass_make_fake_function_literal(
       .flags = Function_Header_Flags_None,
       .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
       .returns = function_return_exact(returns, *source_range),
+      .overload_lock_count = allocator_make(context->allocator, u64, 0),
     },
     .body = body,
     .own_scope = function_scope,
-    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
   return literal;
 }
@@ -5964,42 +6007,36 @@ token_parse_function_literal(
 
   // TODO should be extracted from the :: if available or maybe stored separately from Descriptor
   Slice name = {0};
+  Function_Header_Flags header_flags = Function_Header_Flags_None;
+  if (is_macro) header_flags |= Function_Header_Flags_Macro;
+  if (is_compile_time) header_flags |= Function_Header_Flags_Compile_Time;
+  if (body_value && value_is_intrinsic(body_value)) header_flags |= Function_Header_Flags_Intrinsic;
+
+  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
+    if (param->tag == Function_Parameter_Tag_Generic) {
+      header_flags |= Function_Header_Flags_Generic;
+      break;
+    }
+  }
+
+  Function_Header header = {
+    .flags = header_flags,
+    .parameters = parameters,
+    .returns = returns,
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
+  };
 
   if (body_value && !is_syscall) {
-    Function_Header_Flags flags = Function_Header_Flags_None;
-    if (is_compile_time) flags |= Function_Header_Flags_Compile_Time;
-    if (value_is_intrinsic(body_value)) flags |= Function_Header_Flags_Intrinsic;
-
-    DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
-      if (param->tag == Function_Parameter_Tag_Generic) {
-        flags |= Function_Header_Flags_Generic;
-        break;
-      }
-    }
-    if (!(flags & Function_Header_Flags_Generic)) {
-      ensure_parameter_descriptors(context, parser->scope, &parameters, &returns);
-    }
-
-    if (is_macro) flags |= Function_Header_Flags_Macro;
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
-      .header = {
-        .flags = flags,
-        .parameters = parameters,
-        .returns = returns,
-      },
+      .header = header,
       .body = body_value,
       .own_scope = parser->scope,
-      .overload_lock_count = allocator_make(context->allocator, u64, 0),
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   }
 
-  Function_Info *fn_info = mass_allocate(context, Function_Info);
-  function_info_init(fn_info, returns);
-  fn_info->parameters = parameters;
-  if (is_compile_time) fn_info->flags |= Function_Info_Flags_Compile_Time;
-  ensure_parameter_descriptors(context, parser->scope, &fn_info->parameters, &fn_info->returns);
+  Function_Info *fn_info = mass_function_info_for_header(context, parser->scope, &header, 0);
   if (mass_has_error(context)) return 0;
 
   // TODO support this on non-Linux systems

@@ -1682,6 +1682,7 @@ typedef struct Function_Header {
   u32 _flags_padding;
   Array_Function_Parameter parameters;
   Function_Return returns;
+  u64 * overload_lock_count;
 } Function_Header;
 typedef dyn_array_type(Function_Header) Array_Function_Header;
 
@@ -1689,7 +1690,6 @@ typedef struct Function_Literal {
   Function_Header header;
   Scope * own_scope;
   Value * body;
-  u64 * overload_lock_count;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
 } Function_Literal;
@@ -4685,6 +4685,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_header, Function_Header,
     .name = slice_literal_fields("returns"),
     .offset = offsetof(Function_Header, returns),
   },
+  {
+    .descriptor = &descriptor_i64_pointer,
+    .name = slice_literal_fields("overload_lock_count"),
+    .offset = offsetof(Function_Header, overload_lock_count),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(function_header);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header, function_header);
@@ -4706,11 +4711,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("body"),
     .offset = offsetof(Function_Literal, body),
-  },
-  {
-    .descriptor = &descriptor_i64_pointer,
-    .name = slice_literal_fields("overload_lock_count"),
-    .offset = offsetof(Function_Literal, overload_lock_count),
   },
   {
     .descriptor = &descriptor_array_value_ptr,

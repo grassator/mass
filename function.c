@@ -546,6 +546,57 @@ function_return_value_register_from_storage(
   return 0;
 }
 
+static const Descriptor *
+mass_infer_function_return_type(
+  Mass_Context *context,
+  const Function_Info *info,
+  const Scope *scope,
+  Value *body
+) {
+  Scope *body_scope = scope_make(context->allocator, scope);
+  Parser body_parser = {
+    .flags = Parser_Flags_None,
+    .scope = body_scope,
+    .epoch = get_new_epoch(),
+    .module = 0, // FIXME provide module here
+  };
+
+  for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
+    const Function_Parameter *def_param = dyn_array_get(info->parameters, i);
+    assert(def_param->descriptor);
+    assert(def_param->symbol);
+    Value *arg_value;
+    const Descriptor *descriptor = def_param->descriptor;
+    const Source_Range *source_range = &def_param->source_range;
+    switch(def_param->tag) {
+      case Function_Parameter_Tag_Generic:
+      case Function_Parameter_Tag_Runtime: {
+        // We don't need payload or the proc, because in this pass we do not expect
+        // any of the values to be forced. In fact this will act as a free assertion.
+        void *payload = 0;
+        Lazy_Value_Proc proc = 0;
+        arg_value = mass_make_lazy_value(context, &body_parser, *source_range, payload, descriptor, proc);
+      } break;
+      case Function_Parameter_Tag_Exact_Static: {
+        // Exact static parameters are defined as static, since they might influence the inference
+        Storage storage = def_param->Exact_Static.storage;
+        arg_value = value_make(context, descriptor, storage, *source_range);
+      } break;
+      default: {
+        arg_value = 0;
+        panic("UNREACHEABLE");
+      } break;
+    }
+    arg_value->flags |= Value_Flags_Constant;
+    scope_define_value(body_scope, body_parser.epoch, *source_range, def_param->symbol, arg_value);
+  }
+  assert(value_is_ast_block(body));
+  const Ast_Block *block = value_as_ast_block(body);
+  Value *lazy_value = token_parse_block(context, &body_parser, block, &body->source_range);
+  if (mass_has_error(context)) return 0;
+  return value_or_lazy_value_descriptor(lazy_value);
+}
+
 static Value *
 ensure_function_instance(
   Mass_Context *context,
