@@ -284,6 +284,11 @@ assign_from_static(
     source->descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     void *source_memory = *(void **)storage_static_memory_with_bit_size(&source->storage, (Bits){64});
+    if (!source_memory) {
+      Storage null_pointer = imm64(0);
+      move_value(builder, source_range, &target->storage, &null_pointer);
+      return true;
+    }
     // If a `static_pointer_length_map` contains the pointer, it is actually a C-like array
     // and the length (item count) is the value from the map.
     u64 *maybe_custom_array_length =
