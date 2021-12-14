@@ -85,6 +85,7 @@ get :: fn(x ~ is_pointer_type, rhs) -> _ intrinsic {
   arguments.values.* = deref
   __get(context, parser, arguments)
 }
+get :: fn(x ~ is_fixed_array_type, rhs) -> _ MASS.unchecked_get_at_index
 
 Void :: type_of(())
 make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {

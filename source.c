@@ -5511,10 +5511,6 @@ mass_get(
     return mass_struct_get(context, parser, parsed_args);
   }
 
-  if (lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
-    return mass_array_like_get(context, parser, parsed_args);
-  }
-
   // TODO make a common symbol
   const Symbol *symbol = mass_ensure_symbol(context->compilation, slice_literal("get"));
   return mass_forward_call_to_alias(context, parser, parsed_args, symbol);
