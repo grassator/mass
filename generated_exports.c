@@ -346,12 +346,12 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Descriptor_Function_Instance")),
     type_descriptor_function_instance_value
   );
-  Source_Range Descriptor_Fixed_Size_Array__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Descriptor_Fixed_Size_Array__source_range, "Descriptor_Fixed_Size_Array");
+  Source_Range Descriptor_Fixed_Array__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Descriptor_Fixed_Array__source_range, "Descriptor_Fixed_Array");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Descriptor_Fixed_Size_Array__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Descriptor_Fixed_Size_Array")),
-    type_descriptor_fixed_size_array_value
+    scope, VALUE_STATIC_EPOCH, Descriptor_Fixed_Array__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Fixed_Array")),
+    type_descriptor_fixed_array_value
   );
   Source_Range Descriptor_Struct__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Descriptor_Struct__source_range, "Descriptor_Struct");

@@ -1760,7 +1760,7 @@ typedef enum {
   Descriptor_Tag_Float = 2,
   Descriptor_Tag_Integer = 3,
   Descriptor_Tag_Function_Instance = 4,
-  Descriptor_Tag_Fixed_Size_Array = 5,
+  Descriptor_Tag_Fixed_Array = 5,
   Descriptor_Tag_Struct = 6,
   Descriptor_Tag_Pointer_To = 7,
 } Descriptor_Tag;
@@ -1772,10 +1772,10 @@ typedef struct Descriptor_Function_Instance {
   const Function_Info * info;
   Function_Call_Setup call_setup;
 } Descriptor_Function_Instance;
-typedef struct Descriptor_Fixed_Size_Array {
+typedef struct Descriptor_Fixed_Array {
   const Descriptor * item;
   u64 length;
-} Descriptor_Fixed_Size_Array;
+} Descriptor_Fixed_Array;
 typedef struct Descriptor_Struct {
   Array_Struct_Field fields;
 } Descriptor_Struct;
@@ -1793,7 +1793,7 @@ typedef struct Descriptor {
   union {
     Descriptor_Integer Integer;
     Descriptor_Function_Instance Function_Instance;
-    Descriptor_Fixed_Size_Array Fixed_Size_Array;
+    Descriptor_Fixed_Array Fixed_Array;
     Descriptor_Struct Struct;
     Descriptor_Pointer_To Pointer_To;
   };
@@ -1808,10 +1808,10 @@ descriptor_as_function_instance(const Descriptor *descriptor) {
   assert(descriptor->tag == Descriptor_Tag_Function_Instance);
   return &descriptor->Function_Instance;
 }
-static inline const Descriptor_Fixed_Size_Array *
-descriptor_as_fixed_size_array(const Descriptor *descriptor) {
-  assert(descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-  return &descriptor->Fixed_Size_Array;
+static inline const Descriptor_Fixed_Array *
+descriptor_as_fixed_array(const Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Fixed_Array);
+  return &descriptor->Fixed_Array;
 }
 static inline const Descriptor_Struct *
 descriptor_as_struct(const Descriptor *descriptor) {
@@ -4906,7 +4906,7 @@ static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Float"), .value = 2 },
 { .name = slice_literal_fields("Integer"), .value = 3 },
 { .name = slice_literal_fields("Function_Instance"), .value = 4 },
-{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 5 },
+{ .name = slice_literal_fields("Fixed_Array"), .value = 5 },
 { .name = slice_literal_fields("Struct"), .value = 6 },
 { .name = slice_literal_fields("Pointer_To"), .value = 7 },
 };
@@ -4931,19 +4931,19 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);
-MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_fixed_size_array, Descriptor_Fixed_Size_Array,
+MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_fixed_array, Descriptor_Fixed_Array,
   {
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("item"),
-    .offset = offsetof(Descriptor_Fixed_Size_Array, item),
+    .offset = offsetof(Descriptor_Fixed_Array, item),
   },
   {
     .descriptor = &descriptor_i64,
     .name = slice_literal_fields("length"),
-    .offset = offsetof(Descriptor_Fixed_Size_Array, length),
+    .offset = offsetof(Descriptor_Fixed_Array, length),
   },
 );
-MASS_DEFINE_TYPE_VALUE(descriptor_fixed_size_array);
+MASS_DEFINE_TYPE_VALUE(descriptor_fixed_array);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct, Descriptor_Struct,
   {
     .descriptor = &descriptor_array_struct_field,
@@ -5002,9 +5002,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .offset = offsetof(Descriptor, Function_Instance),
   },
   {
-    .name = slice_literal_fields("Fixed_Size_Array"),
-    .descriptor = &descriptor_descriptor_fixed_size_array,
-    .offset = offsetof(Descriptor, Fixed_Size_Array),
+    .name = slice_literal_fields("Fixed_Array"),
+    .descriptor = &descriptor_descriptor_fixed_array,
+    .offset = offsetof(Descriptor, Fixed_Array),
   },
   {
     .name = slice_literal_fields("Struct"),

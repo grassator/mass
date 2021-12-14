@@ -356,8 +356,8 @@ system_v_item_iterator_count(
       return dyn_array_length(it->aggregate->Struct.fields);
     }
     case System_V_Aggregate_Iterator_Tag_Array: {
-      assert(it->aggregate->tag == Descriptor_Tag_Fixed_Size_Array);
-      return it->aggregate->Fixed_Size_Array.length;
+      assert(it->aggregate->tag == Descriptor_Tag_Fixed_Array);
+      return it->aggregate->Fixed_Array.length;
     }
   }
   panic("UNEXPECTED System_V_Aggregate_Iterator_Tag");
@@ -378,8 +378,8 @@ system_v_item_iterator_next(
       it->offset = field->offset;
     } break;
     case System_V_Aggregate_Iterator_Tag_Array: {
-      assert(it->aggregate->tag == Descriptor_Tag_Fixed_Size_Array);
-      it->item = it->aggregate->Fixed_Size_Array.item;
+      assert(it->aggregate->tag == Descriptor_Tag_Fixed_Array);
+      it->item = it->aggregate->Fixed_Array.item;
       it->offset = descriptor_byte_size(it->item) * it->next_index;
     } break;
     default: {
@@ -453,7 +453,7 @@ x86_64_system_v_classify(
         .aggregate = descriptor,
       };
     } break;
-    case Descriptor_Tag_Fixed_Size_Array: {
+    case Descriptor_Tag_Fixed_Array: {
       it = (System_V_Aggregate_Iterator) {
         .tag = System_V_Aggregate_Iterator_Tag_Array,
         .aggregate = descriptor,
@@ -642,7 +642,7 @@ x86_64_system_v_classify_field_recursively(
         );
         break;
       }
-      case Descriptor_Tag_Fixed_Size_Array: {
+      case Descriptor_Tag_Fixed_Array: {
         System_V_Aggregate_Iterator nested_it = {
           .tag = System_V_Aggregate_Iterator_Tag_Array,
           .aggregate = it->item,

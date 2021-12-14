@@ -35,10 +35,10 @@
 
 #define MASS_DESCRIPTOR_STATIC_ARRAY(_C_TYPE_, _LENGTH_, ...)\
   {\
-    .tag = Descriptor_Tag_Fixed_Size_Array,\
+    .tag = Descriptor_Tag_Fixed_Array,\
     .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT * (_LENGTH_)},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
-    .Fixed_Size_Array = {\
+    .Fixed_Array = {\
       .item = (__VA_ARGS__),\
       .length = (_LENGTH_),\
     },\

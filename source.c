@@ -735,8 +735,8 @@ assign_tuple(
       mass_assign_helper(context, builder, &target_field, field_source, source_range);
       if (mass_has_error(context)) goto err;
     }
-  } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
-    u64 length = target->descriptor->Fixed_Size_Array.length;
+  } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    u64 length = target->descriptor->Fixed_Array.length;
     if ((length != dyn_array_length(tuple->items))) {
       Slice message = length > dyn_array_length(tuple->items)
         ? slice_literal("Tuple does not have enough items to match the array it is assigned to")
@@ -750,7 +750,7 @@ assign_tuple(
       goto err;
     }
 
-    const Descriptor *item_descriptor = target->descriptor->Fixed_Size_Array.item;
+    const Descriptor *item_descriptor = target->descriptor->Fixed_Array.item;
     u64 item_byte_size = descriptor_byte_size(item_descriptor);
     for (u64 index = 0; index < length; ++index) {
       Value *tuple_item = *dyn_array_get(tuple->items, index);
@@ -956,14 +956,14 @@ mass_assign_helper(
     return;
   }
 
-  if (source->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+  if (source->descriptor->tag == Descriptor_Tag_Fixed_Array) {
     if (!same_type(target->descriptor, source->descriptor)) goto err;
-    const Descriptor *item_descriptor = source->descriptor->Fixed_Size_Array.item;
+    const Descriptor *item_descriptor = source->descriptor->Fixed_Array.item;
 
     Storage source_array_storage = value_maybe_dereference(context, builder, source);
     Storage target_array_storage = value_maybe_dereference(context, builder, target);
 
-    for (u64 i = 0; i < source->descriptor->Fixed_Size_Array.length; ++i) {
+    for (u64 i = 0; i < source->descriptor->Fixed_Array.length; ++i) {
       s32 index_number = (u64_to_s32(i));
       s32 offset = index_number * u64_to_s32(descriptor_byte_size(item_descriptor));
 
@@ -4611,7 +4611,7 @@ mass_handle_generic_comparison_lazy_proc(
       storage_release_if_temporary(builder, &temp_a_storage);
       storage_release_if_temporary(builder, &temp_b_storage);
     } break;
-    case Descriptor_Tag_Fixed_Size_Array: {
+    case Descriptor_Tag_Fixed_Array: {
       panic("TODO figure out semantics and support comparing fixed size");
     } break;
     case Descriptor_Tag_Struct: {
@@ -5170,8 +5170,8 @@ mass_handle_array_access_lazy_proc(
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(array_descriptor);
 
   const Descriptor *item_descriptor;
-  if(unwrapped_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
-    item_descriptor = unwrapped_descriptor->Fixed_Size_Array.item;
+  if(unwrapped_descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    item_descriptor = unwrapped_descriptor->Fixed_Array.item;
   } else {
     assert(array_descriptor->tag == Descriptor_Tag_Pointer_To);
     item_descriptor = unwrapped_descriptor;
@@ -5338,7 +5338,7 @@ static const Descriptor *
 mass_constraint_fixed_array_type(
   const Descriptor *descriptor
 ) {
-  return descriptor->tag == Descriptor_Tag_Fixed_Size_Array ? descriptor : 0;
+  return descriptor->tag == Descriptor_Tag_Fixed_Array ? descriptor : 0;
 }
 
 static const Descriptor *
@@ -5445,8 +5445,8 @@ mass_array_like_get(
 
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
   const Descriptor *item_descriptor;
-  if (lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
-    item_descriptor = lhs_descriptor->Fixed_Size_Array.item;
+  if (lhs_descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    item_descriptor = lhs_descriptor->Fixed_Array.item;
   } else if (lhs_descriptor->tag == Descriptor_Tag_Pointer_To) {
     item_descriptor = lhs_descriptor->Pointer_To.descriptor;
   } else {

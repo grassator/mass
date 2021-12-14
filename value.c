@@ -319,9 +319,9 @@ same_type(
     case Descriptor_Tag_Pointer_To: {
       return same_type(a->Pointer_To.descriptor, b->Pointer_To.descriptor);
     }
-    case Descriptor_Tag_Fixed_Size_Array: {
-      return same_type(a->Fixed_Size_Array.item, b->Fixed_Size_Array.item) &&
-        a->Fixed_Size_Array.length == b->Fixed_Size_Array.length;
+    case Descriptor_Tag_Fixed_Array: {
+      return same_type(a->Fixed_Array.item, b->Fixed_Array.item) &&
+        a->Fixed_Array.length == b->Fixed_Array.length;
     }
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Raw: {
@@ -601,14 +601,14 @@ storage_static_equal_internal(
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
     } break;
-    case Descriptor_Tag_Fixed_Size_Array: {
+    case Descriptor_Tag_Fixed_Array: {
       // compare item by item
-      if (a_descriptor->Fixed_Size_Array.length != b_descriptor->Fixed_Size_Array.length) {
+      if (a_descriptor->Fixed_Array.length != b_descriptor->Fixed_Array.length) {
         return false;
       }
-      for (u64 i = 0; i < a_descriptor->Fixed_Size_Array.length; ++i) {
-        const Descriptor *a_item = a_descriptor->Fixed_Size_Array.item;
-        const Descriptor *b_item = b_descriptor->Fixed_Size_Array.item;
+      for (u64 i = 0; i < a_descriptor->Fixed_Array.length; ++i) {
+        const Descriptor *a_item = a_descriptor->Fixed_Array.item;
+        const Descriptor *b_item = b_descriptor->Fixed_Array.item;
         u64 offset = descriptor_byte_size(a_item) * i;
         if (!storage_static_equal_internal(
           a_item, (s8 *)a_memory + offset, b_item, (s8 *)b_memory + offset
@@ -946,10 +946,10 @@ descriptor_array_of(
   u64 item_bit_alignment = item_descriptor->bit_alignment.as_u64;
   u64 aligned_item_size = u64_align(item_descriptor->bit_size.as_u64, item_bit_alignment);
   *result = (Descriptor) {
-    .tag = Descriptor_Tag_Fixed_Size_Array,
+    .tag = Descriptor_Tag_Fixed_Array,
     .bit_size = {aligned_item_size * length},
     .bit_alignment = {item_bit_alignment},
-    .Fixed_Size_Array = {
+    .Fixed_Array = {
       .item = item_descriptor,
       .length = length,
     },
@@ -1507,8 +1507,8 @@ same_type_or_can_implicitly_move_cast(
   if (target->tag != source->tag) return false;
   if (target->tag == Descriptor_Tag_Pointer_To) {
     if (
-      source->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
-      same_type(source->Pointer_To.descriptor->Fixed_Size_Array.item, target->Pointer_To.descriptor)
+      source->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Array &&
+      same_type(source->Pointer_To.descriptor->Fixed_Array.item, target->Pointer_To.descriptor)
     ) {
       return true;
     }

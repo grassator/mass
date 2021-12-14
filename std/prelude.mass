@@ -472,10 +472,10 @@ Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
     return 0
   } else {}
 
-  t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
+  t.tag = MASS.Descriptor_Tag.Fixed_Array
   t.bit_size = [raw_bit_size]
   t.bit_alignment = item_type.bit_alignment
-  t.Fixed_Size_Array = [item_type, length]
+  t.Fixed_Array = [item_type, length]
 
   meta.immediate(context.compilation, t, arguments.source_range)
 }

@@ -1772,7 +1772,7 @@ main(void) {
       { "const Function_Info *", "info" },
       { "Function_Call_Setup", "call_setup"},
     }),
-    struct_fields("Fixed_Size_Array", (Struct_Item[]){
+    struct_fields("Fixed_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },
       { "u64", "length" },
     }),
