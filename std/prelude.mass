@@ -9,15 +9,12 @@ operator(.) :: 20 __get
 operator(module _) :: 100 MASS.inline_module
 operator(intrinsic _) :: 100 MASS.intrinsic
 operator(c_struct _) :: 100 MASS.c_struct
+operator(exports _) :: 100 MASS.exports
 
 // `size_of` and `type_of` are essentially function calls with special parsing
 // rules and evaluation behavior, so they get the same precedence as `apply`
 operator(type_of _) :: 20 MASS.type_of
 operator(size_of _) :: 20 MASS.size_of
-
-// FIXME replace exports with an operator
-//operator(exports _) :: 100 MASS.exports
-apply :: fn(symbol :: 'exports, curly : MASS.Group_Square) => () MASS.exports
 
 operator(' _) :: 30 MASS.quote
 operator(_ ') :: 30 MASS.unquote

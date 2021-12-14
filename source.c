@@ -2184,9 +2184,8 @@ mass_exports(
   Parser *parser,
   Value_View args
 ) {
-  assert(args.length == 2);
-  assert(value_match_symbol(value_view_get(&args, 0), slice_literal("exports")));
-  Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 1));
+  assert(args.length == 1);
+  Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 0));
   if (mass_has_error(context)) return 0;
   if (!mass_value_ensure_static_of(context, tuple_value, &descriptor_tuple)) {
     return 0;

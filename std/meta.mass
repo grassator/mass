@@ -1,4 +1,4 @@
-exports [.reify, .static_value, .immediate, .same_type, .compilation_error, .context_error, .Value]
+exports [.reify, .static_value, .immediate, .same_type, .context_error, .Value]
 
 Value :: MASS.Value
 Source_Range :: MASS.Source_Range
