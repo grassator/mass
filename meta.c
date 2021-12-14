@@ -1998,6 +1998,7 @@ main(void) {
   push_type(type_struct("Common_Symbols", (Struct_Item[]){
     { "const Symbol *", "apply" },
     { "const Symbol *", "fn" },
+    { "const Symbol *", "get" },
     { "const Symbol *", "intrinsic" },
     { "const Symbol *", "label" },
     { "const Symbol *", "macro" },

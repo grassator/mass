@@ -1380,6 +1380,7 @@ compilation_init(
   compilation->common_symbols = (Common_Symbols) {
     .apply = mass_ensure_symbol(compilation, slice_literal("apply")),
     .fn = mass_ensure_symbol(compilation, slice_literal("fn")),
+    .get = mass_ensure_symbol(compilation, slice_literal("get")),
     .intrinsic = mass_ensure_symbol(compilation, slice_literal("intrinsic")),
     .label = mass_ensure_symbol(compilation, slice_literal("label")),
     .macro = mass_ensure_symbol(compilation, slice_literal("macro")),

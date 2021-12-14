@@ -5503,8 +5503,7 @@ mass_get(
     return mass_module_get(context, parser, parsed_args);
   }
 
-  // TODO make a common symbol
-  const Symbol *symbol = mass_ensure_symbol(context->compilation, slice_literal("get"));
+  const Symbol *symbol = context->compilation->common_symbols.get;
   return mass_forward_call_to_alias(context, parser, parsed_args, symbol);
 }
 

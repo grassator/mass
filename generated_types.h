@@ -2093,6 +2093,7 @@ hash_map_template(Descriptor_Pointer_To_Cache_Map, const Descriptor *, const Des
 typedef struct Common_Symbols {
   const Symbol * apply;
   const Symbol * fn;
+  const Symbol * get;
   const Symbol * intrinsic;
   const Symbol * label;
   const Symbol * macro;
@@ -5585,6 +5586,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("fn"),
     .offset = offsetof(Common_Symbols, fn),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("get"),
+    .offset = offsetof(Common_Symbols, get),
   },
   {
     .descriptor = &descriptor_symbol_pointer,
