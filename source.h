@@ -80,12 +80,13 @@ get_new_epoch() {
   return epoch;
 }
 
-static Function_Info *
-mass_function_info_for_header(
+static void
+mass_function_info_init_for_header_and_maybe_body(
   Mass_Context *context,
   Scope *arguments_scope,
   const Function_Header *header,
-  Value *maybe_body
+  Value *maybe_body,
+  Function_Info *out_info
 );
 
 static bool

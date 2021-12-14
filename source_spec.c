@@ -124,11 +124,13 @@ test_program_source_base(
   Value *value = scope_entry_force_value(context, entry);
   if (value && value->descriptor == &descriptor_function_literal) {
     const Function_Literal *literal = value_as_function_literal(value);
-    const Function_Info *info =
-      mass_function_info_for_header(context, literal->own_scope, &literal->header, literal->body);
+    Function_Info info;
+    mass_function_info_init_for_header_and_maybe_body(
+      context, literal->own_scope, &literal->header, literal->body, &info
+    );
     if (mass_has_error(context)) return 0;
     Array_Value_Ptr fake_args =
-      mass_fake_argument_array_from_parameters(context->allocator, info->parameters);
+      mass_fake_argument_array_from_parameters(context->allocator, info.parameters);
     Value_View args_view = value_view_from_value_array(fake_args, &symbol_source_range);
     return ensure_function_instance(context, value, args_view);
   }

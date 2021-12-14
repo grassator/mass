@@ -578,7 +578,7 @@ deduce_runtime_descriptor_for_value(
   }
 
   if (value->descriptor == &descriptor_overload || value->descriptor == &descriptor_function_literal) {
-    const Function_Info *info;
+    Array_Function_Parameter parameters;
     if (value->descriptor == &descriptor_function_literal) {
       const Function_Literal *literal = value_as_function_literal(value);
       if (literal->header.flags & Function_Header_Flags_Macro) {
@@ -587,15 +587,19 @@ deduce_runtime_descriptor_for_value(
       if (literal->header.flags & Function_Header_Flags_Generic) {
         return 0;
       }
-      info = mass_function_info_for_header(context, literal->own_scope, &literal->header, literal->body);
+      Function_Info info;
+      mass_function_info_init_for_header_and_maybe_body(
+        context, literal->own_scope, &literal->header, literal->body, &info
+      );
+      parameters = info.parameters;
     } else {
       if (!maybe_desired_descriptor || maybe_desired_descriptor->tag != Descriptor_Tag_Function_Instance) {
         return 0;
       }
-      info = maybe_desired_descriptor->Function_Instance.info;
+      parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
     }
     Array_Value_Ptr fake_args =
-      mass_fake_argument_array_from_parameters(context->temp_allocator, info->parameters);
+      mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
     Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);
 
     Overload_Match_Found match_found;
@@ -3401,12 +3405,13 @@ struct Overload_Match_State {
   s64 score;
 };
 
-static Function_Info *
-mass_function_info_for_header(
+static void
+mass_function_info_init_for_header_and_maybe_body(
   Mass_Context *context,
   Scope *arguments_scope,
   const Function_Header *header,
-  Value *maybe_body
+  Value *maybe_body,
+  Function_Info *out_info
 ) {
   Mass_Context temp_context = mass_context_from_compilation(context->compilation);
   Parser args_parser = {
@@ -3414,8 +3419,7 @@ mass_function_info_for_header(
     .scope = scope_make(temp_context.temp_allocator, arguments_scope),
   };
 
-  Function_Info *info = mass_allocate(context, Function_Info);
-  *info = (Function_Info) {
+  *out_info = (Function_Info) {
     .flags = Function_Info_Flags_None,
     .parameters = dyn_array_make(
       Array_Function_Parameter,
@@ -3424,10 +3428,10 @@ mass_function_info_for_header(
     ),
   };
   if (header->flags & Function_Header_Flags_Intrinsic) {
-    info->flags |= Function_Info_Flags_Intrinsic;
+    out_info->flags |= Function_Info_Flags_Intrinsic;
   }
   if (header->flags & Function_Header_Flags_Compile_Time) {
-    info->flags |= Function_Info_Flags_Compile_Time;
+    out_info->flags |= Function_Info_Flags_Compile_Time;
   }
 
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
@@ -3450,7 +3454,7 @@ mass_function_info_for_header(
   }
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, header->parameters) {
-    Function_Parameter *info_param = dyn_array_push(info->parameters, *param);
+    Function_Parameter *info_param = dyn_array_push(out_info->parameters, *param);
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime:
       case Function_Parameter_Tag_Generic: {
@@ -3476,7 +3480,7 @@ mass_function_info_for_header(
     case Function_Return_Tag_Inferred: {
       if (header->flags & Function_Header_Flags_Intrinsic) {
         // Handled in :IntrinsicReturnType
-        info->returns = header->returns;
+        out_info->returns = header->returns;
       } else {
         // :OverloadLock :RecursiveInferredType
         // TODO This overload lock correctly catches recursive fns with inferred type,
@@ -3484,9 +3488,9 @@ mass_function_info_for_header(
         //      Perhaps a better option would be to propagate a reason for an overload.
         *header->overload_lock_count += 1;
         const Descriptor *return_descriptor =
-          mass_infer_function_return_type(context, info, arguments_scope, maybe_body);
-        if (mass_has_error(context)) return 0;
-        info->returns = function_return_exact(
+          mass_infer_function_return_type(context, out_info, arguments_scope, maybe_body);
+        if (mass_has_error(context)) return;
+        out_info->returns = function_return_exact(
           return_descriptor, header->returns.source_range
         );
         *header->overload_lock_count -= 1;
@@ -3494,12 +3498,12 @@ mass_function_info_for_header(
     } break;
     case Function_Return_Tag_Exact: {
       // Nothing to do, we already know the type
-      info->returns = header->returns;
+      out_info->returns = header->returns;
     } break;
     case Function_Return_Tag_Generic: {
       const Descriptor *descriptor =
         token_match_type(&temp_context, &args_parser, header->returns.Generic.type_expression);
-      info->returns = (Function_Return) {
+      out_info->returns = (Function_Return) {
         .tag = Function_Return_Tag_Exact,
         .source_range = header->returns.source_range,
         .Exact = { .descriptor = descriptor },
@@ -3509,7 +3513,6 @@ mass_function_info_for_header(
 
   err:
   context_temp_reset_to_mark(&temp_context, temp_mark);
-  return info;
 }
 
 typedef struct {
@@ -6036,7 +6039,8 @@ token_parse_function_literal(
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   }
 
-  Function_Info *fn_info = mass_function_info_for_header(context, parser->scope, &header, 0);
+  Function_Info *fn_info = mass_allocate(context, Function_Info);
+  mass_function_info_init_for_header_and_maybe_body(context, parser->scope, &header, 0, fn_info);
   if (mass_has_error(context)) return 0;
 
   // TODO support this on non-Linux systems

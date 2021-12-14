@@ -1149,8 +1149,10 @@ function_literal_info_for_args(
     dyn_array_push(cache_descriptors, actual_descriptor);
   }
 
-  Function_Info *specialized_info =
-    mass_function_info_for_header(context, literal->own_scope, &specialized_header, literal->body);
+  Function_Info *specialized_info = mass_allocate(context, Function_Info);
+  mass_function_info_init_for_header_and_maybe_body(
+    context, literal->own_scope, &specialized_header, literal->body, specialized_info
+  );
 
   dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
     .descriptors = cache_descriptors,
