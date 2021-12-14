@@ -660,6 +660,24 @@ x86_64_system_v_classify_field_recursively(
   }
 }
 
+static inline Descriptor *
+calling_convention_implicit_pointer_descriptor(
+  const Allocator *allocator,
+  const Descriptor *pointee
+) {
+  Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Pointer_To,
+    .bit_size = {64},
+    .bit_alignment = {64},
+    .Pointer_To = {
+      .descriptor = pointee,
+      .is_implicit = true,
+    },
+  };
+  return descriptor;
+}
+
 static Function_Call_Setup
 calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
@@ -910,17 +928,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     }
 
     if (should_pass_as_an_implicit_pointer) {
-      Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
-      *descriptor = (Descriptor) {
-        .tag = Descriptor_Tag_Pointer_To,
-        .bit_size = {64},
-        .bit_alignment = {64},
-        .Pointer_To = {
-          .descriptor = item.descriptor,
-          .is_implicit = true,
-        },
-      };
-      item.descriptor = descriptor;
+      item.descriptor = calling_convention_implicit_pointer_descriptor(allocator, item.descriptor);
     }
     if (index < countof(general_registers)) {
       Register reg = descriptor_is_float(item.descriptor)

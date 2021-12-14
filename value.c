@@ -1036,7 +1036,10 @@ descriptor_pointer_to(
     .tag = Descriptor_Tag_Pointer_To,
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Pointer_To.descriptor = descriptor,
+    .Pointer_To = {
+      .is_implicit = false,
+      .descriptor = descriptor,
+    }
   };
   hash_map_set(compilation->descriptor_pointer_to_cache_map, descriptor, result);
   return result;
