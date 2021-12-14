@@ -4810,7 +4810,10 @@ mass_pointer_to_lazy_proc(
   Value *forced = value_force(context, builder, &expected_pointee, pointee);
   if (mass_has_error(context)) return 0;
   Value *pointer_value = mass_value_from_expected_result(context, builder, expected_result, *source_range);
-  if (descriptor->tag == Descriptor_Tag_Pointer_To && descriptor->Pointer_To.is_implicit) {
+  if (
+    forced->descriptor->tag == Descriptor_Tag_Pointer_To &&
+    forced->descriptor->Pointer_To.is_implicit
+  ) {
     move_value(builder, source_range, &pointer_value->storage, &forced->storage);
   } else {
     load_address(builder, source_range, pointer_value, forced->storage);
