@@ -627,10 +627,12 @@ ensure_function_instance(
     Value *instance_value = *dyn_array_get(literal->instances, i);
     assert(instance_value->descriptor->tag == Descriptor_Tag_Function_Instance);
     const Descriptor_Function_Instance *instance = &instance_value->descriptor->Function_Instance;
+    assert(instance->info);
+    assert(instance->program);
+    assert(instance->call_setup.calling_convention);
     if (instance->info != fn_info) continue;
-    if (instance->call_setup.calling_convention != calling_convention) {
-      continue;
-    }
+    if (instance->call_setup.calling_convention != calling_convention) continue;
+    if (instance->program != program) continue;
     return instance_value;
   }
 
@@ -642,7 +644,7 @@ ensure_function_instance(
 
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
   const Descriptor *instance_descriptor =
-    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup);
+    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup, program);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = value_as_external_symbol(literal->body);
@@ -769,7 +771,7 @@ program_init_startup_code(
   Slice fn_name = slice_literal("__startup");
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
   Descriptor *descriptor =
-    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup);
+    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup, program);
   Label *fn_label = make_label(context->allocator, program, &program->memory.code, fn_name);
   Label *end_label =
     make_label(context->allocator, program, &program->memory.code, slice_literal("__startup end"));

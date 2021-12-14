@@ -1776,6 +1776,7 @@ main(void) {
     struct_fields("Function_Instance", (Struct_Item[]){
       { "const Function_Info *", "info" },
       { "Function_Call_Setup", "call_setup"},
+      { "const Program *", "program" },
     }),
     struct_fields("Fixed_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },

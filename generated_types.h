@@ -1788,6 +1788,7 @@ typedef struct Descriptor_Integer {
 typedef struct Descriptor_Function_Instance {
   const Function_Info * info;
   Function_Call_Setup call_setup;
+  const Program * program;
 } Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Array {
   const Descriptor * item;
@@ -4970,6 +4971,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_
     .descriptor = &descriptor_function_call_setup,
     .name = slice_literal_fields("call_setup"),
     .offset = offsetof(Descriptor_Function_Instance, call_setup),
+  },
+  {
+    .descriptor = &descriptor_program_pointer,
+    .name = slice_literal_fields("program"),
+    .offset = offsetof(Descriptor_Function_Instance, program),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);

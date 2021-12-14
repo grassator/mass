@@ -609,7 +609,7 @@ deduce_runtime_descriptor_for_value(
     Function_Call_Setup call_setup =
       context->program->default_calling_convention->call_setup_proc(context->allocator, match_found.info);
     return descriptor_function_instance(
-      context->allocator, (Slice){0}, match_found.info, call_setup
+      context->allocator, (Slice){0}, match_found.info, call_setup, context->program
     );
   }
 
@@ -3645,7 +3645,13 @@ mass_match_overload_candidate(
       if (!overload_info) return;
     } else {
       const Descriptor *descriptor = value_or_lazy_value_descriptor(candidate);
-      overload_info = descriptor_as_function_instance(descriptor)->info;
+      const Descriptor_Function_Instance *instance = descriptor_as_function_instance(descriptor);
+      overload_info = instance->info;
+      if (instance->program && instance->program != context->program) {
+        if (!(overload_info->flags & Function_Info_Flags_Compile_Time)) {
+          return;
+        }
+      }
     }
     Mass_Argument_Scoring_Flags scoring_flags = 0;
 
@@ -6037,7 +6043,7 @@ token_parse_function_literal(
   mass_function_info_init_for_header_and_maybe_body(context, parser->scope, &header, 0, fn_info);
   if (mass_has_error(context)) return 0;
 
-  // TODO support this on non-Linux systems
+  // TODO Move to userland
   if (is_syscall) {
     assert(!is_compile_time);
     Function_Call_Setup call_setup =
@@ -6048,16 +6054,18 @@ token_parse_function_literal(
     call_setup.jump.Syscall.number = u64_to_s64(syscall_number.bits);
 
     Descriptor *fn_descriptor =
-      descriptor_function_instance(context->allocator, name, fn_info, call_setup);
+      descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
 
     return value_make(context, fn_descriptor, storage_none, view.source_range);
   } else { // only the signature
+    // FIXME we should not be setting the calling convention here
+    //       and in general this should probably return just the `Function_Header`
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
     Function_Call_Setup call_setup =
       calling_convention->call_setup_proc(context->allocator, fn_info);
     Descriptor *fn_descriptor =
-      descriptor_function_instance(context->allocator, name, fn_info, call_setup);
+      descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
     Storage fn_storage = storage_immediate(&fn_descriptor);
     return value_make(context, &descriptor_descriptor_pointer, fn_storage, view.source_range);
   }
