@@ -581,13 +581,13 @@ deduce_runtime_descriptor_for_value(
     Array_Function_Parameter parameters;
     if (value->descriptor == &descriptor_function_literal) {
       const Function_Literal *literal = value_as_function_literal(value);
-      if (literal->flags & Function_Literal_Flags_Macro) {
+      if (literal->header.flags & Function_Header_Flags_Macro) {
         return 0;
       }
-      if (literal->flags & Function_Literal_Flags_Generic) {
+      if (literal->header.flags & Function_Header_Flags_Generic) {
         return 0;
       }
-      parameters = literal->parameters;
+      parameters = literal->header.parameters;
     } else {
       if (!maybe_desired_descriptor || maybe_desired_descriptor->tag != Descriptor_Tag_Function_Instance) {
         return 0;
@@ -2942,16 +2942,16 @@ mass_handle_macro_call(
   Source_Range source_range
 ) {
   const Function_Literal *literal = value_as_function_literal(overload);
-  assert(literal->flags & Function_Literal_Flags_Macro);
+  assert(literal->header.flags & Function_Header_Flags_Macro);
 
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
   Scope *body_scope = scope_make(context->allocator, literal->own_scope);
 
-  for(u64 i = 0; i < dyn_array_length(literal->parameters); ++i) {
+  for(u64 i = 0; i < dyn_array_length(literal->header.parameters); ++i) {
     if (mass_has_error(context)) goto err;
-    Function_Parameter *param = dyn_array_get(literal->parameters, i);
+    Function_Parameter *param = dyn_array_get(literal->header.parameters, i);
     if (param->symbol) {
       Value *arg_value;
       if (i >= args_view.length) {
@@ -3001,12 +3001,12 @@ mass_handle_macro_call(
   if (mass_has_error(context)) goto err;
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
-  switch(literal->returns.tag) {
+  switch(literal->header.returns.tag) {
     case Function_Return_Tag_Inferred: {
       // Accept whatever the actual return type is
     } break;
     case Function_Return_Tag_Exact: {
-      const Descriptor *expected = literal->returns.Exact.descriptor;
+      const Descriptor *expected = literal->header.returns.Exact.descriptor;
       // TODO should this actually perform a cast?
       if (!same_type_or_can_implicitly_move_cast(expected, actual_return_descriptor)) {
         mass_error(context, (Mass_Error) {
@@ -3026,7 +3026,7 @@ mass_handle_macro_call(
     return body_value;
   }
 
-  Source_Range return_range = literal->returns.source_range;
+  Source_Range return_range = literal->header.returns.source_range;
   return mass_make_lazy_value(
     context, parser, return_range, body_value, actual_return_descriptor, mass_macro_lazy_proc
   );
@@ -3588,13 +3588,13 @@ mass_match_overload_candidate(
       if (*literal->overload_lock_count) {
         return;
       }
-      if (literal->flags & Function_Literal_Flags_Compile_Time) {
+      if (literal->header.flags & Function_Header_Flags_Compile_Time) {
         // :CompileTimeFnInJitMode
         if (!context_is_compile_time_eval(context)) {
           if (!args->all_arguments_are_compile_time_known) return;
         }
       }
-      if (!match_overload_argument_count(literal->parameters, args->view.length)) return;
+      if (!match_overload_argument_count(literal->header.parameters, args->view.length)) return;
       {
         // :OverloadLock
         // A literal must be locked here to allow using its overload to be used
@@ -3805,7 +3805,7 @@ value_is_intrinsic(
   Value *value
 ) {
   if (value_is_function_literal(value)) {
-    return !!(value_as_function_literal(value)->flags & Function_Literal_Flags_Intrinsic);
+    return !!(value_as_function_literal(value)->header.flags & Function_Header_Flags_Intrinsic);
   }
   if (value->descriptor->tag == Descriptor_Tag_Function_Instance) {
     return !!(value->descriptor->Function_Instance.info->flags & Function_Info_Flags_Intrinsic);
@@ -3949,12 +3949,14 @@ mass_ensure_trampoline(
 
   Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
   *trampoline_literal = (Function_Literal) {
-    .flags = Function_Literal_Flags_Compile_Time,
-    .parameters = parameters,
-    .returns = {
-      .tag = Function_Return_Tag_Exact,
-      .source_range = return_range,
-      .Exact = { .descriptor = &descriptor_void },
+    .header = {
+      .flags = Function_Header_Flags_Compile_Time,
+      .parameters = parameters,
+      .returns = {
+        .tag = Function_Return_Tag_Exact,
+        .source_range = return_range,
+        .Exact = { .descriptor = &descriptor_void },
+      },
     },
     .body = body_value,
     .own_scope = trampoline_scope,
@@ -4079,7 +4081,7 @@ token_handle_function_call(
     if (value_is_intrinsic(literal->body)) {
       return mass_intrinsic_call(context, parser, literal->body, &info->returns, args_view);
     }
-    if (literal->flags & Function_Literal_Flags_Macro) {
+    if (literal->header.flags & Function_Header_Flags_Macro) {
       return mass_handle_macro_call(context, parser, overload, args_view, source_range);
     }
   }
@@ -4710,9 +4712,9 @@ mass_handle_startup_call_lazy_proc(
 ) {
   if(startup_function->descriptor != &descriptor_function_literal) goto err;
   const Function_Literal *literal = value_as_function_literal(startup_function);
-  if (dyn_array_length(literal->parameters)) goto err;
-  if (literal->returns.tag != Function_Return_Tag_Exact) goto err;
-  const Descriptor *descriptor = function_return_as_exact(&literal->returns)->descriptor;
+  if (dyn_array_length(literal->header.parameters)) goto err;
+  if (literal->header.returns.tag != Function_Return_Tag_Exact) goto err;
+  const Descriptor *descriptor = function_return_as_exact(&literal->header.returns)->descriptor;
   if (!mass_descriptor_is_void(descriptor)) goto err;
 
   // This call is executed at compile time, but the actual startup function
@@ -5744,8 +5746,11 @@ mass_make_fake_function_literal(
 
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
   *literal = (Function_Literal){
-    .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .returns = function_return_exact(returns, *source_range),
+    .header = {
+      .flags = Function_Header_Flags_None,
+      .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
+      .returns = function_return_exact(returns, *source_range),
+    },
     .body = body,
     .own_scope = function_scope,
     .overload_lock_count = allocator_make(context->allocator, u64, 0),
@@ -5771,30 +5776,30 @@ mass_intrinsic(
 
   // @Volatile :IntrinsicFunctionSignature
   // These arguments must match how we call it.
-  literal->parameters = dyn_array_make(
+  literal->header.parameters = dyn_array_make(
     Array_Function_Parameter,
     .allocator = context->allocator,
     .capacity = 2
   );
-  dyn_array_push(literal->parameters, (Function_Parameter) {
+  dyn_array_push(literal->header.parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
     .descriptor = &descriptor_mass_context_pointer,
     .source_range = *source_range,
   });
-  dyn_array_push(literal->parameters, (Function_Parameter) {
+  dyn_array_push(literal->header.parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("parser")),
     .descriptor = &descriptor_parser_pointer,
     .source_range = *source_range,
   });
-  dyn_array_push(literal->parameters, (Function_Parameter) {
+  dyn_array_push(literal->header.parameters, (Function_Parameter) {
     // TODO make a common symbol for this
     .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
     .descriptor = &descriptor_value_view,
     .source_range = *source_range,
   });
-  literal->flags |= Function_Literal_Flags_Intrinsic;
+  literal->header.flags |= Function_Header_Flags_Intrinsic;
 
   return value_make(context, &descriptor_function_literal, storage_static(literal), *source_range);
 }
@@ -5961,26 +5966,28 @@ token_parse_function_literal(
   Slice name = {0};
 
   if (body_value && !is_syscall) {
-    Function_Literal_Flags flags = Function_Literal_Flags_None;
-    if (is_compile_time) flags |= Function_Literal_Flags_Compile_Time;
-    if (value_is_intrinsic(body_value)) flags |= Function_Literal_Flags_Intrinsic;
+    Function_Header_Flags flags = Function_Header_Flags_None;
+    if (is_compile_time) flags |= Function_Header_Flags_Compile_Time;
+    if (value_is_intrinsic(body_value)) flags |= Function_Header_Flags_Intrinsic;
 
     DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
       if (param->tag == Function_Parameter_Tag_Generic) {
-        flags |= Function_Literal_Flags_Generic;
+        flags |= Function_Header_Flags_Generic;
         break;
       }
     }
-    if (!(flags & Function_Literal_Flags_Generic)) {
+    if (!(flags & Function_Header_Flags_Generic)) {
       ensure_parameter_descriptors(context, parser->scope, &parameters, &returns);
     }
 
-    if (is_macro) flags |= Function_Literal_Flags_Macro;
+    if (is_macro) flags |= Function_Header_Flags_Macro;
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
-      .flags = flags,
-      .parameters = parameters,
-      .returns = returns,
+      .header = {
+        .flags = flags,
+        .parameters = parameters,
+        .returns = returns,
+      },
       .body = body_value,
       .own_scope = parser->scope,
       .overload_lock_count = allocator_make(context->allocator, u64, 0),

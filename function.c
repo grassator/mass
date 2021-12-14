@@ -559,7 +559,7 @@ ensure_function_instance(
 
   // TODO figure out how to avoid the const cast here
   Function_Literal *literal = (Function_Literal *)value_as_function_literal(fn_value);
-  assert(!(literal->flags & Function_Literal_Flags_Macro));
+  assert(!(literal->header.flags & Function_Header_Flags_Macro));
   const Function_Info *fn_info = function_literal_info_for_args(context, literal, args);
 
   const Calling_Convention *calling_convention = program->default_calling_convention;

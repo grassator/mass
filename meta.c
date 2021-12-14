@@ -1682,7 +1682,7 @@ main(void) {
     { "Function_Return", "returns" },
   }));
 
-  push_type(type_enum("Function_Literal_Flags", (Enum_Type_Item[]){
+  push_type(type_enum("Function_Header_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Generic", 1 << 0 },
     { "Macro", 1 << 1 },
@@ -1695,12 +1695,16 @@ main(void) {
     { "Function_Info *", "info" },
   }));
 
-  push_type(type_struct("Function_Literal", (Struct_Item[]){
-    { "Function_Literal_Flags", "flags"},
+  push_type(type_struct("Function_Header", (Struct_Item[]){
+    { "Function_Header_Flags", "flags"},
     { "u32", "_flags_padding"},
-    { "Scope *", "own_scope" },
     { "Array_Function_Parameter", "parameters"},
-    { "Function_Return", "returns"},
+    { "Function_Return", "returns"}
+  }));
+
+  push_type(type_struct("Function_Literal", (Struct_Item[]){
+    { "Function_Header", "header" },
+    { "Scope *", "own_scope" },
     { "Value *", "body" },
     { "u64 *", "overload_lock_count"},
     { "Array_Value_Ptr", "instances"},

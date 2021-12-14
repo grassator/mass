@@ -477,30 +477,34 @@ typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 
-typedef enum Function_Literal_Flags {
-  Function_Literal_Flags_None = 0,
-  Function_Literal_Flags_Generic = 1,
-  Function_Literal_Flags_Macro = 2,
-  Function_Literal_Flags_Intrinsic = 4,
-  Function_Literal_Flags_Compile_Time = 8,
-} Function_Literal_Flags;
+typedef enum Function_Header_Flags {
+  Function_Header_Flags_None = 0,
+  Function_Header_Flags_Generic = 1,
+  Function_Header_Flags_Macro = 2,
+  Function_Header_Flags_Intrinsic = 4,
+  Function_Header_Flags_Compile_Time = 8,
+} Function_Header_Flags;
 
-const char *function_literal_flags_name(Function_Literal_Flags value) {
-  if (value == 0) return "Function_Literal_Flags_None";
-  if (value == 1) return "Function_Literal_Flags_Generic";
-  if (value == 2) return "Function_Literal_Flags_Macro";
-  if (value == 4) return "Function_Literal_Flags_Intrinsic";
-  if (value == 8) return "Function_Literal_Flags_Compile_Time";
-  assert(!"Unexpected value for enum Function_Literal_Flags");
+const char *function_header_flags_name(Function_Header_Flags value) {
+  if (value == 0) return "Function_Header_Flags_None";
+  if (value == 1) return "Function_Header_Flags_Generic";
+  if (value == 2) return "Function_Header_Flags_Macro";
+  if (value == 4) return "Function_Header_Flags_Intrinsic";
+  if (value == 8) return "Function_Header_Flags_Compile_Time";
+  assert(!"Unexpected value for enum Function_Header_Flags");
   return 0;
 };
 
-typedef dyn_array_type(Function_Literal_Flags *) Array_Function_Literal_Flags_Ptr;
-typedef dyn_array_type(const Function_Literal_Flags *) Array_Const_Function_Literal_Flags_Ptr;
+typedef dyn_array_type(Function_Header_Flags *) Array_Function_Header_Flags_Ptr;
+typedef dyn_array_type(const Function_Header_Flags *) Array_Const_Function_Header_Flags_Ptr;
 
 typedef struct Function_Specialization Function_Specialization;
 typedef dyn_array_type(Function_Specialization *) Array_Function_Specialization_Ptr;
 typedef dyn_array_type(const Function_Specialization *) Array_Const_Function_Specialization_Ptr;
+
+typedef struct Function_Header Function_Header;
+typedef dyn_array_type(Function_Header *) Array_Function_Header_Ptr;
+typedef dyn_array_type(const Function_Header *) Array_Const_Function_Header_Ptr;
 
 typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
@@ -1673,12 +1677,17 @@ typedef struct Function_Specialization {
 } Function_Specialization;
 typedef dyn_array_type(Function_Specialization) Array_Function_Specialization;
 
-typedef struct Function_Literal {
-  Function_Literal_Flags flags;
+typedef struct Function_Header {
+  Function_Header_Flags flags;
   u32 _flags_padding;
-  Scope * own_scope;
   Array_Function_Parameter parameters;
   Function_Return returns;
+} Function_Header;
+typedef dyn_array_type(Function_Header) Array_Function_Header;
+
+typedef struct Function_Literal {
+  Function_Header header;
+  Scope * own_scope;
   Value * body;
   u64 * overload_lock_count;
   Array_Value_Ptr instances;
@@ -2519,17 +2528,22 @@ static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
 static Descriptor descriptor_function_info_pointer;
 static Descriptor descriptor_function_info_pointer_pointer;
-static Descriptor descriptor_function_literal_flags;
-static Descriptor descriptor_array_function_literal_flags;
-static Descriptor descriptor_array_function_literal_flags_ptr;
-static Descriptor descriptor_array_const_function_literal_flags_ptr;
-static Descriptor descriptor_function_literal_flags_pointer;
-static Descriptor descriptor_function_literal_flags_pointer_pointer;
+static Descriptor descriptor_function_header_flags;
+static Descriptor descriptor_array_function_header_flags;
+static Descriptor descriptor_array_function_header_flags_ptr;
+static Descriptor descriptor_array_const_function_header_flags_ptr;
+static Descriptor descriptor_function_header_flags_pointer;
+static Descriptor descriptor_function_header_flags_pointer_pointer;
 static Descriptor descriptor_function_specialization;
 static Descriptor descriptor_array_function_specialization;
 static Descriptor descriptor_array_function_specialization_ptr;
 static Descriptor descriptor_function_specialization_pointer;
 static Descriptor descriptor_function_specialization_pointer_pointer;
+static Descriptor descriptor_function_header;
+static Descriptor descriptor_array_function_header;
+static Descriptor descriptor_array_function_header_ptr;
+static Descriptor descriptor_function_header_pointer;
+static Descriptor descriptor_function_header_pointer_pointer;
 static Descriptor descriptor_function_literal;
 static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
@@ -4621,16 +4635,16 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
 MASS_DEFINE_TYPE_VALUE(function_info);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info, function_info);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info *, function_info_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(function_literal_flags, Function_Literal_Flags)
-static C_Enum_Item function_literal_flags_items[] = {
+MASS_DEFINE_OPAQUE_C_TYPE(function_header_flags, Function_Header_Flags)
+static C_Enum_Item function_header_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Generic"), .value = 1 },
 { .name = slice_literal_fields("Macro"), .value = 2 },
 { .name = slice_literal_fields("Intrinsic"), .value = 4 },
 { .name = slice_literal_fields("Compile_Time"), .value = 8 },
 };
-DEFINE_VALUE_IS_AS_HELPERS(Function_Literal_Flags, function_literal_flags);
-DEFINE_VALUE_IS_AS_HELPERS(Function_Literal_Flags *, function_literal_flags_pointer);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags, function_header_flags);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags *, function_header_flags_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_specialization_ptr, Array_Function_Specialization_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_specialization, Array_Function_Specialization)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_specialization, Function_Specialization,
@@ -4648,33 +4662,45 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_specialization, Function_Specialization,
 MASS_DEFINE_TYPE_VALUE(function_specialization);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Specialization, function_specialization);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Specialization *, function_specialization_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
-MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_header_ptr, Array_Function_Header_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_header, Array_Function_Header)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_header, Function_Header,
   {
-    .descriptor = &descriptor_function_literal_flags,
+    .descriptor = &descriptor_function_header_flags,
     .name = slice_literal_fields("flags"),
-    .offset = offsetof(Function_Literal, flags),
+    .offset = offsetof(Function_Header, flags),
   },
   {
     .descriptor = &descriptor_i32,
     .name = slice_literal_fields("_flags_padding"),
-    .offset = offsetof(Function_Literal, _flags_padding),
+    .offset = offsetof(Function_Header, _flags_padding),
+  },
+  {
+    .descriptor = &descriptor_array_function_parameter,
+    .name = slice_literal_fields("parameters"),
+    .offset = offsetof(Function_Header, parameters),
+  },
+  {
+    .descriptor = &descriptor_function_return,
+    .name = slice_literal_fields("returns"),
+    .offset = offsetof(Function_Header, returns),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_header);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Header, function_header);
+DEFINE_VALUE_IS_AS_HELPERS(Function_Header *, function_header_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
+  {
+    .descriptor = &descriptor_function_header,
+    .name = slice_literal_fields("header"),
+    .offset = offsetof(Function_Literal, header),
   },
   {
     .descriptor = &descriptor_scope_pointer,
     .name = slice_literal_fields("own_scope"),
     .offset = offsetof(Function_Literal, own_scope),
-  },
-  {
-    .descriptor = &descriptor_array_function_parameter,
-    .name = slice_literal_fields("parameters"),
-    .offset = offsetof(Function_Literal, parameters),
-  },
-  {
-    .descriptor = &descriptor_function_return,
-    .name = slice_literal_fields("returns"),
-    .offset = offsetof(Function_Literal, returns),
   },
   {
     .descriptor = &descriptor_value_pointer,

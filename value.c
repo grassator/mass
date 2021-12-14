@@ -1120,7 +1120,7 @@ function_literal_info_for_args(
   const Function_Literal *literal,
   Value_View args
 ) {
-  if (!(literal->flags & Function_Literal_Flags_Generic)) {
+  if (!(literal->header.flags & Function_Header_Flags_Generic)) {
     if (dyn_array_is_initialized(literal->specializations)) {
       assert(dyn_array_length(literal->specializations) == 1);
       return dyn_array_get(literal->specializations, 0)->info;
@@ -1152,7 +1152,7 @@ function_literal_info_for_args(
 
   Array_Function_Parameter specialized_params = dyn_array_make(Array_Function_Parameter,
     .allocator = context->allocator,
-    .capacity = dyn_array_length(literal->parameters),
+    .capacity = dyn_array_length(literal->header.parameters),
   );
 
   Array_Const_Descriptor_Ptr cache_descriptors = dyn_array_make(
@@ -1161,8 +1161,8 @@ function_literal_info_for_args(
     .allocator = context->allocator,
   );
 
-  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->parameters); ++arg_index) {
-    const Function_Parameter *param = dyn_array_get(literal->parameters, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->header.parameters); ++arg_index) {
+    const Function_Parameter *param = dyn_array_get(literal->header.parameters, arg_index);
     Function_Parameter *specialized_param = dyn_array_push(specialized_params, *param);
     if (arg_index >= args.length) {
       if (!specialized_param->maybe_default_value) {
@@ -1174,7 +1174,7 @@ function_literal_info_for_args(
     Value *arg = value_view_get(&args, arg_index);
     const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(arg);
     if(param->tag == Function_Parameter_Tag_Generic) {
-      if (!(literal->flags & Function_Literal_Flags_Compile_Time)) {
+      if (!(literal->header.flags & Function_Header_Flags_Compile_Time)) {
         actual_descriptor = deduce_runtime_descriptor_for_value(context, arg, 0);
         // TODO cleanup memory?
         if (!actual_descriptor) return 0;
@@ -1196,11 +1196,11 @@ function_literal_info_for_args(
 
   // FIXME this should be returned from `ensure_parameter_descriptors`
   Function_Info *specialized_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(specialized_info, literal->returns);
-  if (literal->flags & Function_Literal_Flags_Intrinsic) {
+  function_info_init(specialized_info, literal->header.returns);
+  if (literal->header.flags & Function_Header_Flags_Intrinsic) {
     specialized_info->flags |= Function_Info_Flags_Intrinsic;
   }
-  if (literal->flags & Function_Literal_Flags_Compile_Time) {
+  if (literal->header.flags & Function_Header_Flags_Compile_Time) {
     specialized_info->flags |= Function_Info_Flags_Compile_Time;
   }
   specialized_info->parameters = specialized_params;
@@ -1210,7 +1210,7 @@ function_literal_info_for_args(
   );
 
   if (specialized_info->returns.tag == Function_Return_Tag_Inferred) {
-    if (!(literal->flags & Function_Literal_Flags_Intrinsic)) {
+    if (!(literal->header.flags & Function_Header_Flags_Intrinsic)) {
       // :OverloadLock :RecursiveInferredType
       // TODO This overload lock correctly catches recursive fns with inferred type,
       //      but the resulting error message is about an unmatched overload which is confusing.
@@ -1219,7 +1219,9 @@ function_literal_info_for_args(
       const Descriptor *return_descriptor =
         mass_deduce_function_return_type(context, literal, specialized_params);
       if (mass_has_error(context)) return 0;
-      specialized_info->returns = function_return_exact(return_descriptor, literal->returns.source_range);
+      specialized_info->returns = function_return_exact(
+        return_descriptor, literal->header.returns.source_range
+      );
       *literal->overload_lock_count -= 1;
     }
   }
