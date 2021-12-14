@@ -12,14 +12,21 @@ typedef struct {
   u64 x;
   u64 y;
 } Test_128bit;
-static_assert(sizeof(Test_128bit) == 16, "Expected a 128bit struct");
+static_assert(sizeof(Test_128bit) * 8 == 128, "Expected a 128bit struct");
+
+typedef struct {
+  u64 x;
+  u64 y;
+  u64 z;
+} Test_192bit;
+static_assert(sizeof(Test_192bit) * 8 == 192, "Expected a 192bit struct");
 
 typedef struct {
   u8 x;
   u8 y;
   u8 z;
 } Test_24bit;
-static_assert(sizeof(Test_24bit) == 3, "Expected a 24bit struct");
+static_assert(sizeof(Test_24bit) * 8 == 24, "Expected a 24bit struct");
 
 static bool
 spec_check_mass_result_internal(
@@ -2360,7 +2367,7 @@ spec("source") {
       check(checker().y == 42);
     }
 
-    it("should be able to return structs while accepting other arguments") {
+    it("should be able to return 128bit structs while accepting other arguments") {
       Test_128bit(*checker)(u64, u64) = (Test_128bit(*)(u64, u64))test_program_inline_source_function(
         "return_struct", &test_context,
         "Test_128bit :: c_struct [ x : i64, y : i64 ]\n"
@@ -2378,7 +2385,7 @@ spec("source") {
       check(test_128bit.y == 21);
     }
 
-    it("should correctly handle struct argument fields as arguments to another call") {
+    it("should correctly handle 128bit struct argument fields as arguments to another call") {
       u64(*checker)(Test_128bit) = (u64(*)(Test_128bit))test_program_inline_source_function(
         "checker", &test_context,
         "Test_128bit :: c_struct [ x : u64, y : u64 ]\n"
@@ -2394,7 +2401,7 @@ spec("source") {
     }
 
     // Both System_V and win64 will pass 7th argument on the stack
-    it("should be able to use a larger-than-register struct passed as the 7th arguments") {
+    it("should be able to use a 128bit struct passed as the 7th arguments") {
       s8(*checker)(s8, s8, s8, s8, s8, s8, Test_128bit) =
         (s8(*)(s8, s8, s8, s8, s8, s8, Test_128bit))test_program_inline_source_function(
           "foo", &test_context,
@@ -2404,6 +2411,36 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       Test_128bit test_128bit = { .x = 42, .y = 20 };
       check(checker(1, 2, 3, 4, 5, 6, test_128bit) == 42);
+    }
+
+    it("should correctly handle 192bit struct arguments") {
+      u64(*checker)(Test_192bit) = (u64(*)(Test_192bit))test_program_inline_source_function(
+        "checker", &test_context,
+        "Test_192bit :: c_struct [ x : u64, y : u64, z : u64 ]\n"
+        "checker :: fn(x : Test_192bit) -> (u64) {"
+          "x.x + x.y + x.z"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+
+      Test_192bit input = { .x = 11, .y = 21, .z = 10 };
+      check(checker(input) == 42);
+    }
+
+    it("should correctly handle 192bit struct return type") {
+      Test_192bit(*checker)() = (Test_192bit(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "Test_192bit :: c_struct [ x : u64, y : u64, z : u64 ]\n"
+        "checker :: fn() -> (Test_192bit) {"
+          "[.x = 11, .y = 21, .z = 10]"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+
+      Test_192bit output = checker();
+      check(output.x == 11);
+      check(output.y == 21);
+      check(output.z == 10);
     }
 
     it("should be able to access fields of a returned struct") {
