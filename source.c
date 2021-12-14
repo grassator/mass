@@ -3159,22 +3159,16 @@ call_function_overload(
   u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
     Function_Call_Parameter *target_item = dyn_array_get(call_setup->parameters, i);
-    Value *source_arg;
     Value *target_param = dyn_array_push_uninitialized(target_params);
     value_init(target_param, target_item->descriptor, target_item->storage, *source_range);
     if (i >= dyn_array_length(arguments)) {
-      if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
-        Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
-        Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
-        dyn_array_push(temp_arguments, arg_value);
-        continue;
-      } else {
-        Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
-        source_arg = declared_argument->maybe_default_value;
-      }
-    } else {
-      source_arg = *dyn_array_get(arguments, i);
+      assert(target_item->flags & Function_Call_Parameter_Flags_Uninitialized);
+      Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
+      Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
+      dyn_array_push(temp_arguments, arg_value);
+      continue;
     }
+    Value *source_arg = source_arg = *dyn_array_get(arguments, i);
     const Descriptor *stack_descriptor = target_item->descriptor;
     if (descriptor_is_implicit_pointer(stack_descriptor)) {
       stack_descriptor = stack_descriptor->Pointer_To.descriptor;
@@ -4121,11 +4115,30 @@ token_handle_function_call(
     }
   }
 
+  // This copy is required for a couple of reasons:
+  //   1. `args_view` might point to temp memory
+  //   2. Default args are substituted
+  Array_Value_Ptr normalized_args = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->allocator,
+    .capacity = dyn_array_length(info->parameters),
+  );
+  assert(args_view.length <= dyn_array_length(info->parameters));
+  for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
+    const Function_Parameter *param = dyn_array_get(info->parameters, i);
+    if (i >= args_view.length) {
+      assert(param->maybe_default_value);
+      dyn_array_push(normalized_args, param->maybe_default_value);
+    } else {
+      dyn_array_push(normalized_args, value_view_get(&args_view, i));
+    }
+  }
+
   Mass_Function_Call_Lazy_Payload *call_payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
   *call_payload = (Mass_Function_Call_Lazy_Payload){
     .overload = overload,
-    .args = value_view_to_value_array(context->allocator, args_view),
+    .args = normalized_args,
   };
 
   const Descriptor *lazy_descriptor = info->return_descriptor;
