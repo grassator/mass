@@ -3151,12 +3151,12 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
     Function_Call_Parameter *target_item = dyn_array_get(call_setup->parameters, i);
     Value *source_arg;
-    Value *target_arg = dyn_array_push_uninitialized(target_params);
-    value_init(target_arg, target_item->descriptor, target_item->storage, *source_range);
+    Value *target_param = dyn_array_push_uninitialized(target_params);
+    value_init(target_param, target_item->descriptor, target_item->storage, *source_range);
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
-        Storage source_storage = reserve_stack_storage(builder, target_arg->descriptor->bit_size);
-        Value *arg_value = value_make(context, target_arg->descriptor, source_storage, *source_range);
+        Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
+        Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
         dyn_array_push(temp_arguments, arg_value);
         continue;
       } else {
@@ -3171,8 +3171,8 @@ call_function_overload(
       stack_descriptor = stack_descriptor->Pointer_To.descriptor;
     }
 
-    u64 target_arg_register_bitset = register_bitset_from_storage(&target_arg->storage);
-    if (target_arg_register_bitset >> 16) {
+    u64 target_param_register_bitset = register_bitset_from_storage(&target_param->storage);
+    if (target_param_register_bitset >> 16) {
       panic("Found XMM usage");
     }
 
@@ -3193,34 +3193,36 @@ call_function_overload(
       can_use_source_arg_as_is = false;
     }
 
-    bool target_arg_registers_are_free =
-      !(builder->register_occupied_bitset.bits & target_arg_register_bitset);
+    bool target_param_registers_are_free =
+      !(builder->register_occupied_bitset.bits & target_param_register_bitset);
     bool can_assign_straight_to_target = (
-      target_arg_registers_are_free &&
+      target_param_registers_are_free &&
       !descriptor_is_implicit_pointer(target_item->descriptor)
     );
 
     Value *arg_value;
     bool should_assign = true;
-    if (storage_is_stack(&target_arg->storage)) {
+    // If target parameter storage is stack, then copying directly is *always*
+    // the right thing to do, not just when the optimization is on.
+    if (storage_is_stack(&target_param->storage)) {
       arg_value = value_init(
         mass_allocate(context, Value),
-        stack_descriptor, target_arg->storage, *source_range
+        stack_descriptor, target_param->storage, *source_range
       );
     } else if (can_use_source_arg_as_is) {
       arg_value = source_arg;
       should_assign = false;
     } else if (can_assign_straight_to_target) {
-      arg_value = target_arg;
-      copied_straight_to_param_bitset |= target_arg_register_bitset;
-      register_acquire_bitset(builder, target_arg_register_bitset);
+      arg_value = target_param;
+      copied_straight_to_param_bitset |= target_param_register_bitset;
+      register_acquire_bitset(builder, target_param_register_bitset);
     } else {
       u64 prohibited_registers
         = temp_register_argument_bitset
         | all_used_arguments_register_bitset
         | builder->register_occupied_bitset.bits;
       u64 allowed_temp_registers = registers_that_can_be_temp & ~prohibited_registers;
-      u64 required_register_count = register_bitset_occupied_count(target_arg_register_bitset);
+      u64 required_register_count = register_bitset_occupied_count(target_param_register_bitset);
       if (
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
@@ -3308,6 +3310,7 @@ call_function_overload(
     if (storage_is_stack(&param->storage)) continue;
 
     Value *source_arg = *dyn_array_get(temp_arguments, i);
+    // :IndirectReturnArgument
     if (storage_is_indirect(&param->storage)) {
       Register base_register = param->storage.Memory.location.Indirect.base_register;
       Storage target_storage = storage_register(base_register, (Bits){64});

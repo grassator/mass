@@ -770,6 +770,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (is_indirect_return) {
+    // :IndirectReturnArgument
     dyn_array_push(result.parameters, (Function_Call_Parameter) {
       .flags = Function_Call_Parameter_Flags_Uninitialized,
       .descriptor = return_descriptor,
@@ -945,6 +946,7 @@ calling_convention_x86_64_windows_call_setup_proc(
   }
 
   if (is_indirect_return) {
+    // :IndirectReturnArgument
     dyn_array_push(result.parameters, (Function_Call_Parameter) {
       .flags = Function_Call_Parameter_Flags_Uninitialized,
       .descriptor = return_descriptor,
