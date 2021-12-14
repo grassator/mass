@@ -1,5 +1,9 @@
 {
     "files.associations": {
         "calling_convention.h": "c"
-    }
+    },
+    "disasexpl.associations": {
+        "**/*.c": "${workspaceFolder}/build/source_spec.S",
+    },
+    "disasexpl.useBinaryParsing": true
 }
