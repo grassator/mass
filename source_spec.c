@@ -1360,6 +1360,14 @@ spec("source") {
           "test", &test_context,\
           "test :: fn(x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
         )
+    describe("addition") {
+      it("should correctly handle i64") {
+        MATH_CHECKER_FN(i64, i64, +);
+        check(spec_check_mass_result(test_context.result));
+        check(checker((i64){10}, (i64){3}).bits == 10 + 3);
+      }
+    }
+
     describe("division") {
       #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
         it("should correctly handle u"#BITS" divide") {\
