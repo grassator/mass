@@ -1301,10 +1301,11 @@ tokenizer_make_group_children_view(
   Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
   u64 child_count = dyn_array_length(*stack) - parent->index - 1;
   stack->data->length = parent->index + 1; // pop the children
+  assert(offset);
 
   Source_Range children_range = {
     .file = parent_value->source_range.file,
-    .offsets = {.from = u64_to_u32(offset), .to = u64_to_u32(offset)},
+    .offsets = {.from = u64_to_u32(offset - 1), .to = u64_to_u32(offset - 1)},
   };
   if (child_count) {
     Value *first_child = children_values[0];
@@ -1392,6 +1393,7 @@ tokenizer_group_end_paren(
   Value_View children = tokenizer_make_group_children_view(
     context->allocator, stack, parent, parent_value, offset
   );
+
   Group_Paren *group = mass_allocate(context, Group_Paren);
   *group = (Group_Paren){.children = children};
   parent_value->storage = storage_static(group);

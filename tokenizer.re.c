@@ -137,7 +137,7 @@ tokenize(
 
       end_of_statement = "\r\n" | "\r" | "\n" | ";";
       end_of_statement {
-        tokenizer_maybe_push_statement(context, &stack, &parent_stack, token_start_offset);
+        tokenizer_maybe_push_statement(context, &stack, &parent_stack, token_start_offset + 1);
         continue;
       }
 
@@ -160,8 +160,8 @@ tokenize(
     */
   }
 
+  offset++;
   if (dyn_array_length(parent_stack) != 1) {
-    offset++;
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 

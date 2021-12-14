@@ -217,7 +217,7 @@ yy7:
 yy8:
 #line 139 "tokenizer.re.c"
   {
-        tokenizer_maybe_push_statement(context, &stack, &parent_stack, token_start_offset);
+        tokenizer_maybe_push_statement(context, &stack, &parent_stack, token_start_offset + 1);
         continue;
       }
 #line 224 "generated_tokenizer.c"
@@ -575,8 +575,8 @@ yy52:
 
   }
 
+  offset++;
   if (dyn_array_length(parent_stack) != 1) {
-    offset++;
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 
