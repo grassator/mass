@@ -3156,10 +3156,9 @@ call_function_overload(
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Function_Call_Parameter_Flags_Uninitialized) {
         Storage source_storage = reserve_stack_storage(builder, target_arg->descriptor->bit_size);
-        source_arg = value_init(
-          mass_allocate(context, Value),
-          target_arg->descriptor, source_storage, *source_range
-        );
+        Value *arg_value = value_make(context, target_arg->descriptor, source_storage, *source_range);
+        dyn_array_push(temp_arguments, arg_value);
+        continue;
       } else {
         Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
         source_arg = declared_argument->maybe_default_value;
@@ -3202,7 +3201,7 @@ call_function_overload(
     );
 
     Value *arg_value;
-    bool should_assign = !(target_item->flags & Function_Call_Parameter_Flags_Uninitialized);
+    bool should_assign = true;
     if (storage_is_stack(&target_arg->storage)) {
       arg_value = value_init(
         mass_allocate(context, Value),
