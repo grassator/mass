@@ -1609,6 +1609,9 @@ typedef enum {
   Function_Parameter_Tag_Exact_Static = 2,
 } Function_Parameter_Tag;
 
+typedef struct Function_Parameter_Generic {
+  Mass_Type_Constraint_Proc maybe_type_constraint;
+} Function_Parameter_Generic;
 typedef struct Function_Parameter_Exact_Static {
   Storage storage;
 } Function_Parameter_Exact_Static;
@@ -1619,12 +1622,17 @@ typedef struct Function_Parameter {
   const Symbol * symbol;
   Source_Range source_range;
   Value_View maybe_type_expression;
-  Mass_Type_Constraint_Proc maybe_type_constraint;
   Value * maybe_default_value;
   union {
+    Function_Parameter_Generic Generic;
     Function_Parameter_Exact_Static Exact_Static;
   };
 } Function_Parameter;
+static inline const Function_Parameter_Generic *
+function_parameter_as_generic(const Function_Parameter *function_parameter) {
+  assert(function_parameter->tag == Function_Parameter_Tag_Generic);
+  return &function_parameter->Generic;
+}
 static inline const Function_Parameter_Exact_Static *
 function_parameter_as_exact_static(const Function_Parameter *function_parameter) {
   assert(function_parameter->tag == Function_Parameter_Tag_Exact_Static);
@@ -4495,6 +4503,14 @@ static C_Enum_Item function_parameter_tag_items[] = {
 { .name = slice_literal_fields("Generic"), .value = 1 },
 { .name = slice_literal_fields("Exact_Static"), .value = 2 },
 };
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter_generic, Function_Parameter_Generic,
+  {
+    .descriptor = &descriptor_mass_type_constraint_proc,
+    .name = slice_literal_fields("maybe_type_constraint"),
+    .offset = offsetof(Function_Parameter_Generic, maybe_type_constraint),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_parameter_generic);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter_exact_static, Function_Parameter_Exact_Static,
   {
     .descriptor = &descriptor_storage,
@@ -4530,14 +4546,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
     .offset = offsetof(Function_Parameter, maybe_type_expression),
   },
   {
-    .descriptor = &descriptor_mass_type_constraint_proc,
-    .name = slice_literal_fields("maybe_type_constraint"),
-    .offset = offsetof(Function_Parameter, maybe_type_constraint),
-  },
-  {
     .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("maybe_default_value"),
     .offset = offsetof(Function_Parameter, maybe_default_value),
+  },
+  {
+    .name = slice_literal_fields("Generic"),
+    .descriptor = &descriptor_function_parameter_generic,
+    .offset = offsetof(Function_Parameter, Generic),
   },
   {
     .name = slice_literal_fields("Exact_Static"),

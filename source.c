@@ -1951,14 +1951,17 @@ token_match_argument(
   }
 
   arg = (Function_Parameter) {
-    .tag = generic ? Function_Parameter_Tag_Generic : Function_Parameter_Tag_Runtime,
+    .tag = Function_Parameter_Tag_Runtime,
     .maybe_default_value = maybe_default_value,
     .maybe_type_expression = maybe_type_expression,
-    .maybe_type_constraint = maybe_type_constraint,
     .symbol = value_as_symbol(name_token),
     .descriptor = descriptor,
     .source_range = definition.source_range,
   };
+  if (generic) {
+    arg.tag = Function_Parameter_Tag_Generic;
+    arg.Generic.maybe_type_constraint = maybe_type_constraint;
+  }
 
   err:
   return arg;
@@ -3573,7 +3576,7 @@ calculate_arguments_match_score(
         score += Score_Exact_Static;
       } break;
       case Function_Parameter_Tag_Generic: {
-        if (param->maybe_type_constraint) {
+        if (param->Generic.maybe_type_constraint) {
           score += Score_Generic_Constrained;
         } else {
           score += Score_Generic;

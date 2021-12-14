@@ -1118,8 +1118,8 @@ function_literal_info_for_args(
         // TODO cleanup memory?
         if (!actual_descriptor) return 0;
       }
-      if (param->maybe_type_constraint) {
-        actual_descriptor = param->maybe_type_constraint(actual_descriptor);
+      if (param->Generic.maybe_type_constraint) {
+        actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
         if (!actual_descriptor) {
           // TODO cleanup memory?
           return 0;

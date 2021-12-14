@@ -1644,7 +1644,9 @@ main(void) {
 
   push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
     struct_empty("Runtime"),
-    struct_empty("Generic"),
+    struct_fields("Generic", (Struct_Item[]){
+      { "Mass_Type_Constraint_Proc", "maybe_type_constraint" },
+    }),
     struct_fields("Exact_Static", (Struct_Item[]){
       { "Storage", "storage" },
     }),
@@ -1653,7 +1655,6 @@ main(void) {
     { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
     { "Value_View", "maybe_type_expression" },
-    { "Mass_Type_Constraint_Proc", "maybe_type_constraint" },
     { "Value *", "maybe_default_value" },
   }));
 
