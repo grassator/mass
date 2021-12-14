@@ -2443,6 +2443,25 @@ spec("source") {
       check(output.z == 10);
     }
 
+    // FIXME support this
+    xit("should correctly handle this weird case") {
+      Expected_Result(*checker)() = (Expected_Result(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "proxy :: fn() => (MASS.Expected_Result) {\n"
+          "temp_storage := MASS.storage_register(MASS.Register.A, i64.bit_size)\n"
+          "expected := MASS.expected_result_exact(i64, temp_storage)\n"
+          "expected"
+        "}\n"
+        "checker :: fn() -> (MASS.Expected_Result) { proxy() }"
+      );
+      check(spec_check_mass_result(test_context.result));
+
+      Storage temp_storage = storage_register(Register_A, (Bits){64});
+      Expected_Result from_c = mass_expected_result_exact(&descriptor_i64, temp_storage);
+      Expected_Result from_mass = checker();
+      check(memcmp(&from_c, &from_mass, sizeof(from_c)) == 0);
+    }
+
     it("should be able to access fields of a returned struct") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
         "checker", &test_context,
