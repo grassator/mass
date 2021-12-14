@@ -3167,15 +3167,27 @@ call_function_overload(
     if (descriptor_is_implicit_pointer(stack_descriptor)) {
       stack_descriptor = stack_descriptor->Pointer_To.descriptor;
     }
-    bool source_is_stack = (
-      storage_is_stack(&source_arg->storage) &&
-      descriptor_is_implicit_pointer(source_arg->descriptor)
-    );
-    bool should_assign = !(target_item->flags & Function_Call_Parameter_Flags_Uninitialized);
 
     u64 target_arg_register_bitset = register_bitset_from_storage(&target_arg->storage);
     if (target_arg_register_bitset >> 16) {
       panic("Found XMM usage");
+    }
+
+    bool can_use_source_arg_as_is;
+    // If source args are on the stack or rip-relative we don't need to worry about their registers
+    // but it is not true for all Storage_Tag_Memory, because indirect access uses registers
+    if (storage_is_stack(&source_arg->storage) || storage_is_label(&source_arg->storage)) {
+      can_use_source_arg_as_is = true;
+    } else if (
+      // Compile time-known args also don't need registers so they can be used as-is
+      mass_value_is_compile_time_known(source_arg) &&
+      // TODO figure out why this is required and explain but since it just disallows
+      //      some potential optizations it is not critical to do right now.
+      !descriptor_is_implicit_pointer(target_item->descriptor)
+    ) {
+      can_use_source_arg_as_is = true;
+    } else {
+      can_use_source_arg_as_is = false;
     }
 
     argument_register_bitset |= target_arg_register_bitset;
@@ -3187,18 +3199,13 @@ call_function_overload(
     );
 
     Value *arg_value;
+    bool should_assign = !(target_item->flags & Function_Call_Parameter_Flags_Uninitialized);
     if (storage_is_stack(&target_arg->storage)) {
       arg_value = value_init(
         mass_allocate(context, Value),
         stack_descriptor, target_arg->storage, *source_range
       );
-    } else if (source_is_stack) {
-      arg_value = source_arg;
-      should_assign = false;
-    } else if (
-      mass_value_is_compile_time_known(source_arg) &&
-      !descriptor_is_implicit_pointer(target_item->descriptor)
-    ) {
+    } else if (can_use_source_arg_as_is) {
       arg_value = source_arg;
       should_assign = false;
     } else if (can_assign_straight_to_target) {
