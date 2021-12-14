@@ -5307,7 +5307,12 @@ mass_dereference(
     });
     return 0;
   }
-  // FIXME support this for static values
+  if (mass_value_is_compile_time_known(pointer)) {
+    const Descriptor *pointee_descriptor = descriptor_as_pointer_to(descriptor)->descriptor;
+    void *pointee_memory = *(void **)storage_static_memory_with_bit_size(&pointer->storage, descriptor->bit_size);
+    Storage pointee_storage = storage_static_heap(pointee_memory, pointee_descriptor->bit_size);
+    return value_make(context, pointee_descriptor, pointee_storage, args_view.source_range);
+  }
   return mass_make_lazy_value(
     context, parser,
     args_view.source_range,
