@@ -66,6 +66,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Group_Square")),
     type_group_square_value
   );
+  Source_Range Register__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Register__source_range, "Register");
+  scope_define_enum(
+    compilation, scope, Register__source_range,
+    slice_literal("Register"), type_register_value,
+    register_items, countof(register_items)
+  );
   Source_Range Quoted__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Quoted__source_range, "Quoted");
   scope_define_value(
@@ -927,6 +934,18 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("reg")),
 &descriptor_register
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    storage_register, "storage_register", &descriptor_storage,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("reg")),
+&descriptor_register
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("bit_size")),
+&descriptor_bits
     )
   );
   MASS_DEFINE_FUNCTION(

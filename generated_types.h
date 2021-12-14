@@ -781,6 +781,9 @@ static Register register_acquire_temp
 static void register_release
   (Function_Builder * builder, Register reg);
 
+static Storage storage_register
+  (Register reg, Bits bit_size);
+
 static Storage storage_register_temp
   (Function_Builder * builder, Bits bit_size);
 
@@ -2690,6 +2693,7 @@ static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_same_type;
 static Descriptor descriptor_register_acquire_temp;
 static Descriptor descriptor_register_release;
+static Descriptor descriptor_storage_register;
 static Descriptor descriptor_storage_register_temp;
 static Descriptor descriptor_storage_release_if_temporary;
 static Descriptor descriptor_mass_expected_result_exact;

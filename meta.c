@@ -1254,7 +1254,7 @@ main(void) {
   }));
 
   // @Volatile :RegisterEnumValues
-  push_type(type_enum("Register", (Enum_Type_Item[]){
+  export_compiler(push_type(type_enum("Register", (Enum_Type_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
     { "D", 0b0010 },
@@ -1289,7 +1289,7 @@ main(void) {
     { "Xmm13", 0b11101 },
     { "Xmm14", 0b11110 },
     { "Xmm15", 0b11111 },
-  }));
+  })));
 
   push_type(type_struct("Label", (Struct_Item[]){
     { "u32", "resolved" },
@@ -2149,6 +2149,13 @@ main(void) {
     type_function(Default, "register_release", "void", (Argument_Type[]){
       { "Function_Builder *", "builder" },
       { "Register", "reg" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "storage_register", "Storage", (Argument_Type[]){
+      { "Register", "reg" },
+      { "Bits", "bit_size" },
     })
   ));
 
