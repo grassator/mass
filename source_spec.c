@@ -841,6 +841,15 @@ spec("source") {
       check(checker(42) == 42);
     }
 
+    // :RecursiveInferredType
+    it("should report an error when trying to infer a a type of a recursive fn") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "checker :: fn(x: i64) -> _ { checker(1) }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+    }
+
     it("should report an error when non-type id is being used as a type") {
       test_program_inline_source_base(
         "main", &test_context,

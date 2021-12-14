@@ -1211,10 +1211,16 @@ function_literal_info_for_args(
 
   if (specialized_info->returns.tag == Function_Return_Tag_Inferred) {
     if (!(literal->flags & Function_Literal_Flags_Intrinsic)) {
+      // :OverloadLock :RecursiveInferredType
+      // TODO This overload lock correctly catches recursive fns with inferred type,
+      //      but the resulting error message is about an unmatched overload which is confusing.
+      //      Perhaps a better option would be to propagate a reason for an overload.
+      *literal->overload_lock_count += 1;
       const Descriptor *return_descriptor =
         mass_deduce_function_return_type(context, literal, specialized_params);
       if (mass_has_error(context)) return 0;
       specialized_info->returns = function_return_exact(return_descriptor, literal->returns.source_range);
+      *literal->overload_lock_count -= 1;
     }
   }
 
