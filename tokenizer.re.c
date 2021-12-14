@@ -137,7 +137,7 @@ tokenize(
 
       end_of_statement = "\r\n" | "\r" | "\n" | ";";
       end_of_statement {
-        tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset - 1);
+        tokenizer_maybe_push_statement(context, &stack, &parent_stack, token_start_offset);
         continue;
       }
 

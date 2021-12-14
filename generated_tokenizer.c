@@ -217,7 +217,7 @@ yy7:
 yy8:
 #line 139 "tokenizer.re.c"
   {
-        tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset - 1);
+        tokenizer_maybe_push_statement(context, &stack, &parent_stack, token_start_offset);
         continue;
       }
 #line 224 "generated_tokenizer.c"
