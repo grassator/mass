@@ -5909,6 +5909,27 @@ mass_parse_function_parameters(
   return result;
 }
 
+static Function_Header
+mass_function_header(
+  Mass_Context *context,
+  Array_Function_Parameter parameters,
+  const Function_Return *returns
+) {
+  Function_Header header = {
+    .flags = Function_Header_Flags_None,
+    .parameters = parameters,
+    .returns = *returns,
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
+  };
+  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
+    if (param->tag == Function_Parameter_Tag_Generic) {
+      header.flags |= Function_Header_Flags_Generic;
+      break;
+    }
+  }
+  return header;
+}
+
 static Value *
 token_parse_function_literal(
   Mass_Context *context,
@@ -6011,22 +6032,11 @@ token_parse_function_literal(
   }
   if (mass_has_error(context)) return 0;
 
-  Function_Header header = {
-    .flags = Function_Header_Flags_None,
-    .parameters = parameters,
-    .returns = returns,
-    .overload_lock_count = allocator_make(context->allocator, u64, 0),
-  };
+  Function_Header header = mass_function_header(context, parameters, &returns);
 
   if (is_macro) header.flags |= Function_Header_Flags_Macro;
   if (is_compile_time) header.flags |= Function_Header_Flags_Compile_Time;
 
-  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
-    if (param->tag == Function_Parameter_Tag_Generic) {
-      header.flags |= Function_Header_Flags_Generic;
-      break;
-    }
-  }
   *matched_length = peek_index;
 
   if (!body_value) {
