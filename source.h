@@ -83,7 +83,7 @@ get_new_epoch() {
 static void
 mass_function_info_init_for_header_and_maybe_body(
   Mass_Context *context,
-  Scope *arguments_scope,
+  const Scope *arguments_scope,
   const Function_Header *header,
   Value *maybe_body,
   Function_Info *out_info
@@ -106,6 +106,14 @@ scope_make(
 static inline bool
 value_is_intrinsic(
   Value *value
+);
+
+static inline const Descriptor *
+value_ensure_type(
+  Mass_Context *context,
+  const Scope *scope,
+  Value *value,
+  Source_Range source_range
 );
 
 static inline void

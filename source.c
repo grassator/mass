@@ -441,13 +441,6 @@ typedef enum {
   Tuple_Eval_Mode_Type,
 } Tuple_Eval_Mode;
 
-static inline const Descriptor *
-value_ensure_type(
-  Mass_Context *context,
-  Value *value,
-  Source_Range source_range
-);
-
 static Descriptor *
 anonymous_struct_descriptor_from_tuple(
   Mass_Context *context,
@@ -495,7 +488,9 @@ anonymous_struct_descriptor_from_tuple(
           name = typed_symbol->symbol->name;
           field_descriptor = typed_symbol->descriptor;
         } else {
-          field_descriptor = value_ensure_type(context, item, item->source_range);
+          field_descriptor = value_ensure_type(
+            context, tuple->scope_where_it_was_created, item, item->source_range
+          );
         }
       } break;
       default: {
@@ -1501,6 +1496,7 @@ tokenizer_push_string_literal(
 static inline const Descriptor *
 value_ensure_type(
   Mass_Context *context,
+  const Scope *scope,
   Value *value,
   Source_Range source_range
 ) {
@@ -1508,6 +1504,17 @@ value_ensure_type(
   if (value_is_tuple(value)) {
     const Tuple *tuple = value_as_tuple(value);
     return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
+  }
+  if (value_is_function_header(value)) {
+    const Function_Header *header = value_as_function_header(value);
+    Function_Info *info = mass_allocate(context, Function_Info);
+    mass_function_info_init_for_header_and_maybe_body(context, scope, header, 0, info);
+    if (mass_has_error(context)) return 0;
+    const Calling_Convention *calling_convention = context->program->default_calling_convention;
+    Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, info);
+    return descriptor_function_instance(
+      context->allocator, (Slice){0}, info, call_setup, context->program
+    );
   }
   if (!mass_value_ensure_static_of(context, value, &descriptor_descriptor_pointer)) {
     return 0;
@@ -1729,7 +1736,7 @@ token_match_type(
   Value_View view
 ) {
   Value *type_value = token_parse_expression(context, parser, view, &(u32){0}, 0);
-  return value_ensure_type(context, type_value, view.source_range);
+  return value_ensure_type(context, parser->scope, type_value, view.source_range);
 }
 
 static inline bool
@@ -2791,7 +2798,7 @@ mass_cast(
   if (mass_has_error(context)) return 0;
   assert(args_view.length == 2);
   const Descriptor *target_descriptor = value_ensure_type(
-    context, value_view_get(&args_view, 0), args_view.source_range
+    context, parser->scope, value_view_get(&args_view, 0), args_view.source_range
   );
   Value *expression = value_view_get(&args_view, 1);
   return mass_cast_helper(context, parser, target_descriptor, expression, args_view.source_range);
@@ -3405,7 +3412,7 @@ struct Overload_Match_State {
 static void
 mass_function_info_init_for_header_and_maybe_body(
   Mass_Context *context,
-  Scope *arguments_scope,
+  const Scope *arguments_scope,
   const Function_Header *header,
   Value *maybe_body,
   Function_Info *out_info
@@ -3462,7 +3469,7 @@ mass_function_info_init_for_header_and_maybe_body(
           Value *type_value =
             mass_context_force_lookup(&temp_context, &args_parser, args_parser.scope, symbol, &source_range);
           if (mass_has_error(&temp_context)) goto err;
-          descriptor = value_ensure_type(&temp_context, type_value, source_range);
+          descriptor = value_ensure_type(&temp_context, args_parser.scope, type_value, source_range);
           if (mass_has_error(&temp_context)) goto err;
         }
         info_param->descriptor = descriptor;
@@ -4932,7 +4939,8 @@ mass_pointer_to_type(
 ) {
   assert(args_view.length == 1);
   Value *type_value = value_view_get(&args_view, 0);
-  const Descriptor *descriptor = value_ensure_type(context, type_value, args_view.source_range);
+  const Descriptor *descriptor =
+    value_ensure_type(context, parser->scope, type_value, args_view.source_range);
   if (mass_has_error(context)) return 0;
   const Descriptor *pointer_descriptor = descriptor_pointer_to(context->compilation, descriptor);
   Storage storage = storage_immediate(&pointer_descriptor);
@@ -4984,7 +4992,7 @@ mass_typed_symbol(
     return 0;
   }
 
-  const Descriptor *descriptor = value_ensure_type(context, rhs_value, source_range);
+  const Descriptor *descriptor = value_ensure_type(context, parser->scope, rhs_value, source_range);
   Typed_Symbol *typed_symbol = allocator_allocate(context->allocator, Typed_Symbol);
   *typed_symbol = (Typed_Symbol) {
     .symbol = value_as_symbol(lhs_value),
@@ -6057,17 +6065,11 @@ token_parse_function_literal(
       descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
 
     return value_make(context, fn_descriptor, storage_none, view.source_range);
-  } else { // only the signature
-    // FIXME we should not be setting the calling convention here
-    //       and in general this should probably return just the `Function_Header`
-    const Calling_Convention *calling_convention =
-      context->compilation->runtime_program->default_calling_convention;
-    Function_Call_Setup call_setup =
-      calling_convention->call_setup_proc(context->allocator, fn_info);
-    Descriptor *fn_descriptor =
-      descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
-    Storage fn_storage = storage_immediate(&fn_descriptor);
-    return value_make(context, &descriptor_descriptor_pointer, fn_storage, view.source_range);
+  } else {
+    Function_Header *returned_header = mass_allocate(context, Function_Header);
+    *returned_header = header;
+    Storage fn_storage = storage_static(returned_header);
+    return value_make(context, &descriptor_function_header, fn_storage, view.source_range);
   }
 }
 
