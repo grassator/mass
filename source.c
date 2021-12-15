@@ -6010,49 +6010,39 @@ token_parse_function_literal(
     if (rest.length) body_value = token_parse_expression(context, parser, rest, &(u32){0}, 0);
   }
   if (mass_has_error(context)) return 0;
-  if (body_value && !mass_value_ensure_static(context, body_value)) return 0;
-
-  *matched_length = peek_index;
-
-  bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
-
-  // TODO should be extracted from the :: if available or maybe stored separately from Descriptor
-  Slice name = {0};
-  Function_Header_Flags header_flags = Function_Header_Flags_None;
-  if (is_macro) header_flags |= Function_Header_Flags_Macro;
-  if (is_compile_time) header_flags |= Function_Header_Flags_Compile_Time;
-  if (body_value && value_is_intrinsic(body_value)) header_flags |= Function_Header_Flags_Intrinsic;
-
-  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
-    if (param->tag == Function_Parameter_Tag_Generic) {
-      header_flags |= Function_Header_Flags_Generic;
-      break;
-    }
-  }
 
   Function_Header header = {
-    .flags = header_flags,
+    .flags = Function_Header_Flags_None,
     .parameters = parameters,
     .returns = returns,
     .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
 
-  if (body_value && !is_syscall) {
-    Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
-    *literal = (Function_Literal){
-      .header = header,
-      .body = body_value,
-      .own_scope = parser->scope,
-    };
-    return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
+  if (is_macro) header.flags |= Function_Header_Flags_Macro;
+  if (is_compile_time) header.flags |= Function_Header_Flags_Compile_Time;
+
+  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
+    if (param->tag == Function_Parameter_Tag_Generic) {
+      header.flags |= Function_Header_Flags_Generic;
+      break;
+    }
+  }
+  *matched_length = peek_index;
+
+  if (!body_value) {
+    Function_Header *returned_header = mass_allocate(context, Function_Header);
+    *returned_header = header;
+    Storage fn_storage = storage_static(returned_header);
+    return value_make(context, &descriptor_function_header, fn_storage, view.source_range);
   }
 
-  Function_Info *fn_info = mass_allocate(context, Function_Info);
-  mass_function_info_init_for_header_and_maybe_body(context, parser->scope, &header, 0, fn_info);
-  if (mass_has_error(context)) return 0;
+  if (!mass_value_ensure_static(context, body_value)) return 0;
 
   // TODO Move to userland
-  if (is_syscall) {
+  if (value_is_syscall(body_value)) {
+    Function_Info *fn_info = mass_allocate(context, Function_Info);
+    mass_function_info_init_for_header_and_maybe_body(context, parser->scope, &header, 0, fn_info);
+    if (mass_has_error(context)) return 0;
     assert(!is_compile_time);
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
@@ -6061,16 +6051,21 @@ token_parse_function_literal(
     assert(call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
     call_setup.jump.Syscall.number = u64_to_s64(syscall_number.bits);
 
+    Slice name = {0};
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
 
     return value_make(context, fn_descriptor, storage_none, view.source_range);
-  } else {
-    Function_Header *returned_header = mass_allocate(context, Function_Header);
-    *returned_header = header;
-    Storage fn_storage = storage_static(returned_header);
-    return value_make(context, &descriptor_function_header, fn_storage, view.source_range);
   }
+
+  if (value_is_intrinsic(body_value)) header.flags |= Function_Header_Flags_Intrinsic;
+  Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
+  *literal = (Function_Literal){
+    .header = header,
+    .body = body_value,
+    .own_scope = parser->scope,
+  };
+  return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
 }
 
 typedef Value *(*Expression_Matcher_Proc)(
