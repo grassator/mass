@@ -554,7 +554,7 @@ deduce_runtime_descriptor_for_value(
   }
 
   if (value->descriptor == &descriptor_i64) {
-    if (maybe_desired_descriptor) {
+    if (maybe_desired_descriptor && maybe_desired_descriptor != &descriptor_i64) {
       Literal_Cast_Result cast_result =
         value_i64_cast_to(value, maybe_desired_descriptor, &(u64){0}, &(u64){0});
       if (cast_result == Literal_Cast_Result_Success) {
@@ -563,6 +563,7 @@ deduce_runtime_descriptor_for_value(
         return 0;
       }
     }
+    return original_descriptor;
   }
 
   if (value->descriptor == &descriptor_tuple) {
@@ -606,7 +607,7 @@ deduce_runtime_descriptor_for_value(
     );
   }
 
-  return value_or_lazy_value_descriptor(value);
+  return original_descriptor;
 }
 
 static inline bool
