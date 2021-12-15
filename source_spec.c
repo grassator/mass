@@ -842,15 +842,6 @@ spec("source") {
       check(fibonnacci(10) == 55);
     }
 
-    it("should allow non-parenthesized return type") {
-      s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn(x: s32) -> s32 { x }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(42) == 42);
-    }
-
     it("should support inferred return types for a non-recursive fn with no explicit returns") {
       u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
         "checker", &test_context,
@@ -2606,7 +2597,7 @@ spec("source") {
     it("should support inline modules") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> i64 {"
+        "checker :: fn() -> (i64) {"
           "Foo :: module { answer :: 42 }\n"
           "Foo.answer"
         "}\n"
@@ -2618,7 +2609,7 @@ spec("source") {
     it("should support global static variables inside inline modules") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> s64 {"
+        "checker :: fn() -> (s64) {"
           "Foo :: module { answer := 42 }\n"
           "Foo.answer"
         "}\n"

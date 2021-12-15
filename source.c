@@ -5998,8 +5998,8 @@ token_parse_function_literal(
       Source_Range return_range = value_view_slice(&view, peek_index, peek_index).source_range;
       returns = function_return_inferred(return_range);
     } else {
-      Value_View return_types_view = value_view_make_single(context->allocator, token);
-      returns = function_return_generic(return_types_view, return_range);
+      context_parse_error(context, parser, view, peek_index);
+      return 0;
     }
   } else {
     Source_Range return_range = value_view_slice(&view, peek_index, peek_index).source_range;
