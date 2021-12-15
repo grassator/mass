@@ -550,7 +550,7 @@ deduce_runtime_descriptor_for_value(
   }
 
   if (!mass_value_is_compile_time_known(value)) {
-    return value_or_lazy_value_descriptor(value);
+    return original_descriptor;
   }
 
   if (value->descriptor == &descriptor_i64) {
@@ -562,8 +562,6 @@ deduce_runtime_descriptor_for_value(
       } else {
         return 0;
       }
-    } else {
-      return &descriptor_s64;
     }
   }
 

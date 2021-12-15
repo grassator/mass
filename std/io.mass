@@ -47,6 +47,7 @@ print :: fn(x : s64) {
     count
   }
 
+  using unsigned
   integer_index := 0
   while integer_index < count {
     integer_index = integer_index + 1
