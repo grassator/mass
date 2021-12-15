@@ -434,15 +434,15 @@ spec("source") {
 
   describe("if / else") {
     it("should be able to parse and run if expression") {
-      s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
+      u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
         "is_positive", &test_context,
-        "is_positive :: fn(x : s32) -> (s64) {"
-          "if x < 0 then 0 else 1"
+        "is_positive :: fn(x : i64) -> (i64) {"
+          "if x == 0 then 0 else 1"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(42) == 1);
-      check(checker(-2) == 0);
+      check(checker(0) == 0);
     }
     it("should work with a value instead of comparison as a condition") {
       bool(*is_zero)(s32) = (bool(*)(s32))test_program_inline_source_function(
