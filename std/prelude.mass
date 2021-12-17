@@ -189,6 +189,35 @@ using make_arithmetic_operations_module(u16)
 using make_arithmetic_operations_module(u32)
 using make_arithmetic_operations_module(u64)
 
+x86_64 :: module {
+  REX_B :: 0b0001 // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
+  REX_X :: 0b0010 // Extension of the SIB index field
+  REX_R :: 0b0100 // Extension of the ModR/M reg field
+  REX_W :: 0b1000 // 0 = Storage size determined by CS.D; 1 = 64 Bit Storage Size
+
+  Reg_T :: MASS.Register._Type
+  Instruction :: MASS.Instruction
+
+  op1_reg64_reg64_mr :: fn(op_code : i8, target : Reg_T, source : Reg_T) -> (Instruction) {
+    lhs_reg_index := zero_extend(i64, target)
+    rhs_reg_index := zero_extend(i64, source)
+
+    rex := 0x40 + REX_W
+    rex = if lhs_reg_index & 0b1000 != 0 then rex + REX_B else rex
+    rex = if rhs_reg_index & 0b1000 != 0 then rex + REX_R else rex
+
+    mod_reg_rm := cast(i8, (0b11 << 6) | ((rhs_reg_index & 0b111) << 3) | (lhs_reg_index & 0b111))
+
+    instruction : Instruction
+    instruction.tag = MASS.Instruction_Tag.Bytes
+    instruction.Bytes.memory.0 = cast(i8, rex)
+    instruction.Bytes.memory.1 = op_code
+    instruction.Bytes.memory.2 = cast(i8, mod_reg_rm)
+    instruction.Bytes.length = cast(i8, 3)
+    instruction
+  }
+}
+
 add_or_subtract :: fn(
   context : &MASS.Context,
   parser : &MASS.Parser,
@@ -234,14 +263,7 @@ add_or_subtract :: fn(
     }
 
     {
-      mod_reg_rm := MASS.mod_reg_rm(temp_lhs_register, temp_rhs_register)
-
-      instruction : MASS.Instruction
-      instruction.tag = MASS.Instruction_Tag.Bytes
-      instruction.Bytes.memory.0 = cast(i8, 0x48)
-      instruction.Bytes.memory.1 = payload.op_code
-      instruction.Bytes.memory.2 = cast(i8, mod_reg_rm)
-      instruction.Bytes.length = cast(i8, 3)
+      instruction := x86_64.op1_reg64_reg64_mr(payload.op_code, temp_lhs_register, temp_rhs_register)
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
@@ -314,14 +336,7 @@ compare :: fn(
     }
 
     {
-      mod_reg_rm := MASS.mod_reg_rm(temp_lhs_register, temp_rhs_register)
-
-      instruction : MASS.Instruction
-      instruction.tag = MASS.Instruction_Tag.Bytes
-      instruction.Bytes.memory.0 = cast(i8, 0x48)
-      instruction.Bytes.memory.1 = cast(i8, 0x39)
-      instruction.Bytes.memory.2 = cast(i8, mod_reg_rm)
-      instruction.Bytes.length = cast(i8, 3)
+      instruction := x86_64.op1_reg64_reg64_mr(cast(i8, 0x39), temp_lhs_register, temp_rhs_register)
       MASS.push_instruction(&builder.code_block, instruction)
     }
 

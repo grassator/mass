@@ -1083,18 +1083,6 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None,
-    mod_reg_rm, "mod_reg_rm", &descriptor_i8,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_register
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_register
-    )
-  );
-  MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
     mass_i64_logical_shift_left, "i64_logical_shift_left", &descriptor_i64,
     function_parameter(

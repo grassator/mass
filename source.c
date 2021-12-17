@@ -639,6 +639,7 @@ deduce_runtime_descriptor_for_value(
       }
       parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
     }
+    if (mass_has_error(context)) return 0;
     Array_Value_Ptr fake_args =
       mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
     Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);

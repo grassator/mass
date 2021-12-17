@@ -2224,14 +2224,6 @@ main(void) {
     })
   ));
 
-  // FIXME implement this in userland
-  export_compiler_custom_name("mod_reg_rm", push_type(
-    type_function(Default, "mod_reg_rm", "i8", (Argument_Type[]){
-      { "Register", "a" },
-      { "Register", "b" },
-    })
-  ));
-
   const char *i64_ops[] = {
     "logical_shift_left", "logical_shift_right",
     "bitwise_and", "bitwise_or",
