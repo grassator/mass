@@ -684,7 +684,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
-    .jump = {.tag = Function_Call_Jump_Tag_Call},
+    .jump = Function_Call_Jump_Call,
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   bool is_indirect_return = false;
@@ -788,7 +788,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
-    .jump = {.tag = Function_Call_Jump_Tag_Syscall},
+    .jump = Function_Call_Jump_Syscall,
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   const Descriptor *return_descriptor = function->return_descriptor;
@@ -861,7 +861,7 @@ calling_convention_x86_64_windows_call_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
-    .jump = {.tag = Function_Call_Jump_Tag_Call},
+    .jump = Function_Call_Jump_Call,
     .calling_convention = &calling_convention_x86_64_windows,
   };
   const Descriptor *return_descriptor = function->return_descriptor;

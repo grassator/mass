@@ -3135,7 +3135,7 @@ call_function_overload(
   // To make sure the target is not overwritten with the argument we move it to an empty register.
   // :InstructionQuality The move described above is not always necessary
   Storage call_target_storage = *runtime_storage;
-  if (call_setup->jump.tag == Function_Call_Jump_Tag_Call) {
+  if (call_setup->jump == Function_Call_Jump_Call) {
     if (runtime_storage->tag == Storage_Tag_Register) {
       call_target_storage = reserve_stack_storage(builder, (Bits){64});
       call_target_storage.flags |= Storage_Flags_Temporary;
@@ -3346,8 +3346,8 @@ call_function_overload(
     call_setup->parameters_stack_size
   );
 
-  switch(call_setup->jump.tag) {
-    case Function_Call_Jump_Tag_Call: {
+  switch(call_setup->jump) {
+    case Function_Call_Jump_Call: {
       if (storage_is_label(&call_target_storage)) {
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
@@ -3364,11 +3364,11 @@ call_function_overload(
         register_release(builder, temp_reg);
       }
     } break;
-    case Function_Call_Jump_Tag_Syscall: {
+    case Function_Call_Jump_Syscall: {
       Storage syscal_number_storage = storage_register(Register_A, (Bits){64});
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){mov, {syscal_number_storage, imm64(call_setup->jump.Syscall.number)}}
+        &(Instruction_Assembly){mov, {syscal_number_storage, call_target_storage}}
       );
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
@@ -6064,16 +6064,12 @@ token_parse_function_literal(
     assert(!is_compile_time);
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
-    // TODO this patching after the fact feels awkward and brittle
-    i64 syscall_number = value_as_syscall(body_value)->number;
-    assert(call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
-    call_setup.jump.Syscall.number = u64_to_s64(syscall_number.bits);
 
     Slice name = {0};
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
 
-    // FIXME use storage value instead of call_setup.jump.Syscall.number
+    i64 syscall_number = value_as_syscall(body_value)->number;
     return value_make(context, fn_descriptor, imm64(syscall_number.bits), view.source_range);
   }
 

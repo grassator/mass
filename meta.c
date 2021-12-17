@@ -1719,11 +1719,9 @@ main(void) {
     { "Array_Function_Specialization", "specializations"},
   }));
 
-  push_type(type_union("Function_Call_Jump", (Struct_Type[]){
-    struct_empty("Call"),
-    struct_fields("Syscall", (Struct_Item[]){
-      { "s64", "number" },
-    }),
+  push_type(type_enum("Function_Call_Jump", (Enum_Type_Item[]){
+    { "Call", 0 },
+    { "Syscall", 1},
   }));
 
   push_type(type_enum("Function_Call_Parameter_Flags", (Enum_Type_Item[]){
@@ -1742,6 +1740,7 @@ main(void) {
     { "u32", "parameters_stack_size"},
     { "u32", "_parameters_stack_size_padding"},
     { "Function_Call_Jump", "jump"},
+    { "u32", "_jump_padding" },
     { "const Calling_Convention *", "calling_convention" },
     { "Array_Function_Call_Parameter", "parameters" },
     { "Register_Bitset", "parameter_registers_bitset" },
