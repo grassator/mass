@@ -2118,10 +2118,7 @@ value_force_exact(
   Value *forced = value_force(context, builder, &expected_result, source);
   if (!forced) return;
   assert(forced->descriptor == target->descriptor);
-  if (mass_descriptor_is_void(target->descriptor)) {
-    assert(forced->descriptor == target->descriptor);
-    assert(storage_equal(&value_as_forced(forced)->storage, target_storage));
-  }
+  assert(storage_equal(&value_as_forced(forced)->storage, target_storage));
 }
 
 static inline Value *
@@ -4050,8 +4047,8 @@ mass_trampoline_call(
   trampoline->proc(args_struct_memory);
   const Descriptor *return_descriptor = trampoline->original_info->return_descriptor;
   Value *result;
-  if (mass_descriptor_is_void(return_descriptor)) {
-    result = mass_make_void(context, args_view.source_range);
+  if (return_descriptor->bit_size.as_u64 == 0) {
+    result = value_make(context, return_descriptor, imm0, args_view.source_range);
   } else {
     const Struct_Field *return_field = dyn_array_last(fields);
     const void *temp_return_memory = args_struct_memory + return_field->offset;

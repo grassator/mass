@@ -1447,6 +1447,7 @@ same_type_or_can_implicitly_move_cast(
     ) {
       return true;
     }
+    // FIXME should be something like `Unknown` instead `Void`
     if (mass_descriptor_is_void(target->Pointer_To.descriptor)) {
       return true;
     }
