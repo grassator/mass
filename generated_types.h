@@ -35,6 +35,7 @@ typedef dyn_array_type(Assignment *) Array_Assignment_Ptr;
 typedef dyn_array_type(const Assignment *) Array_Const_Assignment_Ptr;
 
 typedef struct Module_Exports Module_Exports;
+typedef struct Module_Exports_Selective Module_Exports_Selective;
 typedef dyn_array_type(Module_Exports *) Array_Module_Exports_Ptr;
 typedef dyn_array_type(const Module_Exports *) Array_Const_Module_Exports_Ptr;
 
@@ -268,6 +269,9 @@ typedef dyn_array_type(Stack_Area *) Array_Stack_Area_Ptr;
 typedef dyn_array_type(const Stack_Area *) Array_Const_Stack_Area_Ptr;
 
 typedef struct Memory_Location Memory_Location;
+typedef struct Memory_Location_Instruction_Pointer_Relative Memory_Location_Instruction_Pointer_Relative;
+typedef struct Memory_Location_Indirect Memory_Location_Indirect;
+typedef struct Memory_Location_Stack Memory_Location_Stack;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
 typedef dyn_array_type(const Memory_Location *) Array_Const_Memory_Location_Ptr;
 
@@ -287,6 +291,13 @@ typedef dyn_array_type(Storage_Flags *) Array_Storage_Flags_Ptr;
 typedef dyn_array_type(const Storage_Flags *) Array_Const_Storage_Flags_Ptr;
 
 typedef struct Storage Storage;
+typedef struct Storage_Eflags Storage_Eflags;
+typedef struct Storage_Register Storage_Register;
+typedef struct Storage_Xmm Storage_Xmm;
+typedef struct Storage_Static Storage_Static;
+typedef struct Storage_Immediate Storage_Immediate;
+typedef struct Storage_Memory Storage_Memory;
+typedef struct Storage_Unpacked Storage_Unpacked;
 typedef dyn_array_type(Storage *) Array_Storage_Ptr;
 typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
 
@@ -299,6 +310,11 @@ typedef dyn_array_type(Instruction_Assembly *) Array_Instruction_Assembly_Ptr;
 typedef dyn_array_type(const Instruction_Assembly *) Array_Const_Instruction_Assembly_Ptr;
 
 typedef struct Instruction Instruction;
+typedef struct Instruction_Label Instruction_Label;
+typedef struct Instruction_Bytes Instruction_Bytes;
+typedef struct Instruction_Label_Patch Instruction_Label_Patch;
+typedef struct Instruction_Stack_Patch Instruction_Stack_Patch;
+typedef struct Instruction_Location Instruction_Location;
 typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
 typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
 
@@ -376,6 +392,8 @@ typedef dyn_array_type(Parser *) Array_Parser_Ptr;
 typedef dyn_array_type(const Parser *) Array_Const_Parser_Ptr;
 
 typedef struct Operator Operator;
+typedef struct Operator_Alias Operator_Alias;
+typedef struct Operator_Intrinsic Operator_Intrinsic;
 typedef dyn_array_type(Operator *) Array_Operator_Ptr;
 typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
 
@@ -400,6 +418,8 @@ typedef dyn_array_type(Overload *) Array_Overload_Ptr;
 typedef dyn_array_type(const Overload *) Array_Const_Overload_Ptr;
 
 typedef struct Overload_Match Overload_Match;
+typedef struct Overload_Match_Undecidable Overload_Match_Undecidable;
+typedef struct Overload_Match_Found Overload_Match_Found;
 typedef dyn_array_type(Overload_Match *) Array_Overload_Match_Ptr;
 typedef dyn_array_type(const Overload_Match *) Array_Const_Overload_Match_Ptr;
 
@@ -419,6 +439,8 @@ typedef dyn_array_type(Value_Flags *) Array_Value_Flags_Ptr;
 typedef dyn_array_type(const Value_Flags *) Array_Const_Value_Flags_Ptr;
 
 typedef struct Value Value;
+typedef struct Value_Lazy Value_Lazy;
+typedef struct Value_Forced Value_Forced;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
@@ -431,6 +453,8 @@ typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
 typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
 
 typedef struct Expected_Result Expected_Result;
+typedef struct Expected_Result_Exact Expected_Result_Exact;
+typedef struct Expected_Result_Flexible Expected_Result_Flexible;
 typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
 typedef dyn_array_type(const Expected_Result *) Array_Const_Expected_Result_Ptr;
 
@@ -449,6 +473,8 @@ typedef Value * (*Mass_Handle_Operator_Proc)
   (Mass_Context * context, Parser * parser, Value_View view, const Operator * operator);
 
 typedef struct Function_Parameter Function_Parameter;
+typedef struct Function_Parameter_Generic Function_Parameter_Generic;
+typedef struct Function_Parameter_Exact_Static Function_Parameter_Exact_Static;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
 typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
 
@@ -470,6 +496,8 @@ typedef dyn_array_type(Function_Info_Flags *) Array_Function_Info_Flags_Ptr;
 typedef dyn_array_type(const Function_Info_Flags *) Array_Const_Function_Info_Flags_Ptr;
 
 typedef struct Function_Return Function_Return;
+typedef struct Function_Return_Generic Function_Return_Generic;
+typedef struct Function_Return_Exact Function_Return_Exact;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
 typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
 
@@ -511,6 +539,7 @@ typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
 typedef struct Function_Call_Jump Function_Call_Jump;
+typedef struct Function_Call_Jump_Syscall Function_Call_Jump_Syscall;
 typedef dyn_array_type(Function_Call_Jump *) Array_Function_Call_Jump_Ptr;
 typedef dyn_array_type(const Function_Call_Jump *) Array_Const_Function_Call_Jump_Ptr;
 
@@ -554,6 +583,11 @@ typedef dyn_array_type(Struct_Field *) Array_Struct_Field_Ptr;
 typedef dyn_array_type(const Struct_Field *) Array_Const_Struct_Field_Ptr;
 
 typedef struct Descriptor Descriptor;
+typedef struct Descriptor_Integer Descriptor_Integer;
+typedef struct Descriptor_Function_Instance Descriptor_Function_Instance;
+typedef struct Descriptor_Fixed_Array Descriptor_Fixed_Array;
+typedef struct Descriptor_Struct Descriptor_Struct;
+typedef struct Descriptor_Pointer_To Descriptor_Pointer_To;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
@@ -561,6 +595,22 @@ typedef const Descriptor * (*Mass_Type_Constraint_Proc)
   (const Descriptor * descriptor);
 
 typedef struct Mass_Error Mass_Error;
+typedef struct Mass_Error_User_Defined Mass_Error_User_Defined;
+typedef struct Mass_Error_Circular_Dependency Mass_Error_Circular_Dependency;
+typedef struct Mass_Error_Integer_Range Mass_Error_Integer_Range;
+typedef struct Mass_Error_File_Open Mass_Error_File_Open;
+typedef struct Mass_Error_File_Too_Large Mass_Error_File_Too_Large;
+typedef struct Mass_Error_Dynamic_Library_Load Mass_Error_Dynamic_Library_Load;
+typedef struct Mass_Error_Dynamic_Library_Symbol_Not_Found Mass_Error_Dynamic_Library_Symbol_Not_Found;
+typedef struct Mass_Error_Unexpected_Token Mass_Error_Unexpected_Token;
+typedef struct Mass_Error_Operator_Fixity_Conflict Mass_Error_Operator_Fixity_Conflict;
+typedef struct Mass_Error_Undefined_Variable Mass_Error_Undefined_Variable;
+typedef struct Mass_Error_Redefinition Mass_Error_Redefinition;
+typedef struct Mass_Error_Unknown_Field Mass_Error_Unknown_Field;
+typedef struct Mass_Error_Invalid_Identifier Mass_Error_Invalid_Identifier;
+typedef struct Mass_Error_Type_Mismatch Mass_Error_Type_Mismatch;
+typedef struct Mass_Error_No_Matching_Overload Mass_Error_No_Matching_Overload;
+typedef struct Mass_Error_Undecidable_Overload Mass_Error_Undecidable_Overload;
 typedef dyn_array_type(Mass_Error *) Array_Mass_Error_Ptr;
 typedef dyn_array_type(const Mass_Error *) Array_Const_Mass_Error_Ptr;
 

@@ -182,6 +182,13 @@ print_c_type_forward_declaration(
       name = type->name;
       if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
         fprintf(file, "typedef struct %s %s;\n", type->name, type->name);
+
+        // Write out individual structs
+        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+          Struct_Type *struct_ = &type->union_.items[i];
+          if (!struct_->item_count) continue;
+          fprintf(file, "typedef struct %s_%s %s_%s;\n", type->name, struct_->name, type->name, struct_->name);
+        }
       }
       break;
     }
