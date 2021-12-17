@@ -2220,13 +2220,6 @@ main(void) {
     })
   ));
 
-  export_compiler_custom_name("value_view_get", push_type(
-    type_function(Compile_Time, "value_view_get", "Value *", (Argument_Type[]){
-      { "const Value_View *", "view" },
-      { "u64", "index" },
-    })
-  ));
-
   const char *i64_ops[] = {
     "logical_shift_left", "logical_shift_right",
     "bitwise_and", "bitwise_or",

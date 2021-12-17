@@ -1176,7 +1176,7 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "intrinsic_id :: fn(x : i64) -> (i64) intrinsic { MASS.value_view_get(&arguments, 0) }\n"
+          "intrinsic_id :: fn(x : i64) -> (i64) intrinsic { arguments.0 }\n"
           "checker :: fn() -> (s64) { intrinsic_id(42) }"
         );
       check(spec_check_mass_result(test_context.result));
@@ -1186,7 +1186,7 @@ spec("source") {
     it("should validate the return type of the intrinsic when specified") {
       test_program_inline_source_function(
         "checker", &test_context,
-        "intrinsic_id :: fn(x : i64, y : String) -> (i64) intrinsic { MASS.value_view_get(&arguments, 1) }\n"
+        "intrinsic_id :: fn(x : i64, y : String) -> (i64) intrinsic { arguments.1 }\n"
         "checker :: fn() -> () { intrinsic_id(42, \"foo\") }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1201,7 +1201,7 @@ spec("source") {
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: fn(a : i64, b : i64) -> (i64)"
-            "intrinsic { MASS.value_view_get(&arguments, 1) }\n"
+            "intrinsic { arguments.1 }\n"
           "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
         );
       check(spec_check_mass_result(test_context.result));

@@ -815,9 +815,6 @@ static Value * value_force
 static i8 mod_reg_rm
   (Register a, Register b);
 
-static Value * value_view_get
-  (const Value_View * view, u64 index);
-
 static i64 mass_i64_logical_shift_left
   (i64 a, i64 b);
 
@@ -2739,7 +2736,6 @@ static Descriptor descriptor_storage_release_if_temporary;
 static Descriptor descriptor_mass_expected_result_exact;
 static Descriptor descriptor_value_force;
 static Descriptor descriptor_mod_reg_rm;
-static Descriptor descriptor_value_view_get;
 static Descriptor descriptor_mass_i64_logical_shift_left;
 static Descriptor descriptor_mass_i64_logical_shift_right;
 static Descriptor descriptor_mass_i64_bitwise_and;
