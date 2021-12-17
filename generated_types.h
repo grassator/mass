@@ -458,10 +458,6 @@ typedef struct Expected_Result_Flexible Expected_Result_Flexible;
 typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
 typedef dyn_array_type(const Expected_Result *) Array_Const_Expected_Result_Ptr;
 
-typedef struct Lazy_Value Lazy_Value;
-typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
-typedef dyn_array_type(const Lazy_Value *) Array_Const_Lazy_Value_Ptr;
-
 typedef struct Lazy_Static_Value Lazy_Static_Value;
 typedef dyn_array_type(Lazy_Static_Value *) Array_Lazy_Static_Value_Ptr;
 typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_Ptr;
@@ -615,6 +611,7 @@ typedef dyn_array_type(Mass_Error *) Array_Mass_Error_Ptr;
 typedef dyn_array_type(const Mass_Error *) Array_Const_Mass_Error_Ptr;
 
 typedef struct Mass_Result Mass_Result;
+typedef struct Mass_Result_Error Mass_Result_Error;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
@@ -645,9 +642,6 @@ typedef Function_Call_Setup (*Calling_Convention_Call_Setup_Proc)
 typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
-
-typedef _Bool (*Token_Statement_Matcher_Proc)
-  (Mass_Context * context, Parser * parser, Value_View view, Lazy_Value * out_lazy_value);
 
 typedef void (*Mass_Trampoline_Proc)
   (void * payload);
@@ -694,6 +688,9 @@ typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
   (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, void * payload);
+
+typedef _Bool (*Token_Statement_Matcher_Proc)
+  (Mass_Context * context, Parser * parser, Value_View view, Value_Lazy * out_lazy_value);
 
 typedef enum Instruction_Extension_Type {
   Instruction_Extension_Type_None = 0,
@@ -1575,15 +1572,42 @@ overload_match_as_found(const Overload_Match *overload_match) {
   return &overload_match->Found;
 }
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
+typedef enum {
+  Value_Tag_Lazy = 0,
+  Value_Tag_Forced = 1,
+} Value_Tag;
+
+typedef struct Value_Lazy {
+  Epoch epoch;
+  void * payload;
+  Lazy_Value_Proc proc;
+} Value_Lazy;
+typedef struct Value_Forced {
+  Storage storage;
+} Value_Forced;
 typedef struct Value {
+  Value_Tag tag;
+  char _tag_padding[4];
   Value_Flags flags;
   u32 _flags_padding;
   const Descriptor * descriptor;
-  Storage storage;
   Source_Range source_range;
+  union {
+    Value_Lazy Lazy;
+    Value_Forced Forced;
+  };
 } Value;
+static inline const Value_Lazy *
+value_as_lazy(const Value *value) {
+  assert(value->tag == Value_Tag_Lazy);
+  return &value->Lazy;
+}
+static inline const Value_Forced *
+value_as_forced(const Value *value) {
+  assert(value->tag == Value_Tag_Forced);
+  return &value->Forced;
+}
 typedef dyn_array_type(Value) Array_Value;
-
 typedef struct Register_Bitset {
   u64 bits;
 } Register_Bitset;
@@ -1634,14 +1658,6 @@ expected_result_as_flexible(const Expected_Result *expected_result) {
   return &expected_result->Flexible;
 }
 typedef dyn_array_type(Expected_Result) Array_Expected_Result;
-typedef struct Lazy_Value {
-  Epoch epoch;
-  const Descriptor * descriptor;
-  Lazy_Value_Proc proc;
-  void * payload;
-} Lazy_Value;
-typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
-
 typedef struct Lazy_Static_Value {
   Mass_Context context;
   Parser parser;
@@ -2531,6 +2547,7 @@ static Descriptor descriptor_value_flags_pointer_pointer;
 static Descriptor descriptor_value;
 static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
+static Descriptor descriptor_array_const_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
 static Descriptor descriptor_register_bitset;
@@ -2549,11 +2566,6 @@ static Descriptor descriptor_array_expected_result_ptr;
 static Descriptor descriptor_array_const_expected_result_ptr;
 static Descriptor descriptor_expected_result_pointer;
 static Descriptor descriptor_expected_result_pointer_pointer;
-static Descriptor descriptor_lazy_value;
-static Descriptor descriptor_array_lazy_value;
-static Descriptor descriptor_array_lazy_value_ptr;
-static Descriptor descriptor_lazy_value_pointer;
-static Descriptor descriptor_lazy_value_pointer_pointer;
 static Descriptor descriptor_lazy_static_value;
 static Descriptor descriptor_array_lazy_static_value;
 static Descriptor descriptor_array_lazy_static_value_ptr;
@@ -2683,7 +2695,6 @@ static Descriptor descriptor_array_calling_convention;
 static Descriptor descriptor_array_calling_convention_ptr;
 static Descriptor descriptor_calling_convention_pointer;
 static Descriptor descriptor_calling_convention_pointer_pointer;
-static Descriptor descriptor_token_statement_matcher_proc;
 static Descriptor descriptor_mass_trampoline_proc;
 static Descriptor descriptor_mass_trampoline;
 static Descriptor descriptor_array_mass_trampoline;
@@ -2721,6 +2732,7 @@ static Descriptor descriptor_array_compilation_ptr;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_compilation_pointer_pointer;
 static Descriptor descriptor_lazy_value_proc;
+static Descriptor descriptor_token_statement_matcher_proc;
 static Descriptor descriptor_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type_ptr;
@@ -4300,9 +4312,46 @@ static C_Enum_Item value_flags_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Value_Flags, value_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Value_Flags *, value_flags_pointer);
+/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
+MASS_DEFINE_OPAQUE_C_TYPE(value_tag, Value_Tag)
+static C_Enum_Item value_tag_items[] = {
+{ .name = slice_literal_fields("Lazy"), .value = 0 },
+{ .name = slice_literal_fields("Forced"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(value_lazy, Value_Lazy,
+  {
+    .descriptor = &descriptor_epoch,
+    .name = slice_literal_fields("epoch"),
+    .offset = offsetof(Value_Lazy, epoch),
+  },
+  {
+    .descriptor = &descriptor_void_pointer,
+    .name = slice_literal_fields("payload"),
+    .offset = offsetof(Value_Lazy, payload),
+  },
+  {
+    .descriptor = &descriptor_lazy_value_proc,
+    .name = slice_literal_fields("proc"),
+    .offset = offsetof(Value_Lazy, proc),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(value_lazy);
+MASS_DEFINE_STRUCT_DESCRIPTOR(value_forced, Value_Forced,
+  {
+    .descriptor = &descriptor_storage,
+    .name = slice_literal_fields("storage"),
+    .offset = offsetof(Value_Forced, storage),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(value_forced);
 MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
+  {
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_value_tag,
+    .offset = offsetof(Value, tag),
+  },
   {
     .descriptor = &descriptor_value_flags,
     .name = slice_literal_fields("flags"),
@@ -4319,19 +4368,25 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
     .offset = offsetof(Value, descriptor),
   },
   {
-    .descriptor = &descriptor_storage,
-    .name = slice_literal_fields("storage"),
-    .offset = offsetof(Value, storage),
-  },
-  {
     .descriptor = &descriptor_source_range,
     .name = slice_literal_fields("source_range"),
     .offset = offsetof(Value, source_range),
+  },
+  {
+    .name = slice_literal_fields("Lazy"),
+    .descriptor = &descriptor_value_lazy,
+    .offset = offsetof(Value, Lazy),
+  },
+  {
+    .name = slice_literal_fields("Forced"),
+    .descriptor = &descriptor_value_forced,
+    .offset = offsetof(Value, Forced),
   },
 );
 MASS_DEFINE_TYPE_VALUE(value);
 DEFINE_VALUE_IS_AS_HELPERS(Value, value);
 DEFINE_VALUE_IS_AS_HELPERS(Value *, value_pointer);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_register_bitset_ptr, Array_Register_Bitset_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_register_bitset, Array_Register_Bitset)
 MASS_DEFINE_STRUCT_DESCRIPTOR(register_bitset, Register_Bitset,
@@ -4451,33 +4506,6 @@ MASS_DEFINE_TYPE_VALUE(expected_result);
 DEFINE_VALUE_IS_AS_HELPERS(Expected_Result, expected_result);
 DEFINE_VALUE_IS_AS_HELPERS(Expected_Result *, expected_result_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
-MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
-  {
-    .descriptor = &descriptor_epoch,
-    .name = slice_literal_fields("epoch"),
-    .offset = offsetof(Lazy_Value, epoch),
-  },
-  {
-    .descriptor = &descriptor_descriptor_pointer,
-    .name = slice_literal_fields("descriptor"),
-    .offset = offsetof(Lazy_Value, descriptor),
-  },
-  {
-    .descriptor = &descriptor_lazy_value_proc,
-    .name = slice_literal_fields("proc"),
-    .offset = offsetof(Lazy_Value, proc),
-  },
-  {
-    .descriptor = &descriptor_void_pointer,
-    .name = slice_literal_fields("payload"),
-    .offset = offsetof(Lazy_Value, payload),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(lazy_value);
-DEFINE_VALUE_IS_AS_HELPERS(Lazy_Value, lazy_value);
-DEFINE_VALUE_IS_AS_HELPERS(Lazy_Value *, lazy_value_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value_ptr, Array_Lazy_Static_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value, Array_Lazy_Static_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
@@ -5555,26 +5583,6 @@ MASS_DEFINE_TYPE_VALUE(calling_convention);
 DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention, calling_convention);
 DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention *, calling_convention_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
-  token_statement_matcher_proc,
-  &descriptor__bool,
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_mass_context_pointer,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_parser_pointer,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_value_view,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_lazy_value_pointer,
-  }
-)
-MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_trampoline_proc,
   &descriptor_void,
   {
@@ -5924,6 +5932,26 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_void_pointer,
+  }
+)
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  token_statement_matcher_proc,
+  &descriptor__bool,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_mass_context_pointer,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_parser_pointer,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_value_view,
+  },
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_value_lazy_pointer,
   }
 )
 MASS_DEFINE_OPAQUE_C_TYPE(instruction_extension_type, Instruction_Extension_Type)

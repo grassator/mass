@@ -8,12 +8,22 @@ mass_value_is_compile_time_known(
   const Value *value
 ) {
   if (!value) return false;
-  if (value->descriptor != &descriptor_lazy_value) {
-    if (value->storage.tag == Storage_Tag_Immediate) return true;
-    if (value->storage.tag == Storage_Tag_Static) return true;
-    if (value->storage.tag == Storage_Tag_None) return true;
+  if (value->tag != Value_Tag_Forced) return false;
+  switch(value->Forced.storage.tag) {
+    case Storage_Tag_None:
+    case Storage_Tag_Static:
+    case Storage_Tag_Immediate: {
+      return true;
+    } break;
+    case Storage_Tag_Register:
+    case Storage_Tag_Xmm:
+    case Storage_Tag_Unpacked:
+    case Storage_Tag_Memory:
+    case Storage_Tag_Eflags:
+    default: {
+      return false;
+    } break;
   }
-  return false;
 }
 
 static inline Slice
@@ -668,7 +678,11 @@ storage_static_equal_values(
   const Value *a,
   const Value *b
 ) {
-  return storage_static_equal(a->descriptor, &a->storage, b->descriptor, &b->storage);
+  if (a->tag != Value_Tag_Forced) return false;
+  if (b->tag != Value_Tag_Forced) return false;
+  return storage_static_equal(
+    a->descriptor, &a->Forced.storage, b->descriptor, &b->Forced.storage
+  );
 }
 
 static inline bool
@@ -1155,11 +1169,13 @@ value_as_function(
   Value *value
 ) {
   assert(value->descriptor->tag == Descriptor_Tag_Function_Instance);
+  assert(value->tag == Value_Tag_Forced);
+  const Storage *storage = &value->Forced.storage;
   if(mass_value_is_compile_time_known(value)) {
-    void const * const *address_pointer = storage_static_memory_with_bit_size(&value->storage, (Bits){64});
+    void const * const *address_pointer = storage_static_memory_with_bit_size(storage, (Bits){64});
     return (fn_type_opaque)*address_pointer;
-  } else if (storage_is_label(&value->storage)) {
-    Label *label = value->storage.Memory.location.Instruction_Pointer_Relative.label;
+  } else if (storage_is_label(storage)) {
+    Label *label = storage->Memory.location.Instruction_Pointer_Relative.label;
     assert(label->program == program);
     return (fn_type_opaque)rip_value_pointer_from_label(label);
   } else {

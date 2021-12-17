@@ -5,11 +5,14 @@
 
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\
   (Value) {\
+    .tag = Value_Tag_Forced,\
     .descriptor = &descriptor_descriptor_pointer,\
-    .storage = {\
-      .tag = Storage_Tag_Immediate,\
-      .bit_size = {sizeof(Descriptor *) * CHAR_BIT},\
-      .Immediate.bits = (u64)(_DESCRIPTOR_),\
+    .Forced = {\
+      .storage = {\
+        .tag = Storage_Tag_Immediate,\
+        .bit_size = {sizeof(Descriptor *) * CHAR_BIT},\
+        .Immediate.bits = (u64)(_DESCRIPTOR_),\
+      },\
     },\
   }
 
@@ -211,7 +214,9 @@ storage_static_memory(const Storage *);
     const Value *value\
   ) {\
     if (!value) return false;\
-    if (value->storage.tag != Storage_Tag_Static && value->storage.tag != Storage_Tag_Immediate) return false;\
+    if (value->tag != Value_Tag_Forced) return false;\
+    const Storage *storage = &value->Forced.storage;\
+    if (storage->tag != Storage_Tag_Static && storage->tag != Storage_Tag_Immediate) return false;\
     return value->descriptor == &descriptor_##_SUFFIX_;\
   }\
   static inline  _C_TYPE_ const *\
@@ -219,8 +224,8 @@ storage_static_memory(const Storage *);
     const Value *value\
   ) {\
     assert(value_is_##_SUFFIX_(value));\
-    assert(value->storage.bit_size.as_u64 == value->descriptor->bit_size.as_u64);\
-    return (_C_TYPE_ const *)storage_static_memory(&value->storage);\
+    assert(value->Forced.storage.bit_size.as_u64 == value->descriptor->bit_size.as_u64);\
+    return (_C_TYPE_ const *)storage_static_memory(&value->Forced.storage);\
   }
 
 #include "generated_types.h"

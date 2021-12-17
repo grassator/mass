@@ -440,10 +440,12 @@ encode_inverted_conditional_jump(
   const Source_Range *source_range,
   const Value *value
 ) {
-  if (value->storage.tag == Storage_Tag_Immediate) {
-    u64 bit_size = value->storage.bit_size.as_u64;
+  assert(value->tag == Value_Tag_Forced);
+  const Storage *storage = &value->Forced.storage;
+  if (storage->tag == Storage_Tag_Immediate) {
+    u64 bit_size = storage->bit_size.as_u64;
     assert(bit_size <= 64);
-    bool is_zero = memcmp(&value->storage.Immediate.bits, &(u64){0}, bit_size / 8) == 0;
+    bool is_zero = memcmp(&storage->Immediate.bits, &(u64){0}, bit_size / 8) == 0;
     if (is_zero) {
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
@@ -454,9 +456,9 @@ encode_inverted_conditional_jump(
     }
     return;
   }
-  if (value->storage.tag == Storage_Tag_Eflags) {
+  if (storage->tag == Storage_Tag_Eflags) {
     const X64_Mnemonic *mnemonic = 0;
-    switch(value->storage.Eflags.compare_type) {
+    switch(storage->Eflags.compare_type) {
       case Compare_Type_Equal: mnemonic = jne; break;
       case Compare_Type_Not_Equal: mnemonic = je; break;
 
@@ -476,12 +478,12 @@ encode_inverted_conditional_jump(
       &(Instruction_Assembly){mnemonic, {code_label32(to_label)}}
     );
   } else {
-    if (value->storage.tag == Storage_Tag_Register) {
-      Storage test_storage = value->storage;
-      bool is_packed = value->storage.Register.offset_in_bits != 0;
+    if (storage->tag == Storage_Tag_Register) {
+      Storage test_storage = *storage;
+      bool is_packed = storage->Register.offset_in_bits != 0;
       if (is_packed) {
         test_storage = storage_register(register_acquire_temp(builder), value->descriptor->bit_size);
-        move_value(builder, source_range, &test_storage, &value->storage);
+        move_value(builder, source_range, &test_storage, storage);
       }
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
@@ -493,12 +495,12 @@ encode_inverted_conditional_jump(
       if (bit_size == 32 || bit_size == 64) {
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
-          &(Instruction_Assembly){cmp, {value->storage, imm32(0)}}
+          &(Instruction_Assembly){cmp, {*storage, imm32(0)}}
         );
       } else if (bit_size == 8) {
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range,
-          &(Instruction_Assembly){cmp, {value->storage, imm8(0)}}
+          &(Instruction_Assembly){cmp, {*storage, imm8(0)}}
         );
       } else {
         assert(!"Unsupported value inside `if`");
@@ -724,7 +726,7 @@ ensure_function_instance(
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = value_as_value_view(literal->body);
     parse_result = token_parse_expression(context, &body_parser, *view, &(u32){0}, 0);
-  } else if (literal->body->descriptor == &descriptor_lazy_value) {
+  } else if (literal->body->tag == Value_Tag_Lazy) {
     parse_result = literal->body;
   } else {
     panic("Unexpected function body type");
@@ -807,15 +809,17 @@ program_init_startup_code(
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
     Value *instance = ensure_function_instance(context, fn, (Value_View){0});
+    assert(instance->tag == Value_Tag_Forced);
     push_eagerly_encoded_assembly(
       &builder.code_block, source_range,
-      &(Instruction_Assembly){call, {instance->storage}}
+      &(Instruction_Assembly){call, {instance->Forced.storage}}
     );
   }
   Value *entry_instance = ensure_function_instance(context, program->entry_point, (Value_View){0});
+  assert(entry_instance->tag == Value_Tag_Forced);
   push_eagerly_encoded_assembly(
     &builder.code_block, source_range,
-    &(Instruction_Assembly){jmp, {entry_instance->storage}}
+    &(Instruction_Assembly){jmp, {entry_instance->Forced.storage}}
   );
 
   program->entry_point = function;

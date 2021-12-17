@@ -1265,6 +1265,23 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Value">
+  <DisplayString Condition="tag == Value_Tag_Lazy">
+    Lazy { Lazy }
+  </DisplayString>
+  <DisplayString Condition="tag == Value_Tag_Forced">
+    Forced { Forced }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="flags">flags</Item>
+    <Item Name="_flags_padding">_flags_padding</Item>
+    <Item Name="descriptor">descriptor</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="Lazy" Condition="tag == Value_Tag_Lazy">Lazy</Item>
+    <Item Name="Forced" Condition="tag == Value_Tag_Forced">Forced</Item>
+  </Expand>
+</Type>
 <Type Name="Array_Register_Bitset">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -1357,33 +1374,6 @@
     <Item Name="tag">tag</Item>
     <Item Name="Exact" Condition="tag == Expected_Result_Tag_Exact">Exact</Item>
     <Item Name="Flexible" Condition="tag == Expected_Result_Tag_Flexible">Flexible</Item>
-  </Expand>
-</Type>
-<Type Name="Array_Lazy_Value">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Lazy_Value_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Array_Const_Lazy_Value_Ptr">
-  <Expand>
-    <Item Name="[length]">data->length</Item>
-    <ArrayItems>
-      <Size>data->length</Size>
-      <ValuePointer>data->items</ValuePointer>
-    </ArrayItems>
   </Expand>
 </Type>
 <Type Name="Array_Lazy_Static_Value">

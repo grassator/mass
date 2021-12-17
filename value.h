@@ -285,8 +285,9 @@ value_init(
   Source_Range source_range
 ) {
   *result = (Value) {
+    .tag = Value_Tag_Forced,
     .descriptor = descriptor,
-    .storage = storage,
+    .Forced.storage = storage,
     .source_range = source_range,
   };
   if (descriptor && storage.tag != Storage_Tag_None && !storage_is_label(&storage)) {

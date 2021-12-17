@@ -45,14 +45,6 @@ mass_assign_helper(
   const Source_Range *source_range
 );
 
-static void
-load_address(
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *result_value,
-  Storage storage
-);
-
 static Storage
 value_maybe_dereference(
   Mass_Context *context,

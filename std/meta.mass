@@ -12,14 +12,16 @@ context_error :: fn(context : &MASS.Context, error : MASS.Error) {
 
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   assert(same_type(value.descriptor, type))
-  assert(value.descriptor.bit_size.as_u64 == value.storage.bit_size.as_u64)
+  assert(value.tag == MASS.Value_Tag.Forced)
+  storage := &value.Forced.storage
+  assert(value.descriptor.bit_size.as_u64 == storage.bit_size.as_u64)
 
-  if value.storage.tag == MASS.Storage_Tag.Static then {
-    value.storage.Static.pointer
-  } else if value.storage.tag == MASS.Storage_Tag.Immediate then {
-    &value.storage.Immediate.bits
+  if storage.tag == MASS.Storage_Tag.Static then {
+    storage.Static.pointer
+  } else if storage.tag == MASS.Storage_Tag.Immediate then {
+    &storage.Immediate.bits
   } else {
-    assert(value.storage.tag == MASS.Storage_Tag.Static)
+    assert(storage.tag == MASS.Storage_Tag.Static)
     0
   }
 }
@@ -34,14 +36,15 @@ static_value :: fn(
   pointee_type :: type.Pointer_To.descriptor
 
   static_value := allocate(compilation.allocator, Value)
+  static_value.tag = MASS.Value_Tag.Forced
   static_value.source_range = source_range
   static_value.descriptor = pointee_type
 
-  static_value.storage.tag = MASS.Storage_Tag.Static
-  static_value.storage.bit_size = pointee_type.bit_size
+  static_value.Forced.storage.tag = MASS.Storage_Tag.Static
+  static_value.Forced.storage.bit_size = pointee_type.bit_size
 
   static_assert(pointee_type.bit_size > 64)
-  static_value.storage.Static.pointer = pointer
+  static_value.Forced.storage.Static.pointer = pointer
 
   static_value
 }
@@ -55,12 +58,13 @@ immediate :: fn(
   static_assert(type.bit_size <= 64, "Type is too large to fit into an immediate")
 
   static_value := allocate(compilation.allocator, Value)
+  static_value.tag = MASS.Value_Tag.Forced
   static_value.source_range = source_range
   static_value.descriptor = type
 
-  static_value.storage.tag = MASS.Storage_Tag.Immediate
-  static_value.storage.bit_size = type.bit_size
-  cast(type, static_value.storage.Immediate.bits) = source
+  static_value.Forced.storage.tag = MASS.Storage_Tag.Immediate
+  static_value.Forced.storage.bit_size = type.bit_size
+  cast(type, static_value.Forced.storage.Immediate.bits) = source
 
   static_value
 }

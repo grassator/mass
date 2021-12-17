@@ -255,6 +255,27 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Value")),
     type_value_value
   );
+  Source_Range Value_Tag__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Value_Tag__source_range, "Value_Tag");
+  scope_define_enum(
+    compilation, scope, Value_Tag__source_range,
+    slice_literal("Value_Tag"), type_value_tag_value,
+    value_tag_items, countof(value_tag_items)
+  );
+  Source_Range Value_Lazy__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Value_Lazy__source_range, "Value_Lazy");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Value_Lazy__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Value_Lazy")),
+    type_value_lazy_value
+  );
+  Source_Range Value_Forced__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Value_Forced__source_range, "Value_Forced");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Value_Forced__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Value_Forced")),
+    type_value_forced_value
+  );
   Source_Range Function_Builder__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Builder__source_range, "Function_Builder");
   scope_define_value(
@@ -289,13 +310,6 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Expected_Result_Flexible__source_range,
     mass_ensure_symbol(compilation, slice_literal("Expected_Result_Flexible")),
     type_expected_result_flexible_value
-  );
-  Source_Range Lazy_Value__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Lazy_Value__source_range, "Lazy_Value");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Lazy_Value__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Lazy_Value")),
-    type_lazy_value_value
   );
   Source_Range Intrinsic_Proc__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Intrinsic_Proc__source_range, "Intrinsic_Proc");

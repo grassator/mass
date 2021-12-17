@@ -93,9 +93,10 @@ Void :: type_of(())
 make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
   value : &MASS.Value = allocate(allocator, MASS.Value)
   value.source_range = source_range.*
+  value.tag = MASS.Value_Tag.Forced
   value.descriptor = Void
-  value.storage.tag = MASS.Storage_Tag.None
-  value.storage.bit_size = value.descriptor.bit_size
+  value.Forced.storage.tag = MASS.Storage_Tag.None
+  value.Forced.storage.bit_size = value.descriptor.bit_size
   value
 }
 
@@ -124,15 +125,13 @@ debugger :: fn() -> () intrinsic {
     make_void(context.allocator, source_range)
   }
 
-
-  lazy_value := allocate(context.allocator, MASS.Lazy_Value)
-  lazy_value.epoch = parser.epoch
+  lazy_value := allocate(context.allocator, MASS.Value)
+  lazy_value.tag = MASS.Value_Tag.Lazy
   lazy_value.descriptor = Void
-  lazy_value.proc = lazy_value_proc
-  lazy_value.payload = 0
+  lazy_value.source_range = arguments.source_range
+  lazy_value.Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload = 0]
 
-  meta :: import("std/meta")
-  meta.static_value(context.compilation, lazy_value, arguments.source_range)
+  lazy_value
 }
 
 true :: cast(bool, 1)
@@ -252,13 +251,13 @@ add_or_subtract :: fn(
   payload := allocate(context.allocator, Payload)
   payload.* = [arguments.0, arguments.1, op_code]
 
-  lazy_value := allocate(context.allocator, MASS.Lazy_Value)
-  lazy_value.epoch = parser.epoch
+  lazy_value := allocate(context.allocator, MASS.Value)
+  lazy_value.tag = MASS.Value_Tag.Lazy
   lazy_value.descriptor = i64
-  lazy_value.proc = lazy_value_proc
-  lazy_value.payload = payload
+  lazy_value.source_range = arguments.source_range
+  lazy_value.Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
 
-  meta.static_value(context.compilation, lazy_value, arguments.source_range)
+  lazy_value
 }
 
 add :: fn(x : i64, y : i64) -> (i64) intrinsic {
@@ -327,26 +326,26 @@ compare :: fn(
     MASS.register_release(builder, temp_rhs_register)
     MASS.register_release(builder, temp_lhs_register)
 
-
     value : &MASS.Value = allocate(context.allocator, MASS.Value)
+    value.tag = MASS.Value_Tag.Forced
     value.source_range = source_range.*
     value.descriptor = bool
-    value.storage.tag = MASS.Storage_Tag.Eflags
-    value.storage.bit_size = value.descriptor.bit_size
-    value.storage.Eflags.compare_type = payload.compare_type
+    value.Forced.storage.tag = MASS.Storage_Tag.Eflags
+    value.Forced.storage.bit_size = value.descriptor.bit_size
+    value.Forced.storage.Eflags.compare_type = payload.compare_type
     value
   }
 
   payload := allocate(context.allocator, Payload)
   payload.* = [arguments.0, arguments.1, compare_type]
 
-  lazy_value := allocate(context.allocator, MASS.Lazy_Value)
-  lazy_value.epoch = parser.epoch
+  lazy_value := allocate(context.allocator, MASS.Value)
+  lazy_value.tag = MASS.Value_Tag.Lazy
   lazy_value.descriptor = bool
-  lazy_value.proc = lazy_value_proc
-  lazy_value.payload = payload
+  lazy_value.source_range = arguments.source_range
+  lazy_value.Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
 
-  meta.static_value(context.compilation, lazy_value, arguments.source_range)
+  lazy_value
 }
 
 make_i64_comparison_fn :: macro(compare_type) {

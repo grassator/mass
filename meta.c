@@ -1584,11 +1584,19 @@ main(void) {
     { "Constant", 1 << 0 },
   }));
 
-  export_compiler(push_type(type_struct("Value", (Struct_Item[]){
+  export_compiler(push_type(add_common_fields(type_union("Value", (Struct_Type[]){
+    struct_fields("Lazy", (Struct_Item[]){
+      { "Epoch", "epoch" },
+      { "void *", "payload" },
+      { "Lazy_Value_Proc", "proc" }
+    }),
+    struct_fields("Forced", (Struct_Item[]){
+      { "Storage", "storage" },
+    }),
+  }), (Struct_Item[]){
     { "Value_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "const Descriptor *", "descriptor" },
-    { "Storage", "storage" },
     { "Source_Range", "source_range" },
   })));
 
@@ -1617,13 +1625,6 @@ main(void) {
     struct_fields("Flexible", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
     }),
-  })));
-
-  export_compiler(push_type(type_struct("Lazy_Value", (Struct_Item[]){
-    { "Epoch", "epoch" },
-    { "const Descriptor *", "descriptor" },
-    { "Lazy_Value_Proc", "proc" },
-    { "void *", "payload" },
   })));
 
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
@@ -1915,13 +1916,6 @@ main(void) {
     { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
   }));
 
-  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "_Bool", (Argument_Type[]){
-    { "Mass_Context *", "context" },
-    { "Parser *", "parser" },
-    { "Value_View", "view" },
-    { "Lazy_Value *", "out_lazy_value" },
-  }));
-
   push_type(type_function(Typedef, "Mass_Trampoline_Proc", "void", (Argument_Type[]){
     { "void *", "payload" },
   }));
@@ -2064,6 +2058,13 @@ main(void) {
     { "const Expected_Result *", "expected_result" },
     { "const Source_Range *", "source_range" },
     { "void *", "payload" },
+  }));
+
+  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "_Bool", (Argument_Type[]){
+    { "Mass_Context *", "context" },
+    { "Parser *", "parser" },
+    { "Value_View", "view" },
+    { "Value_Lazy *", "out_lazy_value" },
   }));
 
   push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){
