@@ -362,9 +362,8 @@ encoding_match(
         encoding = 0;
         break;
       }
-
       if (
-        storage->tag == Storage_Tag_None &&
+        storage->bit_size.as_u64 == 0 &&
         operand_encoding->type == Operand_Encoding_Type_None
       ) {
         continue;

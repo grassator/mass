@@ -442,7 +442,6 @@ value_indirect_from_pointer(
     case Storage_Tag_Unpacked:
     case Storage_Tag_Immediate:
     case Storage_Tag_Static:
-    case Storage_Tag_None:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:{
       panic("Unexpected storage for a reference");
@@ -1936,11 +1935,13 @@ token_match_argument(
         Value *constraint = token_parse_expression(context, parser, maybe_type_expression, &(u32){0}, 0);
         if (mass_has_error(context)) goto err;
         if (!mass_value_ensure_static(context, constraint)) goto err;
-        Value *fake_descriptor_pointer = value_make(
-          context, &descriptor_descriptor_pointer, storage_none, constraint->source_range
-        );
+        Array_Function_Parameter parameters =
+          descriptor_as_function_instance(&descriptor_mass_type_constraint_proc)->info->parameters;
+        Array_Value_Ptr fake_args_array =
+          mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
+        Value_View fake_args_view = value_view_from_value_array(fake_args_array, &constraint->source_range);
         maybe_type_constraint = (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(
-          context, constraint, value_view_single(&fake_descriptor_pointer)
+          context, constraint, fake_args_view
         );
         if (mass_has_error(context)) goto err;
       } else {
@@ -2661,9 +2662,7 @@ compile_time_eval(
   fn_type_opaque jitted_code = (fn_type_opaque)rip_value_pointer_from_label(eval_label);
   jitted_code();
 
-  Storage result_storage = mass_descriptor_is_void(result_descriptor)
-    ? storage_none
-    : storage_immediate_with_bit_size(result, result_descriptor->bit_size);
+  Storage result_storage = storage_immediate_with_bit_size(result, result_descriptor->bit_size);
   return value_make(context, out_value->descriptor, result_storage, *source_range);
 }
 
@@ -3078,12 +3077,11 @@ mass_assert_storage_is_valid_in_context(
   const Mass_Context *context
 ) {
   switch(storage->tag) {
-    case Storage_Tag_Immediate:
     case Storage_Tag_Static: {
       assert(context->program == context->compilation->jit.program);
     } break;
+    case Storage_Tag_Immediate:
     case Storage_Tag_Xmm:
-    case Storage_Tag_None:
     case Storage_Tag_Eflags:
     case Storage_Tag_Unpacked:
     case Storage_Tag_Register: {
@@ -3156,8 +3154,6 @@ call_function_overload(
     } else {
       call_target_storage = *runtime_storage;
     }
-  } else {
-    assert(runtime_storage->tag == Storage_Tag_None);
   }
 
   Temp_Mark temp_mark = context_temp_mark(context);
@@ -3784,13 +3780,13 @@ mass_intrinsic_fake_arg_view() {
     Array_Function_Parameter parameters =
       descriptor_as_function_instance(&descriptor_mass_intrinsic_proc)->info->parameters;
     static Value arg_values[3] = {0};
-    value_init(&arg_values[0], dyn_array_get(parameters, 0)->descriptor, storage_none, (Source_Range){0});
+    arg_values[0] = (Value){ .tag = Value_Tag_Lazy, .descriptor = dyn_array_get(parameters, 0)->descriptor };
     INIT_LITERAL_SOURCE_RANGE(&arg_values[0].source_range, "context");
 
-    value_init(&arg_values[1], dyn_array_get(parameters, 1)->descriptor, storage_none, (Source_Range){0});
+    arg_values[1] = (Value){ .tag = Value_Tag_Lazy, .descriptor = dyn_array_get(parameters, 1)->descriptor };
     INIT_LITERAL_SOURCE_RANGE(&arg_values[1].source_range, "parser");
 
-    value_init(&arg_values[2], dyn_array_get(parameters, 2)->descriptor, storage_none, (Source_Range){0});
+    arg_values[2] = (Value){ .tag = Value_Tag_Lazy, .descriptor = dyn_array_get(parameters, 2)->descriptor };
     INIT_LITERAL_SOURCE_RANGE(&arg_values[2].source_range, "arguments");
 
     assert(dyn_array_length(parameters) == countof(arg_values));
@@ -4009,11 +4005,13 @@ mass_ensure_trampoline(
   );
 
   Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
-  Value *args_struct_value = value_make(context, args_struct_descriptor, storage_none, args_source_range);
+  Array_Value_Ptr fake_args_array =
+    mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
+  Value_View fake_args_view = value_view_from_value_array(fake_args_array, &body_range);
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
     .proc = (Mass_Trampoline_Proc)mass_ensure_jit_function_for_value(
-      &jit_context, literal_value, value_view_single(&args_struct_value)
+      &jit_context, literal_value, fake_args_view
     ),
     .original_info = original_info,
   };
@@ -4321,8 +4319,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         &builder->code_block, result_range,
         &(Instruction_Assembly){mnemonic, {temp_b_storage}}
       );
-      if (maybe_saved_rdx.tag != Storage_Tag_None) {
-        assert(maybe_saved_rdx.tag == Storage_Tag_Register);
+      if (maybe_saved_rdx.tag == Storage_Tag_Register) {
         move_value(builder, &result_range, &reg_d, &maybe_saved_rdx);
         register_release(builder, maybe_saved_rdx.Register.index);
       }
@@ -4428,8 +4425,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       }
 
       storage_release_if_temporary(builder, &temp_divisor_storage);
-      if (maybe_saved_rdx.tag != Storage_Tag_None) {
-        assert(maybe_saved_rdx.tag == Storage_Tag_Register);
+      if (maybe_saved_rdx.tag == Storage_Tag_Register) {
         move_value(builder, &result_range, &reg_d, &maybe_saved_rdx);
         register_release(builder, maybe_saved_rdx.Register.index);
       }
@@ -6087,7 +6083,8 @@ token_parse_function_literal(
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
 
-    return value_make(context, fn_descriptor, storage_none, view.source_range);
+    // FIXME use storage value instead of call_setup.jump.Syscall.number
+    return value_make(context, fn_descriptor, imm64(syscall_number.bits), view.source_range);
   }
 
   if (value_is_intrinsic(body_value)) header.flags |= Function_Header_Flags_Intrinsic;

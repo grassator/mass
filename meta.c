@@ -1389,7 +1389,9 @@ main(void) {
   })));
 
   export_compiler(push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
-    struct_empty("None"),
+    struct_fields("Immediate", (Struct_Item[]){
+      { "u64", "bits" },
+    }),
     struct_fields("Eflags", (Struct_Item[]){
       { "Compare_Type", "compare_type" },
     }),
@@ -1404,9 +1406,6 @@ main(void) {
     }),
     struct_fields("Static", (Struct_Item[]){
       { "const void *", "pointer" },
-    }),
-    struct_fields("Immediate", (Struct_Item[]){
-      { "u64", "bits" },
     }),
     struct_fields("Memory", (Struct_Item[]){
       { "Memory_Location", "location" },

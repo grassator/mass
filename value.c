@@ -10,7 +10,6 @@ mass_value_is_compile_time_known(
   if (!value) return false;
   if (value->tag != Value_Tag_Forced) return false;
   switch(value->Forced.storage.tag) {
-    case Storage_Tag_None:
     case Storage_Tag_Static:
     case Storage_Tag_Immediate: {
       return true;
@@ -428,8 +427,10 @@ storage_immediate_with_bit_size(
   };
   assert(bit_size.as_u64 <= sizeof(result.Immediate.bits) * CHAR_BIT);
   result.Immediate.bits = 0;
-  assert(source);
-  memcpy(&result.Immediate.bits, source, bit_size.as_u64 / CHAR_BIT);
+  if (bit_size.as_u64) {
+    assert(source);
+    memcpy(&result.Immediate.bits, source, bit_size.as_u64 / CHAR_BIT);
+  }
   return result;
 }
 
@@ -498,8 +499,7 @@ storage_with_offset_and_bit_size(
   switch(base->tag) {
     default:
     case Storage_Tag_Eflags:
-    case Storage_Tag_Xmm:
-    case Storage_Tag_None: {
+    case Storage_Tag_Xmm: {
       panic("Internal Error: Unexpected storage type for structs");
     } break;
     case Storage_Tag_Immediate: {
@@ -744,9 +744,6 @@ storage_equal(
         a->Register.offset_in_bits == b->Register.offset_in_bits
       );
     }
-    case Storage_Tag_None: {
-      return true;
-    }
   }
   panic("Unknown operand type");
   return false;
@@ -904,7 +901,6 @@ storage_release_if_temporary(
       register_release(builder, storage->Unpacked.registers[1]);
       break;
     }
-    case Storage_Tag_None:
     case Storage_Tag_Eflags:
     case Storage_Tag_Immediate:
     case Storage_Tag_Static: {
@@ -1057,10 +1053,12 @@ mass_fake_argument_array_from_parameters(
   DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
     assert(param->tag == Function_Parameter_Tag_Runtime);
     assert(param->descriptor);
-    Value *fake_value = value_init(
-      allocator_allocate(allocator, Value),
-      param->descriptor, storage_none, param->source_range
-    );
+    Value *fake_value = allocator_allocate(allocator, Value);
+    *fake_value = (Value){
+      .tag = Value_Tag_Lazy,
+      .descriptor = param->descriptor,
+      .source_range = param->source_range,
+    };
     dyn_array_push(fake_args, fake_value);
   }
   return fake_args;

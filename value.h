@@ -269,7 +269,7 @@ storage_equal(
   const Storage *b
 );
 
-#define storage_none ((const Storage){.tag = Storage_Tag_None })
+const Storage storage_none = { .tag = Storage_Tag_Immediate, .bit_size = {0} };
 
 static Fixed_Buffer *
 mass_error_to_string(
@@ -290,7 +290,7 @@ value_init(
     .Forced.storage = storage,
     .source_range = source_range,
   };
-  if (descriptor && storage.tag != Storage_Tag_None && !storage_is_label(&storage)) {
+  if (descriptor && !storage_is_label(&storage)) {
     assert(descriptor->bit_size.as_u64 == storage.bit_size.as_u64);
   }
   return result;
@@ -316,7 +316,8 @@ mass_make_void(
   Mass_Context *context,
   const Source_Range source_range
 ) {
-  return value_make(context, &descriptor_void, storage_none, source_range);
+  Storage storage = { .tag = Storage_Tag_Immediate, .bit_size = {0} };
+  return value_make(context, &descriptor_void, storage, source_range);
 }
 
 static inline bool

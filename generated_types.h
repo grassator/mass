@@ -291,11 +291,11 @@ typedef dyn_array_type(Storage_Flags *) Array_Storage_Flags_Ptr;
 typedef dyn_array_type(const Storage_Flags *) Array_Const_Storage_Flags_Ptr;
 
 typedef struct Storage Storage;
+typedef struct Storage_Immediate Storage_Immediate;
 typedef struct Storage_Eflags Storage_Eflags;
 typedef struct Storage_Register Storage_Register;
 typedef struct Storage_Xmm Storage_Xmm;
 typedef struct Storage_Static Storage_Static;
-typedef struct Storage_Immediate Storage_Immediate;
 typedef struct Storage_Memory Storage_Memory;
 typedef struct Storage_Unpacked Storage_Unpacked;
 typedef dyn_array_type(Storage *) Array_Storage_Ptr;
@@ -1262,16 +1262,18 @@ memory_location_as_stack(const Memory_Location *memory_location) {
 }
 typedef dyn_array_type(Memory_Location) Array_Memory_Location;
 typedef enum {
-  Storage_Tag_None = 0,
+  Storage_Tag_Immediate = 0,
   Storage_Tag_Eflags = 1,
   Storage_Tag_Register = 2,
   Storage_Tag_Xmm = 3,
   Storage_Tag_Static = 4,
-  Storage_Tag_Immediate = 5,
-  Storage_Tag_Memory = 6,
-  Storage_Tag_Unpacked = 7,
+  Storage_Tag_Memory = 5,
+  Storage_Tag_Unpacked = 6,
 } Storage_Tag;
 
+typedef struct Storage_Immediate {
+  u64 bits;
+} Storage_Immediate;
 typedef struct Storage_Eflags {
   Compare_Type compare_type;
 } Storage_Eflags;
@@ -1287,9 +1289,6 @@ typedef struct Storage_Xmm {
 typedef struct Storage_Static {
   const void * pointer;
 } Storage_Static;
-typedef struct Storage_Immediate {
-  u64 bits;
-} Storage_Immediate;
 typedef struct Storage_Memory {
   Memory_Location location;
 } Storage_Memory;
@@ -1303,15 +1302,20 @@ typedef struct Storage {
   u32 _flags_padding;
   Bits bit_size;
   union {
+    Storage_Immediate Immediate;
     Storage_Eflags Eflags;
     Storage_Register Register;
     Storage_Xmm Xmm;
     Storage_Static Static;
-    Storage_Immediate Immediate;
     Storage_Memory Memory;
     Storage_Unpacked Unpacked;
   };
 } Storage;
+static inline const Storage_Immediate *
+storage_as_immediate(const Storage *storage) {
+  assert(storage->tag == Storage_Tag_Immediate);
+  return &storage->Immediate;
+}
 static inline const Storage_Eflags *
 storage_as_eflags(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Eflags);
@@ -1331,11 +1335,6 @@ static inline const Storage_Static *
 storage_as_static(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Static);
   return &storage->Static;
-}
-static inline const Storage_Immediate *
-storage_as_immediate(const Storage *storage) {
-  assert(storage->tag == Storage_Tag_Immediate);
-  return &storage->Immediate;
 }
 static inline const Storage_Memory *
 storage_as_memory(const Storage *storage) {
@@ -3614,15 +3613,22 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_storage_ptr, Array_Storage_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_storage, Array_Storage)
 MASS_DEFINE_OPAQUE_C_TYPE(storage_tag, Storage_Tag)
 static C_Enum_Item storage_tag_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Immediate"), .value = 0 },
 { .name = slice_literal_fields("Eflags"), .value = 1 },
 { .name = slice_literal_fields("Register"), .value = 2 },
 { .name = slice_literal_fields("Xmm"), .value = 3 },
 { .name = slice_literal_fields("Static"), .value = 4 },
-{ .name = slice_literal_fields("Immediate"), .value = 5 },
-{ .name = slice_literal_fields("Memory"), .value = 6 },
-{ .name = slice_literal_fields("Unpacked"), .value = 7 },
+{ .name = slice_literal_fields("Memory"), .value = 5 },
+{ .name = slice_literal_fields("Unpacked"), .value = 6 },
 };
+MASS_DEFINE_STRUCT_DESCRIPTOR(storage_immediate, Storage_Immediate,
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("bits"),
+    .offset = offsetof(Storage_Immediate, bits),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(storage_immediate);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_eflags, Storage_Eflags,
   {
     .descriptor = &descriptor_compare_type,
@@ -3670,14 +3676,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_static, Storage_Static,
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_static);
-MASS_DEFINE_STRUCT_DESCRIPTOR(storage_immediate, Storage_Immediate,
-  {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("bits"),
-    .offset = offsetof(Storage_Immediate, bits),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(storage_immediate);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_memory, Storage_Memory,
   {
     .descriptor = &descriptor_memory_location,
@@ -3716,6 +3714,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
     .offset = offsetof(Storage, bit_size),
   },
   {
+    .name = slice_literal_fields("Immediate"),
+    .descriptor = &descriptor_storage_immediate,
+    .offset = offsetof(Storage, Immediate),
+  },
+  {
     .name = slice_literal_fields("Eflags"),
     .descriptor = &descriptor_storage_eflags,
     .offset = offsetof(Storage, Eflags),
@@ -3734,11 +3737,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
     .name = slice_literal_fields("Static"),
     .descriptor = &descriptor_storage_static,
     .offset = offsetof(Storage, Static),
-  },
-  {
-    .name = slice_literal_fields("Immediate"),
-    .descriptor = &descriptor_storage_immediate,
-    .offset = offsetof(Storage, Immediate),
   },
   {
     .name = slice_literal_fields("Memory"),

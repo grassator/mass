@@ -129,6 +129,13 @@ compiler_scope_define_exports(
     slice_literal("Storage_Tag"), type_storage_tag_value,
     storage_tag_items, countof(storage_tag_items)
   );
+  Source_Range Storage_Immediate__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Storage_Immediate__source_range, "Storage_Immediate");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Storage_Immediate__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Immediate")),
+    type_storage_immediate_value
+  );
   Source_Range Storage_Eflags__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Storage_Eflags__source_range, "Storage_Eflags");
   scope_define_value(
@@ -156,13 +163,6 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Storage_Static__source_range,
     mass_ensure_symbol(compilation, slice_literal("Storage_Static")),
     type_storage_static_value
-  );
-  Source_Range Storage_Immediate__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Storage_Immediate__source_range, "Storage_Immediate");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Storage_Immediate__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Storage_Immediate")),
-    type_storage_immediate_value
   );
   Source_Range Storage_Memory__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Storage_Memory__source_range, "Storage_Memory");

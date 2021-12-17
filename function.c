@@ -49,7 +49,6 @@ register_bitset_from_storage(
 ) {
   u64 result = 0;
   switch(storage->tag) {
-    case Storage_Tag_None:
     case Storage_Tag_Static:
     case Storage_Tag_Immediate: {
       // Nothing to do
@@ -536,7 +535,6 @@ function_return_value_register_from_storage(
       }
       break;
     }
-    case Storage_Tag_None:
     case Storage_Tag_Unpacked:
     case Storage_Tag_Immediate:
     case Storage_Tag_Static:

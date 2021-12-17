@@ -95,7 +95,7 @@ make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&
   value.source_range = source_range.*
   value.tag = MASS.Value_Tag.Forced
   value.descriptor = Void
-  value.Forced.storage.tag = MASS.Storage_Tag.None
+  value.Forced.storage.tag = MASS.Storage_Tag.Immediate
   value.Forced.storage.bit_size = value.descriptor.bit_size
   value
 }
