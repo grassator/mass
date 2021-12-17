@@ -1348,40 +1348,55 @@ tokenizer_maybe_push_statement(
   return true;
 }
 
-static inline Value *
-tokenizer_group_start(
-  const Allocator *allocator,
+static inline void
+tokenizer_group_push(
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
-  const Descriptor *group_descriptor,
-  Source_Range source_range
+  Value *value
 ) {
-  Value *value = value_init(
-    allocator_allocate(allocator, Value),
-    group_descriptor, storage_none, source_range
-  );
   dyn_array_push(*parent_stack, (Tokenizer_Parent){
     .value = value,
     .index = dyn_array_length(*stack)
   });
   dyn_array_push(*stack, value);
-  return value;
 }
 
 static inline void
 tokenizer_group_start_curly(
-  const Allocator *allocator,
+  Mass_Context *context,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
   Source_Range source_range
 ) {
-  Value *value = tokenizer_group_start(allocator, stack, parent_stack, &descriptor_ast_block, source_range);
-  assert(value->tag == Value_Tag_Forced);
-  assert(value->Forced.storage.tag == Storage_Tag_None);
-  Ast_Block *group = allocator_allocate(allocator, Ast_Block);
+  Ast_Block *group = mass_allocate(context, Ast_Block);
   // TODO use temp allocator first?
-  *group = (Ast_Block){.statements = dyn_array_make(Array_Value_View, .allocator = allocator)};
-  value->Forced.storage = storage_immediate(group);
+  *group = (Ast_Block){.statements = dyn_array_make(Array_Value_View, .allocator = context->allocator)};
+  Value *value = value_make(context, &descriptor_ast_block, storage_immediate(group), source_range);
+  tokenizer_group_push(stack, parent_stack, value);
+}
+
+static inline void
+tokenizer_group_start_paren(
+  Mass_Context *context,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  Source_Range source_range
+) {
+  Group_Paren *group = mass_allocate(context, Group_Paren);
+  Value *value = value_make(context, &descriptor_group_paren, storage_static(group), source_range);
+  tokenizer_group_push(stack, parent_stack, value);
+}
+
+static inline void
+tokenizer_group_start_square(
+  Mass_Context *context,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  Source_Range source_range
+) {
+  Group_Paren *group = mass_allocate(context, Group_Paren);
+  Value *value = value_make(context, &descriptor_group_square, storage_static(group), source_range);
+  tokenizer_group_push(stack, parent_stack, value);
 }
 
 static inline bool

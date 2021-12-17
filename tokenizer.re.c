@@ -11,10 +11,7 @@ tokenize(
   Source_Range source_range,
   Array_Value_View *out_statements
 ) {
-  Compilation *compilation = context->compilation;
   Slice input = source_range.file->text;
-
-  const Allocator *allocator = compilation->allocator;
 
   Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
   Array_Tokenizer_Parent parent_stack =
@@ -39,7 +36,7 @@ tokenize(
     }
 
   // Create top-level block
-  tokenizer_group_start_curly(allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE());
+  tokenizer_group_start_curly(context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE());
 
   #define TOKENIZER_CURRENT_SLICE()\
     slice_sub(input, token_start_offset, offset)
@@ -73,9 +70,7 @@ tokenize(
     )
 
   #define TOKENIZER_GROUP_START(_VARIANT_)\
-    tokenizer_group_start(\
-      allocator, &stack, &parent_stack, &descriptor_group_##_VARIANT_, TOKENIZER_CURRENT_RANGE()\
-    )
+    tokenizer_group_start_##_VARIANT_(context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE())
 
   #define TOKENIZER_GROUP_END(_VARIANT_)\
     if (!tokenizer_group_end_##_VARIANT_(context, &stack, &parent_stack, offset))\
@@ -124,10 +119,7 @@ tokenize(
 
       "(" { TOKENIZER_GROUP_START(paren); continue; }
       "[" { TOKENIZER_GROUP_START(square); continue; }
-      "{" {
-        tokenizer_group_start_curly(allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE());
-        continue;
-      }
+      "{" { TOKENIZER_GROUP_START(curly); continue; }
       ")" { TOKENIZER_GROUP_END(paren); continue; }
       "]" { TOKENIZER_GROUP_END(square); continue; }
       "}" { TOKENIZER_GROUP_END(curly); continue; }
