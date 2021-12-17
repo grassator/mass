@@ -246,7 +246,7 @@ x86_64_system_v_parameter_for_classification(
   u64 *stack_offset
 ) {
   u64 byte_size = descriptor_byte_size(classification->descriptor);
-  Storage storage = storage_none;
+  Storage storage = imm0;
   switch(classification->class) {
     case SYSTEM_V_NO_CLASS: {
       goto absolute;
@@ -689,9 +689,9 @@ calling_convention_x86_64_system_v_call_setup_proc(
   };
   bool is_indirect_return = false;
   const Descriptor *return_descriptor = function->return_descriptor;
-  if (mass_descriptor_is_void(return_descriptor)) {
-    result.callee_return = storage_none;
-    result.caller_return = storage_none;
+  if (!return_descriptor->bit_size.as_u64) {
+    result.callee_return = imm0;
+    result.caller_return = imm0;
   } else {
     static const Register general_registers[] = { Register_A, Register_D };
     static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
@@ -792,9 +792,9 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   const Descriptor *return_descriptor = function->return_descriptor;
-  if (mass_descriptor_is_void(return_descriptor)) {
-    result.callee_return = storage_none;
-    result.caller_return = storage_none;
+  if (!return_descriptor->bit_size.as_u64) {
+    result.callee_return = imm0;
+    result.caller_return = imm0;
   } else {
     // TODO provide user error? or should it be handled earlier?
     assert(return_descriptor->bit_size.as_u64 == 32);
@@ -866,9 +866,9 @@ calling_convention_x86_64_windows_call_setup_proc(
   };
   const Descriptor *return_descriptor = function->return_descriptor;
   bool is_indirect_return = false;
-  if (mass_descriptor_is_void(return_descriptor)) {
-    result.callee_return = storage_none;
-    result.caller_return = storage_none;
+  if (!return_descriptor->bit_size.as_u64) {
+    result.callee_return = imm0;
+    result.caller_return = imm0;
   } else {
     Bits bit_size = return_descriptor->bit_size;
     if (descriptor_is_float(return_descriptor)) {

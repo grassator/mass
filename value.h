@@ -269,7 +269,7 @@ storage_equal(
   const Storage *b
 );
 
-const Storage storage_none = { .tag = Storage_Tag_Immediate, .bit_size = {0} };
+const Storage imm0 = { .tag = Storage_Tag_Immediate, .bit_size = {0} };
 
 static Fixed_Buffer *
 mass_error_to_string(

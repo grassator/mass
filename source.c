@@ -51,15 +51,14 @@ mass_value_from_expected_result(
       return value_make(context, descriptor, storage, source_range);
     } break;
     case Expected_Result_Tag_Flexible: {
-      if (mass_descriptor_is_void(descriptor)) {
-        return mass_make_void(context, source_range);
-      }
-      Storage storage = storage_none;
+      Storage storage;
       if (descriptor->bit_size.as_u64 <= 64) {
         Register reg = register_acquire_temp(builder);
         storage = storage_register(reg, descriptor->bit_size);
       } else if (descriptor->bit_size.as_u64) {
         storage = reserve_stack_storage(builder, descriptor->bit_size);
+      } else {
+        storage = imm0;
       }
       storage.flags |= Storage_Flags_Temporary;
       return value_make(context, descriptor, storage, source_range);
@@ -3129,12 +3128,8 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &runtime_descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  const Descriptor *return_descriptor = fn_info->return_descriptor;
-  Storage return_storage = storage_none;
-  if (!mass_descriptor_is_void(return_descriptor)) {
-    return_storage = instance_descriptor->call_setup.caller_return;
-    return_storage.flags |= Storage_Flags_Temporary;
-  }
+  Storage return_storage = instance_descriptor->call_setup.caller_return;
+  return_storage.flags |= Storage_Flags_Temporary;
 
   const Function_Call_Setup *call_setup = &instance_descriptor->call_setup;
 
@@ -3142,7 +3137,7 @@ call_function_overload(
   // When call target is temporary it might reside in a register that is used for argument passing.
   // To make sure the target is not overwritten with the argument we move it to an empty register.
   // :InstructionQuality The move described above is not always necessary
-  Storage call_target_storage = storage_none;
+  Storage call_target_storage = *runtime_storage;
   if (call_setup->jump.tag == Function_Call_Jump_Tag_Call) {
     if (runtime_storage->tag == Storage_Tag_Register) {
       call_target_storage = reserve_stack_storage(builder, (Bits){64});
@@ -3151,8 +3146,6 @@ call_function_overload(
       move_value(builder, source_range, &call_target_storage, runtime_storage);
       storage_release_if_temporary(builder, runtime_storage);
       runtime_value = 0;
-    } else {
-      call_target_storage = *runtime_storage;
     }
   }
 
@@ -4278,7 +4271,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // Save RDX as it will be used for the result overflow
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
-      Storage maybe_saved_rdx = storage_none;
+      Storage maybe_saved_rdx = {0};
       Storage reg_d = storage_register(Register_D, (Bits){64});
       if (
         expected_result->tag != Expected_Result_Tag_Exact ||
@@ -4354,7 +4347,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // Save RDX as it will be used for the remainder
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
-      Storage maybe_saved_rdx = storage_none;
+      Storage maybe_saved_rdx = {0};
       Storage reg_d = storage_register(Register_D, (Bits){64});
       if (register_bitset_get(builder->register_occupied_bitset.bits, Register_D)) {
         if (
@@ -5028,9 +5021,9 @@ mass_handle_variable_definition_lazy_proc(
   const Source_Range *source_range,
   Mass_Variable_Definition_Lazy_Payload *payload
 ) {
-  Storage storage = mass_descriptor_is_void(payload->descriptor)
-    ? storage_none
-    : reserve_stack_storage(builder, payload->descriptor->bit_size);
+  Storage storage = payload->descriptor->bit_size.as_u64
+    ? reserve_stack_storage(builder, payload->descriptor->bit_size)
+    : (Storage){.tag = Storage_Tag_Immediate, .bit_size = payload->descriptor->bit_size};
   return value_make(
     context, payload->descriptor, storage, *source_range
   );
@@ -6248,7 +6241,7 @@ mass_handle_block_lazy_proc(
   u64 statement_count = dyn_array_length(lazy_statements);
   assert(statement_count);
   Value *result_value = 0;
-  Expected_Result expected_void = mass_expected_result_exact(&descriptor_void, storage_none);
+  Expected_Result expected_void = mass_expected_result_exact(&descriptor_void, imm0);
   for (u64 i = 0; i < statement_count; ++i) {
     if (mass_has_error(context)) return 0;
     Register_Bitset registers_before = (Register_Bitset){0};
