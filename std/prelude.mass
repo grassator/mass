@@ -59,6 +59,7 @@ startup :: fn(callback : fn() -> ()) -> () MASS.startup
 is_pointer_type :: MASS.constraint_pointer_type
 is_fixed_array_type :: MASS.constraint_fixed_array_type
 is_struct_type :: MASS.constraint_struct_type
+is_function_instance_type :: MASS.constraint_function_instance_type
 
 string_get :: fn(string : String, offset : i64) => (i8) {
   using unsigned

@@ -5410,6 +5410,13 @@ mass_constraint_struct_type(
   return descriptor->tag == Descriptor_Tag_Struct ? descriptor : 0;
 }
 
+static const Descriptor *
+mass_constraint_function_instance_type(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Function_Instance ? descriptor : 0;
+}
+
 static Value *
 mass_module_get(
   Mass_Context *context,

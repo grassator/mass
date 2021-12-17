@@ -842,6 +842,9 @@ static const Descriptor * mass_constraint_struct_type
 static const Descriptor * mass_constraint_fixed_array_type
   (const Descriptor * descriptor);
 
+static const Descriptor * mass_constraint_function_instance_type
+  (const Descriptor * descriptor);
+
 static const Descriptor * descriptor_pointer_to
   (Compilation * compilation, const Descriptor * descriptor);
 
@@ -2777,6 +2780,7 @@ static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_mass_constraint_pointer_type;
 static Descriptor descriptor_mass_constraint_struct_type;
 static Descriptor descriptor_mass_constraint_fixed_array_type;
+static Descriptor descriptor_mass_constraint_function_instance_type;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_same_type;
 static Descriptor descriptor_register_acquire_temp;

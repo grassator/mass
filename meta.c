@@ -2153,6 +2153,11 @@ main(void) {
       { "const Descriptor *", "descriptor" },
     })
   ));
+  export_compiler_custom_name("constraint_function_instance_type", push_type(
+    type_function(Default, "mass_constraint_function_instance_type", "const Descriptor *", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+    })
+  ));
 
   export_compiler(push_type(
     type_function(Default, "descriptor_pointer_to", "const Descriptor *", (Argument_Type[]){
