@@ -2692,7 +2692,6 @@ static bool mass_i64_unsigned_greater(i64 a, i64 b) { return a.bits > b.bits; }
 static bool mass_i64_signed_greater_equal(i64 a, i64 b) { return (s64)a.bits >= (s64)b.bits; }
 static bool mass_i64_unsigned_greater_equal(i64 a, i64 b) { return a.bits >= b.bits; }
 
-
 static Value *
 mass_handle_cast_lazy_proc(
   Mass_Context *context,
@@ -2719,7 +2718,7 @@ mass_handle_cast_lazy_proc(
     );
   } else {
     if (cast_to_bit_size.as_u64 > original_bit_size.as_u64) {
-      panic("TODO user error or trying to cast to a larger type");
+      panic("TODO user error");
       return 0;
     } else {
       const Storage *original_storage = &value_as_forced(value)->storage;
@@ -2799,16 +2798,84 @@ mass_cast_helper(
 }
 
 static Value *
+mass_zero_extend_lazy_proc(
+  Mass_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  const Source_Range *source_range,
+  Mass_Cast_Lazy_Payload *payload
+) {
+  const Descriptor *target_descriptor = payload->target;
+  Value *expression = payload->expression;
+  const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
+
+  Bits cast_to_bit_size = target_descriptor->bit_size;
+  Bits original_bit_size = source_descriptor->bit_size;
+
+  if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
+    panic("TODO user error");
+    return 0;
+  }
+
+  Value *result = mass_value_from_expected_result(context, builder, expected_result, *source_range);
+  const Storage *result_storage = &value_as_forced(result)->storage;
+  if (cast_to_bit_size.as_u64 > original_bit_size.as_u64) {
+    if (cast_to_bit_size.as_u64 > 64) panic("TODO support large zero-extension");
+    Storage zero = imm64(0);
+    zero.bit_size = cast_to_bit_size;
+    move_value(builder, source_range, result_storage, &zero);
+  }
+  Storage adjusted_storage = *result_storage;
+  adjusted_storage.bit_size = original_bit_size;
+  Expected_Result adjusted_expected_result =
+    mass_expected_result_exact(source_descriptor, adjusted_storage);
+  (void)value_force(context, builder, &adjusted_expected_result, expression);
+
+  return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, result);
+}
+
+static Value *
+mass_zero_extend(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  assert(args_view.length == 2);
+  const Descriptor *target_descriptor = value_ensure_type(
+    context, parser->scope, value_view_get(&args_view, 0), args_view.source_range
+  );
+  if (mass_has_error(context)) return 0;
+  Value *expression = value_view_get(&args_view, 1);
+
+  Mass_Cast_Lazy_Payload lazy_payload = {
+    .target = target_descriptor,
+    .expression = expression,
+  };
+
+  if (mass_value_is_compile_time_known(expression)) {
+    Expected_Result expected_result = expected_result_any(target_descriptor);
+    return mass_zero_extend_lazy_proc(context, 0, &expected_result, &args_view.source_range, &lazy_payload);
+  }
+
+  Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
+  *heap_payload = lazy_payload;
+
+  return mass_make_lazy_value(
+    context, parser, args_view.source_range, heap_payload, target_descriptor, mass_zero_extend_lazy_proc
+  );
+}
+
+static Value *
 mass_cast(
   Mass_Context *context,
   Parser *parser,
   Value_View args_view
 ) {
-  if (mass_has_error(context)) return 0;
   assert(args_view.length == 2);
   const Descriptor *target_descriptor = value_ensure_type(
     context, parser->scope, value_view_get(&args_view, 0), args_view.source_range
   );
+  if (mass_has_error(context)) return 0;
   Value *expression = value_view_get(&args_view, 1);
   return mass_cast_helper(context, parser, target_descriptor, expression, args_view.source_range);
 }

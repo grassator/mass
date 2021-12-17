@@ -54,6 +54,7 @@ operator(& _) :: 16 'pointer_to
 
 import :: fn(path : String) -> (MASS.Module) MASS.import
 cast :: fn(type : Type, value) -> _ MASS.cast
+zero_extend :: fn(type : Type, value) -> _ MASS.zero_extend
 startup :: fn(callback : fn() -> ()) -> () MASS.startup
 
 is_pointer_type :: MASS.constraint_pointer_type
