@@ -1708,13 +1708,13 @@ main(void) {
     { "u32", "_flags_padding"},
     { "Array_Function_Parameter", "parameters"},
     { "Function_Return", "returns"},
-    { "u64 *", "overload_lock_count"},
   }));
 
   push_type(type_struct("Function_Literal", (Struct_Item[]){
     { "Function_Header", "header" },
     { "Scope *", "own_scope" },
     { "Value *", "body" },
+    { "u64 *", "overload_lock_count"},
     { "Array_Value_Ptr", "instances"},
     { "Array_Function_Specialization", "specializations"},
   }));

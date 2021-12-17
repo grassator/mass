@@ -1147,9 +1147,15 @@ function_literal_info_for_args(
   }
 
   Function_Info *specialized_info = mass_allocate(context, Function_Info);
+  // :OverloadLock :RecursiveInferredType
+  // TODO This overload lock correctly catches recursive fns with inferred type,
+  //      but the resulting error message is about an unmatched overload which is confusing.
+  //      Perhaps a better option would be to propagate a reason for an overload.
+  *literal->overload_lock_count += 1;
   mass_function_info_init_for_header_and_maybe_body(
     context, literal->own_scope, &specialized_header, literal->body, specialized_info
   );
+  *literal->overload_lock_count -= 1;
   if (specialized_header.flags & Function_Header_Flags_Intrinsic) {
     specialized_info->flags |= Function_Info_Flags_Intrinsic;
   }

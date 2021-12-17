@@ -3481,14 +3481,8 @@ mass_function_info_init_for_header_and_maybe_body(
         // Handled in :IntrinsicReturnType
         out_info->return_descriptor = 0;
       } else {
-        // :OverloadLock :RecursiveInferredType
-        // TODO This overload lock correctly catches recursive fns with inferred type,
-        //      but the resulting error message is about an unmatched overload which is confusing.
-        //      Perhaps a better option would be to propagate a reason for an overload.
-        *header->overload_lock_count += 1;
         out_info->return_descriptor =
           mass_infer_function_return_type(context, out_info, arguments_scope, maybe_body);
-        *header->overload_lock_count -= 1;
         if (mass_has_error(context)) return;
       }
     } break;
@@ -3623,7 +3617,7 @@ mass_match_overload_candidate(
     if (value_is_function_literal(candidate)) {
       const Function_Literal *literal = value_as_function_literal(candidate);
       // :OverloadLock Disallow matching this literal if it was locked for some reason
-      if (*literal->header.overload_lock_count) {
+      if (*literal->overload_lock_count) {
         return;
       }
       if (literal->header.flags & Function_Header_Flags_Compile_Time) {
@@ -3640,9 +3634,9 @@ mass_match_overload_candidate(
         //    pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
         //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
         // Without the lock the second literal will infinitely recurse
-        *literal->header.overload_lock_count += 1;
+        *literal->overload_lock_count += 1;
         overload_info = function_literal_info_for_args(context, literal, args->view);
-        *literal->header.overload_lock_count -= 1;
+        *literal->overload_lock_count -= 1;
       }
       if (!overload_info) return;
     } else {
@@ -3985,8 +3979,8 @@ mass_ensure_trampoline(
         .source_range = return_range,
         .Exact = { .descriptor = &descriptor_void },
       },
-      .overload_lock_count = allocator_make(context->allocator, u64, 0),
     },
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
     .body = body_value,
     .own_scope = trampoline_scope,
   };
@@ -5819,8 +5813,8 @@ mass_make_fake_function_literal(
       .flags = Function_Header_Flags_None,
       .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
       .returns = function_return_exact(returns, *source_range),
-      .overload_lock_count = allocator_make(context->allocator, u64, 0),
     },
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
     .body = body,
     .own_scope = function_scope,
   };
@@ -5934,7 +5928,6 @@ mass_function_header(
     .flags = Function_Header_Flags_None,
     .parameters = parameters,
     .returns = *returns,
-    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
   DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
     if (param->tag == Function_Parameter_Tag_Generic) {
@@ -6086,6 +6079,7 @@ token_parse_function_literal(
     .header = header,
     .body = body_value,
     .own_scope = parser->scope,
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
   return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
 }
