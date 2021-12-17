@@ -3431,12 +3431,6 @@ mass_function_info_init_for_header_and_maybe_body(
       .capacity = dyn_array_length(header->parameters),
     ),
   };
-  if (header->flags & Function_Header_Flags_Intrinsic) {
-    out_info->flags |= Function_Info_Flags_Intrinsic;
-  }
-  if (header->flags & Function_Header_Flags_Compile_Time) {
-    out_info->flags |= Function_Info_Flags_Compile_Time;
-  }
 
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
 

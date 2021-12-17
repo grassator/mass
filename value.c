@@ -1152,6 +1152,12 @@ function_literal_info_for_args(
   mass_function_info_init_for_header_and_maybe_body(
     context, literal->own_scope, &specialized_header, literal->body, specialized_info
   );
+  if (specialized_header.flags & Function_Header_Flags_Intrinsic) {
+    specialized_info->flags |= Function_Info_Flags_Intrinsic;
+  }
+  if (specialized_header.flags & Function_Header_Flags_Compile_Time) {
+    specialized_info->flags |= Function_Info_Flags_Compile_Time;
+  }
 
   dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
     .descriptors = cache_descriptors,
