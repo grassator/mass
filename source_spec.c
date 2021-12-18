@@ -1149,6 +1149,18 @@ spec("source") {
       check(checker() == 32);
     }
 
+    it("should support fns requiring staticly known args") {
+      u64 (*checker)() = (u64 (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "static_i64_identity :: fn(@x : i64) -> (i64) { internal :: x; internal }\n"
+        "checker :: fn() -> (u64) {\n"
+          "static_i64_identity(42)\n"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should support type constraints on template parameters") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(

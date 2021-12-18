@@ -1125,7 +1125,16 @@ function_literal_info_for_args(
       arg = value_view_get(&args, arg_index);
     }
     const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(arg);
-    if(param->tag == Function_Parameter_Tag_Generic) {
+    // FIXME turn this into a switch
+    if(param->tag == Function_Parameter_Tag_Static) {
+      if (!mass_value_is_compile_time_known(arg)) {
+        // TODO cleanup memory?
+        return 0;
+      }
+      specialized_param->descriptor = actual_descriptor;
+      specialized_param->tag = Function_Parameter_Tag_Exact_Static;
+      specialized_param->Exact_Static.storage = value_as_forced(arg)->storage;
+    } else if(param->tag == Function_Parameter_Tag_Generic) {
       if (!(literal->header.flags & Function_Header_Flags_Compile_Time)) {
         actual_descriptor = deduce_runtime_descriptor_for_value(context, arg, 0);
         // TODO cleanup memory?

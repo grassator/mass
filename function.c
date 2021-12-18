@@ -582,6 +582,10 @@ mass_infer_function_return_type(
         Storage storage = def_param->Exact_Static.storage;
         arg_value = value_make(context, descriptor, storage, *source_range);
       } break;
+      case Function_Parameter_Tag_Static: {
+        arg_value = 0;
+        panic("TODO");
+      } break;
       default: {
         arg_value = 0;
         panic("UNREACHEABLE");
@@ -706,12 +710,32 @@ ensure_function_instance(
       ) {
         storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
       }
+      // FIXME these indexes can be mismatched in the presence of static params
       const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
+      assert(def_param->tag == Function_Parameter_Tag_Runtime || def_param->tag == Function_Parameter_Tag_Generic);
       Value *arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->symbol;
       if (param_symbol) {
         scope_define_value(body_scope, body_parser.epoch, def_param->source_range, param_symbol, arg_value);
+      }
+    }
+    for (u64 i = 0; i < dyn_array_length(fn_info->parameters); ++i) {
+      const Function_Parameter *param = dyn_array_get(fn_info->parameters, i);
+      switch(param->tag) {
+        case Function_Parameter_Tag_Runtime:
+        case Function_Parameter_Tag_Generic: {
+          // Handled above
+        } break;
+        case Function_Parameter_Tag_Static: {
+          panic("UNREACHEABLE: should have been resolved earlier");
+        } break;
+        case Function_Parameter_Tag_Exact_Static: {
+          const Storage *storage = &param->Exact_Static.storage;
+          Value *arg_value = value_make(context, param->descriptor, *storage, param->source_range);
+          arg_value->flags |= Value_Flags_Constant;
+          scope_define_value(body_scope, VALUE_STATIC_EPOCH, param->source_range, param->symbol, arg_value);
+        } break;
       }
     }
   }

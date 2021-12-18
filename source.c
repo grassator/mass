@@ -1910,7 +1910,9 @@ token_match_argument(
   const Descriptor *descriptor = 0;
   Value *name_token;
   Value_View maybe_type_expression = {0};
-  bool generic = false;
+
+  Function_Parameter_Tag parameter_tag = Function_Parameter_Tag_Runtime;
+
   Mass_Type_Constraint_Proc maybe_type_constraint = 0;
   if (is_inferred_type) {
     if (definition.length != 1 || !value_is_symbol(value_view_get(&definition, 0))) {
@@ -1925,10 +1927,12 @@ token_match_argument(
   } else {
     Value_View name_tokens;
     Value *operator;
-    generic = !token_maybe_split_on_operator(
+    if (!token_maybe_split_on_operator(
       definition, slice_literal(":"), &name_tokens, &maybe_type_expression, &operator
-    );
-    if (generic) {
+    )) {
+      parameter_tag = Function_Parameter_Tag_Generic;
+    }
+    if (parameter_tag == Function_Parameter_Tag_Generic) {
       if (token_maybe_split_on_operator(
         definition, slice_literal("~"), &name_tokens, &maybe_type_expression, &operator
       )) {
@@ -1956,13 +1960,52 @@ token_match_argument(
       });
       goto err;
     }
-    name_token = value_view_get(&name_tokens, 0);
-    if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Invalid_Identifier,
-        .source_range = name_tokens.source_range,
-      });
-      goto err;
+    switch(name_tokens.length) {
+      case 1: {
+        name_token = value_view_get(&name_tokens, 0);
+        if (!value_is_symbol(name_token)) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Invalid_Identifier,
+            .source_range = name_tokens.source_range,
+          });
+          goto err;
+        }
+      } break;
+      case 2: {
+        Value *first = value_view_get(&name_tokens, 0);
+        Value *second = value_view_get(&name_tokens, 1);
+        if (!value_is_symbol(first)) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Invalid_Identifier,
+            .source_range = first->source_range,
+          });
+          goto err;
+        }
+        if (value_as_symbol(first) != context->compilation->common_symbols.operator_at) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Parse,
+            .source_range = first->source_range,
+            .detailed_message = slice_literal("Expected `@` token"),
+          });
+          goto err;
+        }
+        if (!value_is_symbol(second)) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Invalid_Identifier,
+            .source_range = second->source_range,
+          });
+          goto err;
+        }
+        parameter_tag = Function_Parameter_Tag_Static;
+        name_token = second;
+      } break;
+      default: {
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = name_tokens.source_range,
+        });
+        goto err;
+      } break;
     }
   }
 
@@ -1984,15 +2027,14 @@ token_match_argument(
   }
 
   arg = (Function_Parameter) {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = parameter_tag,
     .maybe_default_value = maybe_default_value,
     .maybe_type_expression = maybe_type_expression,
     .symbol = value_as_symbol(name_token),
     .descriptor = descriptor,
     .source_range = definition.source_range,
   };
-  if (generic) {
-    arg.tag = Function_Parameter_Tag_Generic;
+  if (parameter_tag == Function_Parameter_Tag_Generic) {
     arg.Generic.maybe_type_constraint = maybe_type_constraint;
   }
 
@@ -3537,6 +3579,9 @@ mass_function_info_init_for_header_and_maybe_body(
         }
         info_param->descriptor = descriptor;
       } break;
+      case Function_Parameter_Tag_Static: {
+        panic("UNREACHABLE: The static tags should have been substituted already");
+      } break;
       case Function_Parameter_Tag_Exact_Static: {
         // Nothing to do
       } break;
@@ -3630,6 +3675,12 @@ calculate_arguments_match_score(
             return -1;
           }
         }
+      } break;
+      case Function_Parameter_Tag_Static: {
+        if (!mass_value_is_compile_time_known(source_arg)) return -1;
+        source_descriptor = value_or_lazy_value_descriptor(source_arg);
+        if (!same_type(target_descriptor, source_descriptor)) return -1;
+        score += Score_Same_Type_Static;
       } break;
       case Function_Parameter_Tag_Exact_Static: {
         if (!mass_value_is_compile_time_known(source_arg)) return -1;

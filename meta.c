@@ -1654,6 +1654,7 @@ main(void) {
     struct_fields("Generic", (Struct_Item[]){
       { "Mass_Type_Constraint_Proc", "maybe_type_constraint" },
     }),
+    struct_empty("Static"),
     struct_fields("Exact_Static", (Struct_Item[]){
       { "Storage", "storage" },
     }),

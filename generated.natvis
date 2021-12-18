@@ -1434,6 +1434,9 @@
   <DisplayString Condition="tag == Function_Parameter_Tag_Generic">
     Generic { Generic }
   </DisplayString>
+  <DisplayString Condition="tag == Function_Parameter_Tag_Static">
+    Static
+  </DisplayString>
   <DisplayString Condition="tag == Function_Parameter_Tag_Exact_Static">
     Exact_Static { Exact_Static }
   </DisplayString>
