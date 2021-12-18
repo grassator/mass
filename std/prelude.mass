@@ -14,6 +14,9 @@ operator(intrinsic _) :: 100 MASS.intrinsic
 operator(c_struct _) :: 100 MASS.c_struct
 operator(exports _) :: 100 MASS.exports
 
+// `using` and `return` want an arbitrary expression so have the lowest precedence
+operator(using _) :: 0 MASS.using
+
 // `size_of` and `type_of` are essentially function calls with special parsing
 // rules and evaluation behavior, so they get the same precedence as `apply`
 operator(type_of _) :: 20 MASS.type_of

@@ -2112,6 +2112,7 @@ main(void) {
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
+  export_compiler_custom_name("using", push_type(type_intrinsic("mass_using")));
   export_compiler_custom_name("assign", push_type(type_intrinsic("mass_assign")));
   export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
   export_compiler_custom_name("function_literal", push_type(type_intrinsic("mass_function_literal")));
