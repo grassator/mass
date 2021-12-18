@@ -1161,6 +1161,30 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support fns requiring staticly known templated parameters") {
+      u64 (*checker)() = (u64 (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "static_i64_identity :: fn(@x) -> (x) { internal :: x; internal }\n"
+        "checker :: fn() -> (u64) {\n"
+          "static_i64_identity(42)\n"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should not match a static templated parameter to a non-static value") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "static_i64_identity :: fn(@x) -> (x) { internal :: x; internal }\n"
+        "checker :: fn() -> (u64) {\n"
+          "x := 42\n"
+          "static_i64_identity(x)\n"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+    }
+
     it("should support type constraints on template parameters") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(

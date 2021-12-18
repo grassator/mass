@@ -1652,9 +1652,9 @@ main(void) {
   push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
     struct_empty("Runtime"),
     struct_fields("Generic", (Struct_Item[]){
+      { "u64", "is_static" },
       { "Mass_Type_Constraint_Proc", "maybe_type_constraint" },
     }),
-    struct_empty("Static"),
     struct_fields("Exact_Static", (Struct_Item[]){
       { "Storage", "storage" },
     }),

@@ -1912,6 +1912,7 @@ token_match_argument(
   Value_View maybe_type_expression = {0};
 
   Function_Parameter_Tag parameter_tag = Function_Parameter_Tag_Runtime;
+  bool is_static_generic = false;
 
   Mass_Type_Constraint_Proc maybe_type_constraint = 0;
   if (is_inferred_type) {
@@ -1996,7 +1997,8 @@ token_match_argument(
           });
           goto err;
         }
-        parameter_tag = Function_Parameter_Tag_Static;
+        parameter_tag = Function_Parameter_Tag_Generic;
+        is_static_generic = true;
         name_token = second;
       } break;
       default: {
@@ -2035,7 +2037,10 @@ token_match_argument(
     .source_range = definition.source_range,
   };
   if (parameter_tag == Function_Parameter_Tag_Generic) {
-    arg.Generic.maybe_type_constraint = maybe_type_constraint;
+    arg.Generic = (Function_Parameter_Generic) {
+      .is_static = is_static_generic,
+      .maybe_type_constraint = maybe_type_constraint,
+    };
   }
 
   err:
@@ -3579,9 +3584,6 @@ mass_function_info_init_for_header_and_maybe_body(
         }
         info_param->descriptor = descriptor;
       } break;
-      case Function_Parameter_Tag_Static: {
-        panic("UNREACHABLE: The static tags should have been substituted already");
-      } break;
       case Function_Parameter_Tag_Exact_Static: {
         // Nothing to do
       } break;
@@ -3675,12 +3677,6 @@ calculate_arguments_match_score(
             return -1;
           }
         }
-      } break;
-      case Function_Parameter_Tag_Static: {
-        if (!mass_value_is_compile_time_known(source_arg)) return -1;
-        source_descriptor = value_or_lazy_value_descriptor(source_arg);
-        if (!same_type(target_descriptor, source_descriptor)) return -1;
-        score += Score_Same_Type_Static;
       } break;
       case Function_Parameter_Tag_Exact_Static: {
         if (!mass_value_is_compile_time_known(source_arg)) return -1;

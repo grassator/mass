@@ -1684,11 +1684,11 @@ typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
 typedef enum {
   Function_Parameter_Tag_Runtime = 0,
   Function_Parameter_Tag_Generic = 1,
-  Function_Parameter_Tag_Static = 2,
-  Function_Parameter_Tag_Exact_Static = 3,
+  Function_Parameter_Tag_Exact_Static = 2,
 } Function_Parameter_Tag;
 
 typedef struct Function_Parameter_Generic {
+  u64 is_static;
   Mass_Type_Constraint_Proc maybe_type_constraint;
 } Function_Parameter_Generic;
 typedef struct Function_Parameter_Exact_Static {
@@ -4573,10 +4573,14 @@ MASS_DEFINE_OPAQUE_C_TYPE(function_parameter_tag, Function_Parameter_Tag)
 static C_Enum_Item function_parameter_tag_items[] = {
 { .name = slice_literal_fields("Runtime"), .value = 0 },
 { .name = slice_literal_fields("Generic"), .value = 1 },
-{ .name = slice_literal_fields("Static"), .value = 2 },
-{ .name = slice_literal_fields("Exact_Static"), .value = 3 },
+{ .name = slice_literal_fields("Exact_Static"), .value = 2 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter_generic, Function_Parameter_Generic,
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("is_static"),
+    .offset = offsetof(Function_Parameter_Generic, is_static),
+  },
   {
     .descriptor = &descriptor_mass_type_constraint_proc,
     .name = slice_literal_fields("maybe_type_constraint"),

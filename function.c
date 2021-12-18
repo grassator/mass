@@ -569,7 +569,9 @@ mass_infer_function_return_type(
     const Descriptor *descriptor = def_param->descriptor;
     const Source_Range *source_range = &def_param->source_range;
     switch(def_param->tag) {
-      case Function_Parameter_Tag_Generic:
+      case Function_Parameter_Tag_Generic: {
+        if (def_param->Generic.is_static) panic("TODO");
+      } // fallthrough
       case Function_Parameter_Tag_Runtime: {
         // We don't need payload or the proc, because in this pass we do not expect
         // any of the values to be forced. In fact this will act as a free assertion.
@@ -581,10 +583,6 @@ mass_infer_function_return_type(
         // Exact static parameters are defined as static, since they might influence the inference
         Storage storage = def_param->Exact_Static.storage;
         arg_value = value_make(context, descriptor, storage, *source_range);
-      } break;
-      case Function_Parameter_Tag_Static: {
-        arg_value = 0;
-        panic("TODO");
       } break;
       default: {
         arg_value = 0;
@@ -726,9 +724,6 @@ ensure_function_instance(
         case Function_Parameter_Tag_Runtime:
         case Function_Parameter_Tag_Generic: {
           // Handled above
-        } break;
-        case Function_Parameter_Tag_Static: {
-          panic("UNREACHEABLE: should have been resolved earlier");
         } break;
         case Function_Parameter_Tag_Exact_Static: {
           const Storage *storage = &param->Exact_Static.storage;
