@@ -776,6 +776,9 @@ static Value * mass_assign
 static Value * mass_quote
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_function_literal
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_unquote
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2758,6 +2761,7 @@ static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_assign;
 static Descriptor descriptor_mass_quote;
+static Descriptor descriptor_mass_function_literal;
 static Descriptor descriptor_mass_unquote;
 static Descriptor descriptor_mass_dereference;
 static Descriptor descriptor_mass_array_like_get;

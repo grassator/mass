@@ -1703,21 +1703,21 @@ main(void) {
     { "Function_Info *", "info" },
   }));
 
-  push_type(type_struct("Function_Header", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Function_Header", (Struct_Item[]){
     { "Function_Header_Flags", "flags"},
     { "u32", "_flags_padding"},
     { "Array_Function_Parameter", "parameters"},
     { "Function_Return", "returns"},
-  }));
+  })));
 
-  push_type(type_struct("Function_Literal", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Function_Literal", (Struct_Item[]){
     { "Function_Header", "header" },
     { "Scope *", "own_scope" },
     { "Value *", "body" },
     { "u64 *", "overload_lock_count"},
     { "Array_Value_Ptr", "instances"},
     { "Array_Function_Specialization", "specializations"},
-  }));
+  })));
 
   push_type(type_enum("Function_Call_Jump", (Enum_Type_Item[]){
     { "Call", 0 },
@@ -2112,6 +2112,7 @@ main(void) {
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
   export_compiler_custom_name("assign", push_type(type_intrinsic("mass_assign")));
   export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
+  export_compiler_custom_name("function_literal", push_type(type_intrinsic("mass_function_literal")));
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
   export_compiler_custom_name("dereference", push_type(type_intrinsic("mass_dereference")));
   export_compiler_custom_name("unchecked_get_at_index", push_type(type_intrinsic("mass_array_like_get")));

@@ -318,6 +318,20 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Intrinsic_Proc")),
     type_mass_intrinsic_proc_value
   );
+  Source_Range Function_Header__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Header__source_range, "Function_Header");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Header__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Header")),
+    type_function_header_value
+  );
+  Source_Range Function_Literal__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Literal__source_range, "Function_Literal");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Literal__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Literal")),
+    type_function_literal_value
+  );
   Source_Range Tuple__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Tuple__source_range, "Tuple");
   scope_define_value(
@@ -605,6 +619,22 @@ compiler_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_quote, "quote", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
+    mass_function_literal, "function_literal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_mass_context_pointer

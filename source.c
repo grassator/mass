@@ -5986,24 +5986,38 @@ mass_parse_function_parameters(
   return result;
 }
 
-static Function_Header
-mass_function_header(
+static inline Value *
+mass_make_function_literal(
   Mass_Context *context,
-  Array_Function_Parameter parameters,
-  const Function_Return *returns
+  Parser *parser,
+  const Function_Header *header,
+  Value *body_value,
+  Source_Range source_range
 ) {
-  Function_Header header = {
-    .flags = Function_Header_Flags_None,
-    .parameters = parameters,
-    .returns = *returns,
+  Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
+  *literal = (Function_Literal){
+    .header = *header,
+    .body = body_value,
+    .own_scope = parser->scope,
+    .overload_lock_count = allocator_make(context->allocator, u64, 0),
   };
-  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
-    if (param->tag == Function_Parameter_Tag_Generic) {
-      header.flags |= Function_Header_Flags_Generic;
-      break;
-    }
-  }
-  return header;
+  if (value_is_intrinsic(body_value)) literal->header.flags |= Function_Header_Flags_Intrinsic;
+  return value_make(context, &descriptor_function_literal, storage_static(literal), source_range);
+}
+
+static Value *
+mass_function_literal(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  assert(args_view.length == 2);
+  Value *header_value = token_parse_single(context, parser, value_view_get(&args_view, 0));
+  if (mass_has_error(context)) return 0;
+  Value *body_value = value_view_get(&args_view, 1);
+  if (!mass_value_ensure_static_of(context, header_value, &descriptor_function_header)) return 0;
+  const Function_Header *header = value_as_function_header(header_value);
+  return mass_make_function_literal(context, parser, header, body_value, args_view.source_range);
 }
 
 static Value *
@@ -6108,7 +6122,17 @@ token_parse_function_literal(
   }
   if (mass_has_error(context)) return 0;
 
-  Function_Header header = mass_function_header(context, parameters, &returns);
+  Function_Header header = {
+    .flags = Function_Header_Flags_None,
+    .parameters = parameters,
+    .returns = returns,
+  };
+  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
+    if (param->tag == Function_Parameter_Tag_Generic) {
+      header.flags |= Function_Header_Flags_Generic;
+      break;
+    }
+  }
 
   if (is_macro) header.flags |= Function_Header_Flags_Macro;
   if (is_compile_time) header.flags |= Function_Header_Flags_Compile_Time;
@@ -6140,16 +6164,7 @@ token_parse_function_literal(
     i64 syscall_number = value_as_syscall(body_value)->number;
     return value_make(context, fn_descriptor, imm64(syscall_number.bits), view.source_range);
   }
-
-  if (value_is_intrinsic(body_value)) header.flags |= Function_Header_Flags_Intrinsic;
-  Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
-  *literal = (Function_Literal){
-    .header = header,
-    .body = body_value,
-    .own_scope = parser->scope,
-    .overload_lock_count = allocator_make(context->allocator, u64, 0),
-  };
-  return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
+  return mass_make_function_literal(context, parser, &header, body_value, view.source_range);
 }
 
 typedef Value *(*Expression_Matcher_Proc)(

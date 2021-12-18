@@ -547,6 +547,16 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support specifying a function signature separate from the body") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "My_Proc :: fn() -> (s64)\n"
+        "foo :: My_Proc { 42 }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should correctly deal with sign extending negative immediate integers") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
