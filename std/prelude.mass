@@ -200,6 +200,32 @@ MASS_I64_MATH :: module {
   bitwise_and :: MASS.i64_bitwise_and
 }
 
+
+add :: fn(x : i64, y : i64) => (i64) { MASS.i64_add(x, y) }
+subtract :: fn(x : i64, y : i64) => (i64) { MASS.i64_subtract(x, y) }
+signed_multiply :: fn(x : i64, y : i64) => (i64) { MASS.i64_signed_multiply(x, y) }
+unsigned_multiply :: fn(x : i64, y : i64) => (i64) { MASS.i64_unsigned_multiply(x, y) }
+signed_divide :: fn(x : i64, y : i64) => (i64) { MASS.i64_signed_divide(x, y) }
+unsigned_divide :: fn(x : i64, y : i64) => (i64) { MASS.i64_unsigned_divide(x, y) }
+signed_remainder :: fn(x : i64, y : i64) => (i64) { MASS.i64_signed_remainder(x, y) }
+unsigned_remainder :: fn(x : i64, y : i64) => (i64) { MASS.i64_unsigned_remainder(x, y) }
+
+signed_less :: fn(x : i64, y : i64) => (bool) { MASS.i64_signed_less(x, y) }
+unsigned_less :: fn(x : i64, y : i64) => (bool) { MASS.i64_unsigned_less(x, y) }
+signed_less_equal :: fn(x : i64, y : i64) => (bool) { MASS.i64_signed_less_equal(x, y) }
+unsigned_less_equal :: fn(x : i64, y : i64) => (bool) { MASS.i64_unsigned_less_equal(x, y) }
+signed_greater :: fn(x : i64, y : i64) => (bool) { MASS.i64_signed_greater(x, y) }
+unsigned_greater :: fn(x : i64, y : i64) => (bool) { MASS.i64_unsigned_greater(x, y) }
+signed_greater_equal :: fn(x : i64, y : i64) => (bool) { MASS.i64_signed_greater_equal(x, y) }
+unsigned_greater_equal :: fn(x : i64, y : i64) => (bool) { MASS.i64_unsigned_greater_equal(x, y) }
+
+negate :: fn(x : i64) => (i64) { MASS.i64_subtract(0, x) }
+
+logical_shift_left :: fn(x : i64, y : i64) => (i64) { MASS.i64_logical_shift_left(x, y) }
+logical_shift_right :: fn(x : i64, y : i64) => (i64) { MASS.i64_logical_shift_right(x, y) }
+bitwise_or :: fn(x : i64, y : i64) => (i64) { MASS.i64_bitwise_or(x, y) }
+bitwise_and :: fn(x : i64, y : i64) => (i64) { MASS.i64_bitwise_and(x, y) }
+
 make_arithmetic_operations_module :: macro(type : Type) {
   module {
     add :: fn(x : type, y : type) -> (type) MASS.integer_add
@@ -327,12 +353,10 @@ add_or_subtract :: fn(
 add :: fn(x : i64, y : i64) -> (i64) intrinsic {
   add_or_subtract(context, parser, arguments, cast(i8, 0x01))
 }
-add :: fn(x : i64, y : i64) => (i64) { add(x, y) }
 
 subtract :: fn(x : i64, y : i64) -> (i64) intrinsic {
   add_or_subtract(context, parser, arguments, cast(i8, 0x29))
 }
-subtract :: fn(x : i64, y : i64) => (i64) { subtract(x, y) }
 
 compare :: fn(
   context : &MASS.Context,
@@ -436,9 +460,6 @@ signed :: module {
   greater :: signed_greater
   greater_equal :: signed_greater_equal
 }
-
-negate :: fn(x : i64) -> (i64) { 0 - x }
-negate :: fn(x : i64) => (i64) { 0 - x }
 
 memory_equal :: fn(x, y : x) -> (bool) MASS.generic_equal
 memory_not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
