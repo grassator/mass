@@ -6587,11 +6587,10 @@ mass_handle_explicit_return_lazy_proc(
 }
 
 static Value *
-mass_handle_return_operator(
+mass_return(
   Mass_Context *context,
   Parser *parser,
-  Value_View args,
-  const Operator *operator
+  Value_View args
 ) {
   assert(args.length == 1);
   Value *return_value = token_parse_single(context, parser, value_view_get(&args, 0));
@@ -6856,19 +6855,6 @@ scope_define_builtins(
       .associativity = Operator_Associativity_Left,
       .tag = Operator_Tag_Alias,
       .Alias.handler = mass_handle_comma_operator,
-    )
-  );
-
-  Source_Range return_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&return_source_range, "return");
-  scope_define_operator(
-    &context, scope, return_source_range, mass_ensure_symbol(compilation, slice_literal("return")),
-    allocator_make(allocator, Operator,
-      .precedence = 0,
-      .fixity = Operator_Fixity_Prefix,
-      .associativity = Operator_Associativity_Right,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_return_operator,
     )
   );
 

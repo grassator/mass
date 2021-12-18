@@ -16,6 +16,7 @@ operator(exports _) :: 100 MASS.exports
 
 // `using` and `return` want an arbitrary expression so have the lowest precedence
 operator(using _) :: 0 MASS.using
+operator(return _) :: 0 MASS.return
 
 // `size_of` and `type_of` are essentially function calls with special parsing
 // rules and evaluation behavior, so they get the same precedence as `apply`
