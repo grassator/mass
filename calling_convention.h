@@ -755,17 +755,19 @@ calling_convention_x86_64_system_v_call_setup_proc(
   );
 
   u64 stack_offset = 0;
-  DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
+  for(u64 param_index = 0; param_index < dyn_array_length(function->parameters); ++param_index) {
+    Function_Parameter *param = dyn_array_get(function->parameters, param_index);
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     System_V_Classification classification =
       x86_64_system_v_classify(param->descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
-    Function_Call_Parameter struct_item = x86_64_system_v_parameter_for_classification(
+    Function_Call_Parameter call_param = x86_64_system_v_parameter_for_classification(
       &registers, &classification, param->symbol->name, &stack_offset
     );
+    call_param.original_index = param_index; //:ParameterOriginalIndex
 
-    dyn_array_push(result.parameters, struct_item);
+    dyn_array_push(result.parameters, call_param);
   }
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
@@ -825,8 +827,9 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
   );
 
   u64 stack_offset = 0;
-  DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
-    assert(param->tag != Function_Parameter_Tag_Exact_Static);
+  for(u64 param_index = 0; param_index < dyn_array_length(function->parameters); ++param_index) {
+    Function_Parameter *param = dyn_array_get(function->parameters, param_index);
+    if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
 
     System_V_Classification classification =
       x86_64_system_v_classify(param->descriptor);
@@ -845,6 +848,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     Function_Call_Parameter parameter = x86_64_system_v_parameter_for_classification(
       &registers, &classification, param->symbol->name, &stack_offset
     );
+    parameter.original_index = param_index; //:ParameterOriginalIndex
     // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
     dyn_array_push(result.parameters, parameter);
   }
@@ -904,13 +908,15 @@ calling_convention_x86_64_windows_call_setup_proc(
     .capacity = dyn_array_length(function->parameters) + 1,
   );
 
-  u64 index = is_indirect_return ? 1 : 0;
+  u64 argument_index = is_indirect_return ? 1 : 0;
 
-  DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
+  for(u64 param_index = 0; param_index < dyn_array_length(function->parameters); ++param_index) {
+    Function_Parameter *param = dyn_array_get(function->parameters, param_index);
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     Function_Call_Parameter item = {
       .flags = Function_Call_Parameter_Flags_None,
       .descriptor = param->descriptor,
+      .original_index = param_index, //:ParameterOriginalIndex
     };
 
     bool should_pass_as_an_implicit_pointer;
@@ -931,18 +937,18 @@ calling_convention_x86_64_windows_call_setup_proc(
     if (should_pass_as_an_implicit_pointer) {
       item.descriptor = calling_convention_implicit_pointer_descriptor(allocator, item.descriptor);
     }
-    if (index < countof(general_registers)) {
+    if (argument_index < countof(general_registers)) {
       Register reg = descriptor_is_float(item.descriptor)
-        ? float_registers[index]
-        : general_registers[index];
+        ? float_registers[argument_index]
+        : general_registers[argument_index];
       item.storage = storage_register(reg, item.descriptor->bit_size);
     } else {
       item.storage = storage_stack(
-        u64_to_s32(index * 8), item.descriptor->bit_size, Stack_Area_Call_Target_Argument
+        u64_to_s32(argument_index * 8), item.descriptor->bit_size, Stack_Area_Call_Target_Argument
       );
     }
     dyn_array_push(result.parameters, item);
-    index += 1;
+    argument_index += 1;
   }
 
   if (is_indirect_return) {

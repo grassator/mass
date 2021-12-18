@@ -708,8 +708,12 @@ ensure_function_instance(
       ) {
         storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
       }
-      // FIXME these indexes can be mismatched in the presence of static params
-      const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, i);
+      // :ParameterOriginalIndex
+      // `Exact_Static` parameters are not present in call params because they have no runtime storage.
+      // This is great for performance, but can cause mismatches between the indexes the parameters
+      // defined in the `Function_Info` and ones in the call setup. To make sure parameters are
+      // mapped correctly, `Function_Call_Parameter` keeps track of the original index.
+      const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, call_param->original_index);
       assert(def_param->tag == Function_Parameter_Tag_Runtime || def_param->tag == Function_Parameter_Tag_Generic);
       Value *arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       arg_value->flags |= Value_Flags_Constant;

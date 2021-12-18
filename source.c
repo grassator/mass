@@ -3282,27 +3282,28 @@ call_function_overload(
   u64 copied_straight_to_param_bitset = 0;
   u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
-    Function_Call_Parameter *target_item = dyn_array_get(call_setup->parameters, i);
+    Function_Call_Parameter *call_param = dyn_array_get(call_setup->parameters, i);
     Value *target_param = dyn_array_push_uninitialized(target_params);
-    value_init(target_param, target_item->descriptor, target_item->storage, *source_range);
+    value_init(target_param, call_param->descriptor, call_param->storage, *source_range);
     if (i >= dyn_array_length(arguments)) {
-      assert(target_item->flags & Function_Call_Parameter_Flags_Uninitialized);
+      assert(call_param->flags & Function_Call_Parameter_Flags_Uninitialized);
       Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
       Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
       dyn_array_push(temp_arguments, arg_value);
       continue;
     }
-    Value *source_arg = source_arg = *dyn_array_get(arguments, i);
+    // :ParameterOriginalIndex
+    Value *source_arg = *dyn_array_get(arguments, call_param->original_index);
     const Storage *maybe_source_storage = 0;
     if (source_arg->tag == Value_Tag_Forced) {
       maybe_source_storage = &value_as_forced(source_arg)->storage;
     }
-    const Descriptor *stack_descriptor = target_item->descriptor;
+    const Descriptor *stack_descriptor = call_param->descriptor;
     if (descriptor_is_implicit_pointer(stack_descriptor)) {
       stack_descriptor = stack_descriptor->Pointer_To.descriptor;
     }
 
-    u64 target_param_register_bitset = register_bitset_from_storage(&target_item->storage);
+    u64 target_param_register_bitset = register_bitset_from_storage(&call_param->storage);
     if (target_param_register_bitset >> 16) {
       panic("Found XMM usage");
     }
@@ -3319,7 +3320,7 @@ call_function_overload(
       mass_value_is_compile_time_known(source_arg) &&
       // TODO figure out why this is required and explain but since it just disallows
       //      some potential optizations it is not critical to do right now.
-      !descriptor_is_implicit_pointer(target_item->descriptor)
+      !descriptor_is_implicit_pointer(call_param->descriptor)
     ) {
       can_use_source_arg_as_is = true;
     } else {
@@ -3330,7 +3331,7 @@ call_function_overload(
       !(builder->register_occupied_bitset.bits & target_param_register_bitset);
     bool can_assign_straight_to_target = (
       target_param_registers_are_free &&
-      !descriptor_is_implicit_pointer(target_item->descriptor)
+      !descriptor_is_implicit_pointer(call_param->descriptor)
     );
 
     static const bool SHOULD_OPTIMIZE = true;
@@ -3339,10 +3340,10 @@ call_function_overload(
     bool should_assign = true;
     // If target parameter storage is stack, then copying directly is *always*
     // the right thing to do, not just when the optimization is on.
-    if (storage_is_stack(&target_item->storage)) {
+    if (storage_is_stack(&call_param->storage)) {
       arg_value = value_init(
         mass_allocate(context, Value),
-        stack_descriptor, target_item->storage, *source_range
+        stack_descriptor, call_param->storage, *source_range
       );
     } else if (SHOULD_OPTIMIZE && can_use_source_arg_as_is) {
       arg_value = source_arg;
@@ -3363,16 +3364,15 @@ call_function_overload(
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
         required_register_count == 1 &&
-        !descriptor_is_implicit_pointer(target_item->descriptor) &&
-        !(target_item->flags & Function_Call_Parameter_Flags_Uninitialized) &&
+        !descriptor_is_implicit_pointer(call_param->descriptor) &&
         register_bitset_occupied_count(allowed_temp_registers) > 1
       ) {
         Register temp_register = register_find_available(builder, prohibited_registers);
         register_acquire(builder, temp_register);
         register_bitset_set(&temp_register_argument_bitset, temp_register);
-        Storage arg_storage = storage_register(temp_register, target_item->descriptor->bit_size);
+        Storage arg_storage = storage_register(temp_register, call_param->descriptor->bit_size);
         arg_storage.flags |= Storage_Flags_Temporary;
-        arg_value = value_make(context, target_item->descriptor, arg_storage, source_arg->source_range);
+        arg_value = value_make(context, call_param->descriptor, arg_storage, source_arg->source_range);
       } else {
         // The code below is useful to check how many spills to stack happen
         //static int stack_counter = 0;

@@ -1735,6 +1735,7 @@ main(void) {
     { "u32", "_flags_padding" },
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
+    { "u64", "original_index" },
   }));
 
   push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
