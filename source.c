@@ -4015,7 +4015,8 @@ mass_ensure_trampoline(
     });
   }
 
-  const Descriptor *return_descriptor = original_info->return_descriptor;
+  const Descriptor *return_descriptor =
+    descriptor_pointer_to(context->compilation, original_info->return_descriptor);
   u64 return_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, return_descriptor);
   {
     dyn_array_push(fields, (Struct_Field) {
@@ -4047,7 +4048,7 @@ mass_ensure_trampoline(
   scope_define_value(trampoline_scope, VALUE_STATIC_EPOCH, proxy_source_range, proxy_symbol, proxy_value);
   Fixed_Buffer *buffer =
     fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
-  fixed_buffer_append_slice(buffer, slice_literal("{args.returns = proxy("));
+  fixed_buffer_append_slice(buffer, slice_literal("{args.returns.* = proxy("));
   assert(args_view.length <= 10);
   for (u64 i = 0; i < args_view.length; ++i) {
     if (i != 0) {
@@ -4153,26 +4154,21 @@ mass_trampoline_call(
     memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
   }
 
-  trampoline->proc(args_struct_memory);
-  const Descriptor *return_descriptor = trampoline->original_info->return_descriptor;
   Value *result;
+  const Descriptor *return_descriptor = trampoline->original_info->return_descriptor;
   if (return_descriptor->bit_size.as_u64 == 0) {
     result = value_make(context, return_descriptor, imm0, args_view.source_range);
   } else {
     const Struct_Field *return_field = dyn_array_last(fields);
-    const void *temp_return_memory = args_struct_memory + return_field->offset;
-    u64 return_byte_size = descriptor_byte_size(return_field->descriptor);
-    void *return_memory = allocator_allocate_bytes(
-      context->allocator,
-      return_byte_size,
-      descriptor_byte_alignment(return_field->descriptor)
-    );
-    memcpy(return_memory, temp_return_memory, return_byte_size);
-
-    Storage return_storage = storage_static_heap(return_memory, return_field->descriptor->bit_size);
-
-    result = value_make(context, return_field->descriptor, return_storage, args_view.source_range);
+    void **return_pointer_memory = (void **)(args_struct_memory + return_field->offset);
+    u64 return_byte_size = descriptor_byte_size(return_descriptor);
+    u64 byte_alignment = descriptor_byte_alignment(return_descriptor);
+    *return_pointer_memory = allocator_allocate_bytes(context->allocator, return_byte_size, byte_alignment);
+    Storage return_storage = storage_static_heap(*return_pointer_memory, return_descriptor->bit_size);
+    result = value_make(context, return_descriptor, return_storage, args_view.source_range);
   }
+
+  trampoline->proc(args_struct_memory);
   context_temp_reset_to_mark(context, temp_mark);
 
   return result;
