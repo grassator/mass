@@ -99,7 +99,11 @@ mass_error_append_function_signature_string(
   } else {
     APPEND_LITERAL(" -> ");
   }
-  mass_error_append_descriptor(result, info->return_descriptor);
+  if (info->return_descriptor) {
+    mass_error_append_descriptor(result, info->return_descriptor);
+  } else {
+    APPEND_LITERAL("_");
+  }
 }
 
 static Fixed_Buffer *
