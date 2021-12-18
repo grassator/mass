@@ -1068,7 +1068,7 @@ mass_fake_argument_array_from_parameters(
   return fake_args;
 }
 
-static const Function_Info *
+static Function_Info *
 function_literal_info_for_args(
   Mass_Context *context,
   const Function_Literal *literal,
