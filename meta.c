@@ -2243,7 +2243,7 @@ main(void) {
     const char *exported_name = strjoin("i64_", base);
     const char *internal_name = strjoin("mass_i64_", base);
     export_compiler_custom_name(exported_name, push_type(
-      type_function(Compile_Time, internal_name, "i64", (Argument_Type[]){
+      type_function(Default, internal_name, "i64", (Argument_Type[]){
         { "i64", "a" },
         { "i64", "b" },
       })
@@ -2261,7 +2261,7 @@ main(void) {
     const char *exported_name = strjoin("i64_", base);
     const char *internal_name = strjoin("mass_i64_", base);
     export_compiler_custom_name(exported_name, push_type(
-      type_function(Compile_Time, internal_name, "_Bool", (Argument_Type[]){
+      type_function(Default, internal_name, "_Bool", (Argument_Type[]){
         { "i64", "a" },
         { "i64", "b" },
       })

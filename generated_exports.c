@@ -1145,7 +1145,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_logical_shift_left, "i64_logical_shift_left", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1157,7 +1157,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_logical_shift_right, "i64_logical_shift_right", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1169,7 +1169,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_bitwise_and, "i64_bitwise_and", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1181,7 +1181,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_bitwise_or, "i64_bitwise_or", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1193,7 +1193,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_add, "i64_add", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1205,7 +1205,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_subtract, "i64_subtract", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1217,7 +1217,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_multiply, "i64_signed_multiply", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1229,7 +1229,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_multiply, "i64_unsigned_multiply", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1241,7 +1241,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_divide, "i64_signed_divide", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1253,7 +1253,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_divide, "i64_unsigned_divide", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1265,7 +1265,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_remainder, "i64_signed_remainder", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1277,7 +1277,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_remainder, "i64_unsigned_remainder", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1289,7 +1289,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_less, "i64_signed_less", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1301,7 +1301,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_less, "i64_unsigned_less", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1313,7 +1313,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_less_equal, "i64_signed_less_equal", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1325,7 +1325,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_less_equal, "i64_unsigned_less_equal", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1337,7 +1337,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_greater, "i64_signed_greater", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1349,7 +1349,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_greater, "i64_unsigned_greater", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1361,7 +1361,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_signed_greater_equal, "i64_signed_greater_equal", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),
@@ -1373,7 +1373,7 @@ compiler_scope_define_exports(
     )
   );
   MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
+    Function_Info_Flags_None,
     mass_i64_unsigned_greater_equal, "i64_unsigned_greater_equal", &descriptor__bool,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),

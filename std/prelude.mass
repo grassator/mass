@@ -96,7 +96,7 @@ get :: fn(x ~ is_struct_type, rhs) -> _ MASS.struct_get
 get :: fn(x ~ is_fixed_array_type, rhs) -> _ MASS.unchecked_get_at_index
 
 // Auto-dereferencing pointers. This is a very generic fn, meaning that a user can easily
-// greate a more specic overload even for pointer types.
+// create a more specic overload even for pointer types.
 get :: fn(x ~ is_pointer_type, rhs) -> _ intrinsic {
   sliced_args := arguments
   sliced_args.length = cast(i32, 1)
@@ -164,7 +164,7 @@ assert :: fn(condition : bool, message := "Assertion failed\n") -> () {
   }
 }
 get :: fn(view : MASS.Value_View, index : i64) -> (&MASS.Value) {
-  { using unsigned; assert(index <= 0xFFFF_FFFF) }
+  assert(MASS.i64_unsigned_less_equal(index, 0xFFFF_FFFF))
   unchecked_get_at_index(view.values, index)
 }
 
@@ -172,6 +172,33 @@ static_assert :: fn(condition : bool, message : String = "") => () MASS.static_a
 
 pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
 pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
+
+MASS_I64_MATH :: module {
+  add :: MASS.i64_add
+  subtract :: MASS.i64_subtract
+  signed_multiply :: MASS.i64_signed_multiply
+  unsigned_multiply :: MASS.i64_unsigned_multiply
+  signed_divide :: MASS.i64_signed_divide
+  unsigned_divide :: MASS.i64_unsigned_divide
+  signed_remainder :: MASS.i64_signed_remainder
+  unsigned_remainder :: MASS.i64_unsigned_remainder
+
+  signed_less :: MASS.i64_signed_less
+  unsigned_less :: MASS.i64_unsigned_less
+  signed_less_equal :: MASS.i64_signed_less_equal
+  unsigned_less_equal :: MASS.i64_unsigned_less_equal
+  signed_greater :: MASS.i64_signed_greater
+  unsigned_greater :: MASS.i64_unsigned_greater
+  signed_greater_equal :: MASS.i64_signed_greater_equal
+  unsigned_greater_equal :: MASS.i64_unsigned_greater_equal
+
+  negate :: fn(x : i64) -> (i64) { MASS.i64_subtract(0, x) }
+
+  logical_shift_left :: MASS.i64_logical_shift_left
+  logical_shift_right :: MASS.i64_logical_shift_right
+  bitwise_or :: MASS.i64_bitwise_or
+  bitwise_and :: MASS.i64_bitwise_and
+}
 
 make_arithmetic_operations_module :: macro(type : Type) {
   module {
@@ -210,6 +237,8 @@ x86_64 :: module {
   Instruction :: MASS.Instruction
 
   op1_reg64_reg64_mr :: fn(op_code : i8, target : Reg_T, source : Reg_T) -> (Instruction) {
+    using MASS_I64_MATH
+
     lhs_reg_index := zero_extend(i64, target)
     rhs_reg_index := zero_extend(i64, source)
 
@@ -298,10 +327,12 @@ add_or_subtract :: fn(
 add :: fn(x : i64, y : i64) -> (i64) intrinsic {
   add_or_subtract(context, parser, arguments, cast(i8, 0x01))
 }
+add :: fn(x : i64, y : i64) => (i64) { add(x, y) }
 
 subtract :: fn(x : i64, y : i64) -> (i64) intrinsic {
   add_or_subtract(context, parser, arguments, cast(i8, 0x29))
 }
+subtract :: fn(x : i64, y : i64) => (i64) { subtract(x, y) }
 
 compare :: fn(
   context : &MASS.Context,
@@ -406,6 +437,9 @@ signed :: module {
   greater_equal :: signed_greater_equal
 }
 
+negate :: fn(x : i64) -> (i64) { 0 - x }
+negate :: fn(x : i64) => (i64) { 0 - x }
+
 memory_equal :: fn(x, y : x) -> (bool) MASS.generic_equal
 memory_not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
 equal :: memory_equal
@@ -422,31 +456,6 @@ not_equal :: memory_not_equal
 //         and then also define a wrapper - either manually or maybe via a macro / intrinsic
 equal :: fn(x, y : x) => (bool) { memory_equal(x, y) }
 not_equal :: fn(x, y : x) => (bool) { memory_not_equal(x, y) }
-
-add :: MASS.i64_add
-subtract :: MASS.i64_subtract
-signed_multiply :: MASS.i64_signed_multiply
-unsigned_multiply :: MASS.i64_unsigned_multiply
-signed_divide :: MASS.i64_signed_divide
-unsigned_divide :: MASS.i64_unsigned_divide
-signed_remainder :: MASS.i64_signed_remainder
-unsigned_remainder :: MASS.i64_unsigned_remainder
-
-signed_less :: MASS.i64_signed_less
-unsigned_less :: MASS.i64_unsigned_less
-signed_less_equal :: MASS.i64_signed_less_equal
-unsigned_less_equal :: MASS.i64_unsigned_less_equal
-signed_greater :: MASS.i64_signed_greater
-unsigned_greater :: MASS.i64_unsigned_greater
-signed_greater_equal :: MASS.i64_signed_greater_equal
-unsigned_greater_equal :: MASS.i64_unsigned_greater_equal
-
-negate :: fn(x : i64) => (i64) { 0 - x }
-
-logical_shift_left :: MASS.i64_logical_shift_left
-logical_shift_right :: MASS.i64_logical_shift_right
-bitwise_or :: MASS.i64_bitwise_or
-bitwise_and :: MASS.i64_bitwise_and
 
 using {
   Bits :: MASS.Bits
@@ -479,12 +488,13 @@ Allocator :: MASS.Allocator
 allocate :: macro(allocator : &MASS.Allocator, type : Type) {
   cast(&type, MASS.allocator_allocate_bytes(
     allocator,
-    unsigned_divide(type.bit_size.as_u64, 8),
-    unsigned_divide(type.bit_alignment.as_u64, 8)
+    MASS.i64_unsigned_divide(type.bit_size.as_u64, 8),
+    MASS.i64_unsigned_divide(type.bit_alignment.as_u64, 8)
   ))
 }
 
 Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
+  using MASS_I64_MATH
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
   length := meta.reify(arguments.1, i64).*

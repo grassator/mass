@@ -1510,46 +1510,6 @@ spec("source") {
       spec_check_slice(error->Operator_Fixity_Conflict.symbol, slice_literal("**"));
     }
 
-    it("should have a built-in compile-time shift operator") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "test :: fn() -> (s64) { 2 << 1 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual == 4);
-    }
-
-    it("should have a built-in compile-time bitwise and operator") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "test :: fn() -> (s64) { 0b110 & 0b011 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual == 0b10);
-    }
-
-    it("should have correctly handle the difference between addressof and bitwise and operators") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "test :: fn() -> (&s64) { x := 0 & 1; &x }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual);
-    }
-
-    it("should have a built-in compile-time bitwise or operator") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "test :: fn() -> (s64) { 0b110 | 0b011 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual == 0b111);
-    }
-
     it("should support defining a custom 'empty space' operator handler") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
@@ -1712,10 +1672,10 @@ spec("source") {
     }
 
     it("should support compile-time arithmetic operations") {
-      s64 (*checker)() = (s64 (*)())test_program_inline_source_function(
+      u64(*checker)() = (u64(*)())test_program_inline_source_function(
         "checker", &test_context,
         "RESULT :: 40 + 1 + 1\n"
-        "checker :: fn() -> (s64) { RESULT }"
+        "checker :: fn() -> (i64) { RESULT }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);

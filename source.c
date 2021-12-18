@@ -3737,14 +3737,11 @@ mass_match_overload_candidate(
         return;
       }
       if (literal->header.flags & Function_Header_Flags_Compile_Time) {
+        if (!args->all_arguments_are_compile_time_known) return;
         scoring_flags |= Mass_Argument_Scoring_Flags_Prefer_Compile_Time;
-        // :CompileTimeFnInJitMode
-        if (!context_is_compile_time_eval(context)) {
-          if (!args->all_arguments_are_compile_time_known) return;
-        }
       }
       if (!match_overload_argument_count(literal->header.parameters, args->view.length)) return;
-      Function_Info *literal_info;
+      Function_Info *specialized_info;
       {
         // :OverloadLock
         // A literal must be locked here to allow using its overload to be used
@@ -3753,30 +3750,21 @@ mass_match_overload_candidate(
         //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
         // Without the lock the second literal will infinitely recurse
         *literal->overload_lock_count += 1;
-        literal_info = function_literal_info_for_args(context, literal, args->view);
+        specialized_info = function_literal_info_for_args(context, literal, args->view);
         *literal->overload_lock_count -= 1;
       }
-      overload_info = literal_info;
+      overload_info = specialized_info;
       if (!overload_info) return;
     } else {
       const Descriptor *descriptor = value_or_lazy_value_descriptor(candidate);
       const Descriptor_Function_Instance *instance = descriptor_as_function_instance(descriptor);
       overload_info = instance->info;
-      if (instance->program && instance->program != context->program) {
-        if (!(overload_info->flags & Function_Info_Flags_Compile_Time)) {
-          return;
-        }
-      }
       if (overload_info->flags & Function_Info_Flags_Compile_Time) {
+        assert(instance->program == context->compilation->jit.program);
+        if (!args->all_arguments_are_compile_time_known) return;
         scoring_flags |= Mass_Argument_Scoring_Flags_Prefer_Compile_Time;
-        // :CompileTimeFnInJitMode
-        // When we are JIT-compiling a body of a function it is OK to allow
-        // to call a function that requires compile-time known args since
-        // they will be known at a point when this code runs which will
-        // still be at compile time (JIT).
-        if (!context_is_compile_time_eval(context)) {
-          if (!args->all_arguments_are_compile_time_known) return;
-        }
+      } else {
+        if (instance->program && instance->program != context->program) return;
       }
     }
 
@@ -4228,12 +4216,7 @@ token_handle_function_call(
       if (mass_has_error(context)) return 0;
       return result;
     } else {
-      // :CompileTimeFnInJitMode
-      if (context_is_compile_time_eval(context)) {
-        // Fall through and do a regular call
-      } else {
-        panic("A compile-time overload should not have been matched if we can't call it");
-      }
+      panic("A compile-time overload should not have been matched if we can't call it");
     }
   }
 
