@@ -86,11 +86,11 @@ string_get :: fn(string : String, offset : i64) => (i8) {
 unchecked_get_at_index :: fn(
   x ~ is_pointer_type,
   offset : i64
-) -> (x.Pointer_To.descriptor) MASS.unchecked_get_at_index
+) -> ((x.*).Pointer_To.descriptor) MASS.unchecked_get_at_index
 unchecked_get_at_index :: fn(
   x ~ is_pointer_type,
   offset : i64
-) => (x.Pointer_To.descriptor) MASS.unchecked_get_at_index
+) => ((x.*).Pointer_To.descriptor) MASS.unchecked_get_at_index
 
 get :: fn(x ~ is_struct_type, rhs) -> _ MASS.struct_get
 get :: fn(x ~ is_fixed_array_type, rhs) -> _ MASS.unchecked_get_at_index
@@ -112,7 +112,7 @@ make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&
   value.tag = MASS.Value_Tag.Forced
   value.descriptor = Void
   value.Forced.storage.tag = MASS.Storage_Tag.Immediate
-  value.Forced.storage.bit_size = value.descriptor.bit_size
+  value.Forced.storage.bit_size = [0]
   value
 }
 
@@ -259,10 +259,10 @@ x86_64 :: module {
   REX_R :: 0b0100 // Extension of the ModR/M reg field
   REX_W :: 0b1000 // 0 = Storage size determined by CS.D; 1 = 64 Bit Storage Size
 
-  Reg_T :: MASS.Register._Type
+  Register :: MASS.Register
   Instruction :: MASS.Instruction
 
-  op1_reg64_reg64_mr :: fn(op_code : i8, target : Reg_T, source : Reg_T) -> (Instruction) {
+  op1_reg64_reg64_mr :: fn(op_code : i8, target : Register, source : Register) -> (Instruction) {
     using MASS_I64_MATH
 
     lhs_reg_index := zero_extend(i64, target)
@@ -302,7 +302,7 @@ add_or_subtract :: fn(
     raw_payload : &Void
   ) -> (&MASS.Value) {
     payload := cast(&Payload, raw_payload)
-    temp_lhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
+    temp_lhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_lhs_register := temp_lhs_storage.Register.index
     expected_lhs := MASS.expected_result_exact(i64, temp_lhs_storage)
 
@@ -312,7 +312,7 @@ add_or_subtract :: fn(
       return 0
     }
 
-    temp_rhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
+    temp_rhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_rhs_register := temp_rhs_storage.Register.index
     expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
 
@@ -362,11 +362,11 @@ compare :: fn(
   context : &MASS.Context,
   parser : &MASS.Parser,
   arguments : MASS.Value_View,
-  compare_type : MASS.Compare_Type._Type
+  compare_type : MASS.Compare_Type
 ) -> (&MASS.Value) {
   meta :: import("std/meta")
 
-  Payload :: c_struct [ lhs : &MASS.Value, rhs : &MASS.Value, compare_type : MASS.Compare_Type._Type ]
+  Payload :: c_struct [ lhs : &MASS.Value, rhs : &MASS.Value, compare_type : MASS.Compare_Type ]
 
   lazy_value_proc :: fn(
     context : &MASS.Context,
@@ -377,7 +377,7 @@ compare :: fn(
   ) -> (&MASS.Value) {
     payload := cast(&Payload, raw_payload)
 
-    temp_lhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
+    temp_lhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_lhs_register := temp_lhs_storage.Register.index
     expected_lhs := MASS.expected_result_exact(i64, temp_lhs_storage)
     temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
@@ -386,7 +386,7 @@ compare :: fn(
       return 0
     }
 
-    temp_rhs_storage := MASS.storage_register_temp(builder, i64.bit_size);
+    temp_rhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_rhs_register := temp_rhs_storage.Register.index
     expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
     temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
@@ -414,7 +414,7 @@ compare :: fn(
     value.source_range = source_range.*
     value.descriptor = bool
     value.Forced.storage.tag = MASS.Storage_Tag.Eflags
-    value.Forced.storage.bit_size = value.descriptor.bit_size
+    value.Forced.storage.bit_size = (value.descriptor.*).bit_size
     value.Forced.storage.Eflags.compare_type = payload.compare_type
     value
   }
@@ -509,8 +509,8 @@ Allocator :: MASS.Allocator
 allocate :: macro(allocator : &MASS.Allocator, type : Type) {
   cast(&type, MASS.allocator_allocate_bytes(
     allocator,
-    MASS.i64_unsigned_divide(type.bit_size.as_u64, 8),
-    MASS.i64_unsigned_divide(type.bit_alignment.as_u64, 8)
+    MASS.i64_unsigned_divide((type.*).bit_size.as_u64, 8),
+    MASS.i64_unsigned_divide((type.*).bit_alignment.as_u64, 8)
   ))
 }
 
@@ -521,7 +521,7 @@ Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
   length := meta.reify(arguments.1, i64).*
   t := allocate(context.allocator, MASS.Descriptor)
 
-  raw_bit_size : i64 = unsigned_multiply(item_type.bit_size.as_u64, length)
+  raw_bit_size : i64 = unsigned_multiply((item_type.*).bit_size.as_u64, length)
   if raw_bit_size & 0xffff_ffff_8000_0000 != 0 then {
     error : MASS.Error
     error.tag = MASS.Error_Tag.Integer_Range
@@ -530,10 +530,10 @@ Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
     return 0
   }
 
-  t.tag = MASS.Descriptor_Tag.Fixed_Array
-  t.bit_size = [raw_bit_size]
-  t.bit_alignment = item_type.bit_alignment
-  t.Fixed_Array = [item_type, length]
+  (t.*).tag = MASS.Descriptor_Tag.Fixed_Array
+  (t.*).bit_size = [raw_bit_size]
+  (t.*).bit_alignment = (item_type.*).bit_alignment
+  (t.*).Fixed_Array = [item_type, length]
 
   meta.immediate(context.compilation, t, arguments.source_range)
 }
@@ -548,7 +548,7 @@ external :: fn(
 }
 
 os :: MASS.Os
-get_target_os :: fn() -> (os._Type) intrinsic {
+get_target_os :: fn() -> (os) intrinsic {
   meta :: import("std/meta")
   meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }

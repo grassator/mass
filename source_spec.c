@@ -1139,7 +1139,7 @@ spec("source") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_bit_size :: fn(x) -> (u64) { type :: type_of(x); type.bit_size.as_u64 }\n"
+          "my_bit_size :: fn(x) -> (u64) { type :: type_of(x); (type.*).bit_size.as_u64 }\n"
           "checker :: fn() -> (u64) {\n"
             "x : u32 = 0\n"
             "my_bit_size(x)\n"

@@ -5508,6 +5508,27 @@ mass_constraint_function_instance_type(
 }
 
 static Value *
+mass_module_get_impl(
+  Mass_Context *context,
+  const Module *module,
+  const Symbol *symbol,
+  const Source_Range *source_range
+) {
+  Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, symbol);
+  if (!entry) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Unknown_Field,
+      .source_range = *source_range,
+      .Unknown_Field = { .name = symbol->name, .type = &descriptor_module, },
+    });
+    return 0;
+  }
+  // FIXME when looking up values from a different file, need to either adjust source
+  //       range or have some other mechanism to track it.
+  return scope_entry_force_value(context, entry);
+}
+
+static Value *
 mass_module_get(
   Mass_Context *context,
   Parser *parser,
@@ -5522,18 +5543,7 @@ mass_module_get(
 
   const Symbol *symbol = value_as_symbol(rhs);
   const Module *module = value_as_module(lhs);
-  Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, symbol);
-  if (!entry) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Unknown_Field,
-      .source_range = args_view.source_range,
-      .Unknown_Field = { .name = symbol->name, .type = lhs->descriptor, },
-    });
-    return 0;
-  }
-  // FIXME when looking up values from a different file, need to either adjust source
-  //       range or have some other mechanism to track it.
-  return scope_entry_force_value(context, entry);
+  return mass_module_get_impl(context, module, symbol, &args_view.source_range);
 }
 
 static Value *
@@ -5658,8 +5668,24 @@ mass_get(
   if (mass_has_error(context)) return 0;
 
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+
   if (lhs_descriptor == &descriptor_module) {
     return mass_module_get(context, parser, parsed_args);
+  }
+  if (value_is_descriptor_pointer(lhs)) {
+    const Descriptor *descriptor = *value_as_descriptor_pointer(lhs);
+    if (!descriptor->module) {
+      Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Unknown_Field,
+        .source_range = rhs->source_range,
+        .Unknown_Field = { .name = field_name, .type = descriptor },
+      });
+      return 0;
+    }
+    if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
+    const Symbol *symbol = value_as_symbol(rhs);
+    return mass_module_get_impl(context, descriptor->module, symbol, &args_view.source_range);
   }
 
   const Symbol *symbol = context->compilation->common_symbols.get;
@@ -6751,9 +6777,9 @@ scope_define_enum(
 ) {
   const Allocator *allocator = compilation->allocator;
   Scope *enum_scope = scope_make(allocator, 0);
+  const Descriptor *enum_descriptor = *value_as_descriptor_pointer(enum_type_value);
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
-    const Descriptor *enum_descriptor = *value_as_descriptor_pointer(enum_type_value);
     Value *item_value = value_init(
       allocator_allocate(allocator, Value),
       enum_descriptor, storage_immediate(&it->value), source_range
@@ -6761,9 +6787,6 @@ scope_define_enum(
     const Symbol *it_symbol = mass_ensure_symbol(compilation, it->name);
     scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it_symbol, item_value);
   }
-
-  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("_Type"));
-  scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, type_symbol, enum_type_value);
 
   Module *enum_module = allocator_allocate(allocator, Module);
   *enum_module = (Module) {
@@ -6774,13 +6797,10 @@ scope_define_enum(
       .scope = enum_scope,
     },
   };
+  ((Descriptor *)enum_descriptor)->module = enum_module;
 
-  Value *enum_value = value_init(
-    allocator_allocate(allocator, Value),
-    &descriptor_module, storage_static(enum_module), source_range
-  );
   const Symbol *enum_symbol = mass_ensure_symbol(compilation, enum_name);
-  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_symbol, enum_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_symbol, enum_type_value);
 }
 
 static void

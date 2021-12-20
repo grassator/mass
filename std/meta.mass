@@ -14,7 +14,7 @@ pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   assert(same_type(value.descriptor, type))
   assert(value.tag == MASS.Value_Tag.Forced)
   storage := &value.Forced.storage
-  assert(value.descriptor.bit_size.as_u64 == storage.bit_size.as_u64)
+  assert((value.descriptor.*).bit_size.as_u64 == storage.bit_size.as_u64)
 
   if storage.tag == MASS.Storage_Tag.Static then {
     storage.Static.pointer
@@ -33,7 +33,9 @@ static_value :: fn(
 ) -> (&Value) {
   type :: type_of(pointer)
   static_assert(type.tag == MASS.Descriptor_Tag.Pointer_To)
-  pointee_type :: type.Pointer_To.descriptor
+  pointee_type :: (type.Pointer_To.*).descriptor
+  pointee_bit_size :: (pointee_type.*).bit_size
+  static_assert(pointee_bit_size > 64)
 
   static_value := allocate(compilation.allocator, Value)
   static_value.tag = MASS.Value_Tag.Forced
@@ -41,9 +43,8 @@ static_value :: fn(
   static_value.descriptor = pointee_type
 
   static_value.Forced.storage.tag = MASS.Storage_Tag.Static
-  static_value.Forced.storage.bit_size = pointee_type.bit_size
+  static_value.Forced.storage.bit_size = pointee_bit_size
 
-  static_assert(pointee_type.bit_size > 64)
   static_value.Forced.storage.Static.pointer = pointer
 
   static_value
@@ -55,7 +56,8 @@ immediate :: fn(
   source_range : Source_Range
 ) -> (&Value) {
   type :: type_of(source)
-  static_assert(type.bit_size <= 64, "Type is too large to fit into an immediate")
+  type_bit_size :: (type.*).bit_size
+  static_assert(type_bit_size <= 64, "Type is too large to fit into an immediate")
 
   static_value := allocate(compilation.allocator, Value)
   static_value.tag = MASS.Value_Tag.Forced
@@ -63,7 +65,7 @@ immediate :: fn(
   static_value.descriptor = type
 
   static_value.Forced.storage.tag = MASS.Storage_Tag.Immediate
-  static_value.Forced.storage.bit_size = type.bit_size
+  static_value.Forced.storage.bit_size = type_bit_size
   cast(type, static_value.Forced.storage.Immediate.bits) = source
 
   static_value
