@@ -4,6 +4,8 @@ operator(.) :: 20 __get
 // `import` is global to avoid the need to define other compiler exports as global
 operator(import _) :: 20 __import
 
+MASS :: import("mass")
+
 // TODO support mapping apply here with this specialized syntax
 //operator(_ _) :: 20 MASS.apply
 

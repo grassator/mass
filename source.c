@@ -6838,16 +6838,6 @@ scope_define_builtins(
     mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
   );
 
-  Value *compiler_module_value = value_init(
-    allocator_allocate(allocator, Value),
-    &descriptor_module, storage_static(&compilation->compiler_module), (Source_Range){0}
-  );
-  INIT_LITERAL_SOURCE_RANGE(&compiler_module_value->source_range, "MASS");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, compiler_module_value->source_range,
-    mass_ensure_symbol(compilation, slice_literal("MASS")), compiler_module_value
-  );
-
   Source_Range comma_source_range;
   INIT_LITERAL_SOURCE_RANGE(&comma_source_range, ",");
   scope_define_operator(
