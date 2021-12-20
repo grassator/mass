@@ -1817,7 +1817,6 @@
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="brand">brand</Item>
-    <Item Name="name">name</Item>
     <Item Name="bit_size">bit_size</Item>
     <Item Name="bit_alignment">bit_alignment</Item>
     <Item Name="Integer" Condition="tag == Descriptor_Tag_Integer">Integer</Item>

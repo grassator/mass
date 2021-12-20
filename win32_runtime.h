@@ -307,12 +307,7 @@ win32_program_test_exception_handler(
               Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_symbol);
               Value *value = scope_entry->value;
               if (value) {
-                if (value->descriptor->name.length) {
-                  // TODO print the actual value
-                  printf("%"PRIslice" {0}", SLICE_EXPAND_PRINTF(value->descriptor->name));
-                  puts("");
-                }
-                printf("TODO support generic printing of values\n");
+                printf("TODO support printing of values\n");
               } else {
                 printf("No debug information for current IP is available\n");
               }

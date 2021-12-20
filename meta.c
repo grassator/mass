@@ -1799,7 +1799,6 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "const Symbol *", "brand" },
-    { "Slice", "name" },
     { "Bits", "bit_size" },
     { "Bits", "bit_alignment" },
   })));

@@ -651,7 +651,7 @@ deduce_runtime_descriptor_for_value(
     Function_Call_Setup call_setup =
       context->program->default_calling_convention->call_setup_proc(context->allocator, match_found.info);
     return descriptor_function_instance(
-      context->allocator, (Slice){0}, match_found.info, call_setup, context->program
+      context->allocator, match_found.info, call_setup, context->program
     );
   }
 
@@ -1535,9 +1535,7 @@ value_ensure_type(
     if (mass_has_error(context)) return 0;
     const Calling_Convention *calling_convention = context->program->default_calling_convention;
     Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, info);
-    return descriptor_function_instance(
-      context->allocator, (Slice){0}, info, call_setup, context->program
-    );
+    return descriptor_function_instance(context->allocator, info, call_setup, context->program);
   }
   if (!mass_value_ensure_static_of(context, value, &descriptor_descriptor_pointer)) {
     return 0;
@@ -6187,9 +6185,7 @@ token_parse_function_literal(
     Function_Call_Setup call_setup =
       calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
 
-    Slice name = {0};
-    Descriptor *fn_descriptor =
-      descriptor_function_instance(context->allocator, name, fn_info, call_setup, 0);
+    Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, 0);
 
     i64 syscall_number = value_as_syscall(body_value)->number;
     return value_make(context, fn_descriptor, imm64(syscall_number.bits), view.source_range);

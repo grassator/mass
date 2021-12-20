@@ -50,7 +50,6 @@
 #define MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_)\
   static Descriptor descriptor_##_NAME_##_pointer = {\
     .tag = Descriptor_Tag_Pointer_To,\
-    .name = slice_literal_fields(#_NAME_),\
     .bit_size = {sizeof(void *) * CHAR_BIT},\
     .bit_alignment = _Alignof(void *) * CHAR_BIT,\
     .Pointer_To.descriptor = &descriptor_##_NAME_,\
@@ -59,7 +58,6 @@
 #define MASS_DEFINE_DESCRIPTOR_BASE(_TAG_, _NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_, ...)\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = (_TAG_),\
-    .name = slice_literal_fields(#_NAME_),\
     .bit_size = {_BIT_SIZE_},\
     .bit_alignment = (_BIT_ALIGNMENT_),\
     __VA_ARGS__\
@@ -86,7 +84,6 @@
   static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Struct,\
-    .name = slice_literal_fields(#_NAME_),\
     .brand = &(mass_meta_brand_##_NAME_),\
     .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
@@ -109,7 +106,6 @@
   };\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Function_Instance,\
-    .name = slice_literal_fields(#_NAME_),\
     .bit_size = {sizeof(void *) * CHAR_BIT},\
     .bit_alignment = _Alignof(void *) * CHAR_BIT,\
     .Function_Instance = { .info = &descriptor_##_NAME_##__info, .call_setup = 0/*FIXME*/, },\
@@ -187,7 +183,7 @@ do {\
   MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_NAME_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(allocator, function);\
   const Descriptor *instance_descriptor = descriptor_function_instance(\
-    allocator, slice_literal(_NAME_), function, call_setup, compilation->jit.program\
+    allocator, function, call_setup, compilation->jit.program\
   );\
   Value *instance_value = value_init(\
     allocator_allocate(allocator, Value),\
@@ -232,7 +228,6 @@ storage_static_memory(const Storage *);
 
 static Descriptor descriptor_void = {
   .tag = Descriptor_Tag_Void,
-  .name = slice_literal_fields("void"),
 };
 MASS_DEFINE_TYPE_VALUE(void);
 MASS_DEFINE_POINTER_DESCRIPTOR(void);

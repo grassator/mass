@@ -60,27 +60,20 @@ source_range_print_start_position(
   slice_print(file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
-#define APPEND_SLICE(_SLICE_)\
-  fixed_buffer_resizing_append_slice(&result, (_SLICE_))
+#define APPEND_SLICE(...)\
+  fixed_buffer_resizing_append_slice(&result, (__VA_ARGS__))
 #define APPEND_LITERAL(_STRING_)\
   APPEND_SLICE(slice_literal(_STRING_))
+
 
 static void
 mass_error_append_descriptor(
   Fixed_Buffer *result,
   const Descriptor *descriptor
-) {
-  if (descriptor->tag == Descriptor_Tag_Pointer_To) {
-    APPEND_LITERAL("&");
-    mass_error_append_descriptor(result, descriptor->Pointer_To.descriptor);
-    return;
-  }
-  APPEND_SLICE(descriptor->name);
-}
+);
 
 static void
 mass_error_append_function_signature_string(
-  Compilation *compilation,
   Fixed_Buffer *result,
   const Function_Info *info
 ) {
@@ -103,6 +96,72 @@ mass_error_append_function_signature_string(
     mass_error_append_descriptor(result, info->return_descriptor);
   } else {
     APPEND_LITERAL("_");
+  }
+}
+
+static void
+mass_error_append_descriptor(
+  Fixed_Buffer *result,
+  const Descriptor *descriptor
+) {
+  if (descriptor->brand) {
+    APPEND_SLICE(descriptor->brand->name);
+    APPEND_LITERAL(" ");
+  }
+  char print_buffer[32] = {0};
+  switch(descriptor->tag) {
+    case Descriptor_Tag_Void: {
+      APPEND_LITERAL("()");
+    } break;
+    case Descriptor_Tag_Integer:
+    case Descriptor_Tag_Float: {
+      APPEND_LITERAL("<");
+      if (descriptor->tag == Descriptor_Tag_Float) {
+        APPEND_LITERAL("f");
+      } else {
+        if (descriptor->Integer.is_signed) {
+          APPEND_LITERAL("s");
+        } else {
+          APPEND_LITERAL("u");
+        }
+      }
+      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64 / 8);
+      APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
+      APPEND_LITERAL(">");
+    } break;
+    case Descriptor_Tag_Raw: {
+      APPEND_LITERAL("<i");
+      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64 / 8);
+      APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
+      APPEND_LITERAL(">");
+    } break;
+    case Descriptor_Tag_Pointer_To: {
+      if (!descriptor->Pointer_To.is_implicit) APPEND_LITERAL("&");
+      mass_error_append_descriptor(result, descriptor->Pointer_To.descriptor);
+    } break;
+    case Descriptor_Tag_Fixed_Array: {
+      mass_error_append_descriptor(result, descriptor->Fixed_Array.item);
+      u64 item_count = descriptor->Fixed_Array.length;
+      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, item_count);
+      APPEND_LITERAL("*");
+      APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
+    } break;
+    case Descriptor_Tag_Struct: {
+      APPEND_LITERAL("[");
+      bool is_first = true;
+      DYN_ARRAY_FOREACH(Struct_Field, it, descriptor->Struct.fields) {
+        if (is_first) is_first = false; else APPEND_LITERAL(", ");
+        if (it->name.length) {
+          APPEND_SLICE(it->name);
+          APPEND_LITERAL(" : ");
+        }
+        mass_error_append_descriptor(result, it->descriptor);
+      }
+      APPEND_LITERAL("]");
+    } break;
+    case Descriptor_Tag_Function_Instance: {
+      mass_error_append_function_signature_string(result, descriptor->Function_Instance.info);
+    } break;
   }
 }
 
@@ -161,7 +220,7 @@ mass_error_to_string(
       APPEND_LITERAL("Field ");
       APPEND_SLICE(error->Unknown_Field.name);
       APPEND_LITERAL(" does not exist on type ");
-      APPEND_SLICE(error->Unknown_Field.type->name);
+      mass_error_append_descriptor(result, error->Unknown_Field.type);
     } break;
     case Mass_Error_Tag_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier");
@@ -209,7 +268,7 @@ mass_error_to_string(
     } break;
     case Mass_Error_Tag_Integer_Range: {
       APPEND_LITERAL("Value does not fit into integer of type ");
-      APPEND_SLICE(error->Integer_Range.descriptor->name);
+      mass_error_append_descriptor(result, error->Integer_Range.descriptor);
     } break;
     case Mass_Error_Tag_Epoch_Mismatch: {
       APPEND_LITERAL("Trying to access a value from the wrong execution epoch ");
@@ -224,9 +283,9 @@ mass_error_to_string(
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
       APPEND_LITERAL("Could not decide which overload is better: \n  ");
-      mass_error_append_function_signature_string(compilation, result, overloads->a);
+      mass_error_append_function_signature_string(result, overloads->a);
       APPEND_LITERAL("\n  ");
-      mass_error_append_function_signature_string(compilation, result, overloads->b);
+      mass_error_append_function_signature_string(result, overloads->b);
     } break;
     case Mass_Error_Tag_Non_Function_Overload: {
       APPEND_LITERAL("Trying to define a non-function overload ");
@@ -1004,7 +1063,6 @@ function_info_init(
 static inline Descriptor *
 descriptor_function_instance(
   const Allocator *allocator,
-  Slice name,
   const Function_Info *info,
   Function_Call_Setup call_setup,
   const Program *program
@@ -1012,7 +1070,6 @@ descriptor_function_instance(
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
     .tag = Descriptor_Tag_Function_Instance,
-    .name = name,
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function_Instance = { .info = info, .call_setup = call_setup, .program = program, },

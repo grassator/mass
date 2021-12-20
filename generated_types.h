@@ -1871,7 +1871,6 @@ typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
   const Symbol * brand;
-  Slice name;
   Bits bit_size;
   Bits bit_alignment;
   union {
@@ -5093,11 +5092,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("brand"),
     .offset = offsetof(Descriptor, brand),
-  },
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("name"),
-    .offset = offsetof(Descriptor, name),
   },
   {
     .descriptor = &descriptor_bits,

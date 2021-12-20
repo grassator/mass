@@ -638,15 +638,11 @@ ensure_function_instance(
     return instance_value;
   }
 
-  Slice fn_name = fn_value->descriptor->name.length
-    ? fn_value->descriptor->name
-    : slice_literal("__anonymous__");
-
   if (mass_has_error(context)) return 0;
 
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
   const Descriptor *instance_descriptor =
-    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup, program);
+    descriptor_function_instance(context->allocator, fn_info, call_setup, program);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = value_as_external_symbol(literal->body);
@@ -659,7 +655,7 @@ ensure_function_instance(
     return cached_instance;
   }
 
-  Label *call_label = make_label(context->allocator, program, &program->memory.code, fn_name);
+  Label *call_label = make_label(context->allocator, program, &program->memory.code, slice_literal(":start"));
   // It is important to cache the label here for recursive calls
   Value *cached_instance = value_init(
     allocator_allocate(context->allocator, Value),
@@ -675,8 +671,7 @@ ensure_function_instance(
     .module = 0, // FIXME provide module here
   };
 
-  Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
-  Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
+  Slice end_label_name = slice_literal(":end");
 
   const Descriptor *return_descriptor = fn_info->return_descriptor;
   Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
@@ -791,13 +786,13 @@ program_init_startup_code(
   function_info_init(fn_info, &descriptor_void);
   const Calling_Convention *calling_convention =
     context->compilation->runtime_program->default_calling_convention;
-  Slice fn_name = slice_literal("__startup");
   Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, fn_info);
-  Descriptor *descriptor =
-    descriptor_function_instance(context->allocator, fn_name, fn_info, call_setup, program);
-  Label *fn_label = make_label(context->allocator, program, &program->memory.code, fn_name);
+  Descriptor *descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, program);
+  Label *fn_label = make_label(
+    context->allocator, program, &program->memory.code, slice_literal("__startup:start")
+  );
   Label *end_label =
-    make_label(context->allocator, program, &program->memory.code, slice_literal("__startup end"));
+    make_label(context->allocator, program, &program->memory.code, slice_literal("__startup:end"));
   Storage storage = code_label32(fn_label);
 
   Value *function = value_make(context, descriptor, storage, source_range);
