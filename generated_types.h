@@ -764,6 +764,9 @@ static void push_instruction
 static Value * mass_get
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_import
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_intrinsic
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -801,9 +804,6 @@ static Value * mass_named_accessor
   (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_typed_symbol
-  (Mass_Context * context, Parser * parser, Value_View args);
-
-static Value * mass_import
   (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_pointer_to
@@ -2765,6 +2765,7 @@ static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_get;
+static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_using;
@@ -2778,7 +2779,6 @@ static Descriptor descriptor_mass_array_like_get;
 static Descriptor descriptor_mass_struct_get;
 static Descriptor descriptor_mass_named_accessor;
 static Descriptor descriptor_mass_typed_symbol;
-static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_pointer_to_type;
 static Descriptor descriptor_mass_eval;

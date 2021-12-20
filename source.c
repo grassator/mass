@@ -2424,7 +2424,7 @@ mass_import(
   Value_View args
 ) {
   if (args.length != 1) goto parse_err;
-  Value *file_path_value = value_view_get(&args, 0);
+  Value *file_path_value = token_parse_single(context, parser, value_view_get(&args, 0));
   if (file_path_value->descriptor != &descriptor_slice) goto parse_err;
   Slice file_path = *value_as_slice(file_path_value);
 

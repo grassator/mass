@@ -2109,6 +2109,7 @@ main(void) {
   })));
 
   export_global_custom_name("__get", push_type(type_intrinsic("mass_get")));
+  export_global_custom_name("__import", push_type(type_intrinsic("mass_import")));
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
@@ -2123,7 +2124,6 @@ main(void) {
   export_compiler_custom_name("struct_get", push_type(type_intrinsic("mass_struct_get")));
   export_compiler_custom_name("named_accessor", push_type(type_intrinsic("mass_named_accessor")));
   export_compiler_custom_name("typed_symbol", push_type(type_intrinsic("mass_typed_symbol")));
-  export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
   export_compiler_custom_name("pointer_to", push_type(type_intrinsic("mass_pointer_to")));
   export_compiler_custom_name("pointer_to_type", push_type(type_intrinsic("mass_pointer_to_type")));
   export_compiler_custom_name("eval", push_type(type_intrinsic("mass_eval")));
