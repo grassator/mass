@@ -5703,11 +5703,10 @@ mass_handle_dot_operator(
 }
 
 static Value *
-mass_handle_comma_operator(
+mass_comma(
   Mass_Context *context,
   Parser *parser,
-  Value_View args_view,
-  const Operator *operator
+  Value_View args_view
 ) {
   assert(args_view.length == 2);
   Value *lhs = value_view_get(&args_view, 0);
@@ -6827,28 +6826,12 @@ scope_define_builtins(
   Compilation *compilation,
   Scope *scope
 ) {
-  const Allocator *allocator = compilation->allocator;
-  Mass_Context context = mass_context_from_compilation(compilation);
-
   global_scope_define_exports(compilation, scope);
   Source_Range type_source_range;
   INIT_LITERAL_SOURCE_RANGE(&type_source_range, "Type");
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, type_source_range,
     mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
-  );
-
-  Source_Range comma_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&comma_source_range, ",");
-  scope_define_operator(
-    &context, scope, comma_source_range, compilation->common_symbols.operator_comma,
-    allocator_make(allocator, Operator,
-      .precedence = 0,
-      .fixity = Operator_Fixity_Infix,
-      .associativity = Operator_Associativity_Left,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_comma_operator,
-    )
   );
 
   {

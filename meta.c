@@ -2117,8 +2117,9 @@ main(void) {
   export_compiler_custom_name("return", push_type(type_intrinsic("mass_return")));
   export_compiler_custom_name("assign", push_type(type_intrinsic("mass_assign")));
   export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
-  export_compiler_custom_name("function_literal", push_type(type_intrinsic("mass_function_literal")));
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
+  export_compiler_custom_name("comma", push_type(type_intrinsic("mass_comma")));
+  export_compiler_custom_name("function_literal", push_type(type_intrinsic("mass_function_literal")));
   export_compiler_custom_name("dereference", push_type(type_intrinsic("mass_dereference")));
   export_compiler_custom_name("unchecked_get_at_index", push_type(type_intrinsic("mass_array_like_get")));
   export_compiler_custom_name("struct_get", push_type(type_intrinsic("mass_struct_get")));

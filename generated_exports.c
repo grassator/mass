@@ -666,7 +666,7 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_function_literal, "function_literal", &descriptor_value_pointer,
+    mass_unquote, "unquote", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_mass_context_pointer
@@ -682,7 +682,23 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_unquote, "unquote", &descriptor_value_pointer,
+    mass_comma, "comma", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
+    mass_function_literal, "function_literal", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_mass_context_pointer
