@@ -1393,7 +1393,7 @@ tokenizer_group_start_square(
   Array_Tokenizer_Parent *parent_stack,
   Source_Range source_range
 ) {
-  Group_Paren *group = mass_allocate(context, Group_Paren);
+  Group_Square *group = mass_allocate(context, Group_Square);
   Value *value = value_make(context, &descriptor_group_square, storage_static(group), source_range);
   tokenizer_group_push(stack, parent_stack, value);
 }
