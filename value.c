@@ -67,10 +67,14 @@ source_range_print_start_position(
 
 
 static void
-mass_error_append_descriptor(
+mass_error_append_descriptor_impl(
   Fixed_Buffer *result,
-  const Descriptor *descriptor
+  const Descriptor *descriptor,
+  u64 level
 );
+
+#define mass_error_append_descriptor(...)\
+  mass_error_append_descriptor_impl(__VA_ARGS__, 0)
 
 static void
 mass_error_append_function_signature_string(
@@ -100,13 +104,18 @@ mass_error_append_function_signature_string(
 }
 
 static void
-mass_error_append_descriptor(
+mass_error_append_descriptor_impl(
   Fixed_Buffer *result,
-  const Descriptor *descriptor
+  const Descriptor *descriptor,
+  u64 level
 ) {
   if (descriptor->brand) {
     APPEND_SLICE(descriptor->brand->name);
-    APPEND_LITERAL(" ");
+    return;
+  }
+  if (level > 3) {
+    APPEND_LITERAL("..");
+    return;
   }
   char print_buffer[32] = {0};
   switch(descriptor->tag) {
@@ -137,10 +146,10 @@ mass_error_append_descriptor(
     } break;
     case Descriptor_Tag_Pointer_To: {
       if (!descriptor->Pointer_To.is_implicit) APPEND_LITERAL("&");
-      mass_error_append_descriptor(result, descriptor->Pointer_To.descriptor);
+      mass_error_append_descriptor_impl(result, descriptor->Pointer_To.descriptor, level + 1);
     } break;
     case Descriptor_Tag_Fixed_Array: {
-      mass_error_append_descriptor(result, descriptor->Fixed_Array.item);
+      mass_error_append_descriptor_impl(result, descriptor->Fixed_Array.item, level + 1);
       u64 item_count = descriptor->Fixed_Array.length;
       u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, item_count);
       APPEND_LITERAL("*");
@@ -155,7 +164,7 @@ mass_error_append_descriptor(
           APPEND_SLICE(it->name);
           APPEND_LITERAL(" : ");
         }
-        mass_error_append_descriptor(result, it->descriptor);
+        mass_error_append_descriptor_impl(result, it->descriptor, level + 1);
       }
       APPEND_LITERAL("]");
     } break;
