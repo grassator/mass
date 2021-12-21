@@ -1798,7 +1798,7 @@ main(void) {
       { "const Descriptor *", "descriptor" },
     }),
   }), (Struct_Item[]){
-    { "Module *", "module" },
+    { "Module *", "own_module" },
     { "const Symbol *", "brand" },
     { "Bits", "bit_size" },
     { "Bits", "bit_alignment" },

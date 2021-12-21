@@ -1873,7 +1873,7 @@ typedef struct Descriptor_Pointer_To {
 typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
-  Module * module;
+  Module * own_module;
   const Symbol * brand;
   Bits bit_size;
   Bits bit_alignment;
@@ -5095,8 +5095,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
   },
   {
     .descriptor = &descriptor_module_pointer,
-    .name = slice_literal_fields("module"),
-    .offset = offsetof(Descriptor, module),
+    .name = slice_literal_fields("own_module"),
+    .offset = offsetof(Descriptor, own_module),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

@@ -5674,7 +5674,7 @@ mass_get(
   }
   if (value_is_descriptor_pointer(lhs)) {
     const Descriptor *descriptor = *value_as_descriptor_pointer(lhs);
-    if (!descriptor->module) {
+    if (!descriptor->own_module) {
       Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Unknown_Field,
@@ -5685,7 +5685,7 @@ mass_get(
     }
     if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
     const Symbol *symbol = value_as_symbol(rhs);
-    return mass_module_get_impl(context, descriptor->module, symbol, &args_view.source_range);
+    return mass_module_get_impl(context, descriptor->own_module, symbol, &args_view.source_range);
   }
 
   const Symbol *symbol = context->compilation->common_symbols.get;
@@ -6796,7 +6796,7 @@ scope_define_enum(
       .scope = enum_scope,
     },
   };
-  ((Descriptor *)enum_descriptor)->module = enum_module;
+  ((Descriptor *)enum_descriptor)->own_module = enum_module;
 
   const Symbol *enum_symbol = mass_ensure_symbol(compilation, enum_name);
   scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_symbol, enum_type_value);
