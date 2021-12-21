@@ -465,6 +465,17 @@ signed :: module {
   greater_equal :: signed_greater_equal
 }
 
+equal :: fn(x, accessor : MASS.Named_Accessor) -> _ intrinsic {
+  meta :: import("std/meta")
+  accessor := meta.reify(arguments.1, MASS.Named_Accessor)
+  x_descriptor := arguments.0.descriptor
+  named_value := MASS.module_get(context, (x_descriptor.*).own_module, accessor.symbol, &arguments.source_range)
+  values : (&MASS.Value) * 2 = [arguments.0, named_value]
+  new_args : MASS.Value_View = arguments
+  new_args.values = &values
+  MASS.forward_call_to_alias(context, parser, new_args, & 'equal)
+}
+
 memory_equal :: fn(x, y : x) -> (bool) MASS.generic_equal
 memory_not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
 equal :: memory_equal

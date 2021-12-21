@@ -10,7 +10,7 @@ exports [.print]
 //})
 
 native_stdout :: fn(buffer : &i8, size : i64) -> () {
-  if get_target_os() == os.Windows then {
+  if get_target_os() == .Windows then {
     win32 :: import("std/win32")
     handle := win32.GetStdHandle(cast(s32, -11))
     win32.WriteFile(handle, buffer, cast(s32, size), 0, 0)

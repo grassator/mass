@@ -887,6 +887,12 @@ static Expected_Result mass_expected_result_exact
 static Value * value_force
   (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, Value * value);
 
+static Value * mass_module_get_impl
+  (Mass_Context * context, const Module * module, const Symbol * symbol, const Source_Range * source_range);
+
+static Value * mass_forward_call_to_alias
+  (Mass_Context * context, Parser * parser, Value_View args, const Symbol * symbol);
+
 static i64 mass_i64_logical_shift_left
   (i64 a, i64 b);
 
@@ -2809,6 +2815,8 @@ static Descriptor descriptor_storage_register_temp;
 static Descriptor descriptor_storage_release_if_temporary;
 static Descriptor descriptor_mass_expected_result_exact;
 static Descriptor descriptor_value_force;
+static Descriptor descriptor_mass_module_get_impl;
+static Descriptor descriptor_mass_forward_call_to_alias;
 static Descriptor descriptor_mass_i64_logical_shift_left;
 static Descriptor descriptor_mass_i64_logical_shift_right;
 static Descriptor descriptor_mass_i64_bitwise_and;

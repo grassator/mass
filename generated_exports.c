@@ -1146,6 +1146,46 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
+    mass_module_get_impl, "module_get", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("module")),
+&descriptor_module_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("symbol")),
+&descriptor_symbol_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("source_range")),
+&descriptor_source_range_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_forward_call_to_alias, "forward_call_to_alias", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("symbol")),
+&descriptor_symbol_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
     mass_i64_logical_shift_left, "i64_logical_shift_left", &descriptor_i64,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("a")),

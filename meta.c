@@ -2230,6 +2230,24 @@ main(void) {
     })
   ));
 
+  export_compiler_custom_name("module_get", push_type(
+    type_function(Default, "mass_module_get_impl", "Value *", (Argument_Type[]){
+      { "Mass_Context *", "context" },
+      { "const Module *", "module" },
+      { "const Symbol *", "symbol" },
+      { "const Source_Range *", "source_range" },
+    })
+  ));
+
+  export_compiler_custom_name("forward_call_to_alias", push_type(
+    type_function(Default, "mass_forward_call_to_alias", "Value *", (Argument_Type[]){
+      { "Mass_Context *", "context" },
+      { "Parser *", "parser" },
+      { "Value_View", "args" },
+      { "const Symbol *", "symbol" },
+    })
+  ));
+
   const char *i64_ops[] = {
     "logical_shift_left", "logical_shift_right",
     "bitwise_and", "bitwise_or",
