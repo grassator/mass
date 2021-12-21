@@ -810,6 +810,10 @@ print_mass_struct_item(
   const char *struct_name,
   Struct_Item *item
 ) {
+  Slice name_slice = slice_from_c_string(item->name);
+  if (slice_starts_with(name_slice, slice_literal("_"))) {
+    if (slice_ends_with(name_slice, slice_literal("padding"))) return;
+  }
   fprintf(file, "  {\n");
   fprintf(file, "    .descriptor = &");
   print_mass_struct_descriptor_type(file, item->type);
