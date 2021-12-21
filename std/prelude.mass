@@ -476,22 +476,10 @@ equal :: fn(x, accessor : MASS.Named_Accessor) -> _ intrinsic {
   MASS.forward_call_to_alias(context, parser, new_args, & 'equal)
 }
 
-memory_equal :: fn(x, y : x) -> (bool) MASS.generic_equal
-memory_not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
-equal :: memory_equal
-not_equal :: memory_not_equal
-// TODO :CompileTimeFnInJitMode
-//      Because `=>` fns are allowed to match for jit calls we have to define
-//      a separate name for `generic_equal` and call it here, otherwise the code
-//      would infinite loop. There are a few solutions to this:
-//      1) Keep everything as this, but add a helper that would filter out `=>` overloads:
-//           equal :: fn(x, y : x) => (bool) { runtime_overloads(equal)(x, y) }
-//      2) Change `=>` semantics to require static storage values. This would resolve
-//         the ambiguity but if a programmer wants to have the same code run for static
-//         storage values and runtime ones they would have to define a runtime version
-//         and then also define a wrapper - either manually or maybe via a macro / intrinsic
-equal :: fn(x, y : x) => (bool) { memory_equal(x, y) }
-not_equal :: fn(x, y : x) => (bool) { memory_not_equal(x, y) }
+equal :: fn(x, y : x) -> (bool) MASS.generic_equal
+not_equal :: fn(x, y : x) -> (bool) MASS.generic_not_equal
+equal :: fn(x, y : x) => (bool) { equal(x, y) }
+not_equal :: fn(x, y : x) => (bool) { not_equal(x, y) }
 
 using {
   Bits :: MASS.Bits
