@@ -517,7 +517,7 @@ allocate :: macro(allocator : &MASS.Allocator, type : Type) {
   ))
 }
 
-Array :: fn(item_type : Type, length : i64) -> (Type) intrinsic {
+Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
   using MASS_I64_MATH
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
