@@ -438,7 +438,7 @@ value_indirect_from_pointer(
       return temp;
     }
     default:
-    case Storage_Tag_Unpacked:
+    case Storage_Tag_Disjoint:
     case Storage_Tag_Immediate:
     case Storage_Tag_Static:
     case Storage_Tag_Eflags:
@@ -3192,9 +3192,14 @@ mass_assert_storage_is_valid_in_context(
     case Storage_Tag_Immediate:
     case Storage_Tag_Xmm:
     case Storage_Tag_Eflags:
-    case Storage_Tag_Unpacked:
     case Storage_Tag_Register: {
       // Assume valid?
+    } break;
+    case Storage_Tag_Disjoint: {
+      for (u64 i = 0; i < dyn_array_length(storage->Disjoint.pieces); ++i) {
+        const Storage *piece = *dyn_array_get(storage->Disjoint.pieces, i);
+        mass_assert_storage_is_valid_in_context(piece, context);
+      }
     } break;
     case Storage_Tag_Memory: {
       switch(storage->Memory.location.tag) {
@@ -3392,7 +3397,7 @@ call_function_overload(
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       const Storage *expected = &expected_result->Exact.storage;
-      if (expected->tag == Storage_Tag_Register || expected->tag == Storage_Tag_Unpacked) {
+      if (expected->tag == Storage_Tag_Register || expected->tag == Storage_Tag_Disjoint) {
         expected_result_bitset = register_bitset_from_storage(expected);
       }
       break;

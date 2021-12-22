@@ -171,12 +171,12 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Storage_Memory")),
     type_storage_memory_value
   );
-  Source_Range Storage_Unpacked__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Storage_Unpacked__source_range, "Storage_Unpacked");
+  Source_Range Storage_Disjoint__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Storage_Disjoint__source_range, "Storage_Disjoint");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Storage_Unpacked__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Storage_Unpacked")),
-    type_storage_unpacked_value
+    scope, VALUE_STATIC_EPOCH, Storage_Disjoint__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Storage_Disjoint")),
+    type_storage_disjoint_value
   );
   Source_Range Instruction__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Instruction__source_range, "Instruction");

@@ -1414,8 +1414,8 @@ main(void) {
     struct_fields("Memory", (Struct_Item[]){
       { "Memory_Location", "location" },
     }),
-    struct_fields("Unpacked", (Struct_Item[]){
-      { "Register", "registers", 2 },
+    struct_fields("Disjoint", (Struct_Item[]){
+      { "Array_Storage_Ptr", "pieces" },
     }),
   }), (Struct_Item[]){
     { "Storage_Flags", "flags" },

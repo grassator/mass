@@ -16,7 +16,7 @@ mass_value_is_compile_time_known(
     } break;
     case Storage_Tag_Register:
     case Storage_Tag_Xmm:
-    case Storage_Tag_Unpacked:
+    case Storage_Tag_Disjoint:
     case Storage_Tag_Memory:
     case Storage_Tag_Eflags:
     default: {
@@ -591,13 +591,10 @@ storage_with_offset_and_bit_size(
       result.Register.packed = bit_size.as_u64 != 64;
       result.Register.offset_in_bits = u64_to_u16(offset_in_bits);
     } break;
-    case Storage_Tag_Unpacked: {
-      Storage register_storages[2] = {
-        storage_register(base->Unpacked.registers[0], (Bits){64}),
-        storage_register(base->Unpacked.registers[1], (Bits){64}),
-      };
+    case Storage_Tag_Disjoint: {
       u64 bit_start = 0;
-      STATIC_ARRAY_FOREACH(Storage, piece, register_storages) {
+      for (u64 i = 0; i < dyn_array_length(base->Disjoint.pieces); ++i) {
+        const Storage *piece = *dyn_array_get(base->Disjoint.pieces, i);
         u64 bit_end = bit_start + piece->bit_size.as_u64;
         bool starts_in_this_piece = offset_in_bits >= bit_start && offset_in_bits < bit_end;
         if (starts_in_this_piece) {
@@ -805,8 +802,14 @@ storage_equal(
       panic("Internal Error: Unexpected Memory_Location_Tag");
       return false;
     }
-    case Storage_Tag_Unpacked: {
-      return memcmp(a->Unpacked.registers, b->Unpacked.registers, sizeof(a->Unpacked.registers)) == 0;
+    case Storage_Tag_Disjoint: {
+      if (dyn_array_length(a->Disjoint.pieces) != dyn_array_length(b->Disjoint.pieces)) return false;
+      for (u64 i = 0; i < dyn_array_length(a->Disjoint.pieces); ++i) {
+        const Storage *a_piece = *dyn_array_get(a->Disjoint.pieces, i);
+        const Storage *b_piece = *dyn_array_get(b->Disjoint.pieces, i);
+        if (!storage_equal(a_piece, b_piece)) return false;
+      }
+      return true;
     }
     case Storage_Tag_Immediate: {
       return memcmp(&a->Immediate.bits, &b->Immediate.bits, a->bit_size.as_u64 / 8) == 0;
@@ -972,9 +975,15 @@ storage_release_if_temporary(
       }
       break;
     }
-    case Storage_Tag_Unpacked: {
-      register_release(builder, storage->Unpacked.registers[0]);
-      register_release(builder, storage->Unpacked.registers[1]);
+    case Storage_Tag_Disjoint: {
+      for (u64 i = 0; i < dyn_array_length(storage->Disjoint.pieces); ++i) {
+        Storage piece = **dyn_array_get(storage->Disjoint.pieces, i);
+        // TODO This is a quite awkward.
+        //      Maybe the flags should be propagated on storage creation?
+        //      Also is it possible that some pieces are temp and some are not?
+        piece.flags |= storage->flags & Storage_Flags_Temporary;
+        storage_release_if_temporary(builder, &piece);
+      }
       break;
     }
     case Storage_Tag_Eflags:

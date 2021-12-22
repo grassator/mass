@@ -297,7 +297,7 @@ typedef struct Storage_Register Storage_Register;
 typedef struct Storage_Xmm Storage_Xmm;
 typedef struct Storage_Static Storage_Static;
 typedef struct Storage_Memory Storage_Memory;
-typedef struct Storage_Unpacked Storage_Unpacked;
+typedef struct Storage_Disjoint Storage_Disjoint;
 typedef dyn_array_type(Storage *) Array_Storage_Ptr;
 typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
 
@@ -1299,7 +1299,7 @@ typedef enum {
   Storage_Tag_Xmm = 3,
   Storage_Tag_Static = 4,
   Storage_Tag_Memory = 5,
-  Storage_Tag_Unpacked = 6,
+  Storage_Tag_Disjoint = 6,
 } Storage_Tag;
 
 typedef struct Storage_Immediate {
@@ -1323,9 +1323,9 @@ typedef struct Storage_Static {
 typedef struct Storage_Memory {
   Memory_Location location;
 } Storage_Memory;
-typedef struct Storage_Unpacked {
-  Register registers[2];
-} Storage_Unpacked;
+typedef struct Storage_Disjoint {
+  Array_Storage_Ptr pieces;
+} Storage_Disjoint;
 typedef struct Storage {
   Storage_Tag tag;
   char _tag_padding[4];
@@ -1339,7 +1339,7 @@ typedef struct Storage {
     Storage_Xmm Xmm;
     Storage_Static Static;
     Storage_Memory Memory;
-    Storage_Unpacked Unpacked;
+    Storage_Disjoint Disjoint;
   };
 } Storage;
 static inline const Storage_Immediate *
@@ -1372,10 +1372,10 @@ storage_as_memory(const Storage *storage) {
   assert(storage->tag == Storage_Tag_Memory);
   return &storage->Memory;
 }
-static inline const Storage_Unpacked *
-storage_as_unpacked(const Storage *storage) {
-  assert(storage->tag == Storage_Tag_Unpacked);
-  return &storage->Unpacked;
+static inline const Storage_Disjoint *
+storage_as_disjoint(const Storage *storage) {
+  assert(storage->tag == Storage_Tag_Disjoint);
+  return &storage->Disjoint;
 }
 typedef dyn_array_type(Storage) Array_Storage;
 typedef struct Relocation {
@@ -3019,7 +3019,6 @@ static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
 static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
-static Descriptor descriptor_register_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Register, 2, &descriptor_register);
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_i8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_i8);
 static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
@@ -3634,7 +3633,7 @@ static C_Enum_Item storage_tag_items[] = {
 { .name = slice_literal_fields("Xmm"), .value = 3 },
 { .name = slice_literal_fields("Static"), .value = 4 },
 { .name = slice_literal_fields("Memory"), .value = 5 },
-{ .name = slice_literal_fields("Unpacked"), .value = 6 },
+{ .name = slice_literal_fields("Disjoint"), .value = 6 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_immediate, Storage_Immediate,
   {
@@ -3699,14 +3698,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_memory, Storage_Memory,
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_memory);
-MASS_DEFINE_STRUCT_DESCRIPTOR(storage_unpacked, Storage_Unpacked,
+MASS_DEFINE_STRUCT_DESCRIPTOR(storage_disjoint, Storage_Disjoint,
   {
-    .descriptor = &descriptor_register_2,
-    .name = slice_literal_fields("registers"),
-    .offset = offsetof(Storage_Unpacked, registers),
+    .descriptor = &descriptor_array_storage_ptr,
+    .name = slice_literal_fields("pieces"),
+    .offset = offsetof(Storage_Disjoint, pieces),
   },
 );
-MASS_DEFINE_TYPE_VALUE(storage_unpacked);
+MASS_DEFINE_TYPE_VALUE(storage_disjoint);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
   {
     .name = slice_literal_fields("tag"),
@@ -3754,9 +3753,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
     .offset = offsetof(Storage, Memory),
   },
   {
-    .name = slice_literal_fields("Unpacked"),
-    .descriptor = &descriptor_storage_unpacked,
-    .offset = offsetof(Storage, Unpacked),
+    .name = slice_literal_fields("Disjoint"),
+    .descriptor = &descriptor_storage_disjoint,
+    .offset = offsetof(Storage, Disjoint),
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage);

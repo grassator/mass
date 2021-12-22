@@ -70,9 +70,11 @@ register_bitset_from_storage(
         register_bitset_set(&result, reg_index);
       }
     } break;
-    case Storage_Tag_Unpacked: {
-      register_bitset_set(&result, storage->Unpacked.registers[0]);
-      register_bitset_set(&result, storage->Unpacked.registers[1]);
+    case Storage_Tag_Disjoint: {
+      for (u64 i = 0; i < dyn_array_length(storage->Disjoint.pieces); ++i) {
+        const Storage *piece = *dyn_array_get(storage->Disjoint.pieces, i);
+        result |= register_bitset_from_storage(piece);
+      }
     } break;
   }
   return result;
@@ -535,14 +537,14 @@ function_return_value_register_from_storage(
       }
       break;
     }
-    case Storage_Tag_Unpacked:
+    case Storage_Tag_Disjoint:
     case Storage_Tag_Immediate:
     case Storage_Tag_Static:
     case Storage_Tag_Eflags: {
       break;
     }
   }
-  panic("Unexpected storage for a return value");
+  panic("Unexpected storage for an indirect return value");
   return 0;
 }
 

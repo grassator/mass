@@ -240,6 +240,7 @@ x86_64_system_v_adjust_classification_if_no_register_available(
 
 static Function_Call_Parameter
 x86_64_system_v_parameter_for_classification(
+  const Allocator *allocator,
   System_V_Register_State *registers,
   const System_V_Classification *classification,
   Slice name,
@@ -275,15 +276,16 @@ x86_64_system_v_parameter_for_classification(
           } break;
         }
       } else if (classification->eightbyte_count == 2) {
+        Storage *allocated_storages = allocator_allocate_array(allocator, Storage, 2);
+        allocated_storages[0] = storage_register(gpr->items[gpr->index++], (Bits){64});
+        allocated_storages[1] = storage_register(gpr->items[gpr->index++], (Bits){64});
+        Array_Storage_Ptr pieces = dyn_array_make(Array_Storage_Ptr, .capacity = 2, .allocator = allocator);
+        dyn_array_push(pieces, &allocated_storages[0]);
+        dyn_array_push(pieces, &allocated_storages[1]);
         storage = (Storage) {
-          .tag = Storage_Tag_Unpacked,
+          .tag = Storage_Tag_Disjoint,
           .bit_size = classification->descriptor->bit_size,
-          .Unpacked = {
-            .registers = {
-              gpr->items[gpr->index++],
-              gpr->items[gpr->index++]
-            },
-          },
+          .Disjoint = { .pieces = pieces },
         };
       } else {
         panic("Unexpected eightbyte_count for an INTEGER class argument");
@@ -719,7 +721,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
       u64 stack_offset = 0;
       Slice return_name = (Slice){0};
       Function_Call_Parameter item = x86_64_system_v_parameter_for_classification(
-        &registers, &classification, return_name, &stack_offset
+        allocator, &registers, &classification, return_name, &stack_offset
       );
 
       result.callee_return = item.storage;
@@ -763,7 +765,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Function_Call_Parameter call_param = x86_64_system_v_parameter_for_classification(
-      &registers, &classification, param->symbol->name, &stack_offset
+      allocator, &registers, &classification, param->symbol->name, &stack_offset
     );
     call_param.original_index = param_index; //:ParameterOriginalIndex
 
@@ -846,7 +848,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     }
 
     Function_Call_Parameter parameter = x86_64_system_v_parameter_for_classification(
-      &registers, &classification, param->symbol->name, &stack_offset
+      allocator, &registers, &classification, param->symbol->name, &stack_offset
     );
     parameter.original_index = param_index; //:ParameterOriginalIndex
     // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
