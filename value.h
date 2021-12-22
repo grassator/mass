@@ -42,6 +42,18 @@ mass_allocate_bytes(
 #define mass_allocate(_CONTEXT_, _TYPE_) \
   ((_TYPE_ *)mass_allocate_bytes((_CONTEXT_), sizeof(_TYPE_), _Alignof(_TYPE_)))
 
+static inline void *
+mass_allocate_bytes_from_descriptor(
+  Mass_Context *context,
+  const Descriptor *descriptor
+) {
+  return virtual_memory_buffer_allocate_bytes(
+    &context->compilation->allocation_buffer,
+    descriptor->bit_size.as_u64 / 8,
+    descriptor->bit_alignment.as_u64 / 8
+  );
+}
+
 static inline Function_Parameter
 function_parameter_with_default(
   const Symbol *symbol,

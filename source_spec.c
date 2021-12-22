@@ -1864,6 +1864,19 @@ spec("source") {
       Slice result = checker();
       check(slice_equal(result, slice_literal("foo")));
     }
+    it("should be able to accept a string-like argument at compile time") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn(input : String) => (i64) {\n"
+          "input.length"
+        "}\n"
+        "checker :: fn() -> (i64) {\n"
+          "foo([\"foo\".bytes, 3])"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 3);
+    }
   }
 
   describe("Fixed Size Arrays") {

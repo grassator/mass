@@ -323,6 +323,7 @@ assign_from_static(
   const Storage *target_storage = &value_as_forced(target)->storage;
   if (
     !context_is_compile_time_eval(context) &&
+    !mass_value_is_compile_time_known(target) &&
     source->descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     void *source_memory = *(void **)storage_static_memory_with_bit_size(source_storage, (Bits){64});
@@ -918,7 +919,10 @@ mass_assign_helper(
     return;
   }
 
-  if (target->descriptor->tag == Descriptor_Tag_Function_Instance) {
+  if (
+    target->descriptor->tag == Descriptor_Tag_Function_Instance &&
+    source->descriptor->tag != Descriptor_Tag_Function_Instance
+  ) {
     const Function_Info *target_info = target->descriptor->Function_Instance.info;
     if (
       source->descriptor == &descriptor_function_literal ||
@@ -1025,7 +1029,19 @@ mass_assign_helper(
 
   if (mass_has_error(context)) return;
   if (same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) {
-    move_value(builder, source_range, target_storage, source_storage);
+    if (mass_value_is_compile_time_known(target)) {
+      assert(mass_value_is_compile_time_known(source));
+      assert(same_type(target->descriptor, source->descriptor));
+      void *source_memory = (void *)storage_static_memory_with_bit_size(
+        &value_as_forced(source)->storage, source->descriptor->bit_size
+      );
+      void *target_memory = (void *)storage_static_memory_with_bit_size(
+        &value_as_forced(target)->storage, target->descriptor->bit_size
+      );
+      memcpy(target_memory, source_memory, descriptor_byte_size(target->descriptor));
+    } else {
+      move_value(builder, source_range, target_storage, source_storage);
+    }
     return;
   }
 
@@ -3176,7 +3192,7 @@ typedef struct {
 typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 
 typedef struct {
-  Array_Value_Ptr args;
+  Value_View args;
   Value *overload;
 } Mass_Function_Call_Lazy_Payload;
 
@@ -3224,13 +3240,12 @@ call_function_overload(
   const Source_Range *source_range,
   Mass_Function_Call_Lazy_Payload *payload
 ) {
-  Array_Value_Ptr arguments = payload->args;
+  Value_View args_view = payload->args;
 
   Expected_Result instance_expected_result = expected_result_any(0);
   Value *runtime_value = value_force(context, builder, &instance_expected_result, payload->overload);
   if (mass_has_error(context)) return 0;
 
-  Value_View args_view = value_view_from_value_array(arguments, source_range);
   runtime_value = ensure_function_instance(context, runtime_value, args_view);
   if (mass_has_error(context)) return 0;
 
@@ -3288,7 +3303,7 @@ call_function_overload(
     Function_Call_Parameter *call_param = dyn_array_get(call_setup->parameters, i);
     Value *target_param = dyn_array_push_uninitialized(target_params);
     value_init(target_param, call_param->descriptor, call_param->storage, *source_range);
-    if (i >= dyn_array_length(arguments)) {
+    if (i >= args_view.length) {
       assert(call_param->flags & Function_Call_Parameter_Flags_Uninitialized);
       Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
       Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
@@ -3296,7 +3311,7 @@ call_function_overload(
       continue;
     }
     // :ParameterOriginalIndex
-    Value *source_arg = *dyn_array_get(arguments, call_param->original_index);
+    Value *source_arg = value_view_get(&args_view, call_param->original_index);
     const Storage *maybe_source_storage = 0;
     if (source_arg->tag == Value_Tag_Forced) {
       maybe_source_storage = &value_as_forced(source_arg)->storage;
@@ -4167,26 +4182,6 @@ mass_trampoline_call(
   return result;
 }
 
-static bool
-mass_can_trampoline_call(
-  const Function_Info *info,
-  Value_View args_view
-) {
-  for (u64 i = 0; i < args_view.length; ++i) {
-    Value *arg = value_view_get(&args_view, i);
-
-    if (!mass_value_is_compile_time_known(arg)) return false;
-
-    // The check here is required because casts may generate extra instructions.
-    // This can be removed if the casts are not a thing for fn calls or if
-    // there will be a way to compile-time cast without generating instructions
-    // maybe also with trampolines or something similar.
-    const Function_Parameter *param = dyn_array_get(info->parameters, i);
-    if (!same_type(param->descriptor, arg->descriptor)) return false;
-  }
-  return true;
-}
-
 static Value *
 token_handle_function_call(
   Mass_Context *context,
@@ -4203,43 +4198,88 @@ token_handle_function_call(
   Value *overload = match_found.value;
   const Function_Info *info = match_found.info;
 
+  // This normalization is required for a few reasons:
+  //   1. `args_view` might point to temp memory
+  //   2. Default args are substituted. Required for trampolines and intrinsics to work.
+  //   3. Implicits casts for static args are done at compile time. Required for trampolines
+  //      and intrinsics to work. Also provides a nice optimization for runtime.
+  u64 normalized_arg_count = dyn_array_length(info->parameters);
+  Value_View normalized_args = {
+    .values = 0,
+    .length = u64_to_u32(normalized_arg_count),
+    .source_range = args_view.source_range,
+  };
+  if (normalized_arg_count) {
+    assert(args_view.length <= normalized_arg_count);
+    normalized_args.values =
+      allocator_allocate_array(context->allocator, Value *, normalized_arg_count);
+    for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
+      const Function_Parameter *param = dyn_array_get(info->parameters, i);
+      Value *source = i >= args_view.length
+        ? param->maybe_default_value
+        : value_view_get(&args_view, i);
+      assert(source);
+      // TODO @Speed it should be possible to save if all args are exact match in Overload_Match_Found 
+      if (!same_type(param->descriptor, source->descriptor)) {
+        // TODO instead of this code maybe it would be more robust (and performant?)
+        //      to create compile-time casting functions. This would also allow to have
+        //      user-defined casts. The only tricky part is that these casting functions
+        //      must match arguments exactly (no implicit casts).
+        const Descriptor *runtime_source_descriptor =
+          deduce_runtime_descriptor_for_value(context, source, param->descriptor);
+        if (!same_type_or_can_implicitly_move_cast(param->descriptor, runtime_source_descriptor)) {
+          panic("We should not have matched an overload if the value is not assignable");
+        }
+        bool can_static_cast = mass_value_is_compile_time_known(source);
+        if (param->descriptor->tag == Descriptor_Tag_Function_Instance) {
+          // FIXME for runtime calls a function instance might be a relocation, so we can't hard-code
+          //       a static value.
+          // FIXME And for trampolines intrinsics this is completeley broken because we need to
+          //       force a jit function instance.
+          can_static_cast = false;
+        } else if (value_is_tuple(source)) {
+          const Tuple *tuple = value_as_tuple(source);
+          for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
+            Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+            if (!mass_value_is_compile_time_known(tuple_item)) {
+              can_static_cast = false;
+              break;
+            }
+          }
+        }
+        if (can_static_cast) {
+          void *memory = mass_allocate_bytes_from_descriptor(context, param->descriptor);
+          Storage storage = storage_static_heap(memory, param->descriptor->bit_size);
+          Value *adjusted_source = value_make(context, param->descriptor, storage, source->source_range);
+          mass_assign_helper(context, 0/*no builder */, adjusted_source, source, &args_view.source_range);
+          if (mass_has_error(context)) return 0;
+          source = adjusted_source;
+        }
+      }
+      normalized_args.values[i] = source;
+    }
+  }
+
   if (value_is_function_literal(overload)) {
     const Function_Literal *literal = value_as_function_literal(overload);
     if (value_is_intrinsic(literal->body)) {
-      return mass_intrinsic_call(context, parser, literal->body, info->return_descriptor, args_view);
+      return mass_intrinsic_call(context, parser, literal->body, info->return_descriptor, normalized_args);
     }
     if (literal->header.flags & Function_Header_Flags_Macro) {
-      return mass_handle_macro_call(context, parser, overload, args_view, source_range);
+      return mass_handle_macro_call(context, parser, overload, normalized_args, source_range);
     }
   }
 
   if (info->flags & Function_Info_Flags_Compile_Time) {
-    if (mass_can_trampoline_call(info, args_view)) {
-      Value *result = mass_trampoline_call(context, parser, overload, info, args_view);
-      if (mass_has_error(context)) return 0;
-      return result;
-    } else {
-      panic("A compile-time overload should not have been matched if we can't call it");
+    for (u64 i = 0; i < normalized_args.length; ++i) {
+      Value *arg = value_view_get(&normalized_args, i);
+      const Function_Parameter *param = dyn_array_get(info->parameters, i);
+      assert(mass_value_is_compile_time_known(arg));
+      assert(same_type(param->descriptor, arg->descriptor));
     }
-  }
-
-  // This copy is required for a couple of reasons:
-  //   1. `args_view` might point to temp memory
-  //   2. Default args are substituted
-  Array_Value_Ptr normalized_args = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->allocator,
-    .capacity = dyn_array_length(info->parameters),
-  );
-  assert(args_view.length <= dyn_array_length(info->parameters));
-  for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
-    const Function_Parameter *param = dyn_array_get(info->parameters, i);
-    if (i >= args_view.length) {
-      assert(param->maybe_default_value);
-      dyn_array_push(normalized_args, param->maybe_default_value);
-    } else {
-      dyn_array_push(normalized_args, value_view_get(&args_view, i));
-    }
+    Value *result = mass_trampoline_call(context, parser, overload, info, normalized_args);
+    if (mass_has_error(context)) return 0;
+    return result;
   }
 
   Mass_Function_Call_Lazy_Payload *call_payload =
