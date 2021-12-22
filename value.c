@@ -559,15 +559,24 @@ storage_stack(
 static inline Storage
 storage_with_offset_and_bit_size(
   const Storage *base,
-  s32 diff,
+  s32 offset,
   Bits bit_size
 ) {
+  if (offset < 0) panic("Negative offsets are not supported");
   Storage result = *base;
   // Do not inherit flags as it causes issue when a struct or an array
   // is iterated over. In this case storage might be released multiple times.
   result.flags = 0;
   result.bit_size = bit_size;
-  u64 byte_size = bit_size.as_u64 / 8;
+  u64 offset_in_bits = s32_to_u64(offset) * 8;
+  if (offset_in_bits + bit_size.as_u64 > base->bit_size.as_u64) {
+    panic("Out of bounds access on a storage");
+  }
+  bool same_size_as_base = (bit_size.as_u64 == base->bit_size.as_u64);
+  if (same_size_as_base) {
+    assert(offset_in_bits == 0); // Implied by check for out of bounds above
+    return result;
+  }
   switch(base->tag) {
     default:
     case Storage_Tag_Eflags:
@@ -575,53 +584,48 @@ storage_with_offset_and_bit_size(
       panic("Internal Error: Unexpected storage type for structs");
     } break;
     case Storage_Tag_Immediate: {
-      u64 offset_in_bits = s32_to_u64(diff) * 8;
-      assert(offset_in_bits + bit_size.as_u64 <= base->bit_size.as_u64);
       result.Immediate.bits >>= offset_in_bits;
       return result;
     } break;
     case Storage_Tag_Register: {
-      result.Register.packed = byte_size != 8;
-      result.Register.offset_in_bits = s32_to_u16(diff * 8);
+      result.Register.packed = bit_size.as_u64 != 64;
+      result.Register.offset_in_bits = u64_to_u16(offset_in_bits);
     } break;
     case Storage_Tag_Unpacked: {
-      // TODO Consider making this generic and providing to users
-      //      (instead of it being a side effect of System V ABI)
-      if (diff < 0) panic("Can not index before an unpacked register");
-      if (diff + byte_size > 16) panic("Out of bounds access on an unpacked struct");
-      // This is the case for something like `struct { struct { u64 x; u64 y; } nested; } root`
-      // where `root` is unpacked but the only field inside is `nested` which we also unpack.
-      if (diff == 0 && byte_size == 16) {
-        return result;
-      }
-      // Otherwise we expect requested slice to not cross an eight-byte boundary
-      if (diff % 8 + byte_size > 8) panic("Unaligned unpacked struct field access");
-      s32 start_index = diff / 8;
-      Register reg = base->Unpacked.registers[start_index];
-      result = (Storage){
-        .tag = Storage_Tag_Register,
-        .bit_size = bit_size,
-        .Register = {
-          .index = reg,
-          .packed = byte_size != 8,
-          .offset_in_bits = s32_to_u16((diff % 8) * 8),
-        },
+      Storage register_storages[2] = {
+        storage_register(base->Unpacked.registers[0], (Bits){64}),
+        storage_register(base->Unpacked.registers[1], (Bits){64}),
       };
+      u64 bit_start = 0;
+      STATIC_ARRAY_FOREACH(Storage, piece, register_storages) {
+        u64 bit_end = bit_start + piece->bit_size.as_u64;
+        bool starts_in_this_piece = offset_in_bits >= bit_start && offset_in_bits < bit_end;
+        if (starts_in_this_piece) {
+          u64 offset_in_bits_in_this_piece = offset_in_bits - bit_start;
+          if (offset_in_bits_in_this_piece + bit_size.as_u64 > piece->bit_size.as_u64) {
+            panic("Requested storage crosses a disjoint pieces boundary");
+          }
+          s32 nested_byte_offset = u64_to_s32(offset_in_bits_in_this_piece / 8);
+          return storage_with_offset_and_bit_size(piece, nested_byte_offset, bit_size);
+        }
+        bit_start = bit_end;
+      }
+      panic("Could not find specified offset in the storage");
     } break;
     case Storage_Tag_Static: {
       const s8 *pointer = get_static_storage_with_bit_size(base, base->bit_size);
-      result = storage_static_heap(pointer + diff, bit_size);
+      result = storage_static_heap(pointer + offset, bit_size);
     } break;
     case Storage_Tag_Memory: {
       switch(result.Memory.location.tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          result.Memory.location.Instruction_Pointer_Relative.offset += diff;
+          result.Memory.location.Instruction_Pointer_Relative.offset += offset;
         } break;
         case Memory_Location_Tag_Indirect: {
-          result.Memory.location.Indirect.offset += diff;
+          result.Memory.location.Indirect.offset += offset;
         } break;
         case Memory_Location_Tag_Stack: {
-          result.Memory.location.Stack.offset += diff;
+          result.Memory.location.Stack.offset += offset;
         } break;
       }
     } break;
