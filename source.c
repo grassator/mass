@@ -1515,19 +1515,19 @@ tokenizer_push_string_literal(
 
   allocator_allocate_bulk(context->allocator, combined, {
     Descriptor bits_descriptor;
-    Slice slice;
+    Mass_Byte_Slice byte_slice;
     Value string_value;
   });
 
   hash_map_set(context->compilation->static_pointer_length_map, bytes, length);
 
-  Slice *string = &combined->slice;
-  *string = (Slice){bytes, length};
-  Value *string_value = value_init(
+  Mass_Byte_Slice *byte_slice = &combined->byte_slice;
+  *byte_slice = (Mass_Byte_Slice){bytes, length};
+  Value *byte_slice_value = value_init(
     &combined->string_value,
-    &descriptor_slice, storage_static(string), source_range
+    &descriptor_byte_slice, storage_static(byte_slice), source_range
   );
-  dyn_array_push(*stack, string_value);
+  dyn_array_push(*stack, byte_slice_value);
 }
 
 #include "generated_tokenizer.c"
@@ -2433,6 +2433,21 @@ token_parse_operator_definition(
   return true;
 }
 
+static Slice
+mass_slice_from_slice_like(
+  Value *value
+) {
+  if (same_type(value->descriptor, &descriptor_slice)) {
+    return *value_as_slice(value);
+  } else if (same_type(value->descriptor, &descriptor_byte_slice)) {
+    const Mass_Byte_Slice *byte_slice = value_as_byte_slice(value);
+    return (Slice){.bytes = byte_slice->bytes, .length = byte_slice->length};
+  } else {
+    panic("TODO accept any right-shaped struct, not just generic view");
+    return (Slice){0};
+  }
+}
+
 static Value *
 mass_import(
   Mass_Context *context,
@@ -2441,8 +2456,10 @@ mass_import(
 ) {
   if (args.length != 1) goto parse_err;
   Value *file_path_value = token_parse_single(context, parser, value_view_get(&args, 0));
-  if (file_path_value->descriptor != &descriptor_slice) goto parse_err;
-  Slice file_path = *value_as_slice(file_path_value);
+  if (!same_type_or_can_implicitly_move_cast(&descriptor_slice, file_path_value->descriptor)) {
+    goto parse_err;
+  }
+  Slice file_path = mass_slice_from_slice_like(file_path_value);
 
   Module *module;
   if (slice_equal(file_path, slice_literal("mass"))) {
@@ -5022,7 +5039,7 @@ mass_static_assert(
   if (!condition) {
     Slice detailed_message;
     if (args.length == 2) {
-      detailed_message = *value_as_slice(value_view_get(&args, 1));
+      detailed_message = mass_slice_from_slice_like(value_view_get(&args, 1));
     } else {
       detailed_message = (Slice){0};
     }

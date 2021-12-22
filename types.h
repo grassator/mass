@@ -76,15 +76,14 @@
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(...)\
   MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Raw, __VA_ARGS__)
 
-#define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, _C_TYPE_, ...)\
+#define MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _C_TYPE_, _BRAND_, ...)\
   dyn_array_struct(Struct_Field) descriptor_##_NAME_##_fields = {\
     .length = countof((const Struct_Field[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
   };\
-  static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Struct,\
-    .brand = &(mass_meta_brand_##_NAME_),\
+    .brand = (_BRAND_),\
     .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
     .Struct = {\
@@ -93,6 +92,10 @@
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
+
+#define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, _C_TYPE_, ...)\
+  static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
+  MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _C_TYPE_, &(mass_meta_brand_##_NAME_), __VA_ARGS__)
 
 #define MASS_DEFINE_FUNCTION_DESCRIPTOR(_NAME_, _RETURN_DESCRIPTOR_, ...)\
   dyn_array_struct(Function_Parameter) descriptor_##_NAME_##__parameters = {\
@@ -231,5 +234,24 @@ static Descriptor descriptor_void = {
 };
 MASS_DEFINE_TYPE_VALUE(void);
 MASS_DEFINE_POINTER_DESCRIPTOR(void);
+
+typedef struct {
+  void *bytes;
+  u64 length;
+} Mass_Byte_Slice;
+
+MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(byte_slice, Mass_Byte_Slice, 0 /*no brand*/,
+  {
+    .descriptor = &descriptor_i8_pointer,
+    .name = slice_literal_fields("bytes"),
+    .offset = offsetof(Mass_Byte_Slice, bytes),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("length"),
+    .offset = offsetof(Mass_Byte_Slice, length),
+  },
+);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_Byte_Slice, byte_slice)
 
 #endif // C_MACRO_H
