@@ -134,13 +134,13 @@ mass_error_append_descriptor_impl(
           APPEND_LITERAL("u");
         }
       }
-      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64 / 8);
+      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
       APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
       APPEND_LITERAL(">");
     } break;
     case Descriptor_Tag_Raw: {
       APPEND_LITERAL("<i");
-      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64 / 8);
+      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
       APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
       APPEND_LITERAL(">");
     } break;
