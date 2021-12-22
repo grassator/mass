@@ -2688,11 +2688,7 @@ compile_time_eval(
     return forced_value;
   }
 
-  u64 result_byte_size = descriptor_byte_size(result_descriptor);
-  u64 result_alignment = descriptor_byte_alignment(result_descriptor);
-  void *result = result_byte_size // void type has zero size
-    ? allocator_allocate_bytes(context->allocator, result_byte_size, result_alignment)
-    : 0;
+  void *result = mass_allocate_bytes_from_descriptor(context, result_descriptor);
 
   // Load the address of the result
   Register out_register = register_acquire_temp(&eval_builder);
@@ -4169,9 +4165,7 @@ mass_trampoline_call(
   } else {
     const Struct_Field *return_field = dyn_array_last(fields);
     void **return_pointer_memory = (void **)(args_struct_memory + return_field->offset);
-    u64 return_byte_size = descriptor_byte_size(return_descriptor);
-    u64 byte_alignment = descriptor_byte_alignment(return_descriptor);
-    *return_pointer_memory = allocator_allocate_bytes(context->allocator, return_byte_size, byte_alignment);
+    *return_pointer_memory = mass_allocate_bytes_from_descriptor(context, return_descriptor);
     Storage return_storage = storage_static_heap(*return_pointer_memory, return_descriptor->bit_size);
     result = value_make(context, return_descriptor, return_storage, args_view.source_range);
   }
@@ -4219,7 +4213,7 @@ token_handle_function_call(
         ? param->maybe_default_value
         : value_view_get(&args_view, i);
       assert(source);
-      // TODO @Speed it should be possible to save if all args are exact match in Overload_Match_Found 
+      // TODO @Speed it should be possible to save if all args are exact match in Overload_Match_Found
       if (!same_type(param->descriptor, source->descriptor)) {
         // TODO instead of this code maybe it would be more robust (and performant?)
         //      to create compile-time casting functions. This would also allow to have

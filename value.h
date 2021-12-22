@@ -47,6 +47,7 @@ mass_allocate_bytes_from_descriptor(
   Mass_Context *context,
   const Descriptor *descriptor
 ) {
+  if (!descriptor->bit_size.as_u64) return 0;
   return virtual_memory_buffer_allocate_bytes(
     &context->compilation->allocation_buffer,
     descriptor->bit_size.as_u64 / 8,
