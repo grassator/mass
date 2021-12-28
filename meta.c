@@ -2142,6 +2142,16 @@ main(void) {
       { "u64", "byte_alignment" },
     })
   ));
+  export_compiler_custom_name("constraint_integer_type", push_type(
+    type_function(Default, "mass_constraint_integer_type", "const Descriptor *", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+    })
+  ));
+  export_compiler_custom_name("constraint_float_type", push_type(
+    type_function(Default, "mass_constraint_float_type", "const Descriptor *", (Argument_Type[]){
+      { "const Descriptor *", "descriptor" },
+    })
+  ));
   export_compiler_custom_name("constraint_pointer_type", push_type(
     type_function(Default, "mass_constraint_pointer_type", "const Descriptor *", (Argument_Type[]){
       { "const Descriptor *", "descriptor" },

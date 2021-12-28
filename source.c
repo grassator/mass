@@ -5329,6 +5329,20 @@ mass_constraint_pointer_type(
 }
 
 static const Descriptor *
+mass_constraint_integer_type(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Integer ? descriptor : 0;
+}
+
+static const Descriptor *
+mass_constraint_float_type(
+  const Descriptor *descriptor
+) {
+  return descriptor->tag == Descriptor_Tag_Float ? descriptor : 0;
+}
+
+static const Descriptor *
 mass_constraint_fixed_array_type(
   const Descriptor *descriptor
 ) {

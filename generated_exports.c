@@ -1018,6 +1018,22 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
+    mass_constraint_integer_type, "constraint_integer_type", &descriptor_descriptor_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("descriptor")),
+&descriptor_descriptor_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_constraint_float_type, "constraint_float_type", &descriptor_descriptor_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("descriptor")),
+&descriptor_descriptor_pointer
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
     mass_constraint_pointer_type, "constraint_pointer_type", &descriptor_descriptor_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("descriptor")),

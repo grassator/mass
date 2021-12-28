@@ -75,6 +75,8 @@ apply :: fn(x, block : MASS.Ast_Block) => (MASS.Function_Literal) MASS.function_
 cast :: fn(type : Type, value) -> _ MASS.cast
 zero_extend :: fn(type : Type, value) -> _ MASS.zero_extend
 
+is_integer_type :: MASS.constraint_integer_type
+is_float_type :: MASS.constraint_float_type
 is_pointer_type :: MASS.constraint_pointer_type
 is_fixed_array_type :: MASS.constraint_fixed_array_type
 is_struct_type :: MASS.constraint_struct_type
