@@ -1906,7 +1906,7 @@ main(void) {
     { "Program_Memory", "memory" },
     { "const Calling_Convention *", "default_calling_convention"},
     { "Os", "os"},
-    { "u32", "_padding_os"},
+    { "u32", "_os_padding"},
   }));
 
   push_type(type_function(Typedef, "Calling_Convention_Call_Setup_Proc", "Function_Call_Setup", (Argument_Type[]){

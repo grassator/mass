@@ -2134,7 +2134,7 @@ typedef struct Program {
   Program_Memory memory;
   const Calling_Convention * default_calling_convention;
   Os os;
-  u32 _padding_os;
+  u32 _os_padding;
 } Program;
 typedef dyn_array_type(Program) Array_Program;
 
@@ -5484,11 +5484,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
     .descriptor = &descriptor_os,
     .name = slice_literal_fields("os"),
     .offset = offsetof(Program, os),
-  },
-  {
-    .descriptor = &descriptor_i32,
-    .name = slice_literal_fields("_padding_os"),
-    .offset = offsetof(Program, _padding_os),
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);
