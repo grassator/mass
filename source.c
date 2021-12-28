@@ -6521,7 +6521,7 @@ mass_return(
   );
 }
 
-static void
+static Value *
 token_define_global_variable(
   Mass_Context *context,
   Parser *parser,
@@ -6534,7 +6534,7 @@ token_define_global_variable(
       .tag = Mass_Error_Tag_No_Runtime_Use,
       .source_range = value->source_range,
     });
-    return;
+    return 0;
   }
   Value *global_value;
   if (storage_is_label(&value_as_forced(value)->storage)) {
@@ -6553,28 +6553,28 @@ token_define_global_variable(
     if (mass_value_ensure_static(context, value)) {
       mass_assign_helper(context, 0, global_value, value, &value->source_range);
     }
-    if (mass_has_error(context)) return;
+    if (mass_has_error(context)) return 0;
   }
 
   scope_define_value(parser->scope, VALUE_STATIC_EPOCH, symbol->source_range, value_as_symbol(symbol), global_value);
+  return mass_make_void(context, symbol->source_range);
 }
 
-static void
+static Value *
 token_define_local_variable(
   Mass_Context *context,
   Parser *parser,
   Value *symbol,
-  Value_Lazy *out_lazy_value,
   Value *value
 ) {
   const Descriptor *variable_descriptor = deduce_runtime_descriptor_for_value(context, value, 0);
-  if (mass_has_error(context)) return;
+  if (mass_has_error(context)) return 0;
   if (!variable_descriptor) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Runtime_Use,
       .source_range = value->source_range,
     });
-    return;
+    return 0;
   }
 
   Mass_Variable_Definition_Lazy_Payload *variable_payload =
@@ -6592,60 +6592,31 @@ token_define_local_variable(
 
   scope_define_value(parser->scope, parser->epoch, *source_range, value_as_symbol(symbol), variable_value);
 
-  Assignment *assignment_payload = mass_allocate(context, Assignment);
-  *assignment_payload = (Assignment) {
+  Assignment *assignment = mass_allocate(context, Assignment);
+  *assignment = (Assignment) {
     .target = variable_value,
     .source = value,
   };
-
-  out_lazy_value->proc = mass_handle_assignment_lazy_proc;
-  out_lazy_value->payload = assignment_payload;
+  return value_make(context, &descriptor_assignment, storage_static(assignment), *source_range);
 }
 
-static bool
-token_parse_definition_and_assignment_statements(
+static Value *
+mass_define_inferred(
   Mass_Context *context,
   Parser *parser,
-  Value_View view,
-  Value_Lazy *out_lazy_value
+  Value_View args
 ) {
-  Value_View lhs;
-  Value_View rhs;
-  Value *operator;
-
-  if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
-    return false;
-  }
-  if (lhs.length > 1) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Unimplemented,
-      .source_range = lhs.source_range,
-      .detailed_message = slice_literal("multiple assignments"),
-    });
-    goto err;
-  }
-  Value *name_token = value_view_get(&view, 0);
-
-  if (!value_is_symbol(name_token)) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Invalid_Identifier,
-      .source_range = name_token->source_range,
-      .Invalid_Identifier = {.id = name_token},
-    });
-    goto err;
-  }
-
-  Value *value = token_parse_expression(context, parser, rhs, &(u32){0}, 0);
-  if (mass_has_error(context)) goto err;
+  assert(args.length == 2);
+  Value *lhs = value_view_get(&args, 0);
+  if (!mass_value_ensure_static_of(context, lhs, &descriptor_symbol)) return 0;
+  Value *rhs = token_parse_single(context, parser, value_view_get(&args, 1));
+  if (mass_has_error(context)) return 0;
 
   if (parser->flags & Parser_Flags_Global) {
-    token_define_global_variable(context, parser, name_token, value);
+    return token_define_global_variable(context, parser, lhs, rhs);
   } else {
-    token_define_local_variable(context, parser, name_token, out_lazy_value, value);
+    return token_define_local_variable(context, parser, lhs, rhs);
   }
-
-  err:
-  return true;
 }
 
 static void
@@ -6724,7 +6695,6 @@ mass_compilation_init_scopes(
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
-      {.proc = token_parse_definition_and_assignment_statements},
       {.proc = token_parse_while},
       {.proc = token_parse_operator_definition},
     };

@@ -33,6 +33,7 @@ operator(,) :: 0 MASS.comma
 
 // TODO allow non-intrinsic overloads
 operator(=) :: 1 MASS.assign
+operator(:=) :: 0 MASS.define_inferred
 operator(_ .*) :: 20 MASS.dereference
 
 operator(:) :: 2 MASS.typed_symbol

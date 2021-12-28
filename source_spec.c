@@ -1296,7 +1296,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Invalid_Identifier);
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_symbol);
+      check(error->Type_Mismatch.actual == &descriptor_i64);
     }
     it("should report an error for multi-definition assignment") {
       test_program_inline_source_base(
@@ -1305,7 +1307,8 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Unimplemented);
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_symbol);
     }
 
     it("should allow casting one pointer type to another") {
