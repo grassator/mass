@@ -1763,35 +1763,6 @@ token_match_type(
   return value_ensure_type(context, parser->scope, type_value, view.source_range);
 }
 
-static inline bool
-token_maybe_split_on_operator(
-  Value_View view,
-  Slice operator,
-  Value_View *lhs,
-  Value_View *rhs,
-  Value **operator_token
-) {
-  u32 lhs_end = 0;
-  u32 rhs_start = 0;
-  bool found = false;
-  for (u32 i = 0; i < view.length; ++i) {
-    Value *token = value_view_get(&view, i);
-    if (value_match_symbol(token, operator)) {
-      *operator_token = token;
-      lhs_end = i;
-      rhs_start = i + 1;
-      found = true;
-      break;
-    }
-  }
-  if (!found) return false;
-
-  *lhs = value_view_slice(&view, 0, lhs_end);
-  *rhs = value_view_rest(&view, rhs_start);
-
-  return true;
-}
-
 static fn_type_opaque
 mass_ensure_jit_function_for_value(
   Mass_Context *context,
