@@ -2195,32 +2195,6 @@ mass_forward_call_to_alias(
   return token_handle_function_call(context, parser, target, args, source_range);
 }
 
-static Value *
-token_handle_user_defined_operator_proc(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args,
-  const Operator *operator
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  assert(operator->tag == Operator_Tag_Alias);
-  u32 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
-  assert(argument_count == args.length);
-
-  Value *parsed_values[2];
-  parsed_values[0] = token_parse_single(context, parser, value_view_get(&args, 0));
-  if (argument_count == 2) {
-    parsed_values[1] = token_parse_single(context, parser, value_view_get(&args, 1));
-  }
-
-  Value_View parsed_args = (Value_View){
-    .values = parsed_values,
-    .length = argument_count,
-    .source_range = args.source_range,
-  };
-  return mass_forward_call_to_alias(context, parser, parsed_args, operator->Alias.symbol);
-}
-
 static inline Value *
 mass_make_lazy_value(
   Mass_Context *context,
@@ -5715,7 +5689,15 @@ token_dispatch_operator(
   Value *result_value = 0;
   switch(operator->tag) {
     case Operator_Tag_Alias: {
-      result_value = token_handle_user_defined_operator_proc(context, parser, args_view, operator);
+      Value **first_arg_pointer = dyn_array_get(*stack, start_index);
+      *first_arg_pointer = token_parse_single(context, parser, *first_arg_pointer);
+
+      if (argument_count == 2) {
+        Value **second_arg_pointer = dyn_array_get(*stack, start_index + 1);
+        *second_arg_pointer = token_parse_single(context, parser, *second_arg_pointer);
+      }
+
+      result_value = mass_forward_call_to_alias(context, parser, args_view, operator->Alias.symbol);
     } break;
     case Operator_Tag_Intrinsic: {
       const Descriptor *expected_descriptor = 0; // inferred
