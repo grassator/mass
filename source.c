@@ -4456,12 +4456,14 @@ mass_handle_arithmetic_operation(
   Value_View arguments,
   Mass_Arithmetic_Operator operator
 ) {
-  Value *lhs = token_parse_single(context, parser, value_view_get(&arguments, 0));
-  Value *rhs = token_parse_single(context, parser, value_view_get(&arguments, 1));
+  Value *lhs = value_view_get(&arguments, 0);
+  Value *rhs = value_view_get(&arguments, 1);
 
   if (mass_has_error(context)) return 0;
 
   const Descriptor *result_descriptor = value_or_lazy_value_descriptor(lhs);
+  // FIXME this is required for default params with a type specified
+  //       i.e. fn(x : s64 = 20) and should be fixed there
   if (!descriptor_is_integer(value_or_lazy_value_descriptor(rhs))) {
     rhs = mass_cast_helper(context, parser, result_descriptor, rhs, rhs->source_range);
   } else if (!descriptor_is_integer(value_or_lazy_value_descriptor(lhs))) {
