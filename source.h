@@ -99,15 +99,8 @@ scope_define_value(
 );
 
 static void
-module_compiler_init(
-  Compilation *compilation,
-  Module *out_module
-);
-
-static void
-scope_define_builtins(
-  Compilation *compilation,
-  Scope *scope
+mass_compilation_init_scopes(
+  Compilation *compilation
 );
 
 static void

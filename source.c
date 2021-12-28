@@ -6737,42 +6737,37 @@ scope_define_enum(
 }
 
 static void
-module_compiler_init(
-  Compilation *compilation,
-  Module *out_module
+mass_compilation_init_scopes(
+  Compilation *compilation
 ) {
   const Allocator *allocator = compilation->allocator;
-  Scope *scope = scope_make(allocator, compilation->root_scope);
-  *out_module = (Module) {
+  Scope *root_scope =  scope_make(compilation->allocator, 0);
+  compilation->root_scope = root_scope;
+  Scope *module_scope = scope_make(allocator, root_scope);
+  compilation->compiler_module = (Module) {
     .source_range = {0},
-    .own_scope = scope,
+    .own_scope = module_scope,
     .exports = {
       .tag = Module_Exports_Tag_All,
-      .scope = scope,
+      .scope = module_scope,
     },
   };
-  INIT_LITERAL_SOURCE_RANGE(&out_module->source_range, "MASS");
-  compiler_scope_define_exports(compilation, scope);
+  INIT_LITERAL_SOURCE_RANGE(&compilation->compiler_module.source_range, "MASS");
+  compiler_scope_define_exports(compilation, module_scope);
 
   compilation->apply_operator = (Operator){
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
     .associativity = Operator_Associativity_Left,
     .tag = Operator_Tag_Intrinsic,
-    .Intrinsic.body = scope_lookup(scope, mass_ensure_symbol(compilation, slice_literal("apply")))->value,
+    .Intrinsic.body = scope_lookup(module_scope, mass_ensure_symbol(compilation, slice_literal("apply")))->value,
   };
-}
 
-static void
-scope_define_builtins(
-  Compilation *compilation,
-  Scope *scope
-) {
-  global_scope_define_exports(compilation, scope);
+  global_scope_define_exports(compilation, root_scope);
   Source_Range type_source_range;
   INIT_LITERAL_SOURCE_RANGE(&type_source_range, "Type");
   scope_define_value(
-    scope, VALUE_STATIC_EPOCH, type_source_range,
+    root_scope, VALUE_STATIC_EPOCH, type_source_range,
     mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
   );
 
@@ -6787,7 +6782,7 @@ scope_define_builtins(
       default_statement_matchers[i + 1].previous = &default_statement_matchers[i];
     }
 
-    scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
+    root_scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
   }
 }
 

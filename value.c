@@ -1400,9 +1400,6 @@ compilation_init(
   program_init(compilation->allocator, jit_program, host_os());
   jit_init(&compilation->jit, jit_program);
 
-  compilation->root_scope = scope_make(compilation->allocator, 0);
-  module_compiler_init(compilation, &compilation->compiler_module);
-
   // Intern common symbols used during parsing
   compilation->common_symbols = (Common_Symbols) {
     .apply = mass_ensure_symbol(compilation, slice_literal("apply")),
@@ -1433,7 +1430,7 @@ compilation_init(
     .operator_quote = mass_ensure_symbol(compilation, slice_literal("'")),
   };
 
-  scope_define_builtins(compilation, compilation->root_scope);
+  mass_compilation_init_scopes(compilation);
 }
 
 static void
