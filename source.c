@@ -5206,40 +5206,6 @@ typedef struct {
   const Struct_Field *field;
 } Mass_Field_Access_Lazy_Payload;
 
-static Storage
-value_maybe_dereference(
-  Mass_Context *context,
-  Function_Builder *builder,
-  Value *value
-) {
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
-  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(descriptor);
-  // Auto dereference pointers to structs
-  bool is_pointer = descriptor != unwrapped_descriptor;
-  const Storage *original_storage = &value_as_forced(value)->storage;
-  if (!is_pointer) {
-    return *original_storage;
-  } else {
-    if (mass_value_is_compile_time_known(value)) {
-      const void *pointed_memory =
-        *(void **)storage_static_memory_with_bit_size(original_storage, (Bits){64});
-      return storage_static_heap(pointed_memory, unwrapped_descriptor->bit_size);
-    } else if (original_storage->tag == Storage_Tag_Register) {
-      Register reg = original_storage->Register.index;
-      // FIXME this should probably check and set temporary
-      return storage_indirect(unwrapped_descriptor->bit_size, reg);
-    } else {
-      Register reg = register_acquire_temp(builder);
-      Storage base_storage = storage_register(reg, descriptor->bit_size);
-      Storage storage = storage_indirect(unwrapped_descriptor->bit_size, reg);
-      storage.flags |= Storage_Flags_Temporary;
-      move_value(builder, &value->source_range, &base_storage, original_storage);
-      storage_release_if_temporary(builder, original_storage);
-      return storage;
-    }
-  }
-}
-
 static Value *
 mass_handle_field_access_lazy_proc(
   Mass_Context *context,

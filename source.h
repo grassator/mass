@@ -45,13 +45,6 @@ mass_assign_helper(
   const Source_Range *source_range
 );
 
-static Storage
-value_maybe_dereference(
-  Mass_Context *context,
-  Function_Builder *builder,
-  Value *value
-);
-
 static inline const Descriptor *
 mass_expected_result_descriptor(
   const Expected_Result *expected_result
