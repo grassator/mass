@@ -6526,18 +6526,13 @@ token_define_global_variable(
   Mass_Context *context,
   Parser *parser,
   Value *symbol,
-  Value_View expression
+  Value *value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  Value *value = token_parse_expression(context, parser, expression, &(u32){0}, 0);
-  if (mass_has_error(context)) return;
-
   const Descriptor *descriptor = deduce_runtime_descriptor_for_value(context, value, 0);
   if (!descriptor) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Runtime_Use,
-      .source_range = expression.source_range,
+      .source_range = value->source_range,
     });
     return;
   }
@@ -6553,10 +6548,10 @@ token_define_global_variable(
       context->allocator, context->program, section, byte_size, alignment
     );
     Storage global_storage = data_label32(label, descriptor->bit_size);
-    global_value = value_make(context, descriptor, global_storage, expression.source_range);
+    global_value = value_make(context, descriptor, global_storage, value->source_range);
 
     if (mass_value_ensure_static(context, value)) {
-      mass_assign_helper(context, 0, global_value, value, &expression.source_range);
+      mass_assign_helper(context, 0, global_value, value, &value->source_range);
     }
     if (mass_has_error(context)) return;
   }
@@ -6570,18 +6565,14 @@ token_define_local_variable(
   Parser *parser,
   Value *symbol,
   Value_Lazy *out_lazy_value,
-  Value_View expression
+  Value *value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  Value *value = token_parse_expression(context, parser, expression, &(u32){0}, 0);
-  if (mass_has_error(context)) return;
   const Descriptor *variable_descriptor = deduce_runtime_descriptor_for_value(context, value, 0);
   if (mass_has_error(context)) return;
   if (!variable_descriptor) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Runtime_Use,
-      .source_range = expression.source_range,
+      .source_range = value->source_range,
     });
     return;
   }
@@ -6644,10 +6635,13 @@ token_parse_definition_and_assignment_statements(
     goto err;
   }
 
+  Value *value = token_parse_expression(context, parser, rhs, &(u32){0}, 0);
+  if (mass_has_error(context)) goto err;
+
   if (parser->flags & Parser_Flags_Global) {
-    token_define_global_variable(context, parser, name_token, rhs);
+    token_define_global_variable(context, parser, name_token, value);
   } else {
-    token_define_local_variable(context, parser, name_token, out_lazy_value, rhs);
+    token_define_local_variable(context, parser, name_token, out_lazy_value, value);
   }
 
   err:
