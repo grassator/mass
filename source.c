@@ -5254,12 +5254,13 @@ mass_handle_field_access_lazy_proc(
     expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
   if (mass_has_error(context)) return 0;
+  bool source_is_contant = struct_->flags & Value_Flags_Constant;
 
-  const Descriptor *struct_descriptor = value_or_lazy_value_descriptor(struct_);
-  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(struct_descriptor);
-  assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
+  if (descriptor_is_implicit_pointer(struct_->descriptor)) {
+    struct_ = value_indirect_from_pointer(context, builder, struct_, source_range);
+  }
 
-  Storage struct_storage = value_maybe_dereference(context, builder, struct_);
+  Storage struct_storage = value_as_forced(struct_)->storage;
 
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
@@ -5272,7 +5273,7 @@ mass_handle_field_access_lazy_proc(
 
   Value *field_value = value_make(context, field->descriptor, field_storage, *source_range);
 
-  if (struct_descriptor->tag != Descriptor_Tag_Pointer_To && (struct_->flags & Value_Flags_Constant)) {
+  if (source_is_contant) {
     field_value->flags |= Value_Flags_Constant;
   }
 
