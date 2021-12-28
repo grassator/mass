@@ -1831,7 +1831,7 @@ mass_ensure_jit_function_for_value(
 }
 
 static Function_Parameter
-token_match_argument(
+mass_parse_single_function_parameter(
   Mass_Context *context,
   Parser *parser,
   Value_View view
@@ -5882,7 +5882,7 @@ mass_parse_function_parameters(
     match_length = 0;
     Value_View param_view = value_view_match_till_symbol(rest, &match_length, comma);
     assert(match_length);
-    Function_Parameter param = token_match_argument(context, &arg_parser, param_view);
+    Function_Parameter param = mass_parse_single_function_parameter(context, &arg_parser, param_view);
     if (mass_has_error(context)) goto defer;
     dyn_array_push(temp_params, param);
     if (previous_argument_has_default_value) {
