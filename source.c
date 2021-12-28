@@ -5307,14 +5307,17 @@ mass_handle_array_access_lazy_proc(
   Value *array_element_value;
 
   const Descriptor *array_descriptor = value_or_lazy_value_descriptor(array);
-  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(array_descriptor);
 
   const Descriptor *item_descriptor;
-  if(unwrapped_descriptor->tag == Descriptor_Tag_Fixed_Array) {
-    item_descriptor = unwrapped_descriptor->Fixed_Array.item;
+  Storage array_storage;
+  if(array_descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    item_descriptor = array_descriptor->Fixed_Array.item;
+    array_storage = value_as_forced(array)->storage;
   } else {
     assert(array_descriptor->tag == Descriptor_Tag_Pointer_To);
-    item_descriptor = unwrapped_descriptor;
+    item_descriptor = array_descriptor->Pointer_To.descriptor;
+    Value *dereferenced = value_indirect_from_pointer(context, builder, array, source_range);
+    array_storage = value_as_forced(dereferenced)->storage;
   }
 
   u64 item_byte_size = descriptor_byte_size(item_descriptor);
@@ -5323,12 +5326,9 @@ mass_handle_array_access_lazy_proc(
   if (value_is_i64(index)) {
     u64 index_bits = value_as_i64(index)->bits;
     s32 offset = u64_to_s32(index_bits * item_byte_size);
-    Storage array_storage = value_maybe_dereference(context, builder, array);
     element_storage = storage_with_offset_and_bit_size(&array_storage, offset, item_descriptor->bit_size);
     element_storage.flags = array_storage.flags;
   } else {
-    Storage array_storage = value_maybe_dereference(context, builder, array);
-
     Register base_register = register_acquire_temp(builder);
     Storage base_storage = storage_register(base_register, (Bits){64});
 
