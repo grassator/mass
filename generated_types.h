@@ -2196,6 +2196,7 @@ typedef struct Common_Symbols {
   const Symbol * operator_arrow;
   const Symbol * operator_at;
   const Symbol * operator_colon;
+  const Symbol * operator_double_colon;
   const Symbol * operator_comma;
   const Symbol * operator_dot;
   const Symbol * operator_dot_star;
@@ -5672,6 +5673,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_colon"),
     .offset = offsetof(Common_Symbols, operator_colon),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_double_colon"),
+    .offset = offsetof(Common_Symbols, operator_double_colon),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

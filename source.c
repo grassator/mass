@@ -2962,37 +2962,23 @@ token_parse_constant_definitions(
   Value_View view,
   Value_Lazy *out_lazy_value
 ) {
-  Value_View lhs;
-  Value_View rhs;
-  Value *operator;
+  if (view.length < 2) return false;
+  u32 peek_index = 0;
+  Value *name = value_view_next(&view, &peek_index);
+  Value *double_colon = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator_double_colon
+  );
+  if (!double_colon) return false;
 
-  if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
-    return false;
-  }
-  if (lhs.length > 1) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Unimplemented,
-      .source_range = lhs.source_range,
-      .detailed_message = slice_literal("Multiple assignment are not supported at the moment")
-    });
-    goto err;
-  }
-  Value *symbol = value_view_get(&view, 0);
-  if (value_is_group_paren(symbol)) {
-    symbol = token_parse_single(context, parser, symbol);
+  if (value_is_group_paren(name)) {
+    name = token_parse_single(context, parser, name);
     if (mass_has_error(context)) goto err;
-    if (!mass_value_ensure_static_of(context, symbol, &descriptor_symbol)) goto err;
   }
+  if (!mass_value_ensure_static_of(context, name, &descriptor_symbol)) goto err;
+  const Symbol *symbol = value_as_symbol(name);
 
-  if (!value_is_symbol(symbol)) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Invalid_Identifier,
-      .source_range = symbol->source_range,
-    });
-    goto err;
-  }
-
-  scope_define_lazy_compile_time_expression(context, parser, parser->scope, value_as_symbol(symbol), rhs);
+  Value_View rest = value_view_rest(&view, peek_index);
+  scope_define_lazy_compile_time_expression(context, parser, parser->scope, symbol, rest);
 
   err:
   return true;
