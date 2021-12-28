@@ -2015,6 +2015,7 @@ main(void) {
     { "const Symbol *", "operator_arrow" },
     { "const Symbol *", "operator_at" },
     { "const Symbol *", "operator_colon" },
+    { "const Symbol *", "operator_colon_equal" },
     { "const Symbol *", "operator_double_colon" },
     { "const Symbol *", "operator_comma" },
     { "const Symbol *", "operator_dot" },

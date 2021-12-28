@@ -1421,6 +1421,7 @@ compilation_init(
     .operator_arrow = mass_ensure_symbol(compilation, slice_literal("->")),
     .operator_at = mass_ensure_symbol(compilation, slice_literal("@")),
     .operator_colon = mass_ensure_symbol(compilation, slice_literal(":")),
+    .operator_colon_equal = mass_ensure_symbol(compilation, slice_literal(":=")),
     .operator_double_colon = mass_ensure_symbol(compilation, slice_literal("::")),
     .operator_comma = mass_ensure_symbol(compilation, slice_literal(",")),
     .operator_dot = mass_ensure_symbol(compilation, slice_literal(".")),

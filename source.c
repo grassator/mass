@@ -1916,10 +1916,30 @@ token_match_argument(
     };
   }
 
+  // foo(@x := 42) or foo(x := 42)
+  if (operator_symbol == context->compilation->common_symbols.operator_colon_equal) {
+    if (at_token) {
+      panic("TODO test and maybe fix static values with a default value");
+    }
+
+    Value_View default_expression = value_view_rest(&view, peek_index);
+    Value *default_value = token_parse_expression(context, parser, default_expression, &(u32){0}, 0);
+    if (mass_has_error(context)) goto err;
+    if (!mass_value_ensure_static(context, default_value)) goto err;
+    const Descriptor *descriptor = deduce_runtime_descriptor_for_value(context, default_value, 0);
+    if (mass_has_error(context)) goto err;
+    return (Function_Parameter) {
+      .tag = Function_Parameter_Tag_Runtime,
+      .symbol = symbol,
+      .descriptor = descriptor,
+      .source_range = name_token->source_range,
+      .maybe_default_value = default_value,
+    };
+  }
+
   Value_View default_expression;
   Value_View definition;
   Value *equals;
-  bool is_inferred_type = false;
 
   if (token_maybe_split_on_operator(
     view, slice_literal("="), &definition, &default_expression, &equals
@@ -1929,18 +1949,6 @@ token_match_argument(
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
         .detailed_message = slice_literal("Expected an expression after `=`"),
-      });
-      goto err;
-    }
-  } else if (token_maybe_split_on_operator(
-    view, slice_literal(":="), &definition, &default_expression, &equals
-  )) {
-    is_inferred_type = true;
-    if (default_expression.length == 0) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = equals->source_range,
-        .detailed_message = slice_literal("Expected an expression after `:=`"),
       });
       goto err;
     }
@@ -1955,17 +1963,7 @@ token_match_argument(
   Function_Parameter_Tag parameter_tag = Function_Parameter_Tag_Runtime;
   bool is_static_generic = false;
 
-  if (is_inferred_type) {
-    if (definition.length != 1 || !value_is_symbol(value_view_get(&definition, 0))) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = definition.source_range,
-        .detailed_message = slice_literal("Expected an argument name"),
-      });
-      goto err;
-    }
-    name_token = value_view_get(&definition, 0);
-  } else {
+  {
     Value_View name_tokens;
     Value *operator;
     if (!token_maybe_split_on_operator(
@@ -2039,16 +2037,6 @@ token_match_argument(
     maybe_default_value = token_parse_expression(context, parser, default_expression, &(u32){0}, 0);
     if (mass_has_error(context)) goto err;
     if (!mass_value_ensure_static(context, maybe_default_value)) goto err;
-    if (is_inferred_type) {
-      descriptor = deduce_runtime_descriptor_for_value(context, maybe_default_value, 0);
-      if (!descriptor) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_No_Runtime_Use,
-          .source_range = maybe_default_value->source_range,
-        });
-        goto err;
-      }
-    }
   }
 
   arg = (Function_Parameter) {
