@@ -1589,7 +1589,7 @@ main(void) {
   export_compiler(push_type(add_common_fields(type_union("Value", (Struct_Type[]){
     struct_fields("Lazy", (Struct_Item[]){
       { "Epoch", "epoch" },
-      { "void *", "payload" },
+      { "const void *", "payload" },
       { "Lazy_Value_Proc", "proc" }
     }),
     struct_fields("Forced", (Struct_Item[]){
@@ -2053,7 +2053,7 @@ main(void) {
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
     { "const Source_Range *", "source_range" },
-    { "void *", "payload" },
+    { "const void *", "payload" },
   }));
 
   push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "_Bool", (Argument_Type[]){

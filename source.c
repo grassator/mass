@@ -2124,7 +2124,7 @@ mass_make_lazy_value(
   Mass_Context *context,
   Parser *parser,
   Source_Range source_range,
-  void *payload,
+  const void *payload,
   const Descriptor *descriptor,
   Lazy_Value_Proc proc
 ) {
@@ -2400,7 +2400,7 @@ mass_handle_while_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_While *payload
+  const Mass_While *payload
 ) {
   Program *program = context->program;
   Label *continue_label =
@@ -2655,7 +2655,7 @@ mass_handle_cast_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Cast_Lazy_Payload *payload
+  const Mass_Cast_Lazy_Payload *payload
 ) {
   const Descriptor *target_descriptor = payload->target;
   Value *expression = payload->expression;
@@ -2706,7 +2706,7 @@ mass_handle_tuple_cast_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Cast_Lazy_Payload *payload
+  const Mass_Cast_Lazy_Payload *payload
 ) {
   const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
   assert(expected_descriptor == payload->target);
@@ -2760,7 +2760,7 @@ mass_zero_extend_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Cast_Lazy_Payload *payload
+  const Mass_Cast_Lazy_Payload *payload
 ) {
   const Descriptor *target_descriptor = payload->target;
   Value *expression = payload->expression;
@@ -2908,13 +2908,17 @@ token_parse_constant_definitions(
   return true;
 }
 
+typedef struct {
+  Value *value;
+} Mass_Value_Lazy_Payload;
+
 static Value *
 mass_macro_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Value *body_value
+  const Mass_Value_Lazy_Payload *payload
 ) {
   Value *result_value = mass_value_from_expected_result(context, builder, expected_result, *source_range);
 
@@ -2928,7 +2932,7 @@ mass_macro_lazy_proc(
       slice_literal("macro return")
     );
     builder->return_value = *result_value;
-    value_force_exact(context, builder, result_value, body_value);
+    value_force_exact(context, builder, result_value, payload->value);
 
     if (mass_has_error(context)) return 0;
 
@@ -2949,7 +2953,7 @@ mass_macro_temp_param_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Value *arg
+  const Mass_Value_Lazy_Payload *payload
 ) {
   const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
 
@@ -2962,7 +2966,7 @@ mass_macro_temp_param_lazy_proc(
     mass_allocate(context, Value),
     expected_descriptor, stack_storage, *source_range
   );
-  value_force_exact(context, builder, forced, arg);
+  value_force_exact(context, builder, forced, payload->value);
   return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, forced);
 }
 
@@ -3013,9 +3017,11 @@ mass_handle_macro_call(
       } else {
         // Otherwise we will create a temp copy
         // TODO should this be forced or is first access ok?
+        Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
+        *payload = (Mass_Value_Lazy_Payload) {.value = arg_value};
         param_value = mass_make_lazy_value(
           context, parser, param->source_range,
-          arg_value, value_or_lazy_value_descriptor(arg_value),
+          payload, value_or_lazy_value_descriptor(arg_value),
           mass_macro_temp_param_lazy_proc
         );
       }
@@ -3058,8 +3064,10 @@ mass_handle_macro_call(
   }
 
   Source_Range return_range = literal->header.returns.source_range;
+  Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
+  *payload = (Mass_Value_Lazy_Payload) {.value = body_value};
   return mass_make_lazy_value(
-    context, parser, return_range, body_value, actual_return_descriptor, mass_macro_lazy_proc
+    context, parser, return_range, payload, actual_return_descriptor, mass_macro_lazy_proc
   );
 
   err:
@@ -3119,7 +3127,7 @@ call_function_overload(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Function_Call_Lazy_Payload *payload
+  const Mass_Function_Call_Lazy_Payload *payload
 ) {
   Value_View args_view = payload->args;
 
@@ -4239,7 +4247,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Arithmetic_Operator_Lazy_Payload *payload
+  const Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = mass_expected_result_descriptor(expected_result);
 
@@ -4501,7 +4509,7 @@ mass_handle_integer_comparison_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Comparison_Operator_Lazy_Payload *payload
+  const Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(payload->lhs);
@@ -4585,7 +4593,7 @@ mass_handle_generic_comparison_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Comparison_Operator_Lazy_Payload *payload
+  const Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
 
@@ -4814,8 +4822,9 @@ mass_pointer_to_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Value *pointee
+  const Mass_Value_Lazy_Payload *payload
 ) {
+  Value *pointee = payload->value;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(pointee);
   Expected_Result expected_pointee = expected_result_any(descriptor);
   Value *forced = value_force(context, builder, &expected_pointee, pointee);
@@ -4891,8 +4900,10 @@ mass_pointer_to(
     return result;
   }
 
+  Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
+  *payload = (Mass_Value_Lazy_Payload) {.value = pointee};
   return mass_make_lazy_value(
-    context, parser, args.source_range, pointee, descriptor, mass_pointer_to_lazy_proc
+    context, parser, args.source_range, payload, descriptor, mass_pointer_to_lazy_proc
   );
 }
 
@@ -4976,7 +4987,7 @@ mass_handle_variable_definition_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Variable_Definition_Lazy_Payload *payload
+  const Mass_Variable_Definition_Lazy_Payload *payload
 ) {
   Storage storage = payload->descriptor->bit_size.as_u64
     ? reserve_stack_storage(builder, payload->descriptor->bit_size)
@@ -5092,7 +5103,7 @@ mass_handle_field_access_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Field_Access_Lazy_Payload *payload
+  const Mass_Field_Access_Lazy_Payload *payload
 ) {
   const Struct_Field *field = payload->field;
 
@@ -5139,9 +5150,8 @@ mass_handle_array_access_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  void *raw_payload
+  const Mass_Array_Access_Lazy_Payload *payload
 ) {
-  Mass_Array_Access_Lazy_Payload *payload = raw_payload;
   Expected_Result expected_array =
     expected_result_any(value_or_lazy_value_descriptor(payload->array));
   Value *array = value_force(context, builder, &expected_array, payload->array);
@@ -5272,8 +5282,9 @@ mass_handle_dereference_operator_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Value* pointer
+  const Mass_Value_Lazy_Payload *payload
 ) {
+  Value *pointer = payload->value;
   // TODO value_indirect_from_pointer should probably take an expected_result
   Value *value = value_indirect_from_pointer(context, builder, pointer, source_range);
   return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, value);
@@ -5307,10 +5318,12 @@ mass_dereference(
     Storage pointee_storage = storage_static_heap(pointee_memory, pointee_descriptor->bit_size);
     return value_make(context, pointee_descriptor, pointee_storage, args_view.source_range);
   }
+  Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
+  *payload = (Mass_Value_Lazy_Payload) {.value = pointer};
   return mass_make_lazy_value(
     context, parser,
     args_view.source_range,
-    pointer,
+    payload,
     descriptor->Pointer_To.descriptor,
     mass_handle_dereference_operator_lazy_proc
   );
@@ -5633,7 +5646,7 @@ mass_handle_if_expression_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_If_Expression_Lazy_Payload *payload
+  const Mass_If_Expression_Lazy_Payload *payload
 ) {
   Expected_Result expected_condition = expected_result_any(&descriptor__bool);
   Value *condition = value_force(context, builder, &expected_condition, payload->condition);
@@ -6202,7 +6215,7 @@ mass_handle_block_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_block_result,
   const Source_Range *block_source_range,
-  Mass_Block_Lazy_Payload *payload
+  const Mass_Block_Lazy_Payload *payload
 ) {
   Array_Value_Ptr lazy_statements = payload->statements;
   u64 statement_count = dyn_array_length(lazy_statements);
@@ -6319,10 +6332,8 @@ token_parse_block_statements(
           mass_copy_scope_exports(parser->scope, module->exports.scope);
           continue;
         } else if (parse_result->descriptor == &descriptor_assignment) {
-          // TODO make lazy value accept const payload
-          Assignment *assignment = (Assignment *)value_as_assignment(parse_result);
           parse_result = mass_make_lazy_value(
-            context, parser, parse_result->source_range, assignment,
+            context, parser, parse_result->source_range, value_as_assignment(parse_result),
             &descriptor_void, mass_handle_assignment_lazy_proc
           );
         } else if (parse_result->descriptor == &descriptor_typed_symbol) {
@@ -6415,8 +6426,9 @@ mass_handle_explicit_return_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Value *parse_result
+  const Mass_Value_Lazy_Payload *payload
 ) {
+  Value *parse_result = payload->value;
   mass_assign_helper(context, builder, &builder->return_value, parse_result, source_range);
   if (mass_has_error(context)) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
@@ -6439,8 +6451,10 @@ mass_return(
   assert(args.length == 1);
   Value *return_value = token_parse_single(context, parser, value_view_get(&args, 0));
 
+  Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
+  *payload = (Mass_Value_Lazy_Payload) {.value = return_value};
   return mass_make_lazy_value(
-    context, parser, args.source_range, return_value, &descriptor_void,
+    context, parser, args.source_range, payload, &descriptor_void,
     mass_handle_explicit_return_lazy_proc
   );
 }

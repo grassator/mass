@@ -694,7 +694,7 @@ typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
-  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, void * payload);
+  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, const void * payload);
 
 typedef _Bool (*Token_Statement_Matcher_Proc)
   (Mass_Context * context, Parser * parser, Value_View view, Value_Lazy * out_lazy_value);
@@ -1608,7 +1608,7 @@ typedef enum {
 
 typedef struct Value_Lazy {
   Epoch epoch;
-  void * payload;
+  const void * payload;
   Lazy_Value_Proc proc;
 } Value_Lazy;
 typedef struct Value_Forced {

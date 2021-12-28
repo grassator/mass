@@ -14,7 +14,7 @@ mass_handle_cast_lazy_proc(
   Function_Builder *builder,
   const Expected_Result *expected_result,
   const Source_Range *source_range,
-  Mass_Cast_Lazy_Payload *payload
+  const Mass_Cast_Lazy_Payload *payload
 );
 
 static inline bool
@@ -173,7 +173,7 @@ mass_make_lazy_value(
   Mass_Context *context,
   Parser *parser,
   Source_Range source_range,
-  void *payload,
+  const void *payload,
   const Descriptor *descriptor,
   Lazy_Value_Proc proc
 );
