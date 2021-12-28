@@ -1900,7 +1900,6 @@ main(void) {
   push_type(type_struct("Program", (Struct_Item[]){
     { "Array_Import_Library", "import_libraries" },
     { "Array_Label_Location_Diff_Patch_Info", "patch_info_array" },
-    { "Array_Value_Ptr", "startup_functions" },
     { "Array_Relocation", "relocations" },
     { "Value *", "entry_point" },
     { "Array_Function_Builder", "functions" },
@@ -1979,7 +1978,6 @@ main(void) {
   push_type(type_struct("Jit_Counters", (Struct_Item[]){
     { "u64", "functions" },
     { "u64", "imports" },
-    { "u64", "startup" },
     { "u64", "relocations" },
     { "u64", "protected_ro_data_page_count" },
   }));
@@ -2139,7 +2137,6 @@ main(void) {
   export_compiler_custom_name("zero_extend", push_type(type_intrinsic("mass_zero_extend")));
   export_compiler_custom_name("type_of", push_type(type_intrinsic("mass_type_of")));
   export_compiler_custom_name("size_of", push_type(type_intrinsic("mass_size_of")));
-  export_compiler_custom_name("startup", push_type(type_intrinsic("mass_startup")));
   export_compiler_custom_name("static_assert", push_type(type_intrinsic("mass_static_assert")));
 
   export_compiler_custom_name("allocator_allocate_bytes", push_type(

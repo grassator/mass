@@ -102,7 +102,6 @@ posix_program_jit(
   posix_section_protect_from(&memory->code, code_protected_size);
 
   program_jit_resolve_relocations(jit);
-  program_jit_call_startup_functions(jit);
 }
 
 #endif // POSIX_RUNTIME_H

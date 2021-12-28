@@ -4896,57 +4896,6 @@ static inline Value *mass_generic_not_equal(Mass_Context *context, Parser *parse
   );
 }
 
-static Value *
-mass_handle_startup_call_lazy_proc(
-  Mass_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range,
-  Value *startup_function
-) {
-  if(startup_function->descriptor != &descriptor_function_literal) goto err;
-  const Function_Literal *literal = value_as_function_literal(startup_function);
-  if (dyn_array_length(literal->header.parameters)) goto err;
-  if (literal->header.returns.tag != Function_Return_Tag_Exact) goto err;
-  const Descriptor *descriptor = function_return_as_exact(&literal->header.returns)->descriptor;
-  if (!mass_descriptor_is_void(descriptor)) goto err;
-
-  // This call is executed at compile time, but the actual startup function
-  // will be run only at runtime so we need to make sure to use the right Program
-  Mass_Context runtime_context = mass_context_from_compilation(context->compilation);
-  ensure_function_instance(&runtime_context, startup_function, (Value_View){0});
-
-  dyn_array_push(runtime_context.program->startup_functions, startup_function);
-  Value *result = mass_make_void(context, *source_range);
-  return expected_result_validate(expected_result, result);
-
-  err:
-  mass_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_Parse,
-    .source_range = *source_range,
-    .detailed_message = slice_literal("`startup` expects a () -> () {...} function as an argument"),
-  });
-  return 0;
-}
-
-static Value *
-mass_startup(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View arguments
-) {
-  assert(arguments.length == 1);
-  Value *startup_function = value_view_get(&arguments, 0);
-
-  return mass_make_lazy_value(
-    context, parser,
-    arguments.source_range,
-    startup_function,
-    &descriptor_void,
-    mass_handle_startup_call_lazy_proc
-  );
-}
-
 static const Descriptor *
 mass_type_only_token_parse_expression(
   Mass_Context *context,

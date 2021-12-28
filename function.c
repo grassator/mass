@@ -824,15 +824,6 @@ program_init_startup_code(
     );
   }
 
-  for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
-    Value *fn = *dyn_array_get(context->program->startup_functions, i);
-    Value *instance = ensure_function_instance(context, fn, (Value_View){0});
-    assert(instance->tag == Value_Tag_Forced);
-    push_eagerly_encoded_assembly(
-      &builder.code_block, source_range,
-      &(Instruction_Assembly){call, {instance->Forced.storage}}
-    );
-  }
   Value *entry_instance = ensure_function_instance(context, program->entry_point, (Value_View){0});
   assert(entry_instance->tag == Value_Tag_Forced);
   push_eagerly_encoded_assembly(

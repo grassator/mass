@@ -839,9 +839,6 @@ static Value * mass_type_of
 static Value * mass_size_of
   (Mass_Context * context, Parser * parser, Value_View args);
 
-static Value * mass_startup
-  (Mass_Context * context, Parser * parser, Value_View args);
-
 static Value * mass_static_assert
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2131,7 +2128,6 @@ typedef dyn_array_type(Mass_Result) Array_Mass_Result;
 typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
-  Array_Value_Ptr startup_functions;
   Array_Relocation relocations;
   Value * entry_point;
   Array_Function_Builder functions;
@@ -2166,7 +2162,6 @@ hash_map_slice_template(Imported_Module_Map, Module *)
 typedef struct Jit_Counters {
   u64 functions;
   u64 imports;
-  u64 startup;
   u64 relocations;
   u64 protected_ro_data_page_count;
 } Jit_Counters;
@@ -2799,7 +2794,6 @@ static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_zero_extend;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
-static Descriptor descriptor_mass_startup;
 static Descriptor descriptor_mass_static_assert;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_mass_constraint_pointer_type;
@@ -5462,11 +5456,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
     .offset = offsetof(Program, patch_info_array),
   },
   {
-    .descriptor = &descriptor_array_value_ptr,
-    .name = slice_literal_fields("startup_functions"),
-    .offset = offsetof(Program, startup_functions),
-  },
-  {
     .descriptor = &descriptor_array_relocation,
     .name = slice_literal_fields("relocations"),
     .offset = offsetof(Program, relocations),
@@ -5576,11 +5565,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit_counters, Jit_Counters,
     .descriptor = &descriptor_i64,
     .name = slice_literal_fields("imports"),
     .offset = offsetof(Jit_Counters, imports),
-  },
-  {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("startup"),
-    .offset = offsetof(Jit_Counters, startup),
   },
   {
     .descriptor = &descriptor_i64,

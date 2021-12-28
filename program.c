@@ -36,7 +36,6 @@ program_init(
   *program = (Program) {
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
-    .startup_functions = dyn_array_make(Array_Value_Ptr, .capacity = 16, .allocator = allocator),
     .relocations = dyn_array_make(Array_Relocation, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
     .default_calling_convention = default_calling_convention,
@@ -106,7 +105,6 @@ program_deinit(
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
-  dyn_array_destroy(program->startup_functions);
   dyn_array_destroy(program->relocations);
 }
 
@@ -301,20 +299,6 @@ program_jit_resolve_relocations(
     *patch_at = address_of;
   }
   jit->previous_counts.relocations = relocation_count;
-}
-
-static void
-program_jit_call_startup_functions(
-  Jit *jit
-) {
-  Program *program = jit->program;
-  u64 startup_count = dyn_array_length(program->startup_functions);
-  for (u64 i = jit->previous_counts.startup; i < startup_count; ++i) {
-    Value *value = *dyn_array_get(program->startup_functions, i);
-    fn_type_opaque fn = value_as_function(program, value);
-    fn();
-  }
-  jit->previous_counts.startup = startup_count;
 }
 
 static void

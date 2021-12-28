@@ -581,7 +581,6 @@ win32_program_jit(
 
 
   program_jit_resolve_relocations(jit);
-  program_jit_call_startup_functions(jit);
 }
 
 
