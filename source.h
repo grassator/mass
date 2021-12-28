@@ -17,18 +17,6 @@ mass_handle_cast_lazy_proc(
   Mass_Cast_Lazy_Payload *payload
 );
 
-#define PACK_AS_VOID_POINTER(_TARGET_, _SOURCE_)\
-  do {\
-    static_assert(sizeof(_SOURCE_) <= sizeof(_TARGET_), "Value too large to pack into a pointer");\
-    memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_SOURCE_));\
-  } while(0)
-
-#define UNPACK_FROM_VOID_POINTER(_TARGET_, _SOURCE_)\
-  do {\
-    static_assert(sizeof(_SOURCE_) >= sizeof(_TARGET_), "Value too large to unpack from a pointer");\
-    memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_TARGET_));\
-  } while(0)
-
 static inline bool
 mass_descriptor_is_void(
   const Descriptor *descriptor

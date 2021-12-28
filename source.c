@@ -6313,16 +6313,19 @@ token_parse_expression(
   return result;
 }
 
+typedef struct {
+  Array_Value_Ptr statements;
+} Mass_Block_Lazy_Payload;
+
 static Value *
 mass_handle_block_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_block_result,
   const Source_Range *block_source_range,
-  void *raw_payload
+  Mass_Block_Lazy_Payload *payload
 ) {
-  Array_Value_Ptr lazy_statements;
-  UNPACK_FROM_VOID_POINTER(lazy_statements, raw_payload);
+  Array_Value_Ptr lazy_statements = payload->statements;
   u64 statement_count = dyn_array_length(lazy_statements);
   assert(statement_count);
   Value *result_value = 0;
@@ -6483,11 +6486,8 @@ token_parse_block_statements(
     if (statement_count == 1) {
       block_result = last_result;
     } else {
-      Array_Value_Ptr lazy_statements;
-      dyn_array_copy_from_temp(Array_Value_Ptr, context, &lazy_statements, temp_lazy_statements);
-
-      void *payload;
-      PACK_AS_VOID_POINTER(payload, lazy_statements);
+      Mass_Block_Lazy_Payload *payload = mass_allocate(context, Mass_Block_Lazy_Payload);
+      dyn_array_copy_from_temp(Array_Value_Ptr, context, &payload->statements, temp_lazy_statements);
 
       block_result = mass_make_lazy_value(
         context, parser, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
