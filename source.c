@@ -559,7 +559,6 @@ anonymous_struct_descriptor_from_tuple(
     dyn_array_push(fields, (Struct_Field) {
       .name = name,
       .descriptor = field_descriptor,
-      .source_range = item->source_range,
       .offset = field_byte_offset,
     });
   }
@@ -4027,7 +4026,6 @@ mass_ensure_trampoline(
     dyn_array_push(fields, (Struct_Field) {
       .name = {0},
       .descriptor = field_descriptor,
-      .source_range = item->source_range,
       .offset = field_byte_offset,
     });
   }
@@ -4039,7 +4037,6 @@ mass_ensure_trampoline(
     dyn_array_push(fields, (Struct_Field) {
       .name = slice_literal("returns"),
       .descriptor = return_descriptor,
-      .source_range = args_view.source_range,
       .offset = return_byte_offset,
     });
   }

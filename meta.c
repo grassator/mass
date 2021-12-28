@@ -1774,7 +1774,6 @@ main(void) {
     // TODO This should probably be "const Symbol *", but generating that is a giant pain
     { "Slice", "name"},
     { "const Descriptor *", "descriptor"},
-    { "Source_Range", "source_range"},
     { "u64", "offset" },
   }));
 

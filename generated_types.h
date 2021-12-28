@@ -1838,7 +1838,6 @@ typedef dyn_array_type(Typed_Symbol) Array_Typed_Symbol;
 typedef struct Struct_Field {
   Slice name;
   const Descriptor * descriptor;
-  Source_Range source_range;
   u64 offset;
 } Struct_Field;
 typedef dyn_array_type(Struct_Field) Array_Struct_Field;
@@ -4949,11 +4948,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(struct_field, Struct_Field,
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("descriptor"),
     .offset = offsetof(Struct_Field, descriptor),
-  },
-  {
-    .descriptor = &descriptor_source_range,
-    .name = slice_literal_fields("source_range"),
-    .offset = offsetof(Struct_Field, source_range),
   },
   {
     .descriptor = &descriptor_i64,
