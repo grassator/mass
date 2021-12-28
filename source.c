@@ -2387,10 +2387,7 @@ token_parse_operator_definition(
       .tag = Operator_Tag_Alias,
       .fixity = fixity,
       .precedence = precendence,
-      .Alias = {
-        .symbol = alias,
-        .handler = token_handle_user_defined_operator_proc,
-      },
+      .Alias = { .symbol = alias },
     };
   } else if (value_is_intrinsic(body)) {
     *operator = (Operator){
@@ -5726,7 +5723,7 @@ token_dispatch_operator(
   Value *result_value = 0;
   switch(operator->tag) {
     case Operator_Tag_Alias: {
-      result_value = operator->Alias.handler(context, parser, args_view, operator);
+      result_value = token_handle_user_defined_operator_proc(context, parser, args_view, operator);
     } break;
     case Operator_Tag_Intrinsic: {
       const Descriptor *expected_descriptor = 0; // inferred

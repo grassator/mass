@@ -1520,7 +1520,6 @@ main(void) {
   push_type(add_common_fields(type_union("Operator", (Struct_Type[]){
     struct_fields("Alias", (Struct_Item[]){
       { "const Symbol *", "symbol" },
-      { "Mass_Handle_Operator_Proc", "handler" },
     }),
     struct_fields("Intrinsic", (Struct_Item[]){
       { "Value *", "body" },
@@ -1645,13 +1644,6 @@ main(void) {
       { "Value_View", "view" },
     }))
   );
-
-  push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
-    { "Mass_Context *", "context" },
-    { "Parser *", "parser" },
-    { "Value_View", "view" },
-    { "const Operator *", "operator" },
-  }));
 
   push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
     struct_empty("Runtime"),

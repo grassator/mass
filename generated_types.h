@@ -465,9 +465,6 @@ typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_
 typedef Value * (*Mass_Intrinsic_Proc)
   (Mass_Context * context, Parser * parser, Value_View view);
 
-typedef Value * (*Mass_Handle_Operator_Proc)
-  (Mass_Context * context, Parser * parser, Value_View view, const Operator * operator);
-
 typedef struct Function_Parameter Function_Parameter;
 typedef struct Function_Parameter_Generic Function_Parameter_Generic;
 typedef struct Function_Parameter_Exact_Static Function_Parameter_Exact_Static;
@@ -1511,7 +1508,6 @@ typedef enum {
 
 typedef struct Operator_Alias {
   const Symbol * symbol;
-  Mass_Handle_Operator_Proc handler;
 } Operator_Alias;
 typedef struct Operator_Intrinsic {
   Value * body;
@@ -2581,7 +2577,6 @@ static Descriptor descriptor_array_lazy_static_value_ptr;
 static Descriptor descriptor_lazy_static_value_pointer;
 static Descriptor descriptor_lazy_static_value_pointer_pointer;
 static Descriptor descriptor_mass_intrinsic_proc;
-static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_function_parameter;
 static Descriptor descriptor_array_function_parameter;
 static Descriptor descriptor_array_function_parameter_ptr;
@@ -4099,11 +4094,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator_alias, Operator_Alias,
     .name = slice_literal_fields("symbol"),
     .offset = offsetof(Operator_Alias, symbol),
   },
-  {
-    .descriptor = &descriptor_mass_handle_operator_proc,
-    .name = slice_literal_fields("handler"),
-    .offset = offsetof(Operator_Alias, handler),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(operator_alias);
 MASS_DEFINE_STRUCT_DESCRIPTOR(operator_intrinsic, Operator_Intrinsic,
@@ -4536,26 +4526,6 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_value_view,
-  }
-)
-MASS_DEFINE_FUNCTION_DESCRIPTOR(
-  mass_handle_operator_proc,
-  &descriptor_value_pointer,
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_mass_context_pointer,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_parser_pointer,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_value_view,
-  },
-  {
-    .tag = Function_Parameter_Tag_Runtime,
-    .descriptor = &descriptor_operator_pointer,
   }
 )
 /*union struct start */
