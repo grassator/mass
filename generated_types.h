@@ -2206,6 +2206,7 @@ typedef struct Common_Symbols {
   const Symbol * operator_equal;
   const Symbol * operator_fat_arrow;
   const Symbol * operator_space;
+  const Symbol * operator_tilde;
   const Symbol * operator_quote;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
@@ -5712,6 +5713,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_space"),
     .offset = offsetof(Common_Symbols, operator_space),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_tilde"),
+    .offset = offsetof(Common_Symbols, operator_tilde),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

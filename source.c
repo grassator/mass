@@ -1837,48 +1837,89 @@ token_match_argument(
   Value_View view
 ) {
   Function_Parameter arg = {0};
-  if (context->result->tag != Mass_Result_Tag_Success) return arg;
+  if (!view.length) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = view.source_range,
+      .detailed_message = slice_literal("Expected a parameter definition"),
+    });
+    goto err;
+  }
 
-  Value_View default_expression;
-  Value_View static_expression;
-  Value_View definition;
-  Value *equals;
-  bool is_inferred_type = false;
+  u32 peek_index = 0;
 
-  if (token_maybe_split_on_operator(
-    view, slice_literal("::"), &definition, &static_expression, &equals
-  )) {
-    if (static_expression.length == 0) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = equals->source_range,
-        .detailed_message = slice_literal("Expected an expression after `::`"),
-      });
-      goto err;
-    }
-    // TODO @CopyPaste
-    if (definition.length != 1 || !value_is_symbol(value_view_get(&definition, 0))) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = definition.source_range,
-        .detailed_message = slice_literal("Expected an argument name"),
-      });
-      goto err;
-    }
-    Value *name_token = value_view_get(&definition, 0);
+  Value *at_token = value_view_maybe_match_cached_symbol(
+    view, &peek_index, context->compilation->common_symbols.operator_at
+  );
+
+  Value *name_token = value_view_next(&view, &peek_index);
+  if (!mass_value_ensure_static_of(context, name_token, &descriptor_symbol)) goto err;
+  const Symbol *symbol = value_as_symbol(name_token);
+  // foo(x) or foo(@x)
+  if (peek_index == view.length) {
+    return (Function_Parameter) {
+      .tag = Function_Parameter_Tag_Generic,
+      .symbol = symbol,
+      .descriptor = 0,
+      .source_range = view.source_range,
+      .Generic = { .is_static = !!at_token },
+    };
+  }
+
+  Value *operator_token = value_view_next(&view, &peek_index);
+  if (!mass_value_ensure_static_of(context, operator_token, &descriptor_symbol)) goto err;
+  if (peek_index == view.length) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = view.source_range,
+      .detailed_message = slice_literal("Expected an expression"),
+    });
+    goto err;
+  }
+
+  const Symbol *operator_symbol = value_as_symbol(operator_token);
+  // foo(@x :: 42) or foo(x :: 42) both have the same semantics.
+  // TODO Maybe one form should be disallowed
+  if (operator_symbol == context->compilation->common_symbols.operator_double_colon) {
+    Value_View static_expression = value_view_rest(&view, peek_index);
     Value *static_value = token_parse_expression(context, parser, static_expression, &(u32){0}, 0);
     if (mass_has_error(context)) goto err;
     if (!mass_value_ensure_static(context, static_value)) goto err;
     return (Function_Parameter) {
       .tag = Function_Parameter_Tag_Exact_Static,
-      .Exact_Static = {
-        .storage = value_as_forced(static_value)->storage,
-      },
+      .Exact_Static = { .storage = value_as_forced(static_value)->storage },
       .symbol = value_as_symbol(name_token),
       .descriptor = static_value->descriptor,
-      .source_range = definition.source_range,
+      .source_range = name_token->source_range,
     };
   }
+
+  // foo(@x ~ some_constraint) or foo(x ~ some_constraint)
+  if (operator_symbol == context->compilation->common_symbols.operator_tilde) {
+    Value_View constraint_expression = value_view_rest(&view, peek_index);
+    Value *constraint = token_parse_expression(context, parser, constraint_expression, &(u32){0}, 0);
+    if (mass_has_error(context)) goto err;
+    if (!mass_value_ensure_static(context, constraint)) goto err;
+    Array_Function_Parameter parameters =
+      descriptor_as_function_instance(&descriptor_mass_type_constraint_proc)->info->parameters;
+    Array_Value_Ptr fake_args_array =
+      mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
+    Value_View fake_args_view = value_view_from_value_array(fake_args_array, &constraint->source_range);
+    Mass_Type_Constraint_Proc maybe_type_constraint =
+      (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(context, constraint, fake_args_view);
+    return (Function_Parameter) {
+      .tag = Function_Parameter_Tag_Generic,
+      .symbol = symbol,
+      .descriptor = 0,
+      .source_range = view.source_range,
+      .Generic = { .is_static = !!at_token, .maybe_type_constraint = maybe_type_constraint },
+    };
+  }
+
+  Value_View default_expression;
+  Value_View definition;
+  Value *equals;
+  bool is_inferred_type = false;
 
   if (token_maybe_split_on_operator(
     view, slice_literal("="), &definition, &default_expression, &equals
@@ -1909,13 +1950,11 @@ token_match_argument(
   }
 
   const Descriptor *descriptor = 0;
-  Value *name_token;
   Value_View maybe_type_expression = {0};
 
   Function_Parameter_Tag parameter_tag = Function_Parameter_Tag_Runtime;
   bool is_static_generic = false;
 
-  Mass_Type_Constraint_Proc maybe_type_constraint = 0;
   if (is_inferred_type) {
     if (definition.length != 1 || !value_is_symbol(value_view_get(&definition, 0))) {
       mass_error(context, (Mass_Error) {
@@ -1935,24 +1974,7 @@ token_match_argument(
       parameter_tag = Function_Parameter_Tag_Generic;
     }
     if (parameter_tag == Function_Parameter_Tag_Generic) {
-      if (token_maybe_split_on_operator(
-        definition, slice_literal("~"), &name_tokens, &maybe_type_expression, &operator
-      )) {
-        Value *constraint = token_parse_expression(context, parser, maybe_type_expression, &(u32){0}, 0);
-        if (mass_has_error(context)) goto err;
-        if (!mass_value_ensure_static(context, constraint)) goto err;
-        Array_Function_Parameter parameters =
-          descriptor_as_function_instance(&descriptor_mass_type_constraint_proc)->info->parameters;
-        Array_Value_Ptr fake_args_array =
-          mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
-        Value_View fake_args_view = value_view_from_value_array(fake_args_array, &constraint->source_range);
-        maybe_type_constraint = (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(
-          context, constraint, fake_args_view
-        );
-        if (mass_has_error(context)) goto err;
-      } else {
-        name_tokens = definition;
-      }
+      name_tokens = definition;
     }
     if (name_tokens.length == 0) {
       mass_error(context, (Mass_Error) {
@@ -2040,7 +2062,6 @@ token_match_argument(
   if (parameter_tag == Function_Parameter_Tag_Generic) {
     arg.Generic = (Function_Parameter_Generic) {
       .is_static = is_static_generic,
-      .maybe_type_constraint = maybe_type_constraint,
     };
   }
 

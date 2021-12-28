@@ -2022,6 +2022,7 @@ main(void) {
     { "const Symbol *", "operator_equal" },
     { "const Symbol *", "operator_fat_arrow" },
     { "const Symbol *", "operator_space" },
+    { "const Symbol *", "operator_tilde" },
     { "const Symbol *", "operator_quote" },
   }));
 
