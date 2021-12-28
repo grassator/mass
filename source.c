@@ -399,7 +399,8 @@ static Value *
 value_indirect_from_pointer(
   Mass_Context *context,
   Function_Builder *builder,
-  Value *source
+  Value *source,
+  const Source_Range *source_range
 ) {
   const Descriptor *referenced_descriptor;
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
@@ -421,22 +422,17 @@ value_indirect_from_pointer(
       Register reg = source_storage->Register.index;
       Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
       referenced_storage.flags |= source_storage->flags & Storage_Flags_Temporary;
-      Value *value = value_make(
-        context, referenced_descriptor, referenced_storage, source->source_range
-      );
+      Value *value = value_make(context, referenced_descriptor, referenced_storage, *source_range);
       return value;
     }
     case Storage_Tag_Memory: {
       Register reg = register_acquire_temp(builder);
       Storage reg_storage = storage_register(reg, source_descriptor->bit_size);
-      move_value(builder, &source->source_range, &reg_storage, source_storage);
+      move_value(builder, source_range, &reg_storage, source_storage);
       storage_release_if_temporary(builder, source_storage);
       Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
       referenced_storage.flags |= Storage_Flags_Temporary;
-      Value *temp = value_make(
-        context, referenced_descriptor, referenced_storage, source->source_range
-      );
-      return temp;
+      return value_make(context, referenced_descriptor, referenced_storage, *source_range);
     }
     default:
     case Storage_Tag_Disjoint:
@@ -857,7 +853,7 @@ mass_assign_helper(
   }
 
   if (descriptor_is_implicit_pointer(source->descriptor)) {
-    Value *ref_source = value_indirect_from_pointer(context, builder, source);
+    Value *ref_source = value_indirect_from_pointer(context, builder, source, source_range);
     mass_assign_helper(context, builder, target, ref_source, source_range);
     storage_release_if_temporary(builder, &value_as_forced(ref_source)->storage);
     return;
@@ -871,7 +867,7 @@ mass_assign_helper(
       ) ||
       source->descriptor == &descriptor_tuple
     ) {
-      Value *referenced_target = value_indirect_from_pointer(context, builder, target);
+      Value *referenced_target = value_indirect_from_pointer(context, builder, target, source_range);
       mass_assign_helper(context, builder, referenced_target, source, source_range);
       storage_release_if_temporary(builder, &value_as_forced(referenced_target)->storage);
       return;
@@ -5443,7 +5439,7 @@ mass_handle_dereference_operator_lazy_proc(
   Value* pointer
 ) {
   // TODO value_indirect_from_pointer should probably take an expected_result
-  Value *value = value_indirect_from_pointer(context, builder, pointer);
+  Value *value = value_indirect_from_pointer(context, builder, pointer, source_range);
   return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, value);
 }
 
