@@ -959,34 +959,26 @@ mass_assign_helper(
     if (!same_type(target->descriptor, source->descriptor)) goto err;
     const Descriptor *item_descriptor = source->descriptor->Fixed_Array.item;
 
-    Storage source_array_storage = value_maybe_dereference(context, builder, source);
-    Storage target_array_storage = value_maybe_dereference(context, builder, target);
-
     for (u64 i = 0; i < source->descriptor->Fixed_Array.length; ++i) {
       s32 index_number = (u64_to_s32(i));
       s32 offset = index_number * u64_to_s32(descriptor_byte_size(item_descriptor));
+      Bits item_bit_size = item_descriptor->bit_size;
 
       Value source_field = {
         .tag = Value_Tag_Forced,
         .descriptor = item_descriptor,
-        .Forced.storage = storage_with_offset_and_bit_size(
-          &source_array_storage, offset, item_descriptor->bit_size
-        ),
+        .Forced.storage = storage_with_offset_and_bit_size(source_storage, offset, item_bit_size),
         .source_range = source->source_range,
       };
       Value target_field = {
         .tag = Value_Tag_Forced,
         .descriptor = item_descriptor,
-        .Forced.storage = storage_with_offset_and_bit_size(
-          &target_array_storage, offset, item_descriptor->bit_size
-        ),
+        .Forced.storage = storage_with_offset_and_bit_size(target_storage, offset, item_bit_size),
         .source_range = target->source_range,
       };
       mass_assign_helper(context, builder, &target_field, &source_field, source_range);
       if (mass_has_error(context)) return;
     }
-    storage_release_if_temporary(builder, &source_array_storage);
-    storage_release_if_temporary(builder, &target_array_storage);
     return;
   }
 
