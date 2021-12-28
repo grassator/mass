@@ -4704,8 +4704,8 @@ mass_handle_comparison(
   Lazy_Value_Proc lazy_value_proc,
   Compare_Type compare_type
 ) {
-  Value *lhs = token_parse_single(context, parser, value_view_get(&arguments, 0));
-  Value *rhs = token_parse_single(context, parser, value_view_get(&arguments, 1));
+  Value *lhs = value_view_get(&arguments, 0);
+  Value *rhs = value_view_get(&arguments, 1);
   if (mass_has_error(context)) return 0;
 
   Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
