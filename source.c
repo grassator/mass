@@ -1937,121 +1937,65 @@ token_match_argument(
     };
   }
 
-  Value_View default_expression;
-  Value_View definition;
-  Value *equals;
-
-  if (token_maybe_split_on_operator(
-    view, slice_literal("="), &definition, &default_expression, &equals
-  )) {
-    if (default_expression.length == 0) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = equals->source_range,
-        .detailed_message = slice_literal("Expected an expression after `=`"),
-      });
-      goto err;
-    }
-  } else {
-    definition = view;
-    default_expression = (Value_View){0};
+  if (operator_symbol != context->compilation->common_symbols.operator_colon) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = value_view_rest(&view, peek_index).source_range,
+      .detailed_message = slice_literal("Expected a `:` in parameter definition"),
+    });
+    goto err;
   }
 
-  const Descriptor *descriptor = 0;
-  Value_View maybe_type_expression = {0};
+  const Symbol *equal = context->compilation->common_symbols.operator_equal;
+  Value_View type_expression = value_view_match_till_symbol(view, &peek_index, equal);
 
-  Function_Parameter_Tag parameter_tag = Function_Parameter_Tag_Runtime;
-  bool is_static_generic = false;
-
-  {
-    Value_View name_tokens;
-    Value *operator;
-    if (!token_maybe_split_on_operator(
-      definition, slice_literal(":"), &name_tokens, &maybe_type_expression, &operator
-    )) {
-      parameter_tag = Function_Parameter_Tag_Generic;
-    }
-    if (parameter_tag == Function_Parameter_Tag_Generic) {
-      name_tokens = definition;
-    }
-    if (name_tokens.length == 0) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = definition.source_range,
-        .detailed_message = slice_literal("':' operator expects an identifier on the left hand side"),
-      });
-      goto err;
-    }
-    switch(name_tokens.length) {
-      case 1: {
-        name_token = value_view_get(&name_tokens, 0);
-        if (!value_is_symbol(name_token)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Invalid_Identifier,
-            .source_range = name_tokens.source_range,
-          });
-          goto err;
-        }
-      } break;
-      case 2: {
-        Value *first = value_view_get(&name_tokens, 0);
-        Value *second = value_view_get(&name_tokens, 1);
-        if (!value_is_symbol(first)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Invalid_Identifier,
-            .source_range = first->source_range,
-          });
-          goto err;
-        }
-        if (value_as_symbol(first) != context->compilation->common_symbols.operator_at) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Parse,
-            .source_range = first->source_range,
-            .detailed_message = slice_literal("Expected `@` token"),
-          });
-          goto err;
-        }
-        if (!value_is_symbol(second)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Invalid_Identifier,
-            .source_range = second->source_range,
-          });
-          goto err;
-        }
-        parameter_tag = Function_Parameter_Tag_Generic;
-        is_static_generic = true;
-        name_token = second;
-      } break;
-      default: {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = name_tokens.source_range,
-        });
-        goto err;
-      } break;
+  if (peek_index == view.length) {
+    if (at_token) { // foo(@x : i64)
+      return (Function_Parameter) {
+        .tag = Function_Parameter_Tag_Generic,
+        .symbol = symbol,
+        .descriptor = 0,
+        .source_range = view.source_range,
+        .maybe_type_expression = type_expression,
+        .Generic = { .is_static = !!at_token },
+      };
+    } else { // foo(x : i64)
+      return (Function_Parameter) {
+        .tag = Function_Parameter_Tag_Runtime,
+        .symbol = symbol,
+        .descriptor = 0,
+        .source_range = name_token->source_range,
+        .maybe_type_expression = type_expression,
+      };
     }
   }
 
-  Value *maybe_default_value = 0;
-  if (default_expression.length) {
-    maybe_default_value = token_parse_expression(context, parser, default_expression, &(u32){0}, 0);
-    if (mass_has_error(context)) goto err;
-    if (!mass_value_ensure_static(context, maybe_default_value)) goto err;
+  Value_View default_expression = value_view_rest(&view, peek_index);
+  if (!default_expression.length) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = default_expression.source_range,
+      .detailed_message = slice_literal("Expected an expression after `=`"),
+    });
+    goto err;
   }
+
+  // foo(@x : i64 = 42) or foo(x : i64 = 42)
+  if (at_token) {
+    panic("TODO test and maybe fix static values with a type and a default value");
+  }
+  Value *maybe_default_value = token_parse_expression(context, parser, default_expression, &(u32){0}, 0);
+  if (mass_has_error(context)) goto err;
+  if (!mass_value_ensure_static(context, maybe_default_value)) goto err;
 
   arg = (Function_Parameter) {
-    .tag = parameter_tag,
+    .tag = Function_Parameter_Tag_Runtime,
     .maybe_default_value = maybe_default_value,
-    .maybe_type_expression = maybe_type_expression,
+    .maybe_type_expression = type_expression,
     .symbol = value_as_symbol(name_token),
-    .descriptor = descriptor,
-    .source_range = definition.source_range,
+    .descriptor = 0,
+    .source_range = name_token->source_range,
   };
-  if (parameter_tag == Function_Parameter_Tag_Generic) {
-    arg.Generic = (Function_Parameter_Generic) {
-      .is_static = is_static_generic,
-    };
-  }
 
   err:
   return arg;
