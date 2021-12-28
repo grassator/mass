@@ -6699,32 +6699,10 @@ token_define_global_variable(
     Storage global_storage = data_label32(label, descriptor->bit_size);
     global_value = value_make(context, descriptor, global_storage, expression.source_range);
 
-    if (mass_value_is_compile_time_known(value)) {
+    if (mass_value_ensure_static(context, value)) {
       mass_assign_helper(context, 0, global_value, value, &expression.source_range);
-      if (mass_has_error(context)) return;
-    } else {
-      Assignment *assignment_payload = mass_allocate(context, Assignment);
-      *assignment_payload = (Assignment) {
-        .target = global_value,
-        .source = value,
-      };
-
-      Value *body_value = mass_make_lazy_value(
-        context, parser, symbol->source_range, assignment_payload, &descriptor_void,
-        mass_handle_assignment_lazy_proc
-      );
-
-      Function_Literal *startup_literal = mass_make_fake_function_literal(
-        context, parser, body_value, &descriptor_void, &expression.source_range
-      );
-      Value *startup_function = value_make(
-        context, &descriptor_function_literal, storage_static(startup_literal), value->source_range
-      );
-      Compilation *compilation = context->compilation;
-      Program *program = compilation->runtime_program;
-      ensure_function_instance(context, startup_function, (Value_View){0});
-      dyn_array_push(program->startup_functions, startup_function);
     }
+    if (mass_has_error(context)) return;
   }
 
   scope_define_value(parser->scope, VALUE_STATIC_EPOCH, symbol->source_range, value_as_symbol(symbol), global_value);
