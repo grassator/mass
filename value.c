@@ -1366,13 +1366,6 @@ compilation_init(
     .infix_or_suffix_operator_symbol_map = hash_map_make(Operator_Symbol_Map, .initial_capacity = 128),
     .descriptor_pointer_to_cache_map = hash_map_make(Descriptor_Pointer_To_Cache_Map, .initial_capacity = 256),
     .jit = {0},
-    .apply_operator = {
-      .precedence = 20,
-      .fixity = Operator_Fixity_Infix,
-      .associativity = Operator_Associativity_Left,
-      .tag = Operator_Tag_Alias,
-      .Alias.handler = mass_handle_apply_operator,
-    },
   };
 
   void *permanent_arena_address = 0;

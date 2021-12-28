@@ -770,6 +770,9 @@ static Value * mass_import
 static Value * mass_intrinsic
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_apply
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_call
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2770,6 +2773,7 @@ static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_get;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_intrinsic;
+static Descriptor descriptor_mass_apply;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_using;
 static Descriptor descriptor_mass_return;

@@ -2113,6 +2113,7 @@ main(void) {
   export_global_custom_name("__import", push_type(type_intrinsic("mass_import")));
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));
+  export_compiler_custom_name("apply", push_type(type_intrinsic("mass_apply")));
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
   export_compiler_custom_name("using", push_type(type_intrinsic("mass_using")));
   export_compiler_custom_name("return", push_type(type_intrinsic("mass_return")));

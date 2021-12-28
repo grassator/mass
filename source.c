@@ -5048,11 +5048,10 @@ mass_call(
 }
 
 static inline Value *
-mass_handle_apply_operator(
+mass_apply(
   Mass_Context *context,
   Parser *parser,
-  Value_View operands,
-  const Operator *operator
+  Value_View operands
 ) {
   return mass_forward_call_to_alias(context, parser, operands, context->compilation->common_symbols.apply);
 }
@@ -6754,6 +6753,14 @@ module_compiler_init(
   };
   INIT_LITERAL_SOURCE_RANGE(&out_module->source_range, "MASS");
   compiler_scope_define_exports(compilation, scope);
+
+  compilation->apply_operator = (Operator){
+    .precedence = 20,
+    .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
+    .tag = Operator_Tag_Intrinsic,
+    .Intrinsic.body = scope_lookup(scope, mass_ensure_symbol(compilation, slice_literal("apply")))->value,
+  };
 }
 
 static void

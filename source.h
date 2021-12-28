@@ -104,14 +104,6 @@ module_compiler_init(
   Module *out_module
 );
 
-static Value *
-mass_handle_apply_operator(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View operands_view,
-  const Operator *operator
-);
-
 static void
 scope_define_builtins(
   Compilation *compilation,
