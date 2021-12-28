@@ -5706,15 +5706,7 @@ token_dispatch_operator(
     return;
   }
   u64 start_index = dyn_array_length(*stack) - argument_count;
-  Value *first_arg = *dyn_array_get(*stack, start_index);
-  Value *last_arg = *dyn_array_last(*stack);
-  Source_Range source_range;
-  if(first_arg->source_range.file == last_arg->source_range.file) {
-    source_range = last_arg->source_range;
-    source_range.offsets.from = first_arg->source_range.offsets.from;
-  } else {
-    source_range = stack_entry->source_range;
-  }
+  Source_Range source_range = stack_entry->source_range;
   Value_View args_view = {
     .values = dyn_array_get(*stack, start_index),
     .length = argument_count,
@@ -5732,7 +5724,6 @@ token_dispatch_operator(
       );
     } break;
   }
-  if (mass_has_error(context)) return;
 
   // Pop off current arguments and push a new one
   dyn_array_splice_raw(*stack, start_index, argument_count, &result_value, 1);
