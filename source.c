@@ -934,7 +934,11 @@ mass_assign_helper(
         return;
       }
 
-      source = ensure_function_instance(context, match_found.value, args_view);
+      source = match_found.value;
+      if (source->descriptor->tag != Descriptor_Tag_Function_Instance) {
+        const Function_Literal *literal = value_as_function_literal(match_found.value);
+        source = mass_function_literal_instance_for_info(context, literal, match_found.info);
+      }
       if (mass_has_error(context)) return;
       assert(source->descriptor->tag == Descriptor_Tag_Function_Instance);
       source_storage = &value_as_forced(source)->storage;
