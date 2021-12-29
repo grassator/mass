@@ -602,25 +602,20 @@ mass_infer_function_return_type(
 }
 
 static Value *
-ensure_function_instance(
+mass_function_literal_instance_for_info(
   Mass_Context *context,
-  Value *fn_value,
-  Value_View args
+  const Function_Literal *literal,
+  const Function_Info *fn_info
 ) {
   Program *program = context->program;
-  if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
-    return fn_value;
-  }
+  assert(!(literal->header.flags & Function_Header_Flags_Macro));
 
   // TODO figure out how to avoid the const cast here
-  Function_Literal *literal = (Function_Literal *)value_as_function_literal(fn_value);
-  assert(!(literal->header.flags & Function_Header_Flags_Macro));
-  const Function_Info *fn_info = function_literal_info_for_args(context, literal, args);
-
+  Function_Literal *mutable_literal = (Function_Literal *)literal;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
-  if (!dyn_array_is_initialized(literal->instances)) {
-    literal->instances = dyn_array_make(
+  if (!dyn_array_is_initialized(mutable_literal->instances)) {
+    mutable_literal->instances = dyn_array_make(
       Array_Value_Ptr,
       .allocator = context->allocator,
       .capacity = 4
@@ -651,9 +646,9 @@ ensure_function_instance(
     Storage storage = import_symbol(context->allocator, program, symbol->library_name, symbol->symbol_name);
     Value *cached_instance = value_init(
       allocator_allocate(context->allocator, Value),
-      instance_descriptor, storage, fn_value->source_range
+      instance_descriptor, storage, literal->body->source_range
     );
-    dyn_array_push(literal->instances, cached_instance);
+    dyn_array_push(mutable_literal->instances, cached_instance);
     return cached_instance;
   }
 
@@ -661,9 +656,9 @@ ensure_function_instance(
   // It is important to cache the label here for recursive calls
   Value *cached_instance = value_init(
     allocator_allocate(context->allocator, Value),
-    instance_descriptor, code_label32(call_label), fn_value->source_range
+    instance_descriptor, code_label32(call_label), literal->body->source_range
   );
-  dyn_array_push(literal->instances, cached_instance);
+  dyn_array_push(mutable_literal->instances, cached_instance);
 
   Scope *body_scope = scope_make(context->allocator, literal->own_scope);
   Parser body_parser = {
@@ -775,6 +770,20 @@ ensure_function_instance(
   dyn_array_push(program->functions, *builder);
 
   return cached_instance;
+}
+
+static Value *
+ensure_function_instance(
+  Mass_Context *context,
+  Value *fn_value,
+  Value_View args
+) {
+  if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
+    return fn_value;
+  }
+  const Function_Literal *literal = value_as_function_literal(fn_value);
+  const Function_Info *fn_info = function_literal_info_for_args(context, literal, args);
+  return mass_function_literal_instance_for_info(context, literal, fn_info);
 }
 
 static void
