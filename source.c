@@ -616,24 +616,26 @@ deduce_runtime_descriptor_for_value(
 
   if (value->descriptor == &descriptor_overload || value->descriptor == &descriptor_function_literal) {
     Array_Function_Parameter parameters;
-    if (value->descriptor == &descriptor_function_literal) {
-      const Function_Literal *literal = value_as_function_literal(value);
-      if (literal->header.flags & Function_Header_Flags_Macro) {
-        return 0;
-      }
-      if (literal->header.flags & Function_Header_Flags_Generic) {
-        return 0;
-      }
-      Function_Info info;
-      mass_function_info_init_for_header_and_maybe_body(
-        context, literal->own_scope, &literal->header, literal->body, &info
-      );
-      parameters = info.parameters;
-    } else {
-      if (!maybe_desired_descriptor || maybe_desired_descriptor->tag != Descriptor_Tag_Function_Instance) {
-        return 0;
-      }
+    if (maybe_desired_descriptor) {
+      assert(maybe_desired_descriptor->tag == Descriptor_Tag_Function_Instance);
       parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
+    } else {
+      if (value->descriptor == &descriptor_function_literal) {
+        const Function_Literal *literal = value_as_function_literal(value);
+        if (literal->header.flags & Function_Header_Flags_Macro) {
+          return 0;
+        }
+        if (literal->header.flags & Function_Header_Flags_Generic) {
+          return 0;
+        }
+        Function_Info info;
+        mass_function_info_init_for_header_and_maybe_body(
+          context, literal->own_scope, &literal->header, literal->body, &info
+        );
+        parameters = info.parameters;
+      } else {
+        return 0;
+      }
     }
     if (mass_has_error(context)) return 0;
     Array_Value_Ptr fake_args =
