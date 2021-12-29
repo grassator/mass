@@ -1215,6 +1215,21 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should report an error when the constraint function does not match the signature") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "constraint_with_a_wrong_signature :: fn() -> () { }\n"
+        "foo :: fn(x ~ constraint_with_a_wrong_signature) -> (i64) { 42 }\n"
+        "foo :: fn(x) -> (i64) { 21 }\n"
+        "checker :: fn() -> (i64) {\n"
+          "foo(1)\n"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_No_Matching_Overload);
+    }
   }
 
   describe("Intrinsics") {

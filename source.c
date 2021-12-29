@@ -1873,6 +1873,10 @@ mass_parse_single_function_parameter(
     Value *constraint = token_parse_expression(context, parser, constraint_expression, &(u32){0}, 0);
     if (mass_has_error(context)) goto err;
     if (!mass_value_ensure_static(context, constraint)) goto err;
+    const Descriptor *constraint_descriptor =
+      deduce_runtime_descriptor_for_value(context, constraint, &descriptor_mass_type_constraint_proc);
+    if (mass_has_error(context)) goto err;
+    assert(constraint_descriptor->tag == Descriptor_Tag_Function_Instance);
     Array_Function_Parameter parameters =
       descriptor_as_function_instance(&descriptor_mass_type_constraint_proc)->info->parameters;
     Array_Value_Ptr fake_args_array =
