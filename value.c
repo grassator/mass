@@ -370,9 +370,10 @@ same_type(
   if (descriptor_is_implicit_pointer(b)) {
     b = b->Pointer_To.descriptor;
   }
+  if (a->brand != b->brand) return false;
   if (a->tag != b->tag) return false;
   if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
-  if (a->brand != b->brand) return false;
+  if (a->bit_alignment.as_u64 != b->bit_alignment.as_u64) return false;
   switch(a->tag) {
     case Descriptor_Tag_Void:
     case Descriptor_Tag_Float: {
@@ -388,9 +389,11 @@ same_type(
       return same_type(a->Fixed_Array.item, b->Fixed_Array.item) &&
         a->Fixed_Array.length == b->Fixed_Array.length;
     }
-    case Descriptor_Tag_Struct:
-    case Descriptor_Tag_Raw: {
+    case Descriptor_Tag_Struct: {
       return a == b;
+    }
+    case Descriptor_Tag_Raw: {
+      return true;
     }
     case Descriptor_Tag_Function_Instance: {
       return same_function_signature(a->Function_Instance.info, b->Function_Instance.info);
