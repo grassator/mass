@@ -1911,7 +1911,8 @@ main(void) {
   }));
 
   push_type(type_function(Typedef, "Mass_Trampoline_Proc", "void", (Argument_Type[]){
-    { "void *", "payload" },
+    { "void *", "returns" },
+    { "void *", "args" },
   }));
 
   push_type(type_struct("Mass_Trampoline", (Struct_Item[]){

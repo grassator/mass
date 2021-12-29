@@ -651,7 +651,7 @@ typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
 typedef void (*Mass_Trampoline_Proc)
-  (void * payload);
+  (void * returns, void * args);
 
 typedef struct Mass_Trampoline Mass_Trampoline;
 typedef dyn_array_type(Mass_Trampoline *) Array_Mass_Trampoline_Ptr;
@@ -5504,6 +5504,10 @@ DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention *, calling_convention_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_trampoline_proc,
   &descriptor_void,
+  {
+    .tag = Function_Parameter_Tag_Runtime,
+    .descriptor = &descriptor_void_pointer,
+  },
   {
     .tag = Function_Parameter_Tag_Runtime,
     .descriptor = &descriptor_void_pointer,
