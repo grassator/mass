@@ -1277,6 +1277,16 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Recursive_Intrinsic_Use);
     }
+
+    it("should support static generic parameters in intrinsics") {
+      u64(*checker)() = (u64(*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: fn(@a) -> (i64) intrinsic { arguments.0 }\n"
+          "checker :: fn() -> (i64) { my_intrinsic(42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Assignment") {
