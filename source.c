@@ -3916,93 +3916,107 @@ mass_ensure_trampoline(
     .Struct = { .fields = fields, },
   };
 
+  // The code below is a specialized version of `mass_function_literal_instance_for_info`.
+  // This avoids generating a literal with a text version of the body.
   Scope *trampoline_scope = scope_make(context->allocator, context->compilation->root_scope);
 
   Source_Range return_range;
   INIT_LITERAL_SOURCE_RANGE(&return_range, "()");
 
-  Source_Range proxy_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&proxy_source_range, "proxy");
-  const Symbol *proxy_symbol = mass_ensure_symbol(context->compilation, slice_literal("proxy"));
-  scope_define_value(trampoline_scope, VALUE_STATIC_EPOCH, proxy_source_range, proxy_symbol, proxy_value);
-  Fixed_Buffer *buffer =
-    fixed_buffer_make(.allocator = context->allocator, .capacity = 1024);
-  fixed_buffer_append_slice(buffer, slice_literal("{returns.* = proxy("));
-  assert(args_view.length <= 10);
-  for (u64 i = 0; i < args_view.length; ++i) {
-    if (i != 0) {
-      fixed_buffer_append_slice(buffer, slice_literal(", "));
-    }
-    fixed_buffer_append_slice(buffer, slice_literal("args."));
-    fixed_buffer_append_u8(buffer, u64_to_u8(i) + '0');
-  }
-  fixed_buffer_append_slice(buffer, slice_literal(");}"));
+  context = &jit_context;
+  Program *program = jit_context.program;
+  const Calling_Convention *calling_convention = program->default_calling_convention;
 
-  Source_Range body_range = {
-    .file = allocator_make(context->allocator, Source_File, .text = fixed_buffer_as_slice(buffer)),
-    .offsets = {.from = 0, .to = u64_to_u32(buffer->occupied), },
+  Parser body_parser = {
+    .flags = Parser_Flags_None,
+    .scope = trampoline_scope,
+    .epoch = get_new_epoch(),
+    .module = parser->module,
   };
-  Array_Value_View statements;
-  Mass_Result result = tokenize(context, body_range, &statements);
-  if (mass_result_is_error(&result)) {
-    panic("This body should always be tokenizable since we constructed it to be");
-  }
-  Ast_Block body = {.statements = statements};
-  Value *body_value = value_make(context, &descriptor_ast_block, storage_immediate(&body), body_range);
+  const Function_Info *proxy_info =
+    descriptor_as_function_instance(&descriptor_mass_trampoline_proc)->info;
 
-  Array_Function_Parameter parameters = dyn_array_make(
-    Array_Function_Parameter,
-    .allocator = context->allocator,
-    .capacity = 1
-  );
-  Source_Range returns_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&returns_source_range, "returns");
-  dyn_array_push(parameters, (Function_Parameter) {
-    .tag = Function_Parameter_Tag_Runtime,
-    .symbol = mass_ensure_symbol(context->compilation, slice_literal("returns")),
-    .descriptor = descriptor_pointer_to(context->compilation, original_info->return_descriptor),
-    .source_range = returns_source_range,
-  });
-  Source_Range args_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&args_source_range, "args");
-  dyn_array_push(parameters, (Function_Parameter) {
-    .tag = Function_Parameter_Tag_Runtime,
-    .symbol = mass_ensure_symbol(context->compilation, slice_literal("args")),
-    .descriptor = descriptor_pointer_to(context->compilation, args_struct_descriptor),
-    .source_range = args_source_range,
-  });
-
-  Function_Literal *trampoline_literal = allocator_allocate(context->allocator, Function_Literal);
-  *trampoline_literal = (Function_Literal) {
-    .header = {
-      .flags = Function_Header_Flags_Compile_Time,
-      .parameters = parameters,
-      .returns = {
-        .tag = Function_Return_Tag_Exact,
-        .source_range = return_range,
-        .Exact = { .descriptor = &descriptor_void },
-      },
+  Label *start_label = make_label(context->allocator, program, &program->memory.code, slice_literal(":start"));
+  Label *end_label = make_label(context->allocator, program, &program->memory.code, slice_literal(":end"));
+  Function_Builder *builder = &(Function_Builder){
+    .epoch = body_parser.epoch,
+    .function = proxy_info,
+    .register_volatile_bitset = calling_convention->register_volatile_bitset,
+    .return_value = {0},
+    .code_block = {
+      .allocator = context->allocator,
+      .start_label = start_label,
+      .end_label = end_label,
     },
-    .overload_lock_count = allocator_make(context->allocator, u64, 0),
-    .body = body_value,
-    .own_scope = trampoline_scope,
   };
+  value_init(&builder->return_value, &descriptor_void, imm0, return_range);
+
+  Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, proxy_info);
+  register_acquire_bitset(builder, call_setup.parameter_registers_bitset.bits);
+
+  assert(dyn_array_length(call_setup.parameters) == 2);
+  const Storage *return_pointer_storage = &dyn_array_get(call_setup.parameters, 0)->storage;
+  const Storage *args_struct_pointer_storage = &dyn_array_get(call_setup.parameters, 1)->storage;
+
+  assert(args_struct_pointer_storage->tag == Storage_Tag_Register);
+  // TODO Moving this value to a volatile register that is *not* used
+  //      in target parameter passing can result in way less spills
+  //      given current weak optimization state.
+  Storage args_struct_indirect_storage = storage_indirect(
+    args_struct_descriptor->bit_size, args_struct_pointer_storage->Register.index
+  );
+
+  Array_Value_Ptr destructured_arg_array = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->allocator,
+    .capacity = dyn_array_length(fields),
+  );
+  for (u64 i = 0; i < dyn_array_length(fields); ++i) {
+    const Struct_Field *field = dyn_array_get(fields, i);
+    Storage storage = storage_with_offset_and_bit_size(
+      &args_struct_indirect_storage, u64_to_s32(field->offset), field->descriptor->bit_size
+    );
+    Value *arg_value = value_make(context, field->descriptor, storage, args_view.source_range);
+    dyn_array_push(destructured_arg_array, arg_value);
+  }
+  Value_View destructured_arg_view = value_view_from_value_array(destructured_arg_array, &return_range);
+  Value *call_result = token_handle_function_call(
+    context, &body_parser, proxy_value, destructured_arg_view, return_range
+  );
+  if (mass_has_error(context)) return 0;
+
+  const Descriptor *return_descriptor = original_info->return_descriptor;
+  assert(return_pointer_storage->tag == Storage_Tag_Register);
+  Storage return_indirect_storage = storage_indirect(
+    return_descriptor->bit_size, return_pointer_storage->Register.index
+  );
+
+  Value *indirect_return = value_make(context, return_descriptor, return_indirect_storage, return_range);
+
+  mass_assign_helper(context, builder, indirect_return, call_result, &return_range);
+  if (mass_has_error(context)) return 0;
+
+  push_instruction(&builder->code_block, (Instruction) {
+    .tag = Instruction_Tag_Label,
+    .Label.pointer = builder->code_block.end_label,
+  });
+
+  calling_convention_x86_64_common_end_proc(program, builder);
+
+  // Only push the builder at the end to avoid problems in nested JIT compiles
+  dyn_array_push(program->functions, *builder);
+
+  const Descriptor *instance_descriptor =
+    descriptor_function_instance(context->allocator, proxy_info, call_setup, program);
+  Value *proxy_instance = value_make(
+    context, instance_descriptor, code_label32(start_label), original->source_range
+  );
 
   Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
-  Array_Value_Ptr fake_args_array =
-    mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
-  Value_View fake_args_view = value_view_from_value_array(fake_args_array, &body_range);
-  const Function_Info *literal_info =
-    function_literal_info_for_args(&jit_context, trampoline_literal, fake_args_view);
-  Value *literal_value =
-    mass_function_literal_instance_for_info(&jit_context, trampoline_literal, literal_info);
-  if (mass_has_error(context)) {
-    return 0;
-  }
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
     .proc = (Mass_Trampoline_Proc)mass_ensure_jit_function_for_value(
-      &jit_context, literal_value, literal_info
+      &jit_context, proxy_instance, proxy_info
     ),
     .original_info = original_info,
   };

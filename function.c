@@ -654,9 +654,8 @@ mass_function_literal_instance_for_info(
 
   Label *call_label = make_label(context->allocator, program, &program->memory.code, slice_literal(":start"));
   // It is important to cache the label here for recursive calls
-  Value *cached_instance = value_init(
-    allocator_allocate(context->allocator, Value),
-    instance_descriptor, code_label32(call_label), literal->body->source_range
+  Value *cached_instance = value_make(
+    context, instance_descriptor, code_label32(call_label), literal->body->source_range
   );
   dyn_array_push(mutable_literal->instances, cached_instance);
 
