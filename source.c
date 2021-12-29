@@ -6946,16 +6946,14 @@ mass_run_script(
   Function_Literal *literal = mass_make_fake_function_literal(
     context, &parser, fake_function_body, &descriptor_void, &source_range
   );
-  Value *entry =
-    value_make(context, &descriptor_function_literal, storage_static(literal), source_range);
-  entry = ensure_function_instance(context, entry, (Value_View){0});
+  const Function_Info *entry_info = function_literal_info_for_args(context, literal, (Value_View){0});
+  context->program->entry_point = mass_function_literal_instance_for_info(context, literal, entry_info);
 
-  context->program->entry_point = entry;
   if (mass_has_error(context)) return;
 
-  program_jit(context, &compilation->jit);
+  Jit *jit = &compilation->jit;
+  program_jit(context, jit);
   if (mass_has_error(context)) return;
-  fn_type_opaque script =
-    value_as_function(compilation->jit.program, compilation->jit.program->entry_point);
+  fn_type_opaque script = value_as_function(jit->program, jit->program->entry_point);
   script();
 }
