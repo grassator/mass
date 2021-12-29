@@ -1769,14 +1769,30 @@ static fn_type_opaque
 mass_ensure_jit_function_for_value(
   Mass_Context *context,
   Value *value,
-  Value_View args_view
+  const Function_Info *fn_info
 ) {
   Jit *jit = &context->compilation->jit;
 
   Mass_Context jit_context = *context;
   jit_context.program = jit->program;
 
-  Value *instance = ensure_function_instance(&jit_context, value, args_view);
+  Value *instance = value;
+  if (instance->descriptor->tag == Descriptor_Tag_Function_Instance) {
+    #ifndef NDEBUG
+    const Function_Call_Setup *call_setup = &instance->descriptor->Function_Instance.call_setup;
+    Descriptor fake_descriptor = {
+      .tag = Descriptor_Tag_Function_Instance,
+      .bit_size = {sizeof(void *) * CHAR_BIT},
+      .bit_alignment = sizeof(void *) * CHAR_BIT,
+      .Function_Instance = { .info = fn_info, .call_setup = *call_setup, .program = context->program, },
+    };
+    (void)fake_descriptor; // avoid warnings in release build
+    assert(same_type(&fake_descriptor, instance->descriptor));
+    #endif
+  } else {
+    const Function_Literal *literal = value_as_function_literal(value);
+    instance = mass_function_literal_instance_for_info(&jit_context, literal, fn_info);
+  }
   if (mass_has_error(context)) return 0;
   const Storage *storage = &value_as_forced(instance)->storage;
 
@@ -1792,7 +1808,7 @@ mass_ensure_jit_function_for_value(
       // happens when there is a recursive call to intrinsics
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Recursive_Intrinsic_Use,
-        .source_range = args_view.source_range,
+        .source_range = value->source_range,
       });
       return 0;
     }
@@ -1876,14 +1892,9 @@ mass_parse_single_function_parameter(
     const Descriptor *constraint_descriptor =
       deduce_runtime_descriptor_for_value(context, constraint, &descriptor_mass_type_constraint_proc);
     if (mass_has_error(context)) goto err;
-    assert(constraint_descriptor->tag == Descriptor_Tag_Function_Instance);
-    Array_Function_Parameter parameters =
-      descriptor_as_function_instance(&descriptor_mass_type_constraint_proc)->info->parameters;
-    Array_Value_Ptr fake_args_array =
-      mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
-    Value_View fake_args_view = value_view_from_value_array(fake_args_array, &constraint->source_range);
+    const Function_Info *constraint_info = descriptor_as_function_instance(constraint_descriptor)->info;
     Mass_Type_Constraint_Proc maybe_type_constraint =
-      (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(context, constraint, fake_args_view);
+      (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(context, constraint, constraint_info);
     return (Function_Parameter) {
       .tag = Function_Parameter_Tag_Generic,
       .symbol = symbol,
@@ -3775,37 +3786,6 @@ mass_match_overload_or_error(
   return false;
 }
 
-static inline Value_View
-mass_intrinsic_fake_arg_view() {
-  static Value_View args_view = {0};
-  if (!args_view.length) { // not initialized
-    Array_Function_Parameter parameters =
-      descriptor_as_function_instance(&descriptor_mass_intrinsic_proc)->info->parameters;
-    static Value arg_values[3] = {0};
-    arg_values[0] = (Value){ .tag = Value_Tag_Lazy, .descriptor = dyn_array_get(parameters, 0)->descriptor };
-    INIT_LITERAL_SOURCE_RANGE(&arg_values[0].source_range, "context");
-
-    arg_values[1] = (Value){ .tag = Value_Tag_Lazy, .descriptor = dyn_array_get(parameters, 1)->descriptor };
-    INIT_LITERAL_SOURCE_RANGE(&arg_values[1].source_range, "parser");
-
-    arg_values[2] = (Value){ .tag = Value_Tag_Lazy, .descriptor = dyn_array_get(parameters, 2)->descriptor };
-    INIT_LITERAL_SOURCE_RANGE(&arg_values[2].source_range, "arguments");
-
-    assert(dyn_array_length(parameters) == countof(arg_values));
-
-    static Value *arg_value_pointers[countof(arg_values)] = {
-      &arg_values[0], &arg_values[1], &arg_values[2],
-    };
-
-    args_view = (Value_View) {
-      .values = arg_value_pointers,
-      .length = countof(arg_value_pointers),
-    };
-    INIT_LITERAL_SOURCE_RANGE(&args_view.source_range, "context, parser, arguments");
-  }
-  return args_view;
-}
-
 static inline Value *
 mass_intrinsic_call(
   Mass_Context *context,
@@ -3814,10 +3794,15 @@ mass_intrinsic_call(
   const Descriptor *expected_descriptor,
   Value_View args_view
 ) {
-  // @Volatile :IntrinsicFunctionSignature
-  Mass_Intrinsic_Proc jitted_code = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(
-    context, overload, mass_intrinsic_fake_arg_view()
-  );
+  // TODO only do this check in debug but that requires `descriptor_mass_intrinsic_proc`
+  //      to have proper symbols in the parameter definitions.
+  const Descriptor *intrinsic_descriptor =
+    deduce_runtime_descriptor_for_value(context, overload, &descriptor_mass_intrinsic_proc);
+  assert(!mass_has_error(context));
+  assert(intrinsic_descriptor);
+  const Function_Info *intrinsic_info = descriptor_as_function_instance(intrinsic_descriptor)->info;
+  Mass_Intrinsic_Proc jitted_code =
+    (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(context, overload, intrinsic_info);
   if (mass_has_error(context)) return 0;
 
   Value *result = jitted_code(context, parser, args_view);
@@ -4001,18 +3986,22 @@ mass_ensure_trampoline(
     .body = body_value,
     .own_scope = trampoline_scope,
   };
-  Value *literal_value = value_make(
-    context, &descriptor_function_literal, storage_static(trampoline_literal), body_range
-  );
 
   Mass_Trampoline *trampoline = allocator_allocate(context->allocator, Mass_Trampoline);
   Array_Value_Ptr fake_args_array =
     mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
   Value_View fake_args_view = value_view_from_value_array(fake_args_array, &body_range);
+  const Function_Info *literal_info =
+    function_literal_info_for_args(&jit_context, trampoline_literal, fake_args_view);
+  Value *literal_value =
+    mass_function_literal_instance_for_info(&jit_context, trampoline_literal, literal_info);
+  if (mass_has_error(context)) {
+    return 0;
+  }
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
     .proc = (Mass_Trampoline_Proc)mass_ensure_jit_function_for_value(
-      &jit_context, literal_value, fake_args_view
+      &jit_context, literal_value, literal_info
     ),
     .original_info = original_info,
   };
@@ -5635,10 +5624,9 @@ token_dispatch_operator(
       result_value = mass_forward_call_to_alias(context, parser, args_view, operator->Alias.symbol);
     } break;
     case Operator_Tag_Intrinsic: {
+      Value *target = operator->Intrinsic.body;
       const Descriptor *expected_descriptor = 0; // inferred
-      result_value = mass_intrinsic_call(
-        context, parser, operator->Intrinsic.body, expected_descriptor, args_view
-      );
+      result_value = mass_intrinsic_call(context, parser, target, expected_descriptor, args_view);
     } break;
   }
 
