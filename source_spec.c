@@ -1628,7 +1628,29 @@ spec("source") {
         "get_b :: fn() => (i64) { 42 }"
       );
 
-      check(result);
+      check(spec_check_mass_result(test_context.result));
+      check(value_as_i64(result)->bits == 42);
+    }
+
+    xit("should support static exact params in compile-time fns") {
+      Value *result = test_program_inline_source_base(
+        "RESULT", &test_context,
+        "RESULT :: foo(42)\n"
+        "foo :: fn(x :: 42) => (x) { x }"
+      );
+
+      check(spec_check_mass_result(test_context.result));
+      check(value_as_i64(result)->bits == 42);
+    }
+
+    xit("should support static generic params in compile-time fns") {
+      Value *result = test_program_inline_source_base(
+        "RESULT", &test_context,
+        "RESULT :: foo(\"bar\").length + foo(38)\n"
+        "foo :: fn(@x) => (x) { x }"
+      );
+
+      check(spec_check_mass_result(test_context.result));
       check(value_as_i64(result)->bits == 42);
     }
 
