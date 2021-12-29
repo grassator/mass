@@ -372,7 +372,7 @@ same_type(
   }
   if (a->tag != b->tag) return false;
   if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
-  if (a->brand && b->brand && a->brand != b->brand) return false;
+  if (a->brand != b->brand) return false;
   switch(a->tag) {
     case Descriptor_Tag_Void:
     case Descriptor_Tag_Float: {
