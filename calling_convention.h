@@ -243,7 +243,6 @@ x86_64_system_v_parameter_for_classification(
   const Allocator *allocator,
   System_V_Register_State *registers,
   const System_V_Classification *classification,
-  Slice name,
   u64 *stack_offset
 ) {
   u64 byte_size = descriptor_byte_size(classification->descriptor);
@@ -719,9 +718,8 @@ calling_convention_x86_64_system_v_call_setup_proc(
       result.callee_return = storage_indirect(bit_size, Register_DI);
     } else {
       u64 stack_offset = 0;
-      Slice return_name = (Slice){0};
       Function_Call_Parameter item = x86_64_system_v_parameter_for_classification(
-        allocator, &registers, &classification, return_name, &stack_offset
+        allocator, &registers, &classification, &stack_offset
       );
 
       result.callee_return = item.storage;
@@ -765,7 +763,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Function_Call_Parameter call_param = x86_64_system_v_parameter_for_classification(
-      allocator, &registers, &classification, param->symbol->name, &stack_offset
+      allocator, &registers, &classification, &stack_offset
     );
     call_param.original_index = param_index; //:ParameterOriginalIndex
 
@@ -848,7 +846,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     }
 
     Function_Call_Parameter parameter = x86_64_system_v_parameter_for_classification(
-      allocator, &registers, &classification, param->symbol->name, &stack_offset
+      allocator, &registers, &classification, &stack_offset
     );
     parameter.original_index = param_index; //:ParameterOriginalIndex
     // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
