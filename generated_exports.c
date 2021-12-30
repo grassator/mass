@@ -458,13 +458,6 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Error_Dynamic_Library_Symbol_Not_Found")),
     type_mass_error_dynamic_library_symbol_not_found_value
   );
-  Source_Range Error_Unexpected_Token__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Error_Unexpected_Token__source_range, "Error_Unexpected_Token");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Error_Unexpected_Token__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Error_Unexpected_Token")),
-    type_mass_error_unexpected_token_value
-  );
   Source_Range Error_Operator_Fixity_Conflict__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Error_Operator_Fixity_Conflict__source_range, "Error_Operator_Fixity_Conflict");
   scope_define_value(

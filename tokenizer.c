@@ -256,15 +256,15 @@ tokenizer_push_string_literal(
 static Mass_Result
 tokenizer_handle_error(
   Mass_Context *context,
-  Slice expected,
+  Slice detailed_message,
   Source_Range source_range
 ) {
   return (Mass_Result) {
     .tag = Mass_Result_Tag_Error,
     .Error.error = {
-      .tag = Mass_Error_Tag_Unexpected_Token,
-      .Unexpected_Token = { .expected = expected, },
+      .tag = Mass_Error_Tag_Tokenizer,
       .source_range = source_range,
+      .detailed_message = detailed_message,
     }
   };
 }
@@ -294,13 +294,13 @@ tokenize(
       }\
     }
 
-  #define TOKENIZER_HANDLE_ERROR(_EXPECTED_SLICE_)\
+  #define TOKENIZER_HANDLE_ERROR(_MESSAGE_)\
     do {\
       Source_Range error_range = {\
         .file = source_range.file, \
         .offsets = {.from = u64_to_u32(offset) - 1, .to = u64_to_u32(offset) - 1},\
       };\
-      result = tokenizer_handle_error(context, slice_literal(_EXPECTED_SLICE_), error_range);\
+      result = tokenizer_handle_error(context, slice_literal(_MESSAGE_), error_range);\
       goto defer;\
     } while (0)
 

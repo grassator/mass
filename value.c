@@ -200,15 +200,11 @@ mass_error_to_string(
         APPEND_SLICE(error->detailed_message);
       }
     } break;
-    case Mass_Error_Tag_Unexpected_Token: {
-      APPEND_LITERAL("Unexpected token '");
-      APPEND_LITERAL("'");
-      Slice source = source_from_source_range(compilation, &error->source_range);
-      APPEND_SLICE(source);
-      if (error->Unexpected_Token.expected.length) {
-        APPEND_LITERAL(", expected '");
-        APPEND_SLICE(error->Unexpected_Token.expected);
-        APPEND_LITERAL("'");
+    case Mass_Error_Tag_Tokenizer: {
+      APPEND_LITERAL("Error while tokenizing");
+      if (error->detailed_message.length) {
+        APPEND_LITERAL(": ");
+        APPEND_SLICE(error->detailed_message);
       }
     } break;
     case Mass_Error_Tag_Undefined_Variable: {

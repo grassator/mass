@@ -605,7 +605,6 @@ typedef struct Mass_Error_File_Open Mass_Error_File_Open;
 typedef struct Mass_Error_File_Too_Large Mass_Error_File_Too_Large;
 typedef struct Mass_Error_Dynamic_Library_Load Mass_Error_Dynamic_Library_Load;
 typedef struct Mass_Error_Dynamic_Library_Symbol_Not_Found Mass_Error_Dynamic_Library_Symbol_Not_Found;
-typedef struct Mass_Error_Unexpected_Token Mass_Error_Unexpected_Token;
 typedef struct Mass_Error_Operator_Fixity_Conflict Mass_Error_Operator_Fixity_Conflict;
 typedef struct Mass_Error_Undefined_Variable Mass_Error_Undefined_Variable;
 typedef struct Mass_Error_Redefinition Mass_Error_Redefinition;
@@ -1929,12 +1928,12 @@ typedef enum {
   Mass_Error_Tag_Circular_Dependency = 4,
   Mass_Error_Tag_Non_Trailing_Default_Argument = 5,
   Mass_Error_Tag_Expected_Static = 6,
-  Mass_Error_Tag_Integer_Range = 7,
-  Mass_Error_Tag_File_Open = 8,
-  Mass_Error_Tag_File_Too_Large = 9,
-  Mass_Error_Tag_Dynamic_Library_Load = 10,
-  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 11,
-  Mass_Error_Tag_Unexpected_Token = 12,
+  Mass_Error_Tag_Tokenizer = 7,
+  Mass_Error_Tag_Integer_Range = 8,
+  Mass_Error_Tag_File_Open = 9,
+  Mass_Error_Tag_File_Too_Large = 10,
+  Mass_Error_Tag_Dynamic_Library_Load = 11,
+  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 12,
   Mass_Error_Tag_Operator_Fixity_Conflict = 13,
   Mass_Error_Tag_Undefined_Variable = 14,
   Mass_Error_Tag_Redefinition = 15,
@@ -1971,9 +1970,6 @@ typedef struct Mass_Error_Dynamic_Library_Symbol_Not_Found {
   Slice library_name;
   Slice symbol_name;
 } Mass_Error_Dynamic_Library_Symbol_Not_Found;
-typedef struct Mass_Error_Unexpected_Token {
-  Slice expected;
-} Mass_Error_Unexpected_Token;
 typedef struct Mass_Error_Operator_Fixity_Conflict {
   Operator_Fixity fixity;
   u32 _fixity_padding;
@@ -2019,7 +2015,6 @@ typedef struct Mass_Error {
     Mass_Error_File_Too_Large File_Too_Large;
     Mass_Error_Dynamic_Library_Load Dynamic_Library_Load;
     Mass_Error_Dynamic_Library_Symbol_Not_Found Dynamic_Library_Symbol_Not_Found;
-    Mass_Error_Unexpected_Token Unexpected_Token;
     Mass_Error_Operator_Fixity_Conflict Operator_Fixity_Conflict;
     Mass_Error_Undefined_Variable Undefined_Variable;
     Mass_Error_Redefinition Redefinition;
@@ -2064,11 +2059,6 @@ static inline const Mass_Error_Dynamic_Library_Symbol_Not_Found *
 mass_error_as_dynamic_library_symbol_not_found(const Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found);
   return &mass_error->Dynamic_Library_Symbol_Not_Found;
-}
-static inline const Mass_Error_Unexpected_Token *
-mass_error_as_unexpected_token(const Mass_Error *mass_error) {
-  assert(mass_error->tag == Mass_Error_Tag_Unexpected_Token);
-  return &mass_error->Unexpected_Token;
 }
 static inline const Mass_Error_Operator_Fixity_Conflict *
 mass_error_as_operator_fixity_conflict(const Mass_Error *mass_error) {
@@ -5097,12 +5087,12 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Circular_Dependency"), .value = 4 },
 { .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 5 },
 { .name = slice_literal_fields("Expected_Static"), .value = 6 },
-{ .name = slice_literal_fields("Integer_Range"), .value = 7 },
-{ .name = slice_literal_fields("File_Open"), .value = 8 },
-{ .name = slice_literal_fields("File_Too_Large"), .value = 9 },
-{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 10 },
-{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 11 },
-{ .name = slice_literal_fields("Unexpected_Token"), .value = 12 },
+{ .name = slice_literal_fields("Tokenizer"), .value = 7 },
+{ .name = slice_literal_fields("Integer_Range"), .value = 8 },
+{ .name = slice_literal_fields("File_Open"), .value = 9 },
+{ .name = slice_literal_fields("File_Too_Large"), .value = 10 },
+{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 11 },
+{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 12 },
 { .name = slice_literal_fields("Operator_Fixity_Conflict"), .value = 13 },
 { .name = slice_literal_fields("Undefined_Variable"), .value = 14 },
 { .name = slice_literal_fields("Redefinition"), .value = 15 },
@@ -5177,14 +5167,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_dynamic_library_symbol_not_found, Mass_
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_dynamic_library_symbol_not_found);
-MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_unexpected_token, Mass_Error_Unexpected_Token,
-  {
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("expected"),
-    .offset = offsetof(Mass_Error_Unexpected_Token, expected),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(mass_error_unexpected_token);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_operator_fixity_conflict, Mass_Error_Operator_Fixity_Conflict,
   {
     .descriptor = &descriptor_operator_fixity,
@@ -5334,11 +5316,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"),
     .descriptor = &descriptor_mass_error_dynamic_library_symbol_not_found,
     .offset = offsetof(Mass_Error, Dynamic_Library_Symbol_Not_Found),
-  },
-  {
-    .name = slice_literal_fields("Unexpected_Token"),
-    .descriptor = &descriptor_mass_error_unexpected_token,
-    .offset = offsetof(Mass_Error, Unexpected_Token),
   },
   {
     .name = slice_literal_fields("Operator_Fixity_Conflict"),

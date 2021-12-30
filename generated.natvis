@@ -1876,6 +1876,9 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Expected_Static">
     Expected_Static
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Tokenizer">
+    Tokenizer
+  </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Integer_Range">
     Integer_Range { Integer_Range }
   </DisplayString>
@@ -1890,9 +1893,6 @@
   </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found">
     Dynamic_Library_Symbol_Not_Found { Dynamic_Library_Symbol_Not_Found }
-  </DisplayString>
-  <DisplayString Condition="tag == Mass_Error_Tag_Unexpected_Token">
-    Unexpected_Token { Unexpected_Token }
   </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Operator_Fixity_Conflict">
     Operator_Fixity_Conflict { Operator_Fixity_Conflict }
@@ -1942,7 +1942,6 @@
     <Item Name="File_Too_Large" Condition="tag == Mass_Error_Tag_File_Too_Large">File_Too_Large</Item>
     <Item Name="Dynamic_Library_Load" Condition="tag == Mass_Error_Tag_Dynamic_Library_Load">Dynamic_Library_Load</Item>
     <Item Name="Dynamic_Library_Symbol_Not_Found" Condition="tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found">Dynamic_Library_Symbol_Not_Found</Item>
-    <Item Name="Unexpected_Token" Condition="tag == Mass_Error_Tag_Unexpected_Token">Unexpected_Token</Item>
     <Item Name="Operator_Fixity_Conflict" Condition="tag == Mass_Error_Tag_Operator_Fixity_Conflict">Operator_Fixity_Conflict</Item>
     <Item Name="Undefined_Variable" Condition="tag == Mass_Error_Tag_Undefined_Variable">Undefined_Variable</Item>
     <Item Name="Redefinition" Condition="tag == Mass_Error_Tag_Redefinition">Redefinition</Item>

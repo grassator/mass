@@ -1815,6 +1815,7 @@ main(void) {
     }),
     struct_empty("Non_Trailing_Default_Argument"),
     struct_empty("Expected_Static"),
+    struct_empty("Tokenizer"),
     struct_fields("Integer_Range", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
     }),
@@ -1830,9 +1831,6 @@ main(void) {
     struct_fields("Dynamic_Library_Symbol_Not_Found", (Struct_Item[]){
       { "Slice", "library_name" },
       { "Slice", "symbol_name" },
-    }),
-    struct_fields("Unexpected_Token", (Struct_Item[]){
-      { "Slice", "expected" },
     }),
     struct_fields("Operator_Fixity_Conflict", (Struct_Item[]){
       { "Operator_Fixity", "fixity" },

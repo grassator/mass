@@ -485,7 +485,7 @@ spec("source") {
       Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
-      check(error->tag == Mass_Error_Tag_Unexpected_Token);
+      check(error->tag == Mass_Error_Tag_Tokenizer);
       check(error->source_range.file == source_range.file);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
@@ -497,7 +497,7 @@ spec("source") {
       Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
-      check(error->tag == Mass_Error_Tag_Unexpected_Token);
+      check(error->tag == Mass_Error_Tag_Tokenizer);
       check(error->source_range.file == source_range.file);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
