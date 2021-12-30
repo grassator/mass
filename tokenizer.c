@@ -297,14 +297,6 @@ tokenize(
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
 
-  #define TOKENIZER_GROUP_END(_VARIANT_)\
-    do {\
-      if (!tokenizer_group_end_##_VARIANT_(context, &state, offset + 1)) {\
-        tokenizer_handle_error(&state, slice_literal("Expected a " #_VARIANT_), offset);\
-        goto defer;\
-      }\
-    } while (0)
-
   enum Category {
     Digits = 1 << 0,
     Id_Start = 1 << 1,
@@ -517,9 +509,24 @@ tokenize(
         case '(': { tokenizer_group_start_paren(context, &state, offset); } break;
         case '[': { tokenizer_group_start_square(context, &state, offset); } break;
         case '{': { tokenizer_group_start_curly(context, &state, offset); } break;
-        case ')': { TOKENIZER_GROUP_END(paren); } break;
-        case ']': { TOKENIZER_GROUP_END(square); } break;
-        case '}': { TOKENIZER_GROUP_END(curly); } break;
+        case ')': {
+          if (!tokenizer_group_end_paren(context, &state, offset + 1)) {
+            tokenizer_handle_error(&state, slice_literal("Expected a `)`"), offset);
+            goto defer;
+          }
+        } break;
+        case ']': {
+          if (!tokenizer_group_end_square(context, &state, offset + 1)) {
+            tokenizer_handle_error(&state, slice_literal("Expected a `]`"), offset);
+            goto defer;
+          }
+        } break;
+        case '}': {
+          if (!tokenizer_group_end_curly(context, &state, offset + 1)) {
+            tokenizer_handle_error(&state, slice_literal("Expected a `}`"), offset);
+            goto defer;
+          }
+        } break;
         default: {
           panic("UNREACHEABLE");
         } break;
@@ -541,13 +548,7 @@ tokenize(
     goto defer;
   }
 
-  TOKENIZER_GROUP_END(curly);
-
-  #undef TOKENIZER_GROUP_START
-  #undef TOKENIZER_GROUP_END
-  #undef TOKENIZER_CURRENT_RANGE
-  #undef TOKENIZER_HANDLE_ERROR
-  #undef TOKENIZER_PUSH_SYMBOL
+  if (!tokenizer_group_end_curly(context, &state, offset + 1)) panic("UNREACHEABLE");
 
   defer:
   if (state.result.tag == Mass_Result_Tag_Success) {
