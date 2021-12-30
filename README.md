@@ -25,11 +25,6 @@ set which one to use by providing a `CC` environment variable:
 CC=clang ./build.sh
 ```
 
-### Tokenizer
-
-Tokenizer is generated with [re2c](https://re2c.org/) so if you need
-to make changes you need to have it available on Linux or in WSL.
-
 ## License
 
 Copyright (c) 2020 Dmitriy Kubyshkin (unless noted otherwise in the code).

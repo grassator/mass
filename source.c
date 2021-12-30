@@ -1526,7 +1526,6 @@ tokenizer_push_string_literal(
 }
 
 #include "tokenizer.c"
-//#include "generated_tokenizer.c"
 
 static inline const Descriptor *
 value_ensure_type(
