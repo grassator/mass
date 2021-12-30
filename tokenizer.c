@@ -13,17 +13,6 @@ typedef struct {
   u64 token_start_offset;
 } Tokenizer_State;
 
-static inline Value *
-tokenizer_make_symbol(
-  Mass_Context *context,
-  Slice name,
-  Source_Range source_range
-) {
-  const Symbol *symbol = mass_ensure_symbol(context->compilation, name);
-
-  return value_make(context, &descriptor_symbol, storage_static(symbol), source_range);
-}
-
 static inline Value_View
 tokenizer_value_view_for_children(
   const Allocator *allocator,
@@ -470,11 +459,12 @@ tokenize(
         }
       } break;
       case Id_Start:
-      case Symbol: {
-        Value *symbol = tokenizer_make_symbol(
-          context, slice_sub(input, state.token_start_offset, offset), TOKENIZER_CURRENT_RANGE()
-        );
-        dyn_array_push(state.token_stack, symbol);
+      case Symbols: {
+        Slice name = slice_sub(input, state.token_start_offset, offset);
+        const Symbol *symbol = mass_ensure_symbol(context->compilation, name);
+        Source_Range symbol_range = TOKENIZER_CURRENT_RANGE();
+        Value *value = value_make(context, &descriptor_symbol, storage_static(symbol), symbol_range);
+        dyn_array_push(state.token_stack, value);
       } break;
       case Space: {
         // Nothing to do
