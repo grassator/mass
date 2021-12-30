@@ -277,11 +277,24 @@ spec("source") {
     }
 
     it("should count single-line comment as a statement separator") {
-      Source_Range source_range = test_inline_source_range(test_context.compilation, "  a\n//\nb");
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "  a//\nb");
       Array_Value_View statements;
       Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Success);
       check(dyn_array_length(statements) == 2);
+    }
+
+    it("should be able to tokenize ids containing letters and _") {
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "foo_123");
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(tokens.length == 1);
+      Value *token = value_view_get(&tokens, 0);
+      check(value_is_symbol(token));
     }
 
     it("should be able to turn newlines into fake semicolon tokens on top level") {
@@ -290,6 +303,43 @@ spec("source") {
       Mass_Result result = tokenize(&test_context, source_range, &statements);
       check(result.tag == Mass_Result_Tag_Success);
       check(dyn_array_length(statements) == 1);
+    }
+
+    it("should be able to parse a lone 0") {
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "0");
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(tokens.length == 1);
+      Value *token = value_view_get(&tokens, 0);
+      spec_check_slice(source_from_source_range(test_context.compilation, &token->source_range), slice_literal("0"));
+      check(value_is_i64(token));
+      const i64 *literal = value_as_i64(token);
+      check(literal->bits == 0);
+    }
+
+    it("should be able to parse a 0 followed by an identifier") {
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "0foo");
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(tokens.length == 2);
+      {
+        Value *zero = value_view_get(&tokens, 0);
+        spec_check_slice(source_from_source_range(test_context.compilation, &zero->source_range), slice_literal("0"));
+        check(value_is_i64(zero));
+        const i64 *literal = value_as_i64(zero);
+        check(literal->bits == 0);
+      }
+      {
+        Value *foo = value_view_get(&tokens, 1);
+        spec_check_slice(source_from_source_range(test_context.compilation, &foo->source_range), slice_literal("foo"));
+        check(value_is_symbol(foo));
+      }
     }
 
     it("should be able to parse hex integers") {
@@ -307,6 +357,28 @@ spec("source") {
       check(literal->bits == 0xCAFE);
     }
 
+    it("should be able to parse a hex integer followed by an identifier") {
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "0xfffoo");
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(tokens.length == 2);
+      {
+        Value *number = value_view_get(&tokens, 0);
+        spec_check_slice(source_from_source_range(test_context.compilation, &number->source_range), slice_literal("0xfff"));
+        check(value_is_i64(number));
+        const i64 *literal = value_as_i64(number);
+        check(literal->bits == 0xfff);
+      }
+      {
+        Value *symbol = value_view_get(&tokens, 1);
+        spec_check_slice(source_from_source_range(test_context.compilation, &symbol->source_range), slice_literal("oo"));
+        check(value_is_symbol(symbol));
+      }
+    }
+
     it("should be able to parse binary integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0b100");
       Array_Value_View statements;
@@ -322,7 +394,7 @@ spec("source") {
       check(literal->bits == 0b100);
     }
 
-    it("should be able to tokenize a sum of integers") {
+    it("should be able to tokenize a sum of integer and a symbol") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "12 + foo123");
       Array_Value_View statements;
       Mass_Result result = tokenize(&test_context, source_range, &statements);
@@ -343,6 +415,18 @@ spec("source") {
       spec_check_slice(source_from_source_range(test_context.compilation, &id->source_range), slice_literal("foo123"));
     }
 
+    it("should be able to tokenize strings") {
+      Source_Range source_range = test_inline_source_range(test_context.compilation, "\"foo 123\"");
+      Array_Value_View statements;
+      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      check(dyn_array_length(statements) == 1);
+      Value_View tokens = *dyn_array_get(statements, 0);
+      check(result.tag == Mass_Result_Tag_Success);
+      check(tokens.length == 1);
+      Value *string = value_view_get(&tokens, 0);
+      spec_check_slice(source_from_source_range(test_context.compilation, &string->source_range), slice_literal("\"foo 123\""));
+    }
+
     it("should be able to tokenize groups") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(x)");
       Array_Value_View statements;
@@ -359,18 +443,6 @@ spec("source") {
 
       Value *id = value_view_get(&value_as_group_paren(paren)->children, 0);
       check(value_is_symbol(id));
-    }
-
-    it("should be able to tokenize strings") {
-      Source_Range source_range = test_inline_source_range(test_context.compilation, "\"foo 123\"");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
-      check(result.tag == Mass_Result_Tag_Success);
-      check(tokens.length == 1);
-      Value *string = value_view_get(&tokens, 0);
-      spec_check_slice(source_from_source_range(test_context.compilation, &string->source_range), slice_literal("\"foo 123\""));
     }
 
     it("should be able to tokenize nested groups with different braces") {
