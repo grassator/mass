@@ -6,6 +6,11 @@ typedef struct {
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 
+typedef struct {
+  Array_Value_Ptr token_stack;
+  Array_Tokenizer_Parent parent_stack;
+} Tokenizer_State;
+
 static inline Value *
 tokenizer_make_symbol(
   Mass_Context *context,
@@ -35,15 +40,15 @@ tokenizer_value_view_for_children(
 
 static inline Value_View
 tokenizer_make_group_children_view(
-  const Allocator *allocator,
-  Array_Value_Ptr *stack,
+  Mass_Context *context,
+  Tokenizer_State *state,
   Tokenizer_Parent *parent,
   Value *parent_value,
   u64 offset
 ) {
-  Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
-  u64 child_count = dyn_array_length(*stack) - parent->index - 1;
-  stack->data->length = parent->index + 1; // pop the children
+  Value **children_values = dyn_array_raw(state->token_stack) + parent->index + 1;
+  u64 child_count = dyn_array_length(state->token_stack) - parent->index - 1;
+  state->token_stack.data->length = parent->index + 1; // pop the children
   assert(offset);
 
   Source_Range children_range = {
@@ -58,21 +63,20 @@ tokenizer_make_group_children_view(
   parent_value->source_range.offsets.to = u64_to_u32(offset);
 
   return tokenizer_value_view_for_children(
-    allocator, children_values, u64_to_u32(child_count), children_range
+    context->allocator, children_values, u64_to_u32(child_count), children_range
   );
 }
 
 static inline bool
 tokenizer_maybe_push_statement(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   u64 offset
 ) {
-  assert(dyn_array_length(*parent_stack));
-  Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
+  assert(dyn_array_length(state->parent_stack));
+  Tokenizer_Parent *parent = dyn_array_last(state->parent_stack);
   if(parent->value->descriptor != &descriptor_ast_block) return false;
-  bool has_children = parent->index + 1 != dyn_array_length(*stack);
+  bool has_children = parent->index + 1 != dyn_array_length(state->token_stack);
   // Do not treat leading newlines as semicolons
   if (!has_children) return true;
 
@@ -80,7 +84,7 @@ tokenizer_maybe_push_statement(
 
   assert(offset);
   Value_View statement = tokenizer_make_group_children_view(
-    context->allocator, stack, parent, parent->value, offset
+    context, state, parent, parent->value, offset
   );
   dyn_array_push(group->statements, statement);
   return true;
@@ -88,69 +92,64 @@ tokenizer_maybe_push_statement(
 
 static inline void
 tokenizer_group_push(
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   Value *value
 ) {
-  dyn_array_push(*parent_stack, (Tokenizer_Parent){
+  dyn_array_push(state->parent_stack, (Tokenizer_Parent){
     .value = value,
-    .index = dyn_array_length(*stack)
+    .index = dyn_array_length(state->token_stack)
   });
-  dyn_array_push(*stack, value);
+  dyn_array_push(state->token_stack, value);
 }
 
 static inline void
 tokenizer_group_start_curly(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   Source_Range source_range
 ) {
   Ast_Block *group = mass_allocate(context, Ast_Block);
   // TODO use temp allocator first?
   *group = (Ast_Block){.statements = dyn_array_make(Array_Value_View, .allocator = context->allocator)};
   Value *value = value_make(context, &descriptor_ast_block, storage_immediate(group), source_range);
-  tokenizer_group_push(stack, parent_stack, value);
+  tokenizer_group_push(state, value);
 }
 
 static inline void
 tokenizer_group_start_paren(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   Source_Range source_range
 ) {
   Group_Paren *group = mass_allocate(context, Group_Paren);
   Value *value = value_make(context, &descriptor_group_paren, storage_static(group), source_range);
-  tokenizer_group_push(stack, parent_stack, value);
+  tokenizer_group_push(state, value);
 }
 
 static inline void
 tokenizer_group_start_square(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   Source_Range source_range
 ) {
   Group_Square *group = mass_allocate(context, Group_Square);
   Value *value = value_make(context, &descriptor_group_square, storage_static(group), source_range);
-  tokenizer_group_push(stack, parent_stack, value);
+  tokenizer_group_push(state, value);
 }
 
 static inline bool
 tokenizer_group_end_paren(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   u64 offset
 ) {
-  if (!dyn_array_length(*parent_stack)) return false;
-  Tokenizer_Parent *parent = dyn_array_pop(*parent_stack);
-  Value *parent_value = *dyn_array_get(*stack, parent->index);
+  if (!dyn_array_length(state->parent_stack)) return false;
+  Tokenizer_Parent *parent = dyn_array_pop(state->parent_stack);
+  Value *parent_value = *dyn_array_get(state->token_stack, parent->index);
   if (parent_value->descriptor != &descriptor_group_paren) return false;
 
   Value_View children = tokenizer_make_group_children_view(
-    context->allocator, stack, parent, parent_value, offset
+    context, state, parent, parent_value, offset
   );
 
   Group_Paren *group = mass_allocate(context, Group_Paren);
@@ -164,17 +163,16 @@ tokenizer_group_end_paren(
 static inline bool
 tokenizer_group_end_square(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   u64 offset
 ) {
-  if (!dyn_array_length(*parent_stack)) return false;
-  Tokenizer_Parent *parent = dyn_array_pop(*parent_stack);
-  Value *parent_value = *dyn_array_get(*stack, parent->index);
+  if (!dyn_array_length(state->parent_stack)) return false;
+  Tokenizer_Parent *parent = dyn_array_pop(state->parent_stack);
+  Value *parent_value = *dyn_array_get(state->token_stack, parent->index);
   if (parent_value->descriptor != &descriptor_group_square) return false;
 
   Value_View children = tokenizer_make_group_children_view(
-    context->allocator, stack, parent, parent_value, offset
+    context, state, parent, parent_value, offset
   );
   Group_Square *group = mass_allocate(context, Group_Square);
   *group = (Group_Square){.children = children};
@@ -187,12 +185,11 @@ tokenizer_group_end_square(
 static inline bool
 tokenizer_group_end_curly(
   Mass_Context *context,
-  Array_Value_Ptr *stack,
-  Array_Tokenizer_Parent *parent_stack,
+  Tokenizer_State *state,
   u64 offset
 ) {
-  if (!tokenizer_maybe_push_statement(context, stack, parent_stack, offset)) return false;
-  dyn_array_pop(*parent_stack);
+  if (!tokenizer_maybe_push_statement(context, state, offset)) return false;
+  dyn_array_pop(state->parent_stack);
   return true;
 }
 
@@ -277,9 +274,11 @@ tokenize(
 ) {
   Slice input = source_range.file->text;
 
-  Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
-  Array_Tokenizer_Parent parent_stack =
-    dyn_array_make(Array_Tokenizer_Parent, .capacity = 16);
+  Tokenizer_State state = {
+    // FIXME use temp allocator
+    .token_stack = dyn_array_make(Array_Value_Ptr, .capacity = 100),
+    .parent_stack = dyn_array_make(Array_Tokenizer_Parent, .capacity = 32),
+  };
 
   Mass_Result result = {.tag = Mass_Result_Tag_Success};
 
@@ -305,11 +304,11 @@ tokenize(
     } while (0)
 
   #define TOKENIZER_GROUP_START(_VARIANT_)\
-    tokenizer_group_start_##_VARIANT_(context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE())
+    tokenizer_group_start_##_VARIANT_(context, &state, TOKENIZER_CURRENT_RANGE())
 
   #define TOKENIZER_GROUP_END(_VARIANT_)\
     do {\
-      if (!tokenizer_group_end_##_VARIANT_(context, &stack, &parent_stack, offset + 1)) {\
+      if (!tokenizer_group_end_##_VARIANT_(context, &state, offset + 1)) {\
         ++offset;\
         TOKENIZER_HANDLE_ERROR("Expected a " #_VARIANT_);\
       }\
@@ -394,7 +393,7 @@ tokenize(
   u64 token_start_offset = offset;
 
   // Create top-level block
-  tokenizer_group_start_curly(context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE());
+  tokenizer_group_start_curly(context, &state, TOKENIZER_CURRENT_RANGE());
 
   bool should_finalize = true;
   enum Category starting_category = Space;
@@ -411,7 +410,7 @@ tokenize(
     finalize:
     switch(starting_category) {
       case Newline: {
-        tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset);
+        tokenizer_maybe_push_statement(context, &state, offset);
       } break;
       case Digit: {
         Slice source = slice_sub(input, token_start_offset, offset);
@@ -457,7 +456,7 @@ tokenize(
         Value *value = value_make(
           context, &descriptor_i64, storage_immediate(&literal), TOKENIZER_CURRENT_RANGE()
         );
-        dyn_array_push(stack, value);
+        dyn_array_push(state.token_stack, value);
 
         //  when we have smth like `0foo` or `0xCAFEwww`
         if (digit_index < source.length) {
@@ -472,7 +471,7 @@ tokenize(
         Value *symbol = tokenizer_make_symbol(
           context, slice_sub(input, token_start_offset, offset), TOKENIZER_CURRENT_RANGE()
         );
-        dyn_array_push(stack, symbol);
+        dyn_array_push(state.token_stack, symbol);
       } break;
       case Space: {
         // Nothing to do
@@ -500,7 +499,9 @@ tokenize(
                 Slice raw_bytes = slice_sub(input, token_start_offset + 1, offset);
                 Source_Range string_range = TOKENIZER_CURRENT_RANGE();
                 string_range.offsets.to += 1;
-                tokenizer_push_string_literal(context, &string_buffer, &stack, raw_bytes, string_range);
+                tokenizer_push_string_literal(
+                  context, &string_buffer, &state.token_stack, raw_bytes, string_range
+                );
                 break;
               }
             }
@@ -516,7 +517,7 @@ tokenize(
             category = Symbol;
           }
         } break;
-        case ';': { tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset + 1); } break;
+        case ';': { tokenizer_maybe_push_statement(context, &state, offset + 1); } break;
         case '(': { TOKENIZER_GROUP_START(paren); } break;
         case '[': { TOKENIZER_GROUP_START(square); } break;
         case '{': { TOKENIZER_GROUP_START(curly); } break;
@@ -538,7 +539,7 @@ tokenize(
     goto finalize;
   }
 
-  if (dyn_array_length(parent_stack) != 1) {
+  if (dyn_array_length(state.parent_stack) != 1) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 
@@ -552,14 +553,14 @@ tokenize(
 
   defer:
   if (result.tag == Mass_Result_Tag_Success) {
-    assert(dyn_array_length(stack) == 1);
-    Value *root_value = *dyn_array_pop(stack);
+    assert(dyn_array_length(state.token_stack) == 1);
+    Value *root_value = *dyn_array_pop(state.token_stack);
     const Ast_Block *root = value_as_ast_block(root_value);
     *out_statements = root->statements;
   }
   fixed_buffer_destroy(string_buffer);
-  dyn_array_destroy(stack);
-  dyn_array_destroy(parent_stack);
+  dyn_array_destroy(state.token_stack);
+  dyn_array_destroy(state.parent_stack);
   return result;
 }
 
