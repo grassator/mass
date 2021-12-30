@@ -1525,7 +1525,8 @@ tokenizer_push_string_literal(
   dyn_array_push(*stack, byte_slice_value);
 }
 
-#include "generated_tokenizer.c"
+#include "tokenizer.c"
+//#include "generated_tokenizer.c"
 
 static inline const Descriptor *
 value_ensure_type(
