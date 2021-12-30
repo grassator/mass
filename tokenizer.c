@@ -319,11 +319,11 @@ tokenize(
     } while (0)
 
   enum Category {
-    Digit = 1 << 0,
+    Digits = 1 << 0,
     Id_Start = 1 << 1,
     Space = 1 << 2,
     Special = 1 << 3,
-    Symbol = 1 << 4,
+    Symbols = 1 << 4,
     Newline = 1 << 5,
     Other = 1 << 7,
 
@@ -334,11 +334,11 @@ tokenize(
   static u8 CHAR_CATEGORY_MAP[256] = {0};
   static enum Category CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
     [Other] = Other,
-    [Digit] = Digit | Id_Start,
-    [Id_Start] = Digit | Id_Start,
+    [Digits] = Digits | Id_Start,
+    [Id_Start] = Digits | Id_Start,
     [Space] = Space,
     [Special] = Space,
-    [Symbol] = Symbol,
+    [Symbols] = Symbols,
     [Newline] = Newline,
   };
 
@@ -351,7 +351,7 @@ tokenize(
     }
 
     for (s32 i = 0; i < 0x80; ++i) {
-      CHAR_CATEGORY_MAP[i] = Symbol;
+      CHAR_CATEGORY_MAP[i] = Symbols;
     }
     for (s32 i = 0x80; i <= 0xFF; ++i) {
       CHAR_CATEGORY_MAP[i] = Other;
@@ -377,7 +377,7 @@ tokenize(
     CHAR_CATEGORY_MAP[']'] = Special;
 
     for (char ch = '0'; ch <= '9'; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Digit;
+      CHAR_CATEGORY_MAP[ch] = Digits;
       DIGIT_DECODER[ch] = ch - '0';
     }
 
@@ -415,7 +415,7 @@ tokenize(
       case Newline: {
         tokenizer_maybe_push_statement(context, &state, offset);
       } break;
-      case Digit: {
+      case Digits: {
         Slice source = slice_sub(input, state.token_start_offset, offset);
         u32 base = 10;
         u64 digit_index = 0;
@@ -517,7 +517,7 @@ tokenize(
             continuation_mask = ~Newline;
             continue;
           } else {
-            category = Symbol;
+            category = Symbols;
           }
         } break;
         case ';': { tokenizer_maybe_push_statement(context, &state, offset + 1); } break;
