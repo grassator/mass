@@ -14,6 +14,20 @@ typedef struct {
   Mass_Result result;
 } Tokenizer_State;
 
+static inline Source_Range
+tokenizer_token_range(
+  const Tokenizer_State *state,
+  u64 offset
+) {
+  return (Source_Range){
+    .file = state->source_file,
+    .offsets = {
+      .from = u64_to_u32(state->token_start_offset),
+      .to = u64_to_u32(offset),
+    }
+  };
+}
+
 static inline Value_View
 tokenizer_value_view_for_children(
   const Allocator *allocator,
@@ -280,17 +294,8 @@ tokenize(
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
 
-  #define TOKENIZER_CURRENT_RANGE()\
-    (Source_Range){\
-      .file = source_range.file,\
-      .offsets = {\
-        .from = u64_to_u32(state.token_start_offset),\
-        .to = u64_to_u32(offset),\
-      }\
-    }
-
   #define TOKENIZER_GROUP_START(_VARIANT_)\
-    tokenizer_group_start_##_VARIANT_(context, &state, TOKENIZER_CURRENT_RANGE())
+    tokenizer_group_start_##_VARIANT_(context, &state, tokenizer_token_range(&state, offset))
 
   #define TOKENIZER_GROUP_END(_VARIANT_)\
     do {\
@@ -378,7 +383,7 @@ tokenize(
   u64 end_offset = source_range.offsets.to;
 
   // Create top-level block
-  tokenizer_group_start_curly(context, &state, TOKENIZER_CURRENT_RANGE());
+  tokenizer_group_start_curly(context, &state, tokenizer_token_range(&state, offset));
 
   bool should_finalize = true;
   enum Category starting_category = Space;
@@ -440,9 +445,8 @@ tokenize(
           literal += digit;
         }
         offset = state.token_start_offset + digit_index;
-        Value *value = value_make(
-          context, &descriptor_i64, storage_immediate(&literal), TOKENIZER_CURRENT_RANGE()
-        );
+        Source_Range digit_range = tokenizer_token_range(&state, offset);
+        Value *value = value_make(context, &descriptor_i64, storage_immediate(&literal), digit_range);
         dyn_array_push(state.token_stack, value);
 
         //  when we have smth like `0foo` or `0xCAFEwww`
@@ -457,7 +461,7 @@ tokenize(
       case Symbols: {
         Slice name = slice_sub(input, state.token_start_offset, offset);
         const Symbol *symbol = mass_ensure_symbol(context->compilation, name);
-        Source_Range symbol_range = TOKENIZER_CURRENT_RANGE();
+        Source_Range symbol_range = tokenizer_token_range(&state, offset);
         Value *value = value_make(context, &descriptor_symbol, storage_static(symbol), symbol_range);
         dyn_array_push(state.token_stack, value);
       } break;
@@ -486,7 +490,7 @@ tokenize(
               if (input.bytes[offset - 1] != '\\') {
                 found_end = true;
                 Slice raw_bytes = slice_sub(input, state.token_start_offset + 1, offset);
-                Source_Range string_range = TOKENIZER_CURRENT_RANGE();
+                Source_Range string_range = tokenizer_token_range(&state, offset);
                 string_range.offsets.to += 1;
                 tokenizer_push_string_literal(
                   context, &string_buffer, &state.token_stack, raw_bytes, string_range
