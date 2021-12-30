@@ -330,15 +330,15 @@ tokenize(
     Symbol = 1 << 4,
     Newline = 1 << 5,
     Slash = 1 << 6,
-    Error = 1 << 7,
+    Other = 1 << 7,
 
-    _Category_Last = Error,
+    _Category_Last = Other,
   };
   static_assert(_Category_Last < (1 << sizeof(u8) * 8), "Category should fit into a u8");
 
   static u8 CHAR_CATEGORY_MAP[256] = {0};
   static enum Category CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
-    [Error] = Error,
+    [Other] = Other,
     [Digit] = Digit | Id_Start,
     [Id_Start] = Digit | Id_Start,
     [Space] = Space,
@@ -360,10 +360,10 @@ tokenize(
       CHAR_CATEGORY_MAP[i] = Symbol;
     }
     for (s32 i = 0x80; i <= 0xFF; ++i) {
-      CHAR_CATEGORY_MAP[i] = Error;
+      CHAR_CATEGORY_MAP[i] = Other;
     }
     for (char ch = 0; ch < ' '; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Error;
+      CHAR_CATEGORY_MAP[ch] = Other;
     }
     CHAR_CATEGORY_MAP['/'] = Slash;
 
@@ -500,7 +500,7 @@ tokenize(
       case Slash: {
         TOKENIZER_PUSH_SYMBOL();
       } break;
-      case Error: {
+      case Other: {
         TOKENIZER_HANDLE_ERROR("Unexpected character");
       } break;
       case Special: {
