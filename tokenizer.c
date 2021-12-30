@@ -329,7 +329,6 @@ tokenize(
     Special = 1 << 3,
     Symbol = 1 << 4,
     Newline = 1 << 5,
-    Slash = 1 << 6,
     Other = 1 << 7,
 
     _Category_Last = Other,
@@ -345,7 +344,6 @@ tokenize(
     [Special] = Space,
     [Symbol] = Symbol,
     [Newline] = Newline,
-    [Slash] = Slash,
   };
 
   static u8 DIGIT_DECODER[128] = {0};
@@ -365,7 +363,6 @@ tokenize(
     for (char ch = 0; ch < ' '; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Other;
     }
-    CHAR_CATEGORY_MAP['/'] = Slash;
 
     CHAR_CATEGORY_MAP[' '] = Space;
     CHAR_CATEGORY_MAP['\t'] = Space;
@@ -373,6 +370,7 @@ tokenize(
     CHAR_CATEGORY_MAP['\r'] = Newline;
     CHAR_CATEGORY_MAP['\n'] = Newline;
 
+    CHAR_CATEGORY_MAP['/'] = Special;
     CHAR_CATEGORY_MAP['"'] = Special;
     CHAR_CATEGORY_MAP[';'] = Special;
     CHAR_CATEGORY_MAP['('] = Special;
@@ -414,20 +412,6 @@ tokenize(
   for (; offset < end_offset; ++offset) {
     current = input.bytes[offset];
     category = CHAR_CATEGORY_MAP[current];
-
-    if (category == Slash && starting_category == Slash) {
-      for (; offset < end_offset; ++offset) {
-        char current = input.bytes[offset];
-        if (current == '\n') {
-          // TODO support \r\n here
-          break;
-        }
-      }
-      tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset);
-      category = starting_category = Space;
-      continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
-      continue;
-    }
 
     if ((category & continuation_mask)) continue;
 
@@ -497,9 +481,6 @@ tokenize(
       case Space: {
         // Nothing to do
       } break;
-      case Slash: {
-        TOKENIZER_PUSH_SYMBOL();
-      } break;
       case Other: {
         TOKENIZER_HANDLE_ERROR("Unexpected character");
       } break;
@@ -529,6 +510,15 @@ tokenize(
             }
           }
           if (!found_end) TOKENIZER_HANDLE_ERROR("Unterminated string");
+        } break;
+        case '/': {
+          if (offset + 1 < end_offset && input.bytes[offset + 1] == '/') {
+            starting_category = Space;
+            continuation_mask = ~Newline;
+            continue;
+          } else {
+            category = Symbol;
+          }
         } break;
         case ';': { tokenizer_maybe_push_statement(context, &stack, &parent_stack, offset + 1); } break;
         case '(': { TOKENIZER_GROUP_START(paren); } break;
