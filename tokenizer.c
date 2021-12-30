@@ -304,13 +304,6 @@ tokenize(
       goto defer;\
     } while (0)
 
-  #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
-    dyn_array_push(stack, \
-      tokenizer_make_symbol(\
-        context, slice_sub(input, token_start_offset, offset), TOKENIZER_CURRENT_RANGE()\
-      )\
-    )
-
   #define TOKENIZER_GROUP_START(_VARIANT_)\
     tokenizer_group_start_##_VARIANT_(context, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE())
 
@@ -476,7 +469,10 @@ tokenize(
       } break;
       case Id_Start:
       case Symbol: {
-        TOKENIZER_PUSH_SYMBOL();
+        Value *symbol = tokenizer_make_symbol(
+          context, slice_sub(input, token_start_offset, offset), TOKENIZER_CURRENT_RANGE()
+        );
+        dyn_array_push(stack, symbol);
       } break;
       case Space: {
         // Nothing to do
