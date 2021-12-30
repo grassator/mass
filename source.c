@@ -52,11 +52,13 @@ mass_value_from_expected_result(
     } break;
     case Expected_Result_Tag_Flexible: {
       Storage storage;
-      if (descriptor->bit_size.as_u64 <= 64) {
-        Register reg = register_acquire_temp(builder);
-        storage = storage_register(reg, descriptor->bit_size);
-      } else if (descriptor->bit_size.as_u64) {
-        storage = reserve_stack_storage(builder, descriptor->bit_size);
+      if (descriptor->bit_size.as_u64) {
+        if (descriptor->bit_size.as_u64 <= 64) {
+          Register reg = register_acquire_temp(builder);
+          storage = storage_register(reg, descriptor->bit_size);
+        } else {
+          storage = reserve_stack_storage(builder, descriptor->bit_size);
+        }
       } else {
         storage = imm0;
       }
