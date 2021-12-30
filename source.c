@@ -2242,26 +2242,34 @@ token_parse_operator_definition(
   );
   if (!separator_token) { context_parse_error(context, parser, view, peek_index); goto err; }
 
-  Value *precedence_token = value_view_next(&view, &peek_index);
-  if (!precedence_token) { context_parse_error(context, parser, view, peek_index); goto err; }
+  Value *precedence_or_tuple_token = value_view_next(&view, &peek_index);
+  if (!precedence_or_tuple_token) { context_parse_error(context, parser, view, peek_index); goto err; }
 
-  Value_View rest = value_view_rest(&view, peek_index);
-  u32 body_length;
-  Value *body = token_parse_expression(context, parser, rest, &body_length, 0);
+  Value *precedence_or_tuple_value = token_parse_single(context, parser, precedence_or_tuple_token);
   if (mass_has_error(context)) goto err;
 
-  if (!body_length) { context_parse_error(context, parser, view, peek_index); goto err; }
-  peek_index += body_length;
+  Value *precedence_value;
+  Value *body;
+  if (value_is_tuple(precedence_or_tuple_value)) {
+    const Tuple *tuple = value_as_tuple(precedence_or_tuple_value);
+    if (dyn_array_length(tuple->items) != 2) {
+      panic("TODO better matching here");
+      return false;
+    }
+    precedence_value = *dyn_array_get(tuple->items, 0);
+    body = *dyn_array_get(tuple->items, 1);
+  } else {
+    precedence_value = precedence_or_tuple_value;
+    Value_View rest = value_view_rest(&view, peek_index);
+    u32 body_length;
+    body = token_parse_expression(context, parser, rest, &body_length, 0);
+    if (mass_has_error(context)) goto err;
 
-  Value *precedence_value = token_parse_single(context, parser, precedence_token);
-  if (!value_is_i64(precedence_value)) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = precedence_token->source_range,
-      .detailed_message ="Expected a precedence literal number",
-    });
-    goto err;
+    if (!body_length) { context_parse_error(context, parser, view, peek_index); goto err; }
+    peek_index += body_length;
   }
+
+  if (!mass_value_ensure_static_of(context, precedence_value, &descriptor_i64)) goto err;
   u32 precendence = u64_to_u32(value_as_i64(precedence_value)->bits);
 
   Value_View definition = value_as_group_paren(pattern_token)->children;
