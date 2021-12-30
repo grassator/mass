@@ -285,17 +285,20 @@ tokenize(
   Array_Value_View *out_statements
 ) {
   Slice input = source_range.file->text;
-
+  Temp_Mark temp_mark = context_temp_mark(context);
   Tokenizer_State state = {
-    // FIXME use temp allocator
-    .token_stack = dyn_array_make(Array_Value_Ptr, .capacity = 100),
-    .parent_stack = dyn_array_make(Array_Tokenizer_Parent, .capacity = 32),
+    .token_stack = dyn_array_make(
+      Array_Value_Ptr, .allocator = context->temp_allocator, .capacity = 100
+    ),
+    .parent_stack = dyn_array_make(
+      Array_Tokenizer_Parent, .allocator = context->temp_allocator, .capacity = 32
+    ),
     .source_file = source_range.file,
     .token_start_offset = source_range.offsets.from,
     .result = {.tag = Mass_Result_Tag_Success},
   };
 
-  Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
+  Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096, .allocator = context->temp_allocator);
 
   enum Category {
     Digits = 1 << 0,
@@ -557,9 +560,7 @@ tokenize(
     const Ast_Block *root = value_as_ast_block(root_value);
     *out_statements = root->statements;
   }
-  fixed_buffer_destroy(string_buffer);
-  dyn_array_destroy(state.token_stack);
-  dyn_array_destroy(state.parent_stack);
+  context_temp_reset_to_mark(context, temp_mark);
   return state.result;
 }
 
