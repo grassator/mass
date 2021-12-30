@@ -11,6 +11,7 @@ typedef struct {
   Array_Tokenizer_Parent parent_stack;
   const Source_File *source_file;
   u64 token_start_offset;
+  Mass_Result result;
 } Tokenizer_State;
 
 static inline Value_View
@@ -241,17 +242,20 @@ tokenizer_push_string_literal(
   dyn_array_push(*stack, byte_slice_value);
 }
 
-static Mass_Result
+static void
 tokenizer_handle_error(
-  Mass_Context *context,
+  Tokenizer_State *state,
   Slice detailed_message,
-  Source_Range source_range
+  u64 offset
 ) {
-  return (Mass_Result) {
+  state->result = (Mass_Result) {
     .tag = Mass_Result_Tag_Error,
     .Error.error = {
       .tag = Mass_Error_Tag_Tokenizer,
-      .source_range = source_range,
+      .source_range = {
+        .file = state->source_file,
+        .offsets = {.from = u64_to_u32(offset), .to = u64_to_u32(offset)},
+      },
       .detailed_message = detailed_message,
     }
   };
@@ -271,9 +275,8 @@ tokenize(
     .parent_stack = dyn_array_make(Array_Tokenizer_Parent, .capacity = 32),
     .source_file = source_range.file,
     .token_start_offset = source_range.offsets.from,
+    .result = {.tag = Mass_Result_Tag_Success},
   };
-
-  Mass_Result result = {.tag = Mass_Result_Tag_Success};
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
 
@@ -286,24 +289,14 @@ tokenize(
       }\
     }
 
-  #define TOKENIZER_HANDLE_ERROR(_MESSAGE_)\
-    do {\
-      Source_Range error_range = {\
-        .file = source_range.file, \
-        .offsets = {.from = u64_to_u32(offset) - 1, .to = u64_to_u32(offset) - 1},\
-      };\
-      result = tokenizer_handle_error(context, slice_literal(_MESSAGE_), error_range);\
-      goto defer;\
-    } while (0)
-
   #define TOKENIZER_GROUP_START(_VARIANT_)\
     tokenizer_group_start_##_VARIANT_(context, &state, TOKENIZER_CURRENT_RANGE())
 
   #define TOKENIZER_GROUP_END(_VARIANT_)\
     do {\
       if (!tokenizer_group_end_##_VARIANT_(context, &state, offset + 1)) {\
-        ++offset;\
-        TOKENIZER_HANDLE_ERROR("Expected a " #_VARIANT_);\
+        tokenizer_handle_error(&state, slice_literal("Expected a " #_VARIANT_), offset);\
+        goto defer;\
       }\
     } while (0)
 
@@ -429,10 +422,12 @@ tokenize(
               } break;
             }
           } else { // e.g. 0777
-            TOKENIZER_HANDLE_ERROR(
+            Slice message = slice_literal(
               "Numbers are not allowed to have `0` at the start.\n"
               "If you meant to specify an octal number, prefix it with `0o`"
             );
+            tokenizer_handle_error(&state, message, offset);
+            goto defer;
           }
         }
         u64 literal = 0;
@@ -470,7 +465,8 @@ tokenize(
         // Nothing to do
       } break;
       case Other: {
-        TOKENIZER_HANDLE_ERROR("Unexpected character");
+        tokenizer_handle_error(&state, slice_literal("Unexpected character"), offset);
+        goto defer;
       } break;
       case Special: {
         panic("UNREACHEABLE");
@@ -499,7 +495,10 @@ tokenize(
               }
             }
           }
-          if (!found_end) TOKENIZER_HANDLE_ERROR("Unterminated string");
+          if (!found_end) {
+            tokenizer_handle_error(&state, slice_literal("Unterminated string"), offset);
+            goto defer;
+          }
         } break;
         case '/': {
           if (offset + 1 < end_offset && input.bytes[offset + 1] == '/') {
@@ -533,7 +532,9 @@ tokenize(
   }
 
   if (dyn_array_length(state.parent_stack) != 1) {
-    TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
+    Slice message = slice_literal("Unexpected end of file. Expected a closing brace.");
+    tokenizer_handle_error(&state, message, offset - 1);
+    goto defer;
   }
 
   TOKENIZER_GROUP_END(curly);
@@ -545,7 +546,7 @@ tokenize(
   #undef TOKENIZER_PUSH_SYMBOL
 
   defer:
-  if (result.tag == Mass_Result_Tag_Success) {
+  if (state.result.tag == Mass_Result_Tag_Success) {
     assert(dyn_array_length(state.token_stack) == 1);
     Value *root_value = *dyn_array_pop(state.token_stack);
     const Ast_Block *root = value_as_ast_block(root_value);
@@ -554,6 +555,6 @@ tokenize(
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(state.token_stack);
   dyn_array_destroy(state.parent_stack);
-  return result;
+  return state.result;
 }
 
