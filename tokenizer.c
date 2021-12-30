@@ -112,11 +112,12 @@ static inline void
 tokenizer_group_start_curly(
   Mass_Context *context,
   Tokenizer_State *state,
-  Source_Range source_range
+  u64 offset
 ) {
   Ast_Block *group = mass_allocate(context, Ast_Block);
   // TODO use temp allocator first?
   *group = (Ast_Block){.statements = dyn_array_make(Array_Value_View, .allocator = context->allocator)};
+  Source_Range source_range = tokenizer_token_range(state, offset);
   Value *value = value_make(context, &descriptor_ast_block, storage_immediate(group), source_range);
   tokenizer_group_push(state, value);
 }
@@ -125,9 +126,10 @@ static inline void
 tokenizer_group_start_paren(
   Mass_Context *context,
   Tokenizer_State *state,
-  Source_Range source_range
+  u64 offset
 ) {
   Group_Paren *group = mass_allocate(context, Group_Paren);
+  Source_Range source_range = tokenizer_token_range(state, offset);
   Value *value = value_make(context, &descriptor_group_paren, storage_static(group), source_range);
   tokenizer_group_push(state, value);
 }
@@ -136,9 +138,10 @@ static inline void
 tokenizer_group_start_square(
   Mass_Context *context,
   Tokenizer_State *state,
-  Source_Range source_range
+  u64 offset
 ) {
   Group_Square *group = mass_allocate(context, Group_Square);
+  Source_Range source_range = tokenizer_token_range(state, offset);
   Value *value = value_make(context, &descriptor_group_square, storage_static(group), source_range);
   tokenizer_group_push(state, value);
 }
@@ -294,9 +297,6 @@ tokenize(
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
 
-  #define TOKENIZER_GROUP_START(_VARIANT_)\
-    tokenizer_group_start_##_VARIANT_(context, &state, tokenizer_token_range(&state, offset))
-
   #define TOKENIZER_GROUP_END(_VARIANT_)\
     do {\
       if (!tokenizer_group_end_##_VARIANT_(context, &state, offset + 1)) {\
@@ -383,7 +383,7 @@ tokenize(
   u64 end_offset = source_range.offsets.to;
 
   // Create top-level block
-  tokenizer_group_start_curly(context, &state, tokenizer_token_range(&state, offset));
+  tokenizer_group_start_curly(context, &state, offset);
 
   bool should_finalize = true;
   enum Category starting_category = Space;
@@ -514,9 +514,9 @@ tokenize(
           }
         } break;
         case ';': { tokenizer_maybe_push_statement(context, &state, offset + 1); } break;
-        case '(': { TOKENIZER_GROUP_START(paren); } break;
-        case '[': { TOKENIZER_GROUP_START(square); } break;
-        case '{': { TOKENIZER_GROUP_START(curly); } break;
+        case '(': { tokenizer_group_start_paren(context, &state, offset); } break;
+        case '[': { tokenizer_group_start_square(context, &state, offset); } break;
+        case '{': { tokenizer_group_start_curly(context, &state, offset); } break;
         case ')': { TOKENIZER_GROUP_END(paren); } break;
         case ']': { TOKENIZER_GROUP_END(square); } break;
         case '}': { TOKENIZER_GROUP_END(curly); } break;
