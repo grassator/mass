@@ -9,6 +9,8 @@ typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 typedef struct {
   Array_Value_Ptr token_stack;
   Array_Tokenizer_Parent parent_stack;
+  const Source_File *source_file;
+  u64 token_start_offset;
 } Tokenizer_State;
 
 static inline Value *
@@ -278,6 +280,8 @@ tokenize(
     // FIXME use temp allocator
     .token_stack = dyn_array_make(Array_Value_Ptr, .capacity = 100),
     .parent_stack = dyn_array_make(Array_Tokenizer_Parent, .capacity = 32),
+    .source_file = source_range.file,
+    .token_start_offset = source_range.offsets.from,
   };
 
   Mass_Result result = {.tag = Mass_Result_Tag_Success};
@@ -288,7 +292,7 @@ tokenize(
     (Source_Range){\
       .file = source_range.file,\
       .offsets = {\
-        .from = u64_to_u32(token_start_offset),\
+        .from = u64_to_u32(state.token_start_offset),\
         .to = u64_to_u32(offset),\
       }\
     }
@@ -390,7 +394,6 @@ tokenize(
 
   u64 offset = source_range.offsets.from;
   u64 end_offset = source_range.offsets.to;
-  u64 token_start_offset = offset;
 
   // Create top-level block
   tokenizer_group_start_curly(context, &state, TOKENIZER_CURRENT_RANGE());
@@ -413,7 +416,7 @@ tokenize(
         tokenizer_maybe_push_statement(context, &state, offset);
       } break;
       case Digit: {
-        Slice source = slice_sub(input, token_start_offset, offset);
+        Slice source = slice_sub(input, state.token_start_offset, offset);
         u32 base = 10;
         u64 digit_index = 0;
         if (source.length > 1 && source.bytes[0] == '0') {
@@ -452,7 +455,7 @@ tokenize(
           literal *= base;
           literal += digit;
         }
-        offset = token_start_offset + digit_index;
+        offset = state.token_start_offset + digit_index;
         Value *value = value_make(
           context, &descriptor_i64, storage_immediate(&literal), TOKENIZER_CURRENT_RANGE()
         );
@@ -469,7 +472,7 @@ tokenize(
       case Id_Start:
       case Symbol: {
         Value *symbol = tokenizer_make_symbol(
-          context, slice_sub(input, token_start_offset, offset), TOKENIZER_CURRENT_RANGE()
+          context, slice_sub(input, state.token_start_offset, offset), TOKENIZER_CURRENT_RANGE()
         );
         dyn_array_push(state.token_stack, symbol);
       } break;
@@ -483,7 +486,7 @@ tokenize(
         panic("UNREACHEABLE");
       } break;
     }
-    token_start_offset = offset;
+    state.token_start_offset = offset;
 
     if (category == Special) {
       category = Space;
@@ -496,7 +499,7 @@ tokenize(
             if (current == '"') {
               if (input.bytes[offset - 1] != '\\') {
                 found_end = true;
-                Slice raw_bytes = slice_sub(input, token_start_offset + 1, offset);
+                Slice raw_bytes = slice_sub(input, state.token_start_offset + 1, offset);
                 Source_Range string_range = TOKENIZER_CURRENT_RANGE();
                 string_range.offsets.to += 1;
                 tokenizer_push_string_literal(
