@@ -146,6 +146,7 @@ program_patch_labels(
 
     s64 from_rva = program_resolve_label_to_rva(program, &info->from);
     s64 target_rva = program_resolve_label_to_rva(program, info->target);
+    target_rva += info->offset_from_label;
 
     s32 diff = s64_to_s32(target_rva - from_rva);
     memcpy(info->patch32_at, &diff, sizeof(diff));

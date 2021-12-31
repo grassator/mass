@@ -132,9 +132,6 @@ eager_encode_instruction_assembly(
         enum { Sib_Index_None = 0b100,};
         switch(location.tag) {
           case Memory_Location_Tag_Instruction_Pointer_Relative: {
-            if (storage->Memory.location.Instruction_Pointer_Relative.offset) {
-              panic("TODO support encoding a relative pointer with an offset");
-            }
             r_m = 0b101;
             mod = 0b00;
             break;
@@ -262,12 +259,10 @@ eager_encode_instruction_assembly(
     switch(location->tag) {
       case Memory_Location_Tag_Instruction_Pointer_Relative: {
         Label *label = location->Instruction_Pointer_Relative.label;
-        if (storage->Memory.location.Instruction_Pointer_Relative.offset) {
-          panic("TODO support encoding a relative pointer with an offset");
-        }
         u8 offset_in_instruction = result.bytes.length;
         result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
-          .offset = offset_in_instruction,
+          .offset_in_instruction = offset_in_instruction,
+          .offset_from_label = s64_to_s32(storage->Memory.location.Instruction_Pointer_Relative.offset),
           .label = label
         };
         u8 empty_patch_bytes[4] = {0};
@@ -310,8 +305,9 @@ eager_encode_instruction_assembly(
       }
       u8 offset_in_instruction = result.bytes.length;
       result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
-        .offset = offset_in_instruction,
-        .label = label,
+        .offset_in_instruction = offset_in_instruction,
+        .offset_from_label = s64_to_s32(storage->Memory.location.Instruction_Pointer_Relative.offset),
+        .label = label
       };
       u8 empty_patch_bytes[4] = {0};
       instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
@@ -324,7 +320,7 @@ eager_encode_instruction_assembly(
 
   assert(result.label_patch_count <= countof(result.label_patches));
   for (u8 i = 0; i < result.label_patch_count; i += 1) {
-    result.label_patches[i].offset -= result.bytes.length;
+    result.label_patches[i].offset_in_instruction -= result.bytes.length;
   }
 
   return result;
@@ -505,7 +501,7 @@ encode_instruction(
     }
     case Instruction_Tag_Label_Patch: {
       Instruction_Label_Patch *label_patch = &instruction->Label_Patch;
-      u64 patch_offset_in_buffer = buffer->occupied + label_patch->offset;
+      u64 patch_offset_in_buffer = buffer->occupied + label_patch->offset_in_instruction;
       void *patch32_at = buffer->memory + patch_offset_in_buffer;
       assert(memcmp(patch32_at, &(u32){0}, sizeof(u32)) == 0);
       dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
@@ -514,6 +510,7 @@ encode_instruction(
           .section = &program->memory.code,
           .offset_in_section = u64_to_u32(buffer->occupied),
         },
+        .offset_from_label = instruction->Label_Patch.offset_from_label,
         .patch32_at = patch32_at,
       });
       return;

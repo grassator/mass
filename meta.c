@@ -1320,6 +1320,8 @@ main(void) {
     { "Label *", "target" },
     { "Label", "from" },
     { "void *", "patch32_at" },
+    { "s32", "offset_from_label" },
+    { "u32", "_offset_from_label_padding" },
   }));
 
   push_type(type_enum("Number_Base", (Enum_Type_Item[]){
@@ -1448,7 +1450,8 @@ main(void) {
       { "u8", "length" },
     }),
     struct_fields("Label_Patch", (Struct_Item[]){
-      { "s64", "offset" },
+      { "s32", "offset_in_instruction" },
+      { "s32", "offset_from_label" },
       { "Label *", "label" },
     }),
     struct_fields("Stack_Patch", (Struct_Item[]){

@@ -1229,6 +1229,8 @@ typedef struct Label_Location_Diff_Patch_Info {
   Label * target;
   Label from;
   void * patch32_at;
+  s32 offset_from_label;
+  u32 _offset_from_label_padding;
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
@@ -1422,7 +1424,8 @@ typedef struct Instruction_Bytes {
   u8 length;
 } Instruction_Bytes;
 typedef struct Instruction_Label_Patch {
-  s64 offset;
+  s32 offset_in_instruction;
+  s32 offset_from_label;
   Label * label;
 } Instruction_Label_Patch;
 typedef struct Instruction_Stack_Patch {
@@ -3455,6 +3458,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info, Label_Location_Dif
     .name = slice_literal_fields("patch32_at"),
     .offset = offsetof(Label_Location_Diff_Patch_Info, patch32_at),
   },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("offset_from_label"),
+    .offset = offsetof(Label_Location_Diff_Patch_Info, offset_from_label),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(label_location_diff_patch_info);
 DEFINE_VALUE_IS_AS_HELPERS(Label_Location_Diff_Patch_Info, label_location_diff_patch_info);
@@ -3866,9 +3874,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_bytes, Instruction_Bytes,
 MASS_DEFINE_TYPE_VALUE(instruction_bytes);
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label_patch, Instruction_Label_Patch,
   {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("offset"),
-    .offset = offsetof(Instruction_Label_Patch, offset),
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("offset_in_instruction"),
+    .offset = offsetof(Instruction_Label_Patch, offset_in_instruction),
+  },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("offset_from_label"),
+    .offset = offsetof(Instruction_Label_Patch, offset_from_label),
   },
   {
     .descriptor = &descriptor_label_pointer,
