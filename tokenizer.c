@@ -301,12 +301,13 @@ tokenize(
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096, .allocator = context->temp_allocator);
 
   enum Category {
-    Digits = 1 << 0,
-    Id_Start = 1 << 1,
-    Space = 1 << 2,
-    Special = 1 << 3,
-    Symbols = 1 << 4,
-    Newline = 1 << 5,
+    Digits_0 = 1 << 0,
+    Digits_1_to_9 = 1 << 1,
+    Id_Start = 1 << 2,
+    Space = 1 << 3,
+    Special = 1 << 4,
+    Symbols = 1 << 5,
+    Newline = 1 << 6,
     Other = 1 << 7,
 
     _Category_Last = Other,
@@ -316,8 +317,9 @@ tokenize(
   static u8 CHAR_CATEGORY_MAP[256] = {0};
   static enum Category CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
     [Other] = Other,
-    [Digits] = Digits | Id_Start,
-    [Id_Start] = Digits | Id_Start,
+    [Digits_0] = 0, // Needs special handling
+    [Digits_1_to_9] = Digits_0 | Digits_1_to_9 | Id_Start,
+    [Id_Start] = Digits_0 | Digits_1_to_9 | Id_Start,
     [Space] = Space,
     [Special] = Space,
     [Symbols] = Symbols,
@@ -359,9 +361,10 @@ tokenize(
     CHAR_CATEGORY_MAP[']'] = Special;
 
     for (char ch = '0'; ch <= '9'; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Digits;
+      CHAR_CATEGORY_MAP[ch] = Digits_1_to_9;
       DIGIT_DECODER[ch] = ch - '0';
     }
+    CHAR_CATEGORY_MAP['0'] = Digits_0;
 
     CHAR_CATEGORY_MAP['_'] = Id_Start;
     for (char ch = 'a'; ch <= 'z'; ++ch) {
@@ -385,6 +388,7 @@ tokenize(
   char current = 0;
   enum Category category = Space;
   enum Category continuation_mask = 0;
+  u32 number_base = 10;
 
   for (; offset < end_offset; ++offset) {
     current = input.bytes[offset];
@@ -397,52 +401,56 @@ tokenize(
       case Newline: {
         tokenizer_maybe_push_statement(context, &state, offset);
       } break;
-      case Digits: {
-        Slice source = slice_sub(input, state.token_start_offset, offset);
-        u32 base = 10;
-        u64 digit_index = 0;
-        if (source.length > 1 && source.bytes[0] == '0') {
-          char second = source.bytes[1];
-          if (CHAR_CATEGORY_MAP[second] == Id_Start) {
-            switch(second) {
-              case 'b': {
-                base = 2;
-                digit_index = 2; // skip over `0b`
-              } break;
-              case 'o': {
-                base = 8;
-                digit_index = 2; // skip over `0o`
-              } break;
-              case 'x': {
-                base = 16;
-                digit_index = 2; // skip over `0f`
-              } break;
-              default: { // happens when we have smth like `0foo`
-                digit_index = 1; // skip over `0`
-              } break;
-            }
-          } else { // e.g. 0777
-            Slice message = slice_literal(
-              "Numbers are not allowed to have `0` at the start.\n"
-              "If you meant to specify an octal number, prefix it with `0o`"
-            );
-            tokenizer_handle_error(&state, message, offset);
-            goto defer;
-          }
+      case Digits_0: {
+        if (category == Digits_1_to_9) { // e.g. 0777
+          Slice message = slice_literal(
+            "Numbers are not allowed to have `0` at the start.\n"
+            "If you meant to specify an octal number, prefix it with `0o`"
+          );
+          tokenizer_handle_error(&state, message, offset);
+          goto defer;
         }
+        if (current == 'b') {
+          number_base = 2;
+          starting_category = Digits_1_to_9;
+          continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
+          continue;
+        } else if (current == 'o') {
+          number_base = 8;
+          starting_category = Digits_1_to_9;
+          continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
+          continue;
+        } else if (current == 'x') {
+          number_base = 16;
+          starting_category = Digits_1_to_9;
+          continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
+          continue;
+        } else {
+          u64 zero = 0;
+          Source_Range digit_range = tokenizer_token_range(&state, offset);
+          Value *value = value_make(context, &descriptor_i64, storage_immediate(&zero), digit_range);
+          dyn_array_push(state.token_stack, value);
+          number_base = 10;
+        }
+      } break;
+      case Digits_1_to_9: {
+        u64 digit_index = 0;
+        if (number_base != 10) digit_index += 2; // Skip over `0b`, `0o` or `0x`
+        Slice source = slice_sub(input, state.token_start_offset, offset);
         u64 literal = 0;
         for (; digit_index < source.length; ++digit_index) {
           char ch = source.bytes[digit_index];
           if (ch == '_') continue;
           u8 digit = DIGIT_DECODER[ch];
-          if (digit >= base) break;
-          literal *= base;
+          if (digit >= number_base) break;
+          literal *= number_base;
           literal += digit;
         }
         offset = state.token_start_offset + digit_index;
         Source_Range digit_range = tokenizer_token_range(&state, offset);
         Value *value = value_make(context, &descriptor_i64, storage_immediate(&literal), digit_range);
         dyn_array_push(state.token_stack, value);
+        number_base = 10;
 
         //  when we have smth like `0foo` or `0xCAFEwww`
         if (digit_index < source.length) {
