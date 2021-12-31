@@ -305,7 +305,8 @@ tokenize(
     Digit_1,
     Digits_2_to_7,
     Digits_8_to_9,
-    Id_Start,
+    Hex_Letter,
+    Non_Hex_Letter,
     Space,
     Underscore,
     Special,
@@ -318,7 +319,10 @@ tokenize(
   static_assert(_Category_Last < (1 << sizeof(u8) * 8), "Category should fit into a u8");
   static_assert(_Category_Last < sizeof(u32) * 8, "Category mask should fit into a u32");
 
-  enum { Digits_Mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Digits_2_to_7) | (1 << Digits_8_to_9) };
+  enum {
+    Digits_Mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Digits_2_to_7) | (1 << Digits_8_to_9),
+    Id_Mask = Digits_Mask | (1 << Hex_Letter) | (1 << Non_Hex_Letter) | (1 << Underscore),
+  };
 
   static u8 CHAR_CATEGORY_MAP[256] = {0};
   static u32 CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
@@ -327,8 +331,9 @@ tokenize(
     [Digit_1] = Digits_Mask | (1 << Underscore),
     [Digits_2_to_7] = Digits_Mask | (1 << Underscore),
     [Digits_8_to_9] = Digits_Mask | (1 << Underscore),
-    [Id_Start] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
-    [Underscore] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
+    [Hex_Letter] = Id_Mask,
+    [Non_Hex_Letter] = Id_Mask,
+    [Underscore] = Id_Mask,
     [Space] = (1 << Space),
     [Special] = (1 << Space),
     [Symbols] = (1 << Symbols),
@@ -382,13 +387,20 @@ tokenize(
     CHAR_CATEGORY_MAP['8'] = Digits_8_to_9;
     CHAR_CATEGORY_MAP['9'] = Digits_8_to_9;
 
-    for (char ch = 'a'; ch <= 'z'; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Id_Start;
-      if (ch <= 'f') DIGIT_DECODER[ch] = ch - 'a' + 10;
+    for (char ch = 'a'; ch <= 'f'; ++ch) {
+      CHAR_CATEGORY_MAP[ch] = Hex_Letter;
+      DIGIT_DECODER[ch] = ch - 'a' + 10;
     }
-    for (char ch = 'A'; ch <= 'Z'; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Id_Start;
-      if (ch <= 'F') DIGIT_DECODER[ch] = ch - 'A' + 10;
+    for (char ch = 'A'; ch <= 'F'; ++ch) {
+      CHAR_CATEGORY_MAP[ch] = Hex_Letter;
+      DIGIT_DECODER[ch] = ch - 'A' + 10;
+    }
+
+    for (char ch = 'f' + 1; ch <= 'z'; ++ch) {
+      CHAR_CATEGORY_MAP[ch] = Non_Hex_Letter;
+    }
+    for (char ch = 'F' + 1; ch <= 'Z'; ++ch) {
+      CHAR_CATEGORY_MAP[ch] = Non_Hex_Letter;
     }
   }
 
@@ -438,7 +450,7 @@ tokenize(
         } else if (current == 'x') {
           number_base = 16;
           starting_category = Digits_8_to_9;
-          continuation_mask = Digits_Mask | (1 << Id_Start) | (1 << Underscore);
+          continuation_mask = Digits_Mask | (1 << Hex_Letter) | (1 << Underscore);
           continue;
         } else {
           u64 zero = 0;
@@ -468,17 +480,10 @@ tokenize(
         Value *value = value_make(context, &descriptor_i64, storage_immediate(&literal), digit_range);
         dyn_array_push(state.token_stack, value);
         number_base = 10;
-
-        //  when we have smth like `0foo` or `0xCAFEwww`
-        if (digit_index < source.length) {
-          // Reset tokenizer to the state after the matched number
-          offset -= 1;
-          should_finalize = true;
-          category = Space;
-        }
       } break;
       case Underscore:
-      case Id_Start:
+      case Hex_Letter:
+      case Non_Hex_Letter:
       case Symbols: {
         Slice name = slice_sub(input, state.token_start_offset, offset);
         const Symbol *symbol = mass_ensure_symbol(context->compilation, name);
