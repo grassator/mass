@@ -262,35 +262,35 @@ spec("source") {
     it("should be able to tokenize an empty string") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "");
 
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Success);
-      check(dyn_array_length(statements) == 0);
+      check(block.first_statement == 0);
     }
 
     it("should be able to tokenize a comment") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "// foo\n");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Success);
-      check(dyn_array_length(statements) == 0);
+      check(block.first_statement == 0);
     }
 
     it("should count single-line comment as a statement separator") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "  a//\nb");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Success);
-      check(dyn_array_length(statements) == 2);
+      check(block.first_statement->next == block.last_statement, "Expected 2 statements");
     }
 
     it("should be able to tokenize ids containing letters and _") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "foo_123");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Success);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(&tokens, 0);
@@ -299,18 +299,18 @@ spec("source") {
 
     it("should be able to turn newlines into fake semicolon tokens on top level") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "foo\n");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Success);
-      check(dyn_array_length(statements) == 1);
+      check(block.first_statement == block.last_statement);
     }
 
     it("should be able to parse a lone 0") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(&tokens, 0);
@@ -322,10 +322,10 @@ spec("source") {
 
     it("should be able to parse a 0 followed by an identifier") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0foo");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
       {
@@ -344,10 +344,10 @@ spec("source") {
 
     it("should be able to parse hex integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0xCAFE");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(&tokens, 0);
@@ -359,10 +359,10 @@ spec("source") {
 
     it("should be able to parse a hex integer followed by an identifier") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0xfffoo");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
       {
@@ -381,10 +381,10 @@ spec("source") {
 
     it("should be able to parse binary integers") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "0b100");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(&tokens, 0);
@@ -396,10 +396,10 @@ spec("source") {
 
     it("should be able to tokenize a sum of integer and a symbol") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "12 + foo123");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
@@ -417,10 +417,10 @@ spec("source") {
 
     it("should be able to tokenize strings") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "\"foo 123\"");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *string = value_view_get(&tokens, 0);
@@ -429,10 +429,10 @@ spec("source") {
 
     it("should be able to tokenize groups") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(x)");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement == block.last_statement);
+      Value_View tokens = block.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -447,20 +447,20 @@ spec("source") {
 
     it("should be able to tokenize nested groups with different braces") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "{[]}");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
-      Value_View tokens = *dyn_array_get(statements, 0);
+      Ast_Block root;
+      Mass_Result result = tokenize(&test_context, source_range, &root);
+      check(root.first_statement == root.last_statement);
+      Value_View tokens = root.first_statement->children;
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      Value *block = value_view_get(&tokens, 0);
-      check(value_is_ast_block(block));
-      Array_Value_View group_statements = value_as_ast_block(block)->statements;
-      check(dyn_array_length(group_statements) == 1);
-      spec_check_slice(source_from_source_range(test_context.compilation, &block->source_range), slice_literal("{[]}"));
+      Value *block_value = value_view_get(&tokens, 0);
+      check(value_is_ast_block(block_value));
+      const Ast_Block *block = value_as_ast_block(block_value);
+      check(block->first_statement == block->last_statement);
+      spec_check_slice(source_from_source_range(test_context.compilation, &block_value->source_range), slice_literal("{[]}"));
 
-      Value *square = value_view_get(dyn_array_get(group_statements, 0), 0);
+      Value *square = value_view_get(&block->first_statement->children, 0);
       check(value_is_group_square(square));
       check(value_as_group_square(square)->children.length == 0);
       spec_check_slice(source_from_source_range(test_context.compilation, &square->source_range), slice_literal("[]"));
@@ -473,16 +473,17 @@ spec("source") {
         "  return x + 3;\n"
         "}"
       );
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
-      check(dyn_array_length(statements) == 1);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
+      check(block.first_statement);
+      check(block.first_statement == block.last_statement);
       check(result.tag == Mass_Result_Tag_Success);
     }
 
     it("should report a failure when encountering a brace that is not closed") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(foo");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Tokenizer);
@@ -493,8 +494,8 @@ spec("source") {
 
     it("should report a failure when encountering a mismatched brace") {
       Source_Range source_range = test_inline_source_range(test_context.compilation, "(foo}");
-      Array_Value_View statements;
-      Mass_Result result = tokenize(&test_context, source_range, &statements);
+      Ast_Block block;
+      Mass_Result result = tokenize(&test_context, source_range, &block);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
       check(error->tag == Mass_Error_Tag_Tokenizer);

@@ -86,13 +86,23 @@ tokenizer_maybe_push_statement(
   // Do not treat leading newlines as semicolons
   if (!has_children) return true;
 
-  Ast_Block *group = (Ast_Block *)value_as_ast_block(parent->value);
+  Ast_Block *block = (Ast_Block *)value_as_ast_block(parent->value);
 
   assert(offset);
-  Value_View statement = tokenizer_make_group_children_view(
+  Value_View children = tokenizer_make_group_children_view(
     context, state, parent, parent->value, offset
   );
-  dyn_array_push(group->statements, statement);
+  Ast_Statement *statement = mass_allocate(context, Ast_Statement);
+  *statement = (Ast_Statement) {
+    .children = children,
+    .next = 0,
+  };
+  if (block->first_statement) {
+    block->last_statement->next = statement;
+    block->last_statement = statement;
+  } else {
+    block->first_statement = block->last_statement = statement;
+  }
   return true;
 }
 
@@ -114,11 +124,10 @@ tokenizer_group_start_curly(
   Tokenizer_State *state,
   u64 offset
 ) {
-  Ast_Block *group = mass_allocate(context, Ast_Block);
-  // TODO use temp allocator first?
-  *group = (Ast_Block){.statements = dyn_array_make(Array_Value_View, .allocator = context->allocator)};
+  Ast_Block *block = mass_allocate(context, Ast_Block);
+  *block = (Ast_Block){0};
   Source_Range source_range = tokenizer_token_range(state, offset);
-  Value *value = value_make(context, &descriptor_ast_block, storage_immediate(group), source_range);
+  Value *value = value_make(context, &descriptor_ast_block, storage_static(block), source_range);
   tokenizer_group_push(state, value);
 }
 
@@ -282,7 +291,7 @@ PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Mass_Context *context,
   Source_Range source_range,
-  Array_Value_View *out_statements
+  Ast_Block *out_block
 ) {
   Slice input = source_range.file->text;
   Temp_Mark temp_mark = context_temp_mark(context);
@@ -589,8 +598,7 @@ tokenize(
   if (state.result.tag == Mass_Result_Tag_Success) {
     assert(dyn_array_length(state.token_stack) == 1);
     Value *root_value = *dyn_array_pop(state.token_stack);
-    const Ast_Block *root = value_as_ast_block(root_value);
-    *out_statements = root->statements;
+    *out_block = *value_as_ast_block(root_value);
   }
   context_temp_reset_to_mark(context, temp_mark);
   return state.result;

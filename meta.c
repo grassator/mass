@@ -1232,8 +1232,14 @@ main(void) {
     { "Value_View", "children" },
   })));
 
+  export_compiler(push_type(type_struct("Ast_Statement", (Struct_Item[]){
+    { "Value_View", "children" },
+    { "Ast_Statement *", "next" },
+  })));
+
   export_compiler(push_type(type_struct("Ast_Block", (Struct_Item[]){
-    { "Array_Value_View", "statements" },
+    { "Ast_Statement *", "first_statement" },
+    { "Ast_Statement *", "last_statement" },
   })));
 
   export_compiler(push_type(type_struct("Group_Square", (Struct_Item[]){

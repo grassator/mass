@@ -59,6 +59,10 @@ typedef struct Group_Paren Group_Paren;
 typedef dyn_array_type(Group_Paren *) Array_Group_Paren_Ptr;
 typedef dyn_array_type(const Group_Paren *) Array_Const_Group_Paren_Ptr;
 
+typedef struct Ast_Statement Ast_Statement;
+typedef dyn_array_type(Ast_Statement *) Array_Ast_Statement_Ptr;
+typedef dyn_array_type(const Ast_Statement *) Array_Const_Ast_Statement_Ptr;
+
 typedef struct Ast_Block Ast_Block;
 typedef dyn_array_type(Ast_Block *) Array_Ast_Block_Ptr;
 typedef dyn_array_type(const Ast_Block *) Array_Const_Ast_Block_Ptr;
@@ -1174,8 +1178,15 @@ typedef struct Group_Paren {
 } Group_Paren;
 typedef dyn_array_type(Group_Paren) Array_Group_Paren;
 
+typedef struct Ast_Statement {
+  Value_View children;
+  Ast_Statement * next;
+} Ast_Statement;
+typedef dyn_array_type(Ast_Statement) Array_Ast_Statement;
+
 typedef struct Ast_Block {
-  Array_Value_View statements;
+  Ast_Statement * first_statement;
+  Ast_Statement * last_statement;
 } Ast_Block;
 typedef dyn_array_type(Ast_Block) Array_Ast_Block;
 
@@ -2335,6 +2346,11 @@ static Descriptor descriptor_array_group_paren;
 static Descriptor descriptor_array_group_paren_ptr;
 static Descriptor descriptor_group_paren_pointer;
 static Descriptor descriptor_group_paren_pointer_pointer;
+static Descriptor descriptor_ast_statement;
+static Descriptor descriptor_array_ast_statement;
+static Descriptor descriptor_array_ast_statement_ptr;
+static Descriptor descriptor_ast_statement_pointer;
+static Descriptor descriptor_ast_statement_pointer_pointer;
 static Descriptor descriptor_ast_block;
 static Descriptor descriptor_array_ast_block;
 static Descriptor descriptor_array_ast_block_ptr;
@@ -3232,13 +3248,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group_paren, Group_Paren,
 MASS_DEFINE_TYPE_VALUE(group_paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren *, group_paren_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(array_ast_statement_ptr, Array_Ast_Statement_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_ast_statement, Array_Ast_Statement)
+MASS_DEFINE_STRUCT_DESCRIPTOR(ast_statement, Ast_Statement,
+  {
+    .descriptor = &descriptor_value_view,
+    .name = slice_literal_fields("children"),
+    .offset = offsetof(Ast_Statement, children),
+  },
+  {
+    .descriptor = &descriptor_ast_statement_pointer,
+    .name = slice_literal_fields("next"),
+    .offset = offsetof(Ast_Statement, next),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(ast_statement);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Statement, ast_statement);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Statement *, ast_statement_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_ast_block_ptr, Array_Ast_Block_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_ast_block, Array_Ast_Block)
 MASS_DEFINE_STRUCT_DESCRIPTOR(ast_block, Ast_Block,
   {
-    .descriptor = &descriptor_array_value_view,
-    .name = slice_literal_fields("statements"),
-    .offset = offsetof(Ast_Block, statements),
+    .descriptor = &descriptor_ast_statement_pointer,
+    .name = slice_literal_fields("first_statement"),
+    .offset = offsetof(Ast_Block, first_statement),
+  },
+  {
+    .descriptor = &descriptor_ast_statement_pointer,
+    .name = slice_literal_fields("last_statement"),
+    .offset = offsetof(Ast_Block, last_statement),
   },
 );
 MASS_DEFINE_TYPE_VALUE(ast_block);

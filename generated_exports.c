@@ -52,6 +52,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Group_Paren")),
     type_group_paren_value
   );
+  Source_Range Ast_Statement__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Ast_Statement__source_range, "Ast_Statement");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Ast_Statement__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Ast_Statement")),
+    type_ast_statement_value
+  );
   Source_Range Ast_Block__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Ast_Block__source_range, "Ast_Block");
   scope_define_value(

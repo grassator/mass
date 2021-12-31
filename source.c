@@ -2812,8 +2812,8 @@ mass_handle_macro_call(
   Parser body_parser = *parser;
   body_parser.scope = body_scope;
 
-  Array_Value_View statements = value_as_ast_block(literal->body)->statements;
-  Value *body_value = token_parse_block_statements(context, &body_parser, statements, &source_range);
+  Ast_Statement *statement = value_as_ast_block(literal->body)->first_statement;
+  Value *body_value = token_parse_block_statements(context, &body_parser, statement, &source_range);
   if (mass_has_error(context)) goto err;
 
   const Descriptor *actual_return_descriptor = value_or_lazy_value_descriptor(body_value);
@@ -6055,12 +6055,10 @@ static Value *
 token_parse_block_statements(
   Mass_Context *context,
   Parser *parser,
-  Array_Value_View statements,
+  const Ast_Statement *statement,
   const Source_Range *source_range
 ) {
-  u64 max_statement_count = dyn_array_length(statements);
-
-  if (!max_statement_count) {
+  if (!statement) {
     return mass_make_void(context, *source_range);
   }
   Value *block_result = 0;
@@ -6069,11 +6067,12 @@ token_parse_block_statements(
   Array_Value_Ptr temp_lazy_statements = dyn_array_make(
     Array_Value_Ptr,
     .allocator = context->temp_allocator,
-    .capacity = max_statement_count,
+    .capacity = 128,
   );
 
-  DYN_ARRAY_FOREACH(Value_View, statement, statements) {
+  for (; statement; statement = statement->next) {
     if (mass_has_error(context)) goto defer;
+    Source_Range statement_range = statement->children.source_range;
 
     // FIXME token_statement_matcher_in_scopes should instead return a Value *
     Value temp_lazy_value = {
@@ -6084,7 +6083,9 @@ token_parse_block_statements(
       },
     };
 
-    bool matched = token_statement_matcher_in_scopes(context, parser, *statement, &temp_lazy_value.Lazy, parser->scope);
+    bool matched = token_statement_matcher_in_scopes(
+      context, parser, statement->children, &temp_lazy_value.Lazy, parser->scope
+    );
     if (mass_has_error(context)) goto defer;
     if (matched) {
       // If the statement did not assign a proc that means that it does not need
@@ -6093,16 +6094,16 @@ token_parse_block_statements(
         assert(temp_lazy_value.descriptor);
         Value *lazy_value = mass_allocate(context, Value);
         *lazy_value = temp_lazy_value;
-        lazy_value->source_range = statement->source_range;
+        lazy_value->source_range = statement_range;
         dyn_array_push(temp_lazy_statements, lazy_value);
       }
     } else {
       u32 match_length = 0;
-      Value *parse_result = token_parse_expression(context, parser, *statement, &match_length, 0);
+      Value *parse_result = token_parse_expression(context, parser, statement->children, &match_length, 0);
       if (mass_has_error(context)) goto defer;
 
-      if (match_length != statement->length) {
-        Value_View remainder = value_view_rest(statement, match_length);
+      if (match_length != statement->children.length) {
+        Value_View remainder = value_view_rest(&statement->children, match_length);
         mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = remainder.source_range,
@@ -6128,7 +6129,7 @@ token_parse_block_statements(
           if (!(parser->flags & Parser_Flags_Global)) {
             mass_error(context, (Mass_Error) {
               .tag = Mass_Error_Tag_Parse,
-              .source_range = statement->source_range,
+              .source_range = statement_range,
               .detailed_message = slice_literal("Export declarations are only supported at top level"),
             });
             goto defer;
@@ -6136,7 +6137,7 @@ token_parse_block_statements(
           if (parser->module->exports.tag != Module_Exports_Tag_Not_Specified) {
             mass_error(context, (Mass_Error) {
               .tag = Mass_Error_Tag_Parse,
-              .source_range = statement->source_range,
+              .source_range = statement_range,
               .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
               .other_source_range = parser->module->exports.source_range,
             });
@@ -6185,7 +6186,7 @@ token_parse_block(
 ) {
   Parser block_parser = *parser;
   block_parser.scope = scope_make(context->allocator, parser->scope);
-  return token_parse_block_statements(context, &block_parser, group->statements, source_range);
+  return token_parse_block_statements(context, &block_parser, group->first_statement, source_range);
 }
 
 static Value *
@@ -6494,8 +6495,9 @@ mass_inline_module(
   };
   // Need a new context here to ensure we are using the runtime program for new modules
   Mass_Context module_context = mass_context_from_compilation(context->compilation);
-  Value *block_result =
-    token_parse_block_statements(&module_context, &module_parser, curly->statements, &args.source_range);
+  Value *block_result = token_parse_block_statements(
+    &module_context, &module_parser, curly->first_statement, &args.source_range
+  );
   Value *void_value = mass_make_void(context, args.source_range);
   value_force_exact(&module_context, 0, void_value, block_result);
   module_process_exports(&module_context, &module_parser);
@@ -6510,16 +6512,18 @@ program_parse(
 ) {
   assert(parser->module);
   Performance_Counter perf = system_performance_counter_start();
-  Array_Value_View statements;
+  Ast_Block block;
   const Source_Range *program_range = &parser->module->source_range;
-  *context->result = tokenize(context, *program_range, &statements);
+  *context->result = tokenize(context, *program_range, &block);
   if (mass_has_error(context)) return;
   if (0) {
     u64 usec = system_performance_counter_end(&perf);
     printf("Tokenizer took %"PRIu64" µs\n", usec);
   }
 
-  Value *block_result = token_parse_block_statements(context, parser, statements, program_range);
+  Value *block_result = token_parse_block_statements(
+    context, parser, block.first_statement, program_range
+  );
   if (mass_has_error(context)) return;
   compile_time_eval(context, parser, value_view_single(&block_result));
 }
@@ -6705,13 +6709,12 @@ mass_run_script(
   Source_Range source_range = root_module->source_range;
   mass_maybe_trim_shebang(&source_range);
 
-  Array_Value_View statements;
-  *context->result = tokenize(context, source_range, &statements);
+  Ast_Block body;
+  *context->result = tokenize(context, source_range, &body);
   if (mass_has_error(context)) return;
 
-  Ast_Block body = {.statements = statements};
   Value *fake_function_body = value_make(
-    context, &descriptor_ast_block, storage_immediate(&body), source_range
+    context, &descriptor_ast_block, storage_static(&body), source_range
   );
 
   Parser parser = {
