@@ -255,6 +255,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Scope")),
     type_scope_value
   );
+  Source_Range Value_Flags__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Value_Flags__source_range, "Value_Flags");
+  scope_define_enum(
+    compilation, scope, Value_Flags__source_range,
+    slice_literal("Value_Flags"), type_value_flags_value,
+    value_flags_items, countof(value_flags_items)
+  );
   Source_Range Value__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Value__source_range, "Value");
   scope_define_value(

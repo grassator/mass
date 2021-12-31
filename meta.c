@@ -1587,10 +1587,10 @@ main(void) {
     }),
   }));
 
-  push_type(type_enum("Value_Flags", (Enum_Type_Item[]){
+  export_compiler(push_type(type_enum("Value_Flags", (Enum_Type_Item[]){
     { "None",  0 },
     { "Constant", 1 << 0 },
-  }));
+  })));
 
   export_compiler(push_type(add_common_fields(type_union("Value", (Struct_Type[]){
     struct_fields("Lazy", (Struct_Item[]){

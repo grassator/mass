@@ -323,9 +323,13 @@ add_or_subtract :: fn(
     }
 
     {
-      instruction : MASS.Instruction
-      instruction.tag = MASS.Instruction_Tag.Location
-      instruction.Location.source_range = source_range.*
+      instruction := MASS.Instruction [
+        .tag = MASS.Instruction_Tag.Location,
+        .scope = 0,
+        .Location = [source_range.*]
+      ]
+      // TODO support inline tuple in the call
+      MASS.push_instruction(&builder.code_block, instruction);
     }
 
     {
@@ -342,10 +346,13 @@ add_or_subtract :: fn(
   payload.* = [arguments.0, arguments.1, op_code]
 
   lazy_value := allocate(context.allocator, MASS.Value)
-  lazy_value.tag = MASS.Value_Tag.Lazy
-  lazy_value.descriptor = i64
-  lazy_value.source_range = arguments.source_range
-  lazy_value.Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
+  lazy_value.* = [
+    .tag = MASS.Value_Tag.Lazy,
+    .flags = MASS.Value_Flags.None,
+    .descriptor = i64,
+    .source_range = arguments.source_range,
+    .Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
+  ]
 
   lazy_value
 }
@@ -396,9 +403,13 @@ compare :: fn(
     }
 
     {
-      instruction : MASS.Instruction
-      instruction.tag = MASS.Instruction_Tag.Location
-      instruction.Location.source_range = source_range.*
+      instruction := MASS.Instruction [
+        .tag = MASS.Instruction_Tag.Location,
+        .scope = 0,
+        .Location = [source_range.*]
+      ]
+      // TODO support inline tuple in the call
+      MASS.push_instruction(&builder.code_block, instruction);
     }
 
     {
@@ -409,13 +420,19 @@ compare :: fn(
     MASS.register_release(builder, temp_rhs_register)
     MASS.register_release(builder, temp_lhs_register)
 
-    value : &MASS.Value = allocate(context.allocator, MASS.Value)
-    value.tag = MASS.Value_Tag.Forced
-    value.source_range = source_range.*
-    value.descriptor = bool
-    value.Forced.storage.tag = MASS.Storage_Tag.Eflags
-    value.Forced.storage.bit_size = (value.descriptor.*).bit_size
-    value.Forced.storage.Eflags.compare_type = payload.compare_type
+    value := allocate(context.allocator, MASS.Value)
+    value.* = [
+      .tag = MASS.Value_Tag.Forced,
+      .flags = MASS.Value_Flags.None,
+      .descriptor = bool,
+      .source_range = source_range.* ,
+      .Forced = [.storage = [
+        .tag = MASS.Storage_Tag.Eflags,
+        .flags = MASS.Storage_Flags.None,
+        .bit_size = (value.descriptor.*).bit_size,
+        .Eflags = [payload.compare_type]
+      ]]
+    ]
     value
   }
 
@@ -423,11 +440,13 @@ compare :: fn(
   payload.* = [arguments.0, arguments.1, compare_type]
 
   lazy_value := allocate(context.allocator, MASS.Value)
-  lazy_value.tag = MASS.Value_Tag.Lazy
-  lazy_value.descriptor = bool
-  lazy_value.source_range = arguments.source_range
-  lazy_value.Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
-
+  lazy_value.* = [
+    .tag = MASS.Value_Tag.Lazy,
+    .flags = MASS.Value_Flags.None,
+    .descriptor = bool,
+    .source_range = arguments.source_range,
+    .Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
+  ]
   lazy_value
 }
 
