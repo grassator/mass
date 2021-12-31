@@ -303,7 +303,8 @@ tokenize(
   enum Category {
     Digit_0,
     Digit_1,
-    Digits_2_to_9,
+    Digits_2_to_7,
+    Digits_8_to_9,
     Id_Start,
     Space,
     Underscore,
@@ -317,14 +318,15 @@ tokenize(
   static_assert(_Category_Last < (1 << sizeof(u8) * 8), "Category should fit into a u8");
   static_assert(_Category_Last < sizeof(u32) * 8, "Category mask should fit into a u32");
 
-  enum { Digits_Mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Digits_2_to_9) };
+  enum { Digits_Mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Digits_2_to_7) | (1 << Digits_8_to_9) };
 
   static u8 CHAR_CATEGORY_MAP[256] = {0};
   static u32 CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
     [Other] = (1 << Other),
     [Digit_0] = 0, // Needs special handling
     [Digit_1] = Digits_Mask | (1 << Underscore),
-    [Digits_2_to_9] = Digits_Mask | (1 << Underscore),
+    [Digits_2_to_7] = Digits_Mask | (1 << Underscore),
+    [Digits_8_to_9] = Digits_Mask | (1 << Underscore),
     [Id_Start] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
     [Underscore] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
     [Space] = (1 << Space),
@@ -370,11 +372,15 @@ tokenize(
     CHAR_CATEGORY_MAP['_'] = Underscore;
 
     for (char ch = '0'; ch <= '9'; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Digits_2_to_9;
       DIGIT_DECODER[ch] = ch - '0';
     }
     CHAR_CATEGORY_MAP['0'] = Digit_0;
     CHAR_CATEGORY_MAP['1'] = Digit_1;
+    for (char ch = '2'; ch <= '7'; ++ch) {
+      CHAR_CATEGORY_MAP[ch] = Digits_2_to_7;
+    }
+    CHAR_CATEGORY_MAP['8'] = Digits_8_to_9;
+    CHAR_CATEGORY_MAP['9'] = Digits_8_to_9;
 
     for (char ch = 'a'; ch <= 'z'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Id_Start;
@@ -426,12 +432,12 @@ tokenize(
           continue;
         } else if (current == 'o') {
           number_base = 8;
-          starting_category = Digits_2_to_9;
-          continuation_mask = Digits_Mask | (1 << Underscore);
+          starting_category = Digits_2_to_7;
+          continuation_mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Digits_2_to_7) | (1 << Underscore);
           continue;
         } else if (current == 'x') {
           number_base = 16;
-          starting_category = Digits_2_to_9;
+          starting_category = Digits_8_to_9;
           continuation_mask = Digits_Mask | (1 << Id_Start) | (1 << Underscore);
           continue;
         } else {
@@ -443,7 +449,8 @@ tokenize(
         }
       } break;
       case Digit_1:
-      case Digits_2_to_9: {
+      case Digits_2_to_7:
+      case Digits_8_to_9: {
         u64 digit_index = 0;
         if (number_base != 10) digit_index += 2; // Skip over `0b`, `0o` or `0x`
         Slice source = slice_sub(input, state.token_start_offset, offset);
