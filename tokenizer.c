@@ -323,8 +323,8 @@ tokenize(
   static u32 CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
     [Other] = (1 << Other),
     [Digit_0] = 0, // Needs special handling
-    [Digit_1] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
-    [Digits_2_to_9] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
+    [Digit_1] = Digits_Mask | (1 << Underscore),
+    [Digits_2_to_9] = Digits_Mask | (1 << Underscore),
     [Id_Start] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
     [Underscore] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
     [Space] = (1 << Space),
@@ -422,17 +422,17 @@ tokenize(
         if (current == 'b') {
           number_base = 2;
           starting_category = Digit_1;
-          continuation_mask = (1 << Digit_0) | (1 << Digit_1);
+          continuation_mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Underscore);
           continue;
         } else if (current == 'o') {
           number_base = 8;
           starting_category = Digits_2_to_9;
-          continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
+          continuation_mask = Digits_Mask | (1 << Underscore);
           continue;
         } else if (current == 'x') {
           number_base = 16;
           starting_category = Digits_2_to_9;
-          continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
+          continuation_mask = Digits_Mask | (1 << Id_Start) | (1 << Underscore);
           continue;
         } else {
           u64 zero = 0;
