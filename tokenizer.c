@@ -452,14 +452,9 @@ tokenize(
           starting_category = Digits_8_to_9;
           continuation_mask = Digits_Mask | (1 << Hex_Letter) | (1 << Underscore);
           continue;
-        } else {
-          u64 zero = 0;
-          Source_Range digit_range = tokenizer_token_range(&state, offset);
-          Value *value = value_make(context, &descriptor_i64, storage_immediate(&zero), digit_range);
-          dyn_array_push(state.token_stack, value);
-          number_base = 10;
         }
-      } break;
+        number_base = 10;
+      } // fall through
       case Digit_1:
       case Digits_2_to_7:
       case Digits_8_to_9: {
