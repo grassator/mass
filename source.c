@@ -4697,15 +4697,12 @@ mass_apply(
   Value_View operands
 ) {
   assert(operands.length == 2);
-  Value *lhs_token = value_view_get(&operands, 0);
+  operands.values[0] = token_parse_single(context, parser, value_view_get(&operands, 0));
+  if (mass_has_error(context)) return 0;
   Value *rhs_token = value_view_get(&operands, 1);
   if (value_is_group_paren(rhs_token)) {
-    return token_handle_parsed_function_call(
-      context, parser, lhs_token, rhs_token, operands.source_range
-    );
+    return mass_call(context, parser, operands);
   } else if (value_is_ast_block(rhs_token)) {
-    operands.values[0] = token_parse_single(context, parser, lhs_token);
-    if (mass_has_error(context)) return 0;
     return mass_forward_call_to_alias(
       context, parser, operands, context->compilation->common_symbols.postfix_block
     );
