@@ -467,15 +467,20 @@ tokenize(
         if (number_base != 10) digit_index += 2; // Skip over `0b`, `0o` or `0x`
         Slice source = slice_sub(input, state.token_start_offset, offset);
         u64 literal = 0;
-        for (; digit_index < source.length; ++digit_index) {
-          char ch = source.bytes[digit_index];
-          if (ch == '_') continue;
-          u8 digit = DIGIT_DECODER[ch];
-          if (digit >= number_base) break;
-          literal *= number_base;
-          literal += digit;
+
+        if (digit_index != source.length) {
+          for(;;) {
+            char ch = source.bytes[digit_index];
+            if (ch != '_') {
+              u8 digit = DIGIT_DECODER[ch];
+              assert(digit < number_base);
+              literal += digit;
+            }
+            digit_index += 1;
+            if (digit_index == source.length) break;
+            literal *= number_base;
+          }
         }
-        offset = state.token_start_offset + digit_index;
         Source_Range digit_range = tokenizer_token_range(&state, offset);
         Value *value = value_make(context, &descriptor_i64, storage_immediate(&literal), digit_range);
         dyn_array_push(state.token_stack, value);
