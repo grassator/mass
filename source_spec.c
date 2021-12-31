@@ -2124,7 +2124,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [.x = 20, .y = 22]\n"
+          "p := Point [.x = 20, .y = 22]\n"
           "p.x + p.y"
         "}"
       );
@@ -2137,7 +2137,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [.y = 22, .x = 20]\n"
+          "p := Point [.y = 22, .x = 20]\n"
           "p.x + p.y"
         "}"
       );
@@ -2150,8 +2150,8 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {\n"
-          "x : s32 = 20\n"
-          "p : Point = [.x, .y = 22]\n"
+          "x := s32(20)\n"
+          "p := Point [.x, .y = 22]\n"
           "p.x + p.y"
         "}"
       );
@@ -2164,7 +2164,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [.x = 20, 22]\n"
+          "p := Point [.x = 20, 22]\n"
           "p.x + p.y"
         "}"
       );
@@ -2177,7 +2177,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [.x = 20, .x = 22]\n"
+          "p := Point [.x = 20, .x = 22]\n"
           "p.x + p.y"
         "}"
       );
@@ -2201,7 +2201,6 @@ spec("source") {
     it("should report an error when inferred struct tuple type has duplicate fields") {
       test_program_inline_source_base(
         "test", &test_context,
-        "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
           "p := [.x = 20, .x = 22]\n"
           "p.x"
@@ -2217,7 +2216,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [20, 22]\n"
+          "p := Point [20, 22]\n"
           "p.x + p.y"
         "}"
       );
@@ -2230,22 +2229,10 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [20, 22]\n"
+          "p := Point [20, 22]\n"
           "pointer := &p\n"
           "dereferenced := pointer.*\n"
           "dereferenced.x + dereferenced.y\n"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to explicitly cast a tuple to a struct type that matches it") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "Point :: c_struct [x : s32, y : s32]\n"
-        "test :: fn() -> (s32) {"
-          "cast(Point, [42, 0]).x"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
@@ -2268,9 +2255,7 @@ spec("source") {
     it("should support using tuple as a type") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "tuple_id :: fn(x : [s64]) -> (s64) {"
-          "x.0"
-        "}\n"
+        "tuple_id :: fn(x : [s64]) -> (s64) { x.0 }\n"
         "test :: fn() -> (s64) {"
           "tuple := [42]\n"
           "tuple_id(tuple)"
@@ -2309,7 +2294,8 @@ spec("source") {
       test_program_inline_source_base(
         "test", &test_context,
         "test :: fn() -> (s32) {"
-          "p : s32 = [20]\n"
+          "p := s32(0)\n"
+          "p = [20]\n"
           "p"
         "}"
       );
@@ -2323,7 +2309,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [20]\n"
+          "p := Point[20]\n"
           "p.x + p.y"
         "}"
       );
@@ -2337,7 +2323,7 @@ spec("source") {
         "test", &test_context,
         "Point :: c_struct [x : s32, y : s32]\n"
         "test :: fn() -> (s32) {"
-          "p : Point = [20, 1, 1]\n"
+          "p := Point[20, 1, 1]\n"
           "p.x + p.y"
         "}"
       );

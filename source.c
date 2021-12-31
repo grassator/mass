@@ -4697,15 +4697,19 @@ mass_apply(
   Value_View operands
 ) {
   assert(operands.length == 2);
-  operands.values[0] = token_parse_single(context, parser, value_view_get(&operands, 0));
-  if (mass_has_error(context)) return 0;
+  Value *lhs_token = value_view_get(&operands, 0);
   Value *rhs_token = value_view_get(&operands, 1);
-  if (value_is_group_paren(rhs_token)) {
+  Value *lhs_value = operands.values[0] = token_parse_single(context, parser, lhs_token);
+  if (mass_has_error(context)) return 0;
+  if (value_is_descriptor_pointer(lhs_value)) {
+    const Descriptor *descriptor = *value_as_descriptor_pointer(lhs_value);
+    Value *rhs_value = token_parse_single(context, parser, rhs_token);
+    return mass_cast_helper(context, parser, descriptor, rhs_value, operands.source_range);
+  } else if (value_is_group_paren(rhs_token)) {
     return mass_call(context, parser, operands);
   } else if (value_is_ast_block(rhs_token)) {
-    return mass_forward_call_to_alias(
-      context, parser, operands, context->compilation->common_symbols.postfix_block
-    );
+    const Symbol *alias = context->compilation->common_symbols.postfix_block;
+    return mass_forward_call_to_alias(context, parser, operands, alias);
   }
   mass_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
