@@ -301,8 +301,9 @@ tokenize(
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096, .allocator = context->temp_allocator);
 
   enum Category {
-    Digits_0,
-    Digits_1_to_9,
+    Digit_0,
+    Digit_1,
+    Digits_2_to_9,
     Id_Start,
     Space,
     Underscore,
@@ -314,14 +315,18 @@ tokenize(
     _Category_Last = Other,
   };
   static_assert(_Category_Last < (1 << sizeof(u8) * 8), "Category should fit into a u8");
+  static_assert(_Category_Last < sizeof(u32) * 8, "Category mask should fit into a u32");
+
+  enum { Digits_Mask = (1 << Digit_0) | (1 << Digit_1) | (1 << Digits_2_to_9) };
 
   static u8 CHAR_CATEGORY_MAP[256] = {0};
   static u32 CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
     [Other] = (1 << Other),
-    [Digits_0] = 0, // Needs special handling
-    [Digits_1_to_9] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start) | (1 << Underscore),
-    [Id_Start] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start) | (1 << Underscore),
-    [Underscore] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start) | (1 << Underscore),
+    [Digit_0] = 0, // Needs special handling
+    [Digit_1] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
+    [Digits_2_to_9] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
+    [Id_Start] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
+    [Underscore] = Digits_Mask | (1 << Id_Start) | (1 << Underscore),
     [Space] = (1 << Space),
     [Special] = (1 << Space),
     [Symbols] = (1 << Symbols),
@@ -365,10 +370,11 @@ tokenize(
     CHAR_CATEGORY_MAP['_'] = Underscore;
 
     for (char ch = '0'; ch <= '9'; ++ch) {
-      CHAR_CATEGORY_MAP[ch] = Digits_1_to_9;
+      CHAR_CATEGORY_MAP[ch] = Digits_2_to_9;
       DIGIT_DECODER[ch] = ch - '0';
     }
-    CHAR_CATEGORY_MAP['0'] = Digits_0;
+    CHAR_CATEGORY_MAP['0'] = Digit_0;
+    CHAR_CATEGORY_MAP['1'] = Digit_1;
 
     for (char ch = 'a'; ch <= 'z'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Id_Start;
@@ -404,8 +410,8 @@ tokenize(
       case Newline: {
         tokenizer_maybe_push_statement(context, &state, offset);
       } break;
-      case Digits_0: {
-        if (category == Digits_1_to_9) { // e.g. 0777
+      case Digit_0: {
+        if ((1 << category) & Digits_Mask) { // e.g. 0777
           Slice message = slice_literal(
             "Numbers are not allowed to have `0` at the start.\n"
             "If you meant to specify an octal number, prefix it with `0o`"
@@ -415,17 +421,17 @@ tokenize(
         }
         if (current == 'b') {
           number_base = 2;
-          starting_category = Digits_1_to_9;
-          continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
+          starting_category = Digit_1;
+          continuation_mask = (1 << Digit_0) | (1 << Digit_1);
           continue;
         } else if (current == 'o') {
           number_base = 8;
-          starting_category = Digits_1_to_9;
+          starting_category = Digits_2_to_9;
           continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
           continue;
         } else if (current == 'x') {
           number_base = 16;
-          starting_category = Digits_1_to_9;
+          starting_category = Digits_2_to_9;
           continuation_mask = CATEGORY_CONTINUATION_MASK[starting_category];
           continue;
         } else {
@@ -436,7 +442,8 @@ tokenize(
           number_base = 10;
         }
       } break;
-      case Digits_1_to_9: {
+      case Digit_1:
+      case Digits_2_to_9: {
         u64 digit_index = 0;
         if (number_base != 10) digit_index += 2; // Skip over `0b`, `0o` or `0x`
         Slice source = slice_sub(input, state.token_start_offset, offset);
@@ -554,6 +561,7 @@ tokenize(
 
   if (should_finalize) {
     should_finalize = false;
+    category = Space;
     goto finalize;
   }
 
