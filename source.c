@@ -678,7 +678,6 @@ struct_find_field_by_name(
   return false;
 }
 
-// TODO :AssignCleanup Merge this with `same_type_or_can_implicitly_move_cast`
 static void
 assign_tuple(
   Mass_Context *context,
@@ -691,19 +690,6 @@ assign_tuple(
   Temp_Mark temp_mark = context_temp_mark(context);
   if (target->descriptor->tag == Descriptor_Tag_Struct) {
     Array_Struct_Field fields = target->descriptor->Struct.fields;
-    if ((dyn_array_length(fields) != dyn_array_length(tuple->items))) {
-      Slice message = dyn_array_length(fields) > dyn_array_length(tuple->items)
-        ? slice_literal("Tuple does not have enough items to match the struct it is assigned to")
-        : slice_literal("Tuple has too many items for the struct it is assigned to");
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = *source_range,
-        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-        .detailed_message = message,
-      });
-      goto err;
-    }
-
     Struct_Field_Set *assigned_set = hash_map_make(
       Struct_Field_Set,
       .initial_capacity = dyn_array_length(fields) * 2,
@@ -759,6 +745,16 @@ assign_tuple(
         }
       } else {
         field_source = tuple_item;
+        if (field_index >= dyn_array_length(fields)) {
+          Slice message = slice_literal("Tuple has too many items for the struct it is assigned to");
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Type_Mismatch,
+            .source_range = *source_range,
+            .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+            .detailed_message = message,
+          });
+          goto err;
+        }
         field = dyn_array_get(fields, field_index);
       }
       field_index += 1;
@@ -770,7 +766,6 @@ assign_tuple(
         });
         goto err;
       }
-      hash_map_set(assigned_set, field, 1);
 
       const Storage *target_storage = &value_as_forced(target)->storage;
       Value target_field = {
@@ -782,7 +777,32 @@ assign_tuple(
         .source_range = target->source_range,
       };
       mass_assign_helper(context, builder, &target_field, field_source, source_range);
+      Range_u64 field_overlap_range = {
+        .from = field->offset,
+        .to = field->offset + descriptor_byte_size(field->descriptor),
+      };
+      // Skip overlapped fields for unions
+      // TODO @Speed if sorting is guaranteed can look only forward and back
+      for (u64 i = 0; i < dyn_array_length(fields); ++i) {
+        const Struct_Field *a_field = dyn_array_get(fields, i);
+        if (range_contains(field_overlap_range, a_field->offset)) {
+          hash_map_set(assigned_set, a_field, 1);
+        }
+      }
       if (mass_has_error(context)) goto err;
+    }
+
+    if ((dyn_array_length(fields) != assigned_set->occupied)) {
+      Slice message = slice_literal(
+        "Tuple does not have enough items to match the struct it is assigned to"
+      );
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+        .detailed_message = message,
+      });
+      goto err;
     }
   } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Array) {
     const Storage *target_storage = &value_as_forced(target)->storage;
