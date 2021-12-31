@@ -2184,6 +2184,7 @@ typedef struct Common_Symbols {
   const Symbol * macro;
   const Symbol * operator;
   const Symbol * placeholder;
+  const Symbol * postfix_block;
   const Symbol * statement;
   const Symbol * syntax;
   const Symbol * underscore;
@@ -5613,6 +5614,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("placeholder"),
     .offset = offsetof(Common_Symbols, placeholder),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("postfix_block"),
+    .offset = offsetof(Common_Symbols, postfix_block),
   },
   {
     .descriptor = &descriptor_symbol_pointer,

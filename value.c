@@ -1409,6 +1409,7 @@ compilation_init(
     .macro = mass_ensure_symbol(compilation, slice_literal("macro")),
     .operator = mass_ensure_symbol(compilation, slice_literal("operator")),
     .placeholder = mass_ensure_symbol(compilation, slice_literal("placeholder")),
+    .postfix_block = mass_ensure_symbol(compilation, slice_literal("postfix_block")),
     .statement = mass_ensure_symbol(compilation, slice_literal("statement")),
     .syntax = mass_ensure_symbol(compilation, slice_literal("syntax")),
     .underscore = mass_ensure_symbol(compilation, slice_literal("underscore")),

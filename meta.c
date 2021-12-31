@@ -2003,6 +2003,7 @@ main(void) {
     { "const Symbol *", "macro" },
     { "const Symbol *", "operator" },
     { "const Symbol *", "placeholder" },
+    { "const Symbol *", "postfix_block" },
     { "const Symbol *", "statement" },
     { "const Symbol *", "syntax" },
     { "const Symbol *", "underscore" },

@@ -4704,11 +4704,11 @@ mass_apply(
       context, parser, lhs_token, rhs_token, operands.source_range
     );
   } else if (value_is_ast_block(rhs_token)) {
-    Value *lhs_value = token_parse_single(context, parser, lhs_token);
+    operands.values[0] = token_parse_single(context, parser, lhs_token);
     if (mass_has_error(context)) return 0;
-    if (value_is_function_header(lhs_value)) {
-      return mass_function_literal(context, parser, operands);
-    }
+    return mass_forward_call_to_alias(
+      context, parser, operands, context->compilation->common_symbols.postfix_block
+    );
   }
   mass_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
