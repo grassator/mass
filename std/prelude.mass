@@ -1,13 +1,10 @@
-// `get_intrinsic` is a global because it itself needs to be used to access module exports
+// `__get` is a global because it itself needs to be used to access module exports
 operator(.) :: 20 __get
 
-// `import` is global to avoid the need to define other compiler exports as global
+// `__import` is global to avoid the need to define other compiler exports as global
 operator(import _) :: 20 __import
 
 MASS :: import("mass")
-
-// TODO support mapping apply here with this specialized syntax
-//operator(_ _) :: 20 MASS.apply
 
 // These keyword-like operators have extremely high precedence to make sure that
 // they really get the next token, unless the user has something really specific
@@ -63,14 +60,6 @@ operator(&) :: 15 'bitwise_and
 
 operator(- _) :: 16 'negate
 operator(& _) :: 16 'pointer_to
-
-apply :: fn(x, paren : MASS.Group_Paren) => _ MASS.call
-apply :: fn(x, paren : MASS.Group_Paren) -> _ MASS.call
-
-// FIXME this should not be generic, but it is unclear how this should be handled.
-//       An easy thing to do would be for `apply` to actually parse lhs. This is limiting
-//       to what can be done, but so far this is what is useful in practice.
-apply :: fn(x, block : MASS.Ast_Block) => (MASS.Function_Literal) MASS.function_literal
 
 cast :: fn(type : Type, value) -> _ MASS.cast
 zero_extend :: fn(type : Type, value) -> _ MASS.zero_extend

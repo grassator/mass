@@ -4696,7 +4696,26 @@ mass_apply(
   Parser *parser,
   Value_View operands
 ) {
-  return mass_forward_call_to_alias(context, parser, operands, context->compilation->common_symbols.apply);
+  assert(operands.length == 2);
+  Value *lhs_token = value_view_get(&operands, 0);
+  Value *rhs_token = value_view_get(&operands, 1);
+  if (value_is_group_paren(rhs_token)) {
+    return token_handle_parsed_function_call(
+      context, parser, lhs_token, rhs_token, operands.source_range
+    );
+  } else if (value_is_ast_block(rhs_token)) {
+    Value *lhs_value = token_parse_single(context, parser, lhs_token);
+    if (mass_has_error(context)) return 0;
+    if (value_is_function_header(lhs_value)) {
+      return mass_function_literal(context, parser, operands);
+    }
+  }
+  mass_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Parse,
+    .source_range = operands.source_range,
+    .detailed_message = "Unexpected token sequence"
+  });
+  return 0;
 }
 
 static Value *

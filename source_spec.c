@@ -1609,16 +1609,6 @@ spec("source") {
       check(error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Postfix);
       spec_check_slice(error->Operator_Fixity_Conflict.symbol, slice_literal("**"));
     }
-
-    it("should support defining a custom 'empty space' operator handler") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "apply :: macro(symbol :: 'foo, literal : i64) -> (i64) { literal }\n"
-        "checker :: fn() -> (s64) { foo 42 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
   }
 
   describe("Quote / Unquote") {
