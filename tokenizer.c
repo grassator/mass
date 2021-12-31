@@ -301,29 +301,29 @@ tokenize(
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096, .allocator = context->temp_allocator);
 
   enum Category {
-    Digits_0 = 1 << 0,
-    Digits_1_to_9 = 1 << 1,
-    Id_Start = 1 << 2,
-    Space = 1 << 3,
-    Special = 1 << 4,
-    Symbols = 1 << 5,
-    Newline = 1 << 6,
-    Other = 1 << 7,
+    Digits_0,
+    Digits_1_to_9,
+    Id_Start,
+    Space,
+    Special,
+    Symbols,
+    Newline,
+    Other,
 
     _Category_Last = Other,
   };
   static_assert(_Category_Last < (1 << sizeof(u8) * 8), "Category should fit into a u8");
 
   static u8 CHAR_CATEGORY_MAP[256] = {0};
-  static enum Category CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
-    [Other] = Other,
+  static u32 CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
+    [Other] = (1 << Other),
     [Digits_0] = 0, // Needs special handling
-    [Digits_1_to_9] = Digits_0 | Digits_1_to_9 | Id_Start,
-    [Id_Start] = Digits_0 | Digits_1_to_9 | Id_Start,
-    [Space] = Space,
-    [Special] = Space,
-    [Symbols] = Symbols,
-    [Newline] = Newline,
+    [Digits_1_to_9] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start),
+    [Id_Start] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start),
+    [Space] = (1 << Space),
+    [Special] = (1 << Space),
+    [Symbols] = (1 << Symbols),
+    [Newline] = (1 << Newline),
   };
 
   static u8 DIGIT_DECODER[128] = {0};
@@ -387,14 +387,14 @@ tokenize(
   enum Category starting_category = Space;
   char current = 0;
   enum Category category = Space;
-  enum Category continuation_mask = 0;
+  u32 continuation_mask = 0;
   u32 number_base = 10;
 
   for (; offset < end_offset; ++offset) {
     current = input.bytes[offset];
     category = CHAR_CATEGORY_MAP[current];
 
-    if ((category & continuation_mask)) continue;
+    if ((1 << category) & continuation_mask) continue;
 
     finalize:
     switch(starting_category) {
@@ -510,7 +510,7 @@ tokenize(
         case '/': {
           if (offset + 1 < end_offset && input.bytes[offset + 1] == '/') {
             starting_category = Space;
-            continuation_mask = ~Newline;
+            continuation_mask = ~(1u << Newline);
             continue;
           } else {
             category = Symbols;
