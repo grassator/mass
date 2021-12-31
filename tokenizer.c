@@ -305,6 +305,7 @@ tokenize(
     Digits_1_to_9,
     Id_Start,
     Space,
+    Underscore,
     Special,
     Symbols,
     Newline,
@@ -318,8 +319,9 @@ tokenize(
   static u32 CATEGORY_CONTINUATION_MASK[_Category_Last + 1] = {
     [Other] = (1 << Other),
     [Digits_0] = 0, // Needs special handling
-    [Digits_1_to_9] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start),
-    [Id_Start] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start),
+    [Digits_1_to_9] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start) | (1 << Underscore),
+    [Id_Start] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start) | (1 << Underscore),
+    [Underscore] = (1 << Digits_0) | (1 << Digits_1_to_9) | (1 << Id_Start) | (1 << Underscore),
     [Space] = (1 << Space),
     [Special] = (1 << Space),
     [Symbols] = (1 << Symbols),
@@ -360,13 +362,14 @@ tokenize(
     CHAR_CATEGORY_MAP['['] = Special;
     CHAR_CATEGORY_MAP[']'] = Special;
 
+    CHAR_CATEGORY_MAP['_'] = Underscore;
+
     for (char ch = '0'; ch <= '9'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Digits_1_to_9;
       DIGIT_DECODER[ch] = ch - '0';
     }
     CHAR_CATEGORY_MAP['0'] = Digits_0;
 
-    CHAR_CATEGORY_MAP['_'] = Id_Start;
     for (char ch = 'a'; ch <= 'z'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Id_Start;
       if (ch <= 'f') DIGIT_DECODER[ch] = ch - 'a' + 10;
@@ -460,6 +463,7 @@ tokenize(
           category = Space;
         }
       } break;
+      case Underscore:
       case Id_Start:
       case Symbols: {
         Slice name = slice_sub(input, state.token_start_offset, offset);
