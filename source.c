@@ -3012,6 +3012,13 @@ call_function_overload(
       panic("Found XMM usage");
     }
 
+    // Generally we can not optimize a copy to stack if the target is implicit pointer
+    // or an indirect storage because they need a memory address.
+    bool needs_memory_address = (
+      descriptor_is_implicit_pointer(call_param->descriptor) ||
+      storage_is_indirect(&call_param->storage)
+    );
+
     bool can_use_source_arg_as_is;
     // If source args are on the stack or rip-relative we don't need to worry about their registers
     // but it is not true for all Storage_Tag_Memory, because indirect access uses registers
@@ -3022,9 +3029,8 @@ call_function_overload(
     } else if (
       // Compile time-known args also don't need registers so they can be used as-is
       mass_value_is_compile_time_known(source_arg) &&
-      // TODO figure out why this is required and explain but since it just disallows
-      //      some potential optizations it is not critical to do right now.
-      !descriptor_is_implicit_pointer(call_param->descriptor)
+      // TODO Consider if it is ok to just pass the address as an immediate here
+      !needs_memory_address
     ) {
       can_use_source_arg_as_is = true;
     } else {
@@ -3033,10 +3039,8 @@ call_function_overload(
 
     bool target_param_registers_are_free =
       !(builder->register_occupied_bitset.bits & target_param_register_bitset);
-    bool can_assign_straight_to_target = (
-      target_param_registers_are_free &&
-      !descriptor_is_implicit_pointer(call_param->descriptor)
-    );
+    bool can_assign_straight_to_target =
+      target_param_registers_are_free && !needs_memory_address;
 
     static const bool SHOULD_OPTIMIZE = true;
 
@@ -3068,7 +3072,7 @@ call_function_overload(
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
         required_register_count == 1 &&
-        !descriptor_is_implicit_pointer(call_param->descriptor) &&
+        !needs_memory_address &&
         register_bitset_occupied_count(allowed_temp_registers) > 1
       ) {
         Register temp_register = register_find_available(builder, prohibited_registers);
@@ -3749,9 +3753,16 @@ mass_ensure_trampoline(
   );
   for (u64 i = 0; i < dyn_array_length(fields); ++i) {
     const Struct_Field *field = dyn_array_get(fields, i);
-    Storage storage = storage_with_offset_and_bit_size(
-      &args_struct_indirect_storage, u64_to_s32(field->offset), field->descriptor->bit_size
-    );
+    Storage storage;
+    Function_Parameter *param = dyn_array_get(original_info->parameters, i);
+    if (param->tag == Function_Parameter_Tag_Exact_Static) {
+      storage = param->Exact_Static.storage;
+      assert(same_type(field->descriptor, param->descriptor));
+    } else {
+      storage = storage_with_offset_and_bit_size(
+        &args_struct_indirect_storage, u64_to_s32(field->offset), field->descriptor->bit_size
+      );
+    }
     Value *arg_value = value_make(context, field->descriptor, storage, args_view.source_range);
     dyn_array_push(destructured_arg_array, arg_value);
   }

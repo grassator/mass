@@ -1710,7 +1710,7 @@ spec("source") {
       check(value_as_i64(result)->bits == 42);
     }
 
-    xit("should support static exact params in compile-time fns") {
+    it("should support static exact params in compile-time fns") {
       Value *result = test_program_inline_source_base(
         "RESULT", &test_context,
         "RESULT :: foo(42)\n"
@@ -1721,10 +1721,10 @@ spec("source") {
       check(value_as_i64(result)->bits == 42);
     }
 
-    xit("should support static generic params in compile-time fns") {
+    it("should support static generic params in compile-time fns") {
       Value *result = test_program_inline_source_base(
         "RESULT", &test_context,
-        "RESULT :: foo(\"bar\").length + foo(38)\n"
+        "RESULT :: foo(\"bar\").length + foo(39)\n"
         "foo :: fn(@x) => (x) { x }"
       );
 
