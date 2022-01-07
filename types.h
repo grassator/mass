@@ -97,6 +97,15 @@
   static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _C_TYPE_, &(mass_meta_brand_##_NAME_), __VA_ARGS__)
 
+#define MASS_DEFINE_C_DYN_ARRAY_TYPE(_NAME_, _ITEM_, _C_TYPE_)\
+  MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_,  _C_TYPE_, \
+    {\
+      .descriptor = &descriptor_dyn_array_internal_pointer,\
+      .name = slice_literal_fields("internal"),\
+      .offset = 0,\
+    },\
+  )
+
 #define MASS_DEFINE_FUNCTION_DESCRIPTOR(_NAME_, _RETURN_DESCRIPTOR_, ...)\
   dyn_array_struct(Function_Parameter) descriptor_##_NAME_##__parameters = {\
     .length = countof((const Function_Parameter[]){__VA_ARGS__}),\

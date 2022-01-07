@@ -1090,6 +1090,9 @@ typedef dyn_array_type(const Range_f64 *) Array_Const_Range_f64_Ptr;
 typedef dyn_array_type(Slice *) Array_Slice_Ptr;
 typedef dyn_array_type(const Slice *) Array_Const_Slice_Ptr;
 
+typedef dyn_array_type(Dyn_Array_Internal *) Array_Dyn_Array_Internal_Ptr;
+typedef dyn_array_type(const Dyn_Array_Internal *) Array_Const_Dyn_Array_Internal_Ptr;
+
 
 // Type Definitions
 
@@ -3026,6 +3029,11 @@ static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
 static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
+static Descriptor descriptor_dyn_array_internal;
+static Descriptor descriptor_array_dyn_array_internal;
+static Descriptor descriptor_array_dyn_array_internal_ptr;
+static Descriptor descriptor_dyn_array_internal_pointer;
+static Descriptor descriptor_dyn_array_internal_pointer_pointer;
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_i8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_i8);
 static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
@@ -3033,8 +3041,6 @@ static Descriptor descriptor_i8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descr
 static Descriptor descriptor_i8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_i8);
 static Descriptor descriptor_i8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_i8);
 static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
-MASS_DEFINE_OPAQUE_C_TYPE(array_bits_ptr, Array_Bits_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_bits, Array_Bits)
 MASS_DEFINE_STRUCT_DESCRIPTOR(bits, Bits,
   {
     .descriptor = &descriptor_i64,
@@ -3043,10 +3049,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(bits, Bits,
   },
 );
 MASS_DEFINE_TYPE_VALUE(bits);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_bits_ptr, bits_pointer, Array_Bits_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_bits, bits, Array_Bits);
 DEFINE_VALUE_IS_AS_HELPERS(Bits, bits);
 DEFINE_VALUE_IS_AS_HELPERS(Bits *, bits_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_position, Source_Position,
   {
     .descriptor = &descriptor_i64,
@@ -3060,10 +3066,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_position, Source_Position,
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_position);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_position_ptr, source_position_pointer, Array_Source_Position_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_position, source_position, Array_Source_Position);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Position, source_position);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Position *, source_position_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_source_file_ptr, Array_Source_File_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_source_file, Array_Source_File)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_file, Source_File,
   {
     .descriptor = &descriptor_slice,
@@ -3077,10 +3083,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_file, Source_File,
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_file);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_file_ptr, source_file_pointer, Array_Source_File_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_file, source_file, Array_Source_File);
 DEFINE_VALUE_IS_AS_HELPERS(Source_File, source_file);
 DEFINE_VALUE_IS_AS_HELPERS(Source_File *, source_file_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_source_range_ptr, Array_Source_Range_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_source_range, Array_Source_Range)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_range, Source_Range,
   {
     .descriptor = &descriptor_source_file_pointer,
@@ -3094,10 +3100,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range, Source_Range,
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_range);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_range_ptr, source_range_pointer, Array_Source_Range_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_range, source_range, Array_Source_Range);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Range, source_range);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Range *, source_range_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_assignment_ptr, Array_Assignment_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_assignment, Array_Assignment)
 MASS_DEFINE_STRUCT_DESCRIPTOR(assignment, Assignment,
   {
     .descriptor = &descriptor_value_pointer,
@@ -3111,11 +3117,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(assignment, Assignment,
   },
 );
 MASS_DEFINE_TYPE_VALUE(assignment);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_assignment_ptr, assignment_pointer, Array_Assignment_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_assignment, assignment, Array_Assignment);
 DEFINE_VALUE_IS_AS_HELPERS(Assignment, assignment);
 DEFINE_VALUE_IS_AS_HELPERS(Assignment *, assignment_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports_ptr, Array_Module_Exports_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports, Array_Module_Exports)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_module_exports_ptr, module_exports_pointer, Array_Module_Exports_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_module_exports, module_exports, Array_Module_Exports);
 MASS_DEFINE_OPAQUE_C_TYPE(module_exports_tag, Module_Exports_Tag)
 static C_Enum_Item module_exports_tag_items[] = {
 { .name = slice_literal_fields("Not_Specified"), .value = 0 },
@@ -3156,8 +3164,6 @@ MASS_DEFINE_TYPE_VALUE(module_exports);
 DEFINE_VALUE_IS_AS_HELPERS(Module_Exports, module_exports);
 DEFINE_VALUE_IS_AS_HELPERS(Module_Exports *, module_exports_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_module_ptr, Array_Module_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_module, Array_Module)
 MASS_DEFINE_STRUCT_DESCRIPTOR(module, Module,
   {
     .descriptor = &descriptor_source_range,
@@ -3176,10 +3182,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module, Module,
   },
 );
 MASS_DEFINE_TYPE_VALUE(module);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_module_ptr, module_pointer, Array_Module_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_module, module, Array_Module);
 DEFINE_VALUE_IS_AS_HELPERS(Module, module);
 DEFINE_VALUE_IS_AS_HELPERS(Module *, module_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_parse_error_ptr, Array_Parse_Error_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_parse_error, Array_Parse_Error)
 MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error, Parse_Error,
   {
     .descriptor = &descriptor_slice,
@@ -3193,10 +3199,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error, Parse_Error,
   },
 );
 MASS_DEFINE_TYPE_VALUE(parse_error);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_parse_error_ptr, parse_error_pointer, Array_Parse_Error_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_parse_error, parse_error, Array_Parse_Error);
 DEFINE_VALUE_IS_AS_HELPERS(Parse_Error, parse_error);
 DEFINE_VALUE_IS_AS_HELPERS(Parse_Error *, parse_error_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_value_view_ptr, Array_Value_View_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_value_view, Array_Value_View)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value_view, Value_View,
   {
     .descriptor = &descriptor_value_pointer_pointer,
@@ -3215,10 +3221,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_view, Value_View,
   },
 );
 MASS_DEFINE_TYPE_VALUE(value_view);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_value_view_ptr, value_view_pointer, Array_Value_View_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_value_view, value_view, Array_Value_View);
 DEFINE_VALUE_IS_AS_HELPERS(Value_View, value_view);
 DEFINE_VALUE_IS_AS_HELPERS(Value_View *, value_view_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_symbol_ptr, Array_Symbol_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_symbol, Array_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(symbol, Symbol,
   {
     .descriptor = &descriptor_slice,
@@ -3227,10 +3233,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(symbol, Symbol,
   },
 );
 MASS_DEFINE_TYPE_VALUE(symbol);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_symbol_ptr, symbol_pointer, Array_Symbol_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_symbol, symbol, Array_Symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Symbol *, symbol_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_paren_ptr, Array_Group_Paren_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_paren, Array_Group_Paren)
 MASS_DEFINE_STRUCT_DESCRIPTOR(group_paren, Group_Paren,
   {
     .descriptor = &descriptor_value_view,
@@ -3239,10 +3245,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group_paren, Group_Paren,
   },
 );
 MASS_DEFINE_TYPE_VALUE(group_paren);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_group_paren_ptr, group_paren_pointer, Array_Group_Paren_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_group_paren, group_paren, Array_Group_Paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren *, group_paren_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_ast_statement_ptr, Array_Ast_Statement_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_ast_statement, Array_Ast_Statement)
 MASS_DEFINE_STRUCT_DESCRIPTOR(ast_statement, Ast_Statement,
   {
     .descriptor = &descriptor_value_view,
@@ -3256,10 +3262,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(ast_statement, Ast_Statement,
   },
 );
 MASS_DEFINE_TYPE_VALUE(ast_statement);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_statement_ptr, ast_statement_pointer, Array_Ast_Statement_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_statement, ast_statement, Array_Ast_Statement);
 DEFINE_VALUE_IS_AS_HELPERS(Ast_Statement, ast_statement);
 DEFINE_VALUE_IS_AS_HELPERS(Ast_Statement *, ast_statement_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_ast_block_ptr, Array_Ast_Block_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_ast_block, Array_Ast_Block)
 MASS_DEFINE_STRUCT_DESCRIPTOR(ast_block, Ast_Block,
   {
     .descriptor = &descriptor_ast_statement_pointer,
@@ -3273,10 +3279,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(ast_block, Ast_Block,
   },
 );
 MASS_DEFINE_TYPE_VALUE(ast_block);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_block_ptr, ast_block_pointer, Array_Ast_Block_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_block, ast_block, Array_Ast_Block);
 DEFINE_VALUE_IS_AS_HELPERS(Ast_Block, ast_block);
 DEFINE_VALUE_IS_AS_HELPERS(Ast_Block *, ast_block_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_square_ptr, Array_Group_Square_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_square, Array_Group_Square)
 MASS_DEFINE_STRUCT_DESCRIPTOR(group_square, Group_Square,
   {
     .descriptor = &descriptor_value_view,
@@ -3285,10 +3291,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group_square, Group_Square,
   },
 );
 MASS_DEFINE_TYPE_VALUE(group_square);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_group_square_ptr, group_square_pointer, Array_Group_Square_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_group_square, group_square, Array_Group_Square);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Square *, group_square_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_ast_using_ptr, Array_Ast_Using_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_ast_using, Array_Ast_Using)
 MASS_DEFINE_STRUCT_DESCRIPTOR(ast_using, Ast_Using,
   {
     .descriptor = &descriptor_module_pointer,
@@ -3297,6 +3303,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(ast_using, Ast_Using,
   },
 );
 MASS_DEFINE_TYPE_VALUE(ast_using);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_using_ptr, ast_using_pointer, Array_Ast_Using_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_using, ast_using, Array_Ast_Using);
 DEFINE_VALUE_IS_AS_HELPERS(Ast_Using, ast_using);
 DEFINE_VALUE_IS_AS_HELPERS(Ast_Using *, ast_using_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
@@ -3307,8 +3315,6 @@ static C_Enum_Item section_permissions_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Section_Permissions, section_permissions);
 DEFINE_VALUE_IS_AS_HELPERS(Section_Permissions *, section_permissions_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_section_ptr, Array_Section_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_section, Array_Section)
 MASS_DEFINE_STRUCT_DESCRIPTOR(section, Section,
   {
     .descriptor = &descriptor_virtual_memory_buffer,
@@ -3332,10 +3338,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(section, Section,
   },
 );
 MASS_DEFINE_TYPE_VALUE(section);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_section_ptr, section_pointer, Array_Section_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_section, section, Array_Section);
 DEFINE_VALUE_IS_AS_HELPERS(Section, section);
 DEFINE_VALUE_IS_AS_HELPERS(Section *, section_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_program_memory_ptr, Array_Program_Memory_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_program_memory, Array_Program_Memory)
 MASS_DEFINE_STRUCT_DESCRIPTOR(program_memory, Program_Memory,
   {
     .descriptor = &descriptor_virtual_memory_buffer,
@@ -3359,6 +3365,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program_memory, Program_Memory,
   },
 );
 MASS_DEFINE_TYPE_VALUE(program_memory);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_program_memory_ptr, program_memory_pointer, Array_Program_Memory_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_program_memory, program_memory, Array_Program_Memory);
 DEFINE_VALUE_IS_AS_HELPERS(Program_Memory, program_memory);
 DEFINE_VALUE_IS_AS_HELPERS(Program_Memory *, program_memory_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(register, Register)
@@ -3398,8 +3406,6 @@ static C_Enum_Item register_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Register, register);
 DEFINE_VALUE_IS_AS_HELPERS(Register *, register_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_label_ptr, Array_Label_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_label, Array_Label)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label, Label,
   {
     .descriptor = &descriptor_i32,
@@ -3428,10 +3434,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label, Label,
   },
 );
 MASS_DEFINE_TYPE_VALUE(label);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_label_ptr, label_pointer, Array_Label_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_label, label, Array_Label);
 DEFINE_VALUE_IS_AS_HELPERS(Label, label);
 DEFINE_VALUE_IS_AS_HELPERS(Label *, label_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_label_location_diff_patch_info_ptr, Array_Label_Location_Diff_Patch_Info_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_label_location_diff_patch_info, Array_Label_Location_Diff_Patch_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info, Label_Location_Diff_Patch_Info,
   {
     .descriptor = &descriptor_label_pointer,
@@ -3455,6 +3461,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info, Label_Location_Dif
   },
 );
 MASS_DEFINE_TYPE_VALUE(label_location_diff_patch_info);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_label_location_diff_patch_info_ptr, label_location_diff_patch_info_pointer, Array_Label_Location_Diff_Patch_Info_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_label_location_diff_patch_info, label_location_diff_patch_info, Array_Label_Location_Diff_Patch_Info);
 DEFINE_VALUE_IS_AS_HELPERS(Label_Location_Diff_Patch_Info, label_location_diff_patch_info);
 DEFINE_VALUE_IS_AS_HELPERS(Label_Location_Diff_Patch_Info *, label_location_diff_patch_info_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(number_base, Number_Base)
@@ -3465,8 +3473,6 @@ static C_Enum_Item number_base_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Number_Base, number_base);
 DEFINE_VALUE_IS_AS_HELPERS(Number_Base *, number_base_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_quoted_ptr, Array_Quoted_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_quoted, Array_Quoted)
 MASS_DEFINE_STRUCT_DESCRIPTOR(quoted, Quoted,
   {
     .descriptor = &descriptor_value_pointer,
@@ -3475,10 +3481,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(quoted, Quoted,
   },
 );
 MASS_DEFINE_TYPE_VALUE(quoted);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_quoted_ptr, quoted_pointer, Array_Quoted_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_quoted, quoted, Array_Quoted);
 DEFINE_VALUE_IS_AS_HELPERS(Quoted, quoted);
 DEFINE_VALUE_IS_AS_HELPERS(Quoted *, quoted_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_named_accessor_ptr, Array_Named_Accessor_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_named_accessor, Array_Named_Accessor)
 MASS_DEFINE_STRUCT_DESCRIPTOR(named_accessor, Named_Accessor,
   {
     .descriptor = &descriptor_symbol_pointer,
@@ -3487,10 +3493,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(named_accessor, Named_Accessor,
   },
 );
 MASS_DEFINE_TYPE_VALUE(named_accessor);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_named_accessor_ptr, named_accessor_pointer, Array_Named_Accessor_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_named_accessor, named_accessor, Array_Named_Accessor);
 DEFINE_VALUE_IS_AS_HELPERS(Named_Accessor, named_accessor);
 DEFINE_VALUE_IS_AS_HELPERS(Named_Accessor *, named_accessor_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol_ptr, Array_External_Symbol_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol, Array_External_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol, External_Symbol,
   {
     .descriptor = &descriptor_slice,
@@ -3504,10 +3510,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol, External_Symbol,
   },
 );
 MASS_DEFINE_TYPE_VALUE(external_symbol);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_external_symbol_ptr, external_symbol_pointer, Array_External_Symbol_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_external_symbol, external_symbol, Array_External_Symbol);
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol *, external_symbol_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol_ptr, Array_Import_Symbol_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol, Import_Symbol,
   {
     .descriptor = &descriptor_slice,
@@ -3521,10 +3527,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol, Import_Symbol,
   },
 );
 MASS_DEFINE_TYPE_VALUE(import_symbol);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_import_symbol_ptr, import_symbol_pointer, Array_Import_Symbol_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_import_symbol, import_symbol, Array_Import_Symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Import_Symbol, import_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Import_Symbol *, import_symbol_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_import_library_ptr, Array_Import_Library_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_import_library, Array_Import_Library)
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_library, Import_Library,
   {
     .descriptor = &descriptor_slice,
@@ -3538,6 +3544,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(import_library, Import_Library,
   },
 );
 MASS_DEFINE_TYPE_VALUE(import_library);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_import_library_ptr, import_library_pointer, Array_Import_Library_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_import_library, import_library, Array_Import_Library);
 DEFINE_VALUE_IS_AS_HELPERS(Import_Library, import_library);
 DEFINE_VALUE_IS_AS_HELPERS(Import_Library *, import_library_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(compare_type, Compare_Type)
@@ -3564,8 +3572,8 @@ static C_Enum_Item stack_area_items[] = {
 DEFINE_VALUE_IS_AS_HELPERS(Stack_Area, stack_area);
 DEFINE_VALUE_IS_AS_HELPERS(Stack_Area *, stack_area_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_memory_location_ptr, Array_Memory_Location_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_memory_location, Array_Memory_Location)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_memory_location_ptr, memory_location_pointer, Array_Memory_Location_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_memory_location, memory_location, Array_Memory_Location);
 MASS_DEFINE_OPAQUE_C_TYPE(memory_location_tag, Memory_Location_Tag)
 static C_Enum_Item memory_location_tag_items[] = {
 { .name = slice_literal_fields("Instruction_Pointer_Relative"), .value = 0 },
@@ -3645,8 +3653,8 @@ static C_Enum_Item storage_flags_items[] = {
 DEFINE_VALUE_IS_AS_HELPERS(Storage_Flags, storage_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Storage_Flags *, storage_flags_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_storage_ptr, Array_Storage_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_storage, Array_Storage)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_storage_ptr, storage_pointer, Array_Storage_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_storage, storage, Array_Storage);
 MASS_DEFINE_OPAQUE_C_TYPE(storage_tag, Storage_Tag)
 static C_Enum_Item storage_tag_items[] = {
 { .name = slice_literal_fields("Immediate"), .value = 0 },
@@ -3784,8 +3792,6 @@ MASS_DEFINE_TYPE_VALUE(storage);
 DEFINE_VALUE_IS_AS_HELPERS(Storage, storage);
 DEFINE_VALUE_IS_AS_HELPERS(Storage *, storage_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_relocation_ptr, Array_Relocation_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_relocation, Array_Relocation)
 MASS_DEFINE_STRUCT_DESCRIPTOR(relocation, Relocation,
   {
     .descriptor = &descriptor_storage,
@@ -3799,10 +3805,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(relocation, Relocation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(relocation);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_relocation_ptr, relocation_pointer, Array_Relocation_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_relocation, relocation, Array_Relocation);
 DEFINE_VALUE_IS_AS_HELPERS(Relocation, relocation);
 DEFINE_VALUE_IS_AS_HELPERS(Relocation *, relocation_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_assembly_ptr, Array_Instruction_Assembly_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_assembly, Array_Instruction_Assembly)
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
   {
     .descriptor = &descriptor_x64_mnemonic_pointer,
@@ -3816,11 +3822,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_assembly);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_assembly_ptr, instruction_assembly_pointer, Array_Instruction_Assembly_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_assembly, instruction_assembly, Array_Instruction_Assembly);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction_Assembly, instruction_assembly);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction_Assembly *, instruction_assembly_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_ptr, Array_Instruction_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction, Array_Instruction)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_ptr, instruction_pointer, Array_Instruction_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction, instruction, Array_Instruction);
 MASS_DEFINE_OPAQUE_C_TYPE(instruction_tag, Instruction_Tag)
 static C_Enum_Item instruction_tag_items[] = {
 { .name = slice_literal_fields("Label"), .value = 0 },
@@ -3930,8 +3938,6 @@ MASS_DEFINE_TYPE_VALUE(instruction);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction, instruction);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction *, instruction_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_bucket_ptr, Array_Instruction_Bucket_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_bucket, Array_Instruction_Bucket)
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_bucket, Instruction_Bucket,
   {
     .descriptor = &descriptor_instruction_15,
@@ -3950,10 +3956,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_bucket, Instruction_Bucket,
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_bucket);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_bucket_ptr, instruction_bucket_pointer, Array_Instruction_Bucket_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_bucket, instruction_bucket, Array_Instruction_Bucket);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction_Bucket, instruction_bucket);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction_Bucket *, instruction_bucket_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_code_block_ptr, Array_Code_Block_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_code_block, Array_Code_Block)
 MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
   {
     .descriptor = &descriptor_allocator_pointer,
@@ -3982,10 +3988,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
   },
 );
 MASS_DEFINE_TYPE_VALUE(code_block);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_code_block_ptr, code_block_pointer, Array_Code_Block_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_code_block, code_block, Array_Code_Block);
 DEFINE_VALUE_IS_AS_HELPERS(Code_Block, code_block);
 DEFINE_VALUE_IS_AS_HELPERS(Code_Block *, code_block_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_epoch_ptr, Array_Epoch_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_epoch, Array_Epoch)
 MASS_DEFINE_STRUCT_DESCRIPTOR(epoch, Epoch,
   {
     .descriptor = &descriptor_i64,
@@ -3994,6 +4000,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(epoch, Epoch,
   },
 );
 MASS_DEFINE_TYPE_VALUE(epoch);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_epoch_ptr, epoch_pointer, Array_Epoch_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_epoch, epoch, Array_Epoch);
 DEFINE_VALUE_IS_AS_HELPERS(Epoch, epoch);
 DEFINE_VALUE_IS_AS_HELPERS(Epoch *, epoch_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
@@ -4011,8 +4019,6 @@ static C_Enum_Item operator_associativity_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity, operator_associativity);
 DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity *, operator_associativity_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_layout_ptr, Array_Function_Layout_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_layout, Array_Function_Layout)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
   {
     .descriptor = &descriptor_i32,
@@ -4046,10 +4052,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_layout);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_layout_ptr, function_layout_pointer, Array_Function_Layout_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_layout, function_layout, Array_Function_Layout);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Layout, function_layout);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Layout *, function_layout_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_context_ptr, Array_Mass_Context_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_context, Array_Mass_Context)
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_context, Mass_Context,
   {
     .descriptor = &descriptor_allocator_pointer,
@@ -4078,6 +4084,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_context, Mass_Context,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_context);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_context_ptr, mass_context_pointer, Array_Mass_Context_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_context, mass_context, Array_Mass_Context);
 DEFINE_VALUE_IS_AS_HELPERS(Mass_Context, mass_context);
 DEFINE_VALUE_IS_AS_HELPERS(Mass_Context *, mass_context_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(parser_flags, Parser_Flags)
@@ -4088,8 +4096,6 @@ static C_Enum_Item parser_flags_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Parser_Flags, parser_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Parser_Flags *, parser_flags_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_parser_ptr, Array_Parser_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_parser, Array_Parser)
 MASS_DEFINE_STRUCT_DESCRIPTOR(parser, Parser,
   {
     .descriptor = &descriptor_parser_flags,
@@ -4113,11 +4119,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parser, Parser,
   },
 );
 MASS_DEFINE_TYPE_VALUE(parser);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_parser_ptr, parser_pointer, Array_Parser_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_parser, parser, Array_Parser);
 DEFINE_VALUE_IS_AS_HELPERS(Parser, parser);
 DEFINE_VALUE_IS_AS_HELPERS(Parser *, parser_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_operator_ptr, Array_Operator_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_operator, Array_Operator)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operator_ptr, operator_pointer, Array_Operator_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operator, operator, Array_Operator);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_tag, Operator_Tag)
 static C_Enum_Item operator_tag_items[] = {
 { .name = slice_literal_fields("Alias"), .value = 0 },
@@ -4175,8 +4183,6 @@ MASS_DEFINE_TYPE_VALUE(operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator, operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator *, operator_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher_ptr, Array_Token_Statement_Matcher_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher, Array_Token_Statement_Matcher)
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
   {
     .descriptor = &descriptor_token_statement_matcher_pointer,
@@ -4190,10 +4196,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_statement_matcher);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_token_statement_matcher_ptr, token_statement_matcher_pointer, Array_Token_Statement_Matcher_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_token_statement_matcher, token_statement_matcher, Array_Token_Statement_Matcher);
 DEFINE_VALUE_IS_AS_HELPERS(Token_Statement_Matcher, token_statement_matcher);
 DEFINE_VALUE_IS_AS_HELPERS(Token_Statement_Matcher *, token_statement_matcher_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry_ptr, Array_Scope_Entry_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry, Array_Scope_Entry)
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   {
     .descriptor = &descriptor_value_pointer,
@@ -4222,10 +4228,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope_entry);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_entry_ptr, scope_entry_pointer, Array_Scope_Entry_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_entry, scope_entry, Array_Scope_Entry);
 DEFINE_VALUE_IS_AS_HELPERS(Scope_Entry, scope_entry);
 DEFINE_VALUE_IS_AS_HELPERS(Scope_Entry *, scope_entry_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_scope_ptr, Array_Scope_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_scope, Array_Scope)
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
   {
     .descriptor = &descriptor_allocator_pointer,
@@ -4249,10 +4255,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_ptr, scope_pointer, Array_Scope_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope, scope, Array_Scope);
 DEFINE_VALUE_IS_AS_HELPERS(Scope, scope);
 DEFINE_VALUE_IS_AS_HELPERS(Scope *, scope_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_overload_ptr, Array_Overload_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_overload, Array_Overload)
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload, Overload,
   {
     .descriptor = &descriptor_value_pointer,
@@ -4266,11 +4272,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(overload, Overload,
   },
 );
 MASS_DEFINE_TYPE_VALUE(overload);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_ptr, overload_pointer, Array_Overload_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload, overload, Array_Overload);
 DEFINE_VALUE_IS_AS_HELPERS(Overload, overload);
 DEFINE_VALUE_IS_AS_HELPERS(Overload *, overload_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_overload_match_ptr, Array_Overload_Match_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_overload_match, Array_Overload_Match)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match_ptr, overload_match_pointer, Array_Overload_Match_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match, overload_match, Array_Overload_Match);
 MASS_DEFINE_OPAQUE_C_TYPE(overload_match_tag, Overload_Match_Tag)
 static C_Enum_Item overload_match_tag_items[] = {
 { .name = slice_literal_fields("No_Match"), .value = 0 },
@@ -4332,8 +4340,8 @@ static C_Enum_Item value_flags_items[] = {
 DEFINE_VALUE_IS_AS_HELPERS(Value_Flags, value_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Value_Flags *, value_flags_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_value_ptr, value_pointer, Array_Value_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_value, value, Array_Value);
 MASS_DEFINE_OPAQUE_C_TYPE(value_tag, Value_Tag)
 static C_Enum_Item value_tag_items[] = {
 { .name = slice_literal_fields("Lazy"), .value = 0 },
@@ -4401,8 +4409,6 @@ MASS_DEFINE_TYPE_VALUE(value);
 DEFINE_VALUE_IS_AS_HELPERS(Value, value);
 DEFINE_VALUE_IS_AS_HELPERS(Value *, value_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_register_bitset_ptr, Array_Register_Bitset_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_register_bitset, Array_Register_Bitset)
 MASS_DEFINE_STRUCT_DESCRIPTOR(register_bitset, Register_Bitset,
   {
     .descriptor = &descriptor_i64,
@@ -4411,10 +4417,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(register_bitset, Register_Bitset,
   },
 );
 MASS_DEFINE_TYPE_VALUE(register_bitset);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_register_bitset_ptr, register_bitset_pointer, Array_Register_Bitset_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_register_bitset, register_bitset, Array_Register_Bitset);
 DEFINE_VALUE_IS_AS_HELPERS(Register_Bitset, register_bitset);
 DEFINE_VALUE_IS_AS_HELPERS(Register_Bitset *, register_bitset_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
   {
     .descriptor = &descriptor_epoch,
@@ -4468,11 +4474,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_builder);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_builder_ptr, function_builder_pointer, Array_Function_Builder_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_builder, function_builder, Array_Function_Builder);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Builder, function_builder);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Builder *, function_builder_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result_ptr, Array_Expected_Result_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result, Array_Expected_Result)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_expected_result_ptr, expected_result_pointer, Array_Expected_Result_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_expected_result, expected_result, Array_Expected_Result);
 MASS_DEFINE_OPAQUE_C_TYPE(expected_result_tag, Expected_Result_Tag)
 static C_Enum_Item expected_result_tag_items[] = {
 { .name = slice_literal_fields("Exact"), .value = 0 },
@@ -4520,8 +4528,6 @@ MASS_DEFINE_TYPE_VALUE(expected_result);
 DEFINE_VALUE_IS_AS_HELPERS(Expected_Result, expected_result);
 DEFINE_VALUE_IS_AS_HELPERS(Expected_Result *, expected_result_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value_ptr, Array_Lazy_Static_Value_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value, Array_Lazy_Static_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
   {
     .descriptor = &descriptor_mass_context,
@@ -4545,6 +4551,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_static_value);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_lazy_static_value_ptr, lazy_static_value_pointer, Array_Lazy_Static_Value_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_lazy_static_value, lazy_static_value, Array_Lazy_Static_Value);
 DEFINE_VALUE_IS_AS_HELPERS(Lazy_Static_Value, lazy_static_value);
 DEFINE_VALUE_IS_AS_HELPERS(Lazy_Static_Value *, lazy_static_value_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
@@ -4564,8 +4572,8 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   }
 )
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter_ptr, Array_Function_Parameter_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter, Array_Function_Parameter)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_parameter_ptr, function_parameter_pointer, Array_Function_Parameter_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_parameter, function_parameter, Array_Function_Parameter);
 MASS_DEFINE_OPAQUE_C_TYPE(function_parameter_tag, Function_Parameter_Tag)
 static C_Enum_Item function_parameter_tag_items[] = {
 { .name = slice_literal_fields("Runtime"), .value = 0 },
@@ -4648,8 +4656,8 @@ static C_Enum_Item function_info_flags_items[] = {
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info_Flags, function_info_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info_Flags *, function_info_flags_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_return_ptr, function_return_pointer, Array_Function_Return_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_return, function_return, Array_Function_Return);
 MASS_DEFINE_OPAQUE_C_TYPE(function_return_tag, Function_Return_Tag)
 static C_Enum_Item function_return_tag_items[] = {
 { .name = slice_literal_fields("Inferred"), .value = 0 },
@@ -4698,8 +4706,6 @@ MASS_DEFINE_TYPE_VALUE(function_return);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Return, function_return);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Return *, function_return_pointer);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   {
     .descriptor = &descriptor_function_info_flags,
@@ -4718,6 +4724,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_info);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_info_ptr, function_info_pointer, Array_Function_Info_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_info, function_info, Array_Function_Info);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info, function_info);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Info *, function_info_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(function_header_flags, Function_Header_Flags)
@@ -4730,8 +4738,6 @@ static C_Enum_Item function_header_flags_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags, function_header_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags *, function_header_flags_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_specialization_ptr, Array_Function_Specialization_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_specialization, Array_Function_Specialization)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_specialization, Function_Specialization,
   {
     .descriptor = &descriptor_array_const_descriptor_ptr,
@@ -4745,10 +4751,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_specialization, Function_Specialization,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_specialization);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_specialization_ptr, function_specialization_pointer, Array_Function_Specialization_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_specialization, function_specialization, Array_Function_Specialization);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Specialization, function_specialization);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Specialization *, function_specialization_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_header_ptr, Array_Function_Header_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_header, Array_Function_Header)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_header, Function_Header,
   {
     .descriptor = &descriptor_function_header_flags,
@@ -4767,10 +4773,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_header, Function_Header,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_header);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_header_ptr, function_header_pointer, Array_Function_Header_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_header, function_header, Array_Function_Header);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header, function_header);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header *, function_header_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   {
     .descriptor = &descriptor_function_header,
@@ -4804,6 +4810,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_literal_ptr, function_literal_pointer, Array_Function_Literal_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_literal, function_literal, Array_Function_Literal);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal *, function_literal_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(function_call_jump, Function_Call_Jump)
@@ -4820,8 +4828,6 @@ static C_Enum_Item function_call_parameter_flags_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter_Flags, function_call_parameter_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter_Flags *, function_call_parameter_flags_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_parameter_ptr, Array_Function_Call_Parameter_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_parameter, Array_Function_Call_Parameter)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_parameter, Function_Call_Parameter,
   {
     .descriptor = &descriptor_function_call_parameter_flags,
@@ -4845,10 +4851,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_parameter, Function_Call_Parameter,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_call_parameter);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_parameter_ptr, function_call_parameter_pointer, Array_Function_Call_Parameter_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_parameter, function_call_parameter, Array_Function_Call_Parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter, function_call_parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter *, function_call_parameter_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup_ptr, Array_Function_Call_Setup_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   {
     .descriptor = &descriptor_i32,
@@ -4887,10 +4893,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_call_setup);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_setup_ptr, function_call_setup_pointer, Array_Function_Call_Setup_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_setup, function_call_setup, Array_Function_Call_Setup);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup, function_call_setup);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup *, function_call_setup_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_tuple_ptr, Array_Tuple_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_tuple, Array_Tuple)
 MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
   {
     .descriptor = &descriptor_epoch,
@@ -4909,10 +4915,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
   },
 );
 MASS_DEFINE_TYPE_VALUE(tuple);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_tuple_ptr, tuple_pointer, Array_Tuple_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_tuple, tuple, Array_Tuple);
 DEFINE_VALUE_IS_AS_HELPERS(Tuple, tuple);
 DEFINE_VALUE_IS_AS_HELPERS(Tuple *, tuple_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_list_node_ptr, Array_List_Node_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_list_node, Array_List_Node)
 MASS_DEFINE_STRUCT_DESCRIPTOR(list_node, List_Node,
   {
     .descriptor = &descriptor_list_node_pointer,
@@ -4926,10 +4932,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(list_node, List_Node,
   },
 );
 MASS_DEFINE_TYPE_VALUE(list_node);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_list_node_ptr, list_node_pointer, Array_List_Node_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_list_node, list_node, Array_List_Node);
 DEFINE_VALUE_IS_AS_HELPERS(List_Node, list_node);
 DEFINE_VALUE_IS_AS_HELPERS(List_Node *, list_node_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol_ptr, Array_Typed_Symbol_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol, Array_Typed_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(typed_symbol, Typed_Symbol,
   {
     .descriptor = &descriptor_symbol_pointer,
@@ -4943,10 +4949,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(typed_symbol, Typed_Symbol,
   },
 );
 MASS_DEFINE_TYPE_VALUE(typed_symbol);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_typed_symbol_ptr, typed_symbol_pointer, Array_Typed_Symbol_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_typed_symbol, typed_symbol, Array_Typed_Symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol *, typed_symbol_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_struct_field_ptr, Array_Struct_Field_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_struct_field, Array_Struct_Field)
 MASS_DEFINE_STRUCT_DESCRIPTOR(struct_field, Struct_Field,
   {
     .descriptor = &descriptor_slice,
@@ -4965,11 +4971,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(struct_field, Struct_Field,
   },
 );
 MASS_DEFINE_TYPE_VALUE(struct_field);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_struct_field_ptr, struct_field_pointer, Array_Struct_Field_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_struct_field, struct_field, Array_Struct_Field);
 DEFINE_VALUE_IS_AS_HELPERS(Struct_Field, struct_field);
 DEFINE_VALUE_IS_AS_HELPERS(Struct_Field *, struct_field_pointer);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_ptr, Array_Descriptor_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_descriptor_ptr, descriptor_pointer, Array_Descriptor_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_descriptor, descriptor, Array_Descriptor);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Void"), .value = 0 },
@@ -5106,8 +5114,8 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   }
 )
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error_ptr, Array_Mass_Error_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error, Array_Mass_Error)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_error_ptr, mass_error_pointer, Array_Mass_Error_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_error, mass_error, Array_Mass_Error);
 MASS_DEFINE_OPAQUE_C_TYPE(mass_error_tag, Mass_Error_Tag)
 static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Unimplemented"), .value = 0 },
@@ -5393,8 +5401,8 @@ DEFINE_VALUE_IS_AS_HELPERS(Mass_Error, mass_error);
 DEFINE_VALUE_IS_AS_HELPERS(Mass_Error *, mass_error_pointer);
 /*union struct end*/
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_result_ptr, Array_Mass_Result_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_result, Array_Mass_Result)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_result_ptr, mass_result_pointer, Array_Mass_Result_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_result, mass_result, Array_Mass_Result);
 MASS_DEFINE_OPAQUE_C_TYPE(mass_result_tag, Mass_Result_Tag)
 static C_Enum_Item mass_result_tag_items[] = {
 { .name = slice_literal_fields("Success"), .value = 0 },
@@ -5432,8 +5440,6 @@ static C_Enum_Item os_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Os, os);
 DEFINE_VALUE_IS_AS_HELPERS(Os *, os_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
 MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
   {
     .descriptor = &descriptor_array_import_library,
@@ -5477,6 +5483,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_program_ptr, program_pointer, Array_Program_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_program, program, Array_Program);
 DEFINE_VALUE_IS_AS_HELPERS(Program, program);
 DEFINE_VALUE_IS_AS_HELPERS(Program *, program_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
@@ -5491,8 +5499,6 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
     .descriptor = &descriptor_function_info_pointer,
   }
 )
-MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
 MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   {
     .descriptor = &descriptor_register_bitset,
@@ -5506,6 +5512,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_calling_convention_ptr, calling_convention_pointer, Array_Calling_Convention_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_calling_convention, calling_convention, Array_Calling_Convention);
 DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention, calling_convention);
 DEFINE_VALUE_IS_AS_HELPERS(Calling_Convention *, calling_convention_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
@@ -5520,8 +5528,6 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
     .descriptor = &descriptor_void_pointer,
   }
 )
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline_ptr, Array_Mass_Trampoline_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_mass_trampoline, Array_Mass_Trampoline)
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_trampoline, Mass_Trampoline,
   {
     .descriptor = &descriptor_descriptor_pointer,
@@ -5540,10 +5546,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_trampoline, Mass_Trampoline,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_trampoline);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_trampoline_ptr, mass_trampoline_pointer, Array_Mass_Trampoline_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_trampoline, mass_trampoline, Array_Mass_Trampoline);
 DEFINE_VALUE_IS_AS_HELPERS(Mass_Trampoline, mass_trampoline);
 DEFINE_VALUE_IS_AS_HELPERS(Mass_Trampoline *, mass_trampoline_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters_ptr, Array_Jit_Counters_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters, Array_Jit_Counters)
 MASS_DEFINE_STRUCT_DESCRIPTOR(jit_counters, Jit_Counters,
   {
     .descriptor = &descriptor_i64,
@@ -5567,10 +5573,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit_counters, Jit_Counters,
   },
 );
 MASS_DEFINE_TYPE_VALUE(jit_counters);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_jit_counters_ptr, jit_counters_pointer, Array_Jit_Counters_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_jit_counters, jit_counters, Array_Jit_Counters);
 DEFINE_VALUE_IS_AS_HELPERS(Jit_Counters, jit_counters);
 DEFINE_VALUE_IS_AS_HELPERS(Jit_Counters *, jit_counters_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_jit_ptr, Array_Jit_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_jit, Array_Jit)
 MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
   {
     .descriptor = &descriptor_i64,
@@ -5599,10 +5605,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
   },
 );
 MASS_DEFINE_TYPE_VALUE(jit);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_jit_ptr, jit_pointer, Array_Jit_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_jit, jit, Array_Jit);
 DEFINE_VALUE_IS_AS_HELPERS(Jit, jit);
 DEFINE_VALUE_IS_AS_HELPERS(Jit *, jit_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_common_symbols_ptr, Array_Common_Symbols_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_common_symbols, Array_Common_Symbols)
 MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   {
     .descriptor = &descriptor_symbol_pointer,
@@ -5756,10 +5762,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_common_symbols_ptr, common_symbols_pointer, Array_Common_Symbols_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_common_symbols, common_symbols, Array_Common_Symbols);
 DEFINE_VALUE_IS_AS_HELPERS(Common_Symbols, common_symbols);
 DEFINE_VALUE_IS_AS_HELPERS(Common_Symbols *, common_symbols_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_compilation_ptr, Array_Compilation_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_compilation, Array_Compilation)
 MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
   {
     .descriptor = &descriptor_virtual_memory_buffer,
@@ -5853,6 +5859,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_compilation_ptr, compilation_pointer, Array_Compilation_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_compilation, compilation, Array_Compilation);
 DEFINE_VALUE_IS_AS_HELPERS(Compilation, compilation);
 DEFINE_VALUE_IS_AS_HELPERS(Compilation *, compilation_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
@@ -5920,8 +5928,6 @@ static C_Enum_Item operand_encoding_type_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Operand_Encoding_Type, operand_encoding_type);
 DEFINE_VALUE_IS_AS_HELPERS(Operand_Encoding_Type *, operand_encoding_type_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding_ptr, Array_Operand_Encoding_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding, Array_Operand_Encoding)
 MASS_DEFINE_STRUCT_DESCRIPTOR(operand_encoding, Operand_Encoding,
   {
     .descriptor = &descriptor_operand_encoding_type,
@@ -5935,10 +5941,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operand_encoding, Operand_Encoding,
   },
 );
 MASS_DEFINE_TYPE_VALUE(operand_encoding);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operand_encoding_ptr, operand_encoding_pointer, Array_Operand_Encoding_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operand_encoding, operand_encoding, Array_Operand_Encoding);
 DEFINE_VALUE_IS_AS_HELPERS(Operand_Encoding, operand_encoding);
 DEFINE_VALUE_IS_AS_HELPERS(Operand_Encoding *, operand_encoding_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding_ptr, Array_Instruction_Encoding_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding, Array_Instruction_Encoding)
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_encoding, Instruction_Encoding,
   {
     .descriptor = &descriptor_i8_4,
@@ -5962,10 +5968,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_encoding, Instruction_Encoding,
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_encoding);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_encoding_ptr, instruction_encoding_pointer, Array_Instruction_Encoding_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_instruction_encoding, instruction_encoding, Array_Instruction_Encoding);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction_Encoding, instruction_encoding);
 DEFINE_VALUE_IS_AS_HELPERS(Instruction_Encoding *, instruction_encoding_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_x64_mnemonic_ptr, Array_X64_Mnemonic_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_x64_mnemonic, Array_X64_Mnemonic)
 MASS_DEFINE_STRUCT_DESCRIPTOR(x64_mnemonic, X64_Mnemonic,
   {
     .descriptor = &descriptor_char_pointer,
@@ -5984,75 +5990,95 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(x64_mnemonic, X64_Mnemonic,
   },
 );
 MASS_DEFINE_TYPE_VALUE(x64_mnemonic);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_x64_mnemonic_ptr, x64_mnemonic_pointer, Array_X64_Mnemonic_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_x64_mnemonic, x64_mnemonic, Array_X64_Mnemonic);
 DEFINE_VALUE_IS_AS_HELPERS(X64_Mnemonic, x64_mnemonic);
 DEFINE_VALUE_IS_AS_HELPERS(X64_Mnemonic *, x64_mnemonic_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(char, char, 1)
-MASS_DEFINE_OPAQUE_C_TYPE(array_char, Array_char)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_char_ptr, char_pointer, Array_char_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_char, char, Array_char);
 DEFINE_VALUE_IS_AS_HELPERS(char, char);
 DEFINE_VALUE_IS_AS_HELPERS(char *, char_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(int, int, 1)
-MASS_DEFINE_OPAQUE_C_TYPE(array_int, Array_int)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_int_ptr, int_pointer, Array_int_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_int, int, Array_int);
 DEFINE_VALUE_IS_AS_HELPERS(int, int);
 DEFINE_VALUE_IS_AS_HELPERS(int *, int_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator)
-MASS_DEFINE_OPAQUE_C_TYPE(array_allocator, Array_Allocator)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_allocator_ptr, allocator_pointer, Array_Allocator_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_allocator, allocator, Array_Allocator);
 DEFINE_VALUE_IS_AS_HELPERS(Allocator, allocator);
 DEFINE_VALUE_IS_AS_HELPERS(Allocator *, allocator_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer)
-MASS_DEFINE_OPAQUE_C_TYPE(array_virtual_memory_buffer, Array_Virtual_Memory_Buffer)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_virtual_memory_buffer_ptr, virtual_memory_buffer_pointer, Array_Virtual_Memory_Buffer_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_virtual_memory_buffer, virtual_memory_buffer, Array_Virtual_Memory_Buffer);
 DEFINE_VALUE_IS_AS_HELPERS(Virtual_Memory_Buffer, virtual_memory_buffer);
 DEFINE_VALUE_IS_AS_HELPERS(Virtual_Memory_Buffer *, virtual_memory_buffer_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool)
-MASS_DEFINE_OPAQUE_C_TYPE(array__bool, Array__Bool)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array__bool_ptr, _bool_pointer, Array__Bool_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array__bool, _bool, Array__Bool);
 DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool);
 DEFINE_VALUE_IS_AS_HELPERS(_Bool *, _bool_pointer);
 MASS_DEFINE_RAW_C_TYPE(i8, i8)
-MASS_DEFINE_OPAQUE_C_TYPE(array_i8, Array_i8)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i8_ptr, i8_pointer, Array_i8_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i8, i8, Array_i8);
 DEFINE_VALUE_IS_AS_HELPERS(i8, i8);
 DEFINE_VALUE_IS_AS_HELPERS(i8 *, i8_pointer);
 MASS_DEFINE_RAW_C_TYPE(i16, i16)
-MASS_DEFINE_OPAQUE_C_TYPE(array_i16, Array_i16)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i16_ptr, i16_pointer, Array_i16_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i16, i16, Array_i16);
 DEFINE_VALUE_IS_AS_HELPERS(i16, i16);
 DEFINE_VALUE_IS_AS_HELPERS(i16 *, i16_pointer);
 MASS_DEFINE_RAW_C_TYPE(i32, i32)
-MASS_DEFINE_OPAQUE_C_TYPE(array_i32, Array_i32)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i32_ptr, i32_pointer, Array_i32_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i32, i32, Array_i32);
 DEFINE_VALUE_IS_AS_HELPERS(i32, i32);
 DEFINE_VALUE_IS_AS_HELPERS(i32 *, i32_pointer);
 MASS_DEFINE_RAW_C_TYPE(i64, i64)
-MASS_DEFINE_OPAQUE_C_TYPE(array_i64, Array_i64)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i64_ptr, i64_pointer, Array_i64_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i64, i64, Array_i64);
 DEFINE_VALUE_IS_AS_HELPERS(i64, i64);
 DEFINE_VALUE_IS_AS_HELPERS(i64 *, i64_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(u8, u8, 0)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_u8_ptr, u8_pointer, Array_u8_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(u8, u8);
 DEFINE_VALUE_IS_AS_HELPERS(u8 *, u8_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(u16, u16, 0)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_u16_ptr, u16_pointer, Array_u16_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(u16, u16);
 DEFINE_VALUE_IS_AS_HELPERS(u16 *, u16_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(u32, u32, 0)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_u32_ptr, u32_pointer, Array_u32_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(u32, u32);
 DEFINE_VALUE_IS_AS_HELPERS(u32 *, u32_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(u64, u64, 0)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_u64_ptr, u64_pointer, Array_u64_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(u64, u64);
 DEFINE_VALUE_IS_AS_HELPERS(u64 *, u64_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(s8, s8, 1)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_s8_ptr, s8_pointer, Array_s8_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(s8, s8);
 DEFINE_VALUE_IS_AS_HELPERS(s8 *, s8_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(s16, s16, 1)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_s16_ptr, s16_pointer, Array_s16_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(s16, s16);
 DEFINE_VALUE_IS_AS_HELPERS(s16 *, s16_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(s32, s32, 1)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_s32_ptr, s32_pointer, Array_s32_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(s32, s32);
 DEFINE_VALUE_IS_AS_HELPERS(s32 *, s32_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(s64, s64, 1)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_s64_ptr, s64_pointer, Array_s64_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(s64, s64);
 DEFINE_VALUE_IS_AS_HELPERS(s64 *, s64_pointer);
 MASS_DEFINE_FLOAT_C_TYPE(f32, f32)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_f32_ptr, f32_pointer, Array_f32_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(f32, f32);
 DEFINE_VALUE_IS_AS_HELPERS(f32 *, f32_pointer);
 MASS_DEFINE_FLOAT_C_TYPE(f64, f64)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_f64_ptr, f64_pointer, Array_f64_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(f64, f64);
 DEFINE_VALUE_IS_AS_HELPERS(f64 *, f64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8_ptr, Array_Range_u8_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u8, Range_u8,
   {
     .descriptor = &descriptor_i8,
@@ -6066,9 +6092,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_u8, Range_u8,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_u8);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_u8_ptr, range_u8_pointer, Array_Range_u8_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u8, range_u8);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u8 *, range_u8_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16_ptr, Array_Range_u16_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u16, Range_u16,
   {
     .descriptor = &descriptor_i16,
@@ -6082,9 +6108,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_u16, Range_u16,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_u16);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_u16_ptr, range_u16_pointer, Array_Range_u16_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u16, range_u16);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u16 *, range_u16_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32_ptr, Array_Range_u32_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u32, Range_u32,
   {
     .descriptor = &descriptor_i32,
@@ -6098,9 +6124,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_u32, Range_u32,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_u32);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_u32_ptr, range_u32_pointer, Array_Range_u32_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u32, range_u32);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u32 *, range_u32_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64_ptr, Array_Range_u64_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_u64, Range_u64,
   {
     .descriptor = &descriptor_i64,
@@ -6114,9 +6140,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_u64, Range_u64,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_u64);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_u64_ptr, range_u64_pointer, Array_Range_u64_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u64, range_u64);
 DEFINE_VALUE_IS_AS_HELPERS(Range_u64 *, range_u64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8_ptr, Array_Range_s8_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s8, Range_s8,
   {
     .descriptor = &descriptor_i8,
@@ -6130,9 +6156,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_s8, Range_s8,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_s8);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_s8_ptr, range_s8_pointer, Array_Range_s8_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s8, range_s8);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s8 *, range_s8_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16_ptr, Array_Range_s16_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s16, Range_s16,
   {
     .descriptor = &descriptor_i16,
@@ -6146,9 +6172,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_s16, Range_s16,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_s16);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_s16_ptr, range_s16_pointer, Array_Range_s16_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s16, range_s16);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s16 *, range_s16_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32_ptr, Array_Range_s32_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s32, Range_s32,
   {
     .descriptor = &descriptor_i32,
@@ -6162,9 +6188,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_s32, Range_s32,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_s32);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_s32_ptr, range_s32_pointer, Array_Range_s32_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s32, range_s32);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s32 *, range_s32_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64_ptr, Array_Range_s64_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_s64, Range_s64,
   {
     .descriptor = &descriptor_i64,
@@ -6178,9 +6204,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_s64, Range_s64,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_s64);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_s64_ptr, range_s64_pointer, Array_Range_s64_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s64, range_s64);
 DEFINE_VALUE_IS_AS_HELPERS(Range_s64 *, range_s64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32_ptr, Array_Range_f32_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_f32, Range_f32,
   {
     .descriptor = &descriptor_f32,
@@ -6194,9 +6220,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_f32, Range_f32,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_f32);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_f32_ptr, range_f32_pointer, Array_Range_f32_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_f32, range_f32);
 DEFINE_VALUE_IS_AS_HELPERS(Range_f32 *, range_f32_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64_ptr, Array_Range_f64_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(range_f64, Range_f64,
   {
     .descriptor = &descriptor_f64,
@@ -6210,9 +6236,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(range_f64, Range_f64,
   },
 );
 MASS_DEFINE_TYPE_VALUE(range_f64);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_range_f64_ptr, range_f64_pointer, Array_Range_f64_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Range_f64, range_f64);
 DEFINE_VALUE_IS_AS_HELPERS(Range_f64 *, range_f64_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,
   {
     .descriptor = &descriptor_i8_pointer,
@@ -6226,7 +6252,29 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,
   },
 );
 MASS_DEFINE_TYPE_VALUE(slice);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_slice_ptr, slice_pointer, Array_Slice_Ptr);
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice);
 DEFINE_VALUE_IS_AS_HELPERS(Slice *, slice_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(dyn_array_internal, Dyn_Array_Internal,
+  {
+    .descriptor = &descriptor_allocator_pointer,
+    .name = slice_literal_fields("allocator"),
+    .offset = offsetof(Dyn_Array_Internal, allocator),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("length"),
+    .offset = offsetof(Dyn_Array_Internal, length),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("capacity"),
+    .offset = offsetof(Dyn_Array_Internal, capacity),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(dyn_array_internal);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_dyn_array_internal_ptr, dyn_array_internal_pointer, Array_Dyn_Array_Internal_Ptr);
+DEFINE_VALUE_IS_AS_HELPERS(Dyn_Array_Internal, dyn_array_internal);
+DEFINE_VALUE_IS_AS_HELPERS(Dyn_Array_Internal *, dyn_array_internal_pointer);
 
 #endif // GENERATED_TYPES_H

@@ -841,6 +841,20 @@ print_mass_struct(
 }
 
 static void
+print_mass_dyn_array(
+  FILE *file,
+  Meta_Type *type
+) {
+  char *lowercase_name = strtolower(type->name);
+  fprintf(file, "MASS_DEFINE_C_DYN_ARRAY_TYPE(array_%s_ptr, %s_pointer, Array_%s_Ptr);\n",
+    lowercase_name, lowercase_name, type->name);
+  if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+    fprintf(file, "MASS_DEFINE_C_DYN_ARRAY_TYPE(array_%s, %s, Array_%s);\n",
+      lowercase_name, lowercase_name, type->name);
+  }
+}
+
+static void
 print_mass_descriptor_and_type(
   FILE *file,
   Meta_Type *type
@@ -848,11 +862,8 @@ print_mass_descriptor_and_type(
   char *lowercase_name = strtolower(type->name);
   switch(type->tag) {
     case Meta_Type_Tag_Struct: {
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->name);
-      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
-        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
-      }
       print_mass_struct(file, type->name, &type->struct_);
+      print_mass_dyn_array(file, type);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
       break;
@@ -870,9 +881,7 @@ print_mass_descriptor_and_type(
       } else {
         fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->name);
       }
-      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
-        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
-      }
+      print_mass_dyn_array(file, type);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s, %s);\n", type->name, lowercase_name);
       fprintf(file, "DEFINE_VALUE_IS_AS_HELPERS(%s *, %s_pointer);\n", type->name, lowercase_name);
     } break;
@@ -894,8 +903,7 @@ print_mass_descriptor_and_type(
     }
     case Meta_Type_Tag_Tagged_Union: {
       fprintf(file, "/*union struct start */\n");
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->name);
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->name);
+      print_mass_dyn_array(file, type);
 
       // Write out the enum
       {
@@ -2382,6 +2390,13 @@ main(void) {
   export_global_custom_name("String", set_flags(push_type(type_struct("Slice", (Struct_Item[]){
     { "u8 *", "bytes" },
     { "i64", "length" },
+  })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
+
+  export_compiler(set_flags(push_type(type_struct("Dyn_Array_Internal", (Struct_Item[]){
+    { "const Allocator *", "allocator" },
+    { "i64", "length" },
+    { "i64", "capacity" },
+    //{ "s8 *", "items" }, // TODO support flexible array members or even better - sized by a field
   })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
 
   const char *this_filename = __FILE__;

@@ -1695,6 +1695,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Allocator")),
     type_allocator_value
   );
+  Source_Range Dyn_Array_Internal__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Dyn_Array_Internal__source_range, "Dyn_Array_Internal");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Dyn_Array_Internal__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Dyn_Array_Internal")),
+    type_dyn_array_internal_value
+  );
 }
 
 static void
