@@ -1489,7 +1489,13 @@ same_type_or_can_implicitly_move_cast(
   if (target->brand && source->brand && target->brand != source->brand) return false;
   if (source->tag == Descriptor_Tag_Raw) {
     if (source->bit_size.as_u64 == target->bit_size.as_u64) {
-      return true;
+      if (
+        target->tag == Descriptor_Tag_Raw ||
+        target->tag == Descriptor_Tag_Integer ||
+        target->tag == Descriptor_Tag_Float
+      ) {
+        return true;
+      }
     }
   }
 
