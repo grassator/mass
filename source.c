@@ -2185,11 +2185,6 @@ mass_push_token_matcher(
   parser->scope->statement_matcher = matcher;
 }
 
-typedef struct {
-  Value *condition;
-  Value *body;
-} Mass_While;
-
 // TODO move this to user land (again)
 static Value *
 mass_handle_while_lazy_proc(
@@ -2235,18 +2230,17 @@ mass_handle_while_lazy_proc(
   return void_value;
 }
 
-static bool
+static Value *
 token_parse_while(
   Mass_Context *context,
   Parser *parser,
   Value_View view,
-  Value_Lazy *out_lazy_value
+  u32 *matched_length,
+  const Symbol *end_symbol
 ) {
   u32 peek_index = 0;
-  Value *keyword_token = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols._while
-  );
-  if (!keyword_token) return 0;
+  Value *keyword_token = value_view_next(&view, &peek_index);
+  assert(value_as_symbol(keyword_token) == context->compilation->common_symbols._while);
 
   u32 condition_start_index = peek_index;
   for (; peek_index < view.length; peek_index += 1) {
@@ -2261,7 +2255,7 @@ token_parse_while(
       .tag = Mass_Error_Tag_Parse,
       .source_range = value_view_rest(&view, peek_index).source_range,
     });
-    return false;
+    return 0;
   }
 
   Value *body_token = value_view_next(&view, &peek_index);
@@ -2271,19 +2265,19 @@ token_parse_while(
       .tag = Mass_Error_Tag_Parse,
       .source_range = value_view_rest(&view, peek_index).source_range,
     });
-    return false;
+    return 0;
   }
 
+  Value *condition = token_parse_expression(context, parser, condition_view, &(u32){0}, 0);
+  if (mass_has_error(context)) return 0;
+  Value *body = token_parse_single(context, parser, body_token);
+  if (mass_has_error(context)) return 0;
+
+  *matched_length = peek_index;
   Mass_While *lazy_payload = mass_allocate(context, Mass_While);
-  *lazy_payload = (Mass_While) {
-    .condition = token_parse_expression(context, parser, condition_view, &(u32){0}, 0),
-    .body = token_parse_single(context, parser, body_token),
-  };
+  *lazy_payload = (Mass_While) { .condition = condition, .body = body };
 
-  out_lazy_value->proc = mass_handle_while_lazy_proc;
-  out_lazy_value->payload = lazy_payload;
-
-  return true;
+  return value_make(context, &descriptor_mass_while, storage_static(lazy_payload), keyword_token->source_range);
 }
 
 static Value *
@@ -5973,13 +5967,19 @@ token_parse_expression(
       if (
         symbol == context->compilation->common_symbols.fn ||
         symbol == context->compilation->common_symbols.macro ||
+        symbol == context->compilation->common_symbols._while ||
         symbol == context->compilation->common_symbols._if
       ) {
         Value_View rest = value_view_rest(&view, i);
         u32 match_length = 0;
-        Value *match_result = symbol == context->compilation->common_symbols._if
-          ? token_parse_if_expression(context, parser, rest, &match_length, end_symbol)
-          : token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
+        Value *match_result;
+        if (symbol == context->compilation->common_symbols._if) {
+          match_result = token_parse_if_expression(context, parser, rest, &match_length, end_symbol);
+        } else if (symbol == context->compilation->common_symbols._while) {
+          match_result = token_parse_while(context, parser, rest, &match_length, end_symbol);
+        } else {
+          match_result = token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
+        }
         if (mass_has_error(context)) goto defer;
         if (match_length) {
           dyn_array_push(value_stack, match_result);
@@ -6168,6 +6168,11 @@ token_parse_block_statements(
         } else if (parse_result->descriptor == &descriptor_typed_symbol) {
           parse_result = mass_define_stack_value_from_typed_symbol(
             context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
+          );
+        } else if (parse_result->descriptor == &descriptor_mass_while) {
+          parse_result = mass_make_lazy_value(
+            context, parser, parse_result->source_range, value_as_mass_while(parse_result),
+            &descriptor_void, mass_handle_while_lazy_proc
           );
         } else if (parse_result->descriptor == &descriptor_module_exports) {
           if (!(parser->flags & Parser_Flags_Global)) {
@@ -6462,7 +6467,6 @@ mass_compilation_init_scopes(
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
-      {.proc = token_parse_while},
       {.proc = token_parse_operator_definition},
     };
     for (u64 i = 0; i < countof(default_statement_matchers) - 1; ++i) {

@@ -1198,6 +1198,11 @@ main(void) {
     { "Range_u32", "offsets" },
   })));
 
+  push_type(type_struct("Mass_While", (Struct_Item[]){
+    { "Value *", "condition" },
+    { "Value *", "body" },
+  }));
+
   push_type(type_struct("Assignment", (Struct_Item[]){
     { "Value *", "target" },
     { "Value *", "source" },

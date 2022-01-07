@@ -30,6 +30,10 @@ typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
 
+typedef struct Mass_While Mass_While;
+typedef dyn_array_type(Mass_While *) Array_Mass_While_Ptr;
+typedef dyn_array_type(const Mass_While *) Array_Const_Mass_While_Ptr;
+
 typedef struct Assignment Assignment;
 typedef dyn_array_type(Assignment *) Array_Assignment_Ptr;
 typedef dyn_array_type(const Assignment *) Array_Const_Assignment_Ptr;
@@ -1118,6 +1122,12 @@ typedef struct Source_Range {
   Range_u32 offsets;
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
+
+typedef struct Mass_While {
+  Value * condition;
+  Value * body;
+} Mass_While;
+typedef dyn_array_type(Mass_While) Array_Mass_While;
 
 typedef struct Assignment {
   Value * target;
@@ -2310,6 +2320,11 @@ static Descriptor descriptor_array_source_range;
 static Descriptor descriptor_array_source_range_ptr;
 static Descriptor descriptor_source_range_pointer;
 static Descriptor descriptor_source_range_pointer_pointer;
+static Descriptor descriptor_mass_while;
+static Descriptor descriptor_array_mass_while;
+static Descriptor descriptor_array_mass_while_ptr;
+static Descriptor descriptor_mass_while_pointer;
+static Descriptor descriptor_mass_while_pointer_pointer;
 static Descriptor descriptor_assignment;
 static Descriptor descriptor_array_assignment;
 static Descriptor descriptor_array_assignment_ptr;
@@ -3104,6 +3119,23 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_range_ptr, source_range_pointer, Array
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_source_range, source_range, Array_Source_Range);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Range, source_range);
 DEFINE_VALUE_IS_AS_HELPERS(Source_Range *, source_range_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_while, Mass_While,
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("condition"),
+    .offset = offsetof(Mass_While, condition),
+  },
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("body"),
+    .offset = offsetof(Mass_While, body),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_while);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_while_ptr, mass_while_pointer, Array_Mass_While_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_while, mass_while, Array_Mass_While);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_While, mass_while);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_While *, mass_while_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(assignment, Assignment,
   {
     .descriptor = &descriptor_value_pointer,
