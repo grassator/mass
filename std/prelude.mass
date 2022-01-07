@@ -570,5 +570,4 @@ get_target_os :: fn() -> (os) intrinsic {
   meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }
 
-syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
 

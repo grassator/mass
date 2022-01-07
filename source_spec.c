@@ -2779,21 +2779,6 @@ spec("source") {
 
   #if defined(__linux__)
   describe("Linux") {
-    it("should be able to call a syscall") {
-      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "STDOUT_FILENO :: 1\n"
-        "SYS_WRITE :: 1\n"
-        "write :: fn(descriptor : s32, buffer : &i8, size : i64) "
-          "-> (s32) syscall(SYS_WRITE)\n"
-        "checker :: fn() -> () {\n"
-          "hello :: \"Hello, world!\\n\"\n"
-          "write(STDOUT_FILENO, hello.bytes, hello.length) \n"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      checker();
-    }
     it("should be able to determine the OS type") {
       Os(*checker)(void) = (Os(*)(void))test_program_inline_source_function(
         "checker", &test_context,

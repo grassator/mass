@@ -2,6 +2,12 @@ exports [.sys_write, .sys_exit, .STDOUT_FILENO]
 
 STDOUT_FILENO :: 1
 
-sys_write :: fn(descriptor : s32, buffer : &i8, size : i64) -> (s32) syscall(1)
-sys_exit :: fn(status : s32) -> (s32) syscall(60)
+syscall :: fn(number : i64) => (MASS.Syscall) { [number] }
+
+make_syscall :: macro(signature : MASS.Function_Header, number : i64) {
+  signature (syscall(number))
+}
+
+sys_write :: make_syscall((fn(descriptor : s32, buffer : &i8, size : i64) -> (s32)), 1)
+sys_exit :: make_syscall((fn(status : s32) -> (s32)), 60)
 
