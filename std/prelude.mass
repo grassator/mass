@@ -570,4 +570,6 @@ get_target_os :: fn() -> (os) intrinsic {
   meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }
 
+// TODO move this to something like c_prelude_interop
+length :: fn(array : [internal : &MASS.Dyn_Array_Internal]) -> (i64) { array.internal.length }
 

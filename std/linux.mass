@@ -4,6 +4,10 @@ STDOUT_FILENO :: 1
 
 make_syscall :: macro(signature : MASS.Function_Header, number : i64) {
   signature (intrinsic {
+    using unsigned
+    // AMD64 ABI A.2.1.4
+    // System-calls are limited to six arguments, no argument is passed directly on the stack.
+    assert(length(signature.parameters) <= 6)
     MASS.syscall(context, parser, arguments, &signature, number)
   })
 }
