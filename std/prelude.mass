@@ -29,7 +29,7 @@ operator(_ ') :: 30 MASS.unquote
 operator(,) :: 0 MASS.comma
 
 // TODO allow non-intrinsic overloads
-operator(=) :: 1 MASS.assign
+operator(=) :: 1 MASS.operator_assignment
 operator(:=) :: 0 MASS.define_inferred
 operator(_ .*) :: 20 MASS.dereference
 

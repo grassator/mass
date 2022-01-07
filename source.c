@@ -4886,7 +4886,7 @@ mass_define_stack_value_from_typed_symbol(
 }
 
 static Value *
-mass_assign(
+mass_operator_assignment(
   Mass_Context *context,
   Parser *parser,
   Value_View operands

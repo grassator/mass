@@ -778,7 +778,7 @@ static Value * mass_using
 static Value * mass_return
   (Mass_Context * context, Parser * parser, Value_View args);
 
-static Value * mass_assign
+static Value * mass_operator_assignment
   (Mass_Context * context, Parser * parser, Value_View args);
 
 static Value * mass_define_inferred
@@ -2786,7 +2786,7 @@ static Descriptor descriptor_mass_apply;
 static Descriptor descriptor_mass_call;
 static Descriptor descriptor_mass_using;
 static Descriptor descriptor_mass_return;
-static Descriptor descriptor_mass_assign;
+static Descriptor descriptor_mass_operator_assignment;
 static Descriptor descriptor_mass_define_inferred;
 static Descriptor descriptor_mass_quote;
 static Descriptor descriptor_mass_unquote;

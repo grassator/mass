@@ -2125,7 +2125,7 @@ main(void) {
   export_compiler_custom_name("call", push_type(type_intrinsic("mass_call")));
   export_compiler_custom_name("using", push_type(type_intrinsic("mass_using")));
   export_compiler_custom_name("return", push_type(type_intrinsic("mass_return")));
-  export_compiler_custom_name("assign", push_type(type_intrinsic("mass_assign")));
+  export_compiler_custom_name("operator_assignment", push_type(type_intrinsic("mass_operator_assignment")));
   export_compiler_custom_name("define_inferred", push_type(type_intrinsic("mass_define_inferred")));
   export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
