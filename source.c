@@ -10,7 +10,7 @@ mass_value_ensure_static(
   Mass_Context *context,
   Value *value
 ) {
-  if (!mass_value_is_compile_time_known(value)) {
+  if (!mass_value_is_static(value)) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Expected_Static,
       .source_range = value->source_range,
@@ -326,7 +326,7 @@ assign_from_static(
   const Storage *target_storage = &value_as_forced(target)->storage;
   if (
     !context_is_compile_time_eval(context) &&
-    !mass_value_is_compile_time_known(target) &&
+    !mass_value_is_static(target) &&
     source->descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     void *source_memory = *(void **)storage_static_memory_with_bit_size(source_storage, (Bits){64});
@@ -595,7 +595,7 @@ deduce_runtime_descriptor_for_value(
     return descriptor_as_pointer_to(original_descriptor)->descriptor;
   }
 
-  if (!mass_value_is_compile_time_known(value)) {
+  if (!mass_value_is_static(value)) {
     return original_descriptor;
   }
 
@@ -886,7 +886,7 @@ mass_assign_helper(
   if (descriptor_is_implicit_pointer(target->descriptor)) {
     if (
       (
-        mass_value_is_compile_time_known(source) &&
+        mass_value_is_static(source) &&
         !assign_from_static(context, builder, target, source, source_range)
       ) ||
       source->descriptor == &descriptor_tuple
@@ -1037,7 +1037,7 @@ mass_assign_helper(
     return;
   }
 
-  if (mass_value_is_compile_time_known(source)) {
+  if (mass_value_is_static(source)) {
     if (assign_from_static(context, builder, target, source, source_range)) {
       return;
     }
@@ -1045,8 +1045,8 @@ mass_assign_helper(
 
   if (mass_has_error(context)) return;
   if (same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) {
-    if (mass_value_is_compile_time_known(target)) {
-      assert(mass_value_is_compile_time_known(source));
+    if (mass_value_is_static(target)) {
+      assert(mass_value_is_static(source));
       assert(same_type(target->descriptor, source->descriptor));
       void *source_memory = (void *)storage_static_memory_with_bit_size(
         &value_as_forced(source)->storage, source->descriptor->bit_size
@@ -1803,7 +1803,7 @@ mass_expected_result_ensure_value_or_temp(
       const Storage *actual_storage = &value_as_forced(value)->storage;
       // @Hack there should be a better and more robust way to do this
       if (
-        !mass_value_is_compile_time_known(value) &&
+        !mass_value_is_static(value) &&
         !storage_occupies_same_memory(&expected_result->Exact.storage, actual_storage)
       ) {
         storage_release_if_temporary(builder, actual_storage);
@@ -2528,7 +2528,7 @@ mass_cast_helper(
 
   if (
     expression->descriptor == &descriptor_tuple &&
-    mass_value_is_compile_time_known(expression)
+    mass_value_is_static(expression)
   ) {
     Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
     *heap_payload = lazy_payload;
@@ -2538,7 +2538,7 @@ mass_cast_helper(
     );
   }
 
-  if (mass_value_is_compile_time_known(expression)) {
+  if (mass_value_is_static(expression)) {
     Expected_Result expected_result = expected_result_any(target_descriptor);
     return mass_handle_cast_lazy_proc(context, 0, &expected_result, &source_range, &lazy_payload);
   }
@@ -2606,7 +2606,7 @@ mass_zero_extend(
     .expression = expression,
   };
 
-  if (mass_value_is_compile_time_known(expression)) {
+  if (mass_value_is_static(expression)) {
     Expected_Result expected_result = expected_result_any(target_descriptor);
     return mass_zero_extend_lazy_proc(context, 0, &expected_result, &args_view.source_range, &lazy_payload);
   }
@@ -2795,7 +2795,7 @@ mass_handle_macro_call(
       }
 
       Epoch arg_epoch =
-        mass_value_is_compile_time_known(arg_value) ? VALUE_STATIC_EPOCH : parser->epoch;
+        mass_value_is_static(arg_value) ? VALUE_STATIC_EPOCH : parser->epoch;
 
       bool needs_casting = (
         // FIXME pass in resolved Function_Info from call and remove a guard on the next line
@@ -2809,7 +2809,7 @@ mass_handle_macro_call(
       //
       // This assumption holds if the argument is exactly the right type and is statically known
       Value *param_value;
-      if (mass_value_is_compile_time_known(arg_value) && !needs_casting) {
+      if (mass_value_is_static(arg_value) && !needs_casting) {
         param_value = arg_value;
       } else {
         // Otherwise we will create a temp copy
@@ -2856,7 +2856,7 @@ mass_handle_macro_call(
     } break;
   }
 
-  if (mass_value_is_compile_time_known(body_value)) {
+  if (mass_value_is_static(body_value)) {
     return body_value;
   }
 
@@ -3028,7 +3028,7 @@ call_function_overload(
       can_use_source_arg_as_is = true;
     } else if (
       // Compile time-known args also don't need registers so they can be used as-is
-      mass_value_is_compile_time_known(source_arg) &&
+      mass_value_is_static(source_arg) &&
       // TODO Consider if it is ok to just pass the address as an immediate here
       !needs_memory_address
     ) {
@@ -3373,7 +3373,7 @@ calculate_arguments_match_score(
             score += Score_Same_Type;
           }
         } else {
-          if (mass_value_is_compile_time_known(source_arg)) {
+          if (mass_value_is_static(source_arg)) {
             source_descriptor = deduce_runtime_descriptor_for_value(
               context, source_arg, target_descriptor
             );
@@ -3387,7 +3387,7 @@ calculate_arguments_match_score(
         }
       } break;
       case Function_Parameter_Tag_Exact_Static: {
-        if (!mass_value_is_compile_time_known(source_arg)) return -1;
+        if (!mass_value_is_static(source_arg)) return -1;
         if (!storage_static_equal(
           target_descriptor, &param->Exact_Static.storage,
           source_arg->descriptor, &value_as_forced(source_arg)->storage
@@ -3506,7 +3506,7 @@ mass_match_overload(
     .all_arguments_are_compile_time_known = true,
   };
   for (u64 i = 0; i < args_view.length; ++i) {
-    if (!mass_value_is_compile_time_known(value_view_get(&args_view, i))) {
+    if (!mass_value_is_static(value_view_get(&args_view, i))) {
       args.all_arguments_are_compile_time_known = false;
       break;
     }
@@ -3836,7 +3836,7 @@ mass_trampoline_call(
   assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < args_view.length; ++i) {
     Value *item = value_view_get(&args_view, i);
-    assert(mass_value_is_compile_time_known(item));
+    assert(mass_value_is_static(item));
     const Struct_Field *field = dyn_array_get(fields, i);
     u64 offset = field->offset;
     void *arg_memory = args_struct_memory + offset;
@@ -3905,7 +3905,7 @@ token_handle_function_call(
         if (!same_type_or_can_implicitly_move_cast(param->descriptor, runtime_source_descriptor)) {
           panic("We should not have matched an overload if the value is not assignable");
         }
-        bool can_static_cast = mass_value_is_compile_time_known(source);
+        bool can_static_cast = mass_value_is_static(source);
         if (param->descriptor->tag == Descriptor_Tag_Function_Instance) {
           // FIXME for runtime calls a function instance might be a relocation, so we can't hard-code
           //       a static value.
@@ -3916,7 +3916,7 @@ token_handle_function_call(
           const Tuple *tuple = value_as_tuple(source);
           for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
             Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
-            if (!mass_value_is_compile_time_known(tuple_item)) {
+            if (!mass_value_is_static(tuple_item)) {
               can_static_cast = false;
               break;
             }
@@ -3949,7 +3949,7 @@ token_handle_function_call(
     for (u64 i = 0; i < normalized_args.length; ++i) {
       Value *arg = value_view_get(&normalized_args, i);
       const Function_Parameter *param = dyn_array_get(info->parameters, i);
-      assert(mass_value_is_compile_time_known(arg));
+      assert(mass_value_is_static(arg));
       assert(same_type(param->descriptor, arg->descriptor));
     }
     Value *result = mass_trampoline_call(context, parser, overload, info, normalized_args);
@@ -4426,7 +4426,7 @@ mass_handle_generic_comparison_lazy_proc(
     } break;
   }
 
-  if (mass_value_is_compile_time_known(lhs) && mass_value_is_compile_time_known(rhs)) {
+  if (mass_value_is_static(lhs) && mass_value_is_static(rhs)) {
     const Storage *lhs_storage = &value_as_forced(lhs)->storage;
     const Storage *rhs_storage = &value_as_forced(rhs)->storage;
     bool equal = storage_static_equal(lhs->descriptor, lhs_storage, rhs->descriptor, rhs_storage);
@@ -4672,7 +4672,7 @@ mass_pointer_to(
   Value *pointee = value_view_get(&args, 0);
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee_descriptor);
-  if (mass_value_is_compile_time_known(pointee)) {
+  if (mass_value_is_static(pointee)) {
     const void *source_memory = get_static_storage_with_bit_size(
       &value_as_forced(pointee)->storage, pointee_descriptor->bit_size
     );
@@ -5059,7 +5059,7 @@ mass_struct_field_access(
     .field = field,
   };
 
-  if (mass_value_is_compile_time_known(struct_)) {
+  if (mass_value_is_static(struct_)) {
     Expected_Result expected_result = expected_result_any(field->descriptor);
     return mass_handle_field_access_lazy_proc(
       context, 0, &expected_result, source_range, &stack_lazy_payload
@@ -5112,7 +5112,7 @@ mass_dereference(
     });
     return 0;
   }
-  if (mass_value_is_compile_time_known(pointer)) {
+  if (mass_value_is_static(pointer)) {
     const Descriptor *pointee_descriptor = descriptor_as_pointer_to(descriptor)->descriptor;
     void *pointee_memory = *(void **)storage_static_memory_with_bit_size(
       &value_as_forced(pointer)->storage, descriptor->bit_size
@@ -5301,7 +5301,7 @@ mass_array_like_get(
   }
 
   Mass_Array_Access_Lazy_Payload lazy_payload = { .array = lhs, .index = rhs };
-  if (mass_value_is_compile_time_known(lhs) && mass_value_is_compile_time_known(rhs)) {
+  if (mass_value_is_static(lhs) && mass_value_is_static(rhs)) {
     Expected_Result expected_result = expected_result_any(item_descriptor);
     return mass_handle_array_access_lazy_proc(
       context, 0, &expected_result, &args_view.source_range, &lazy_payload
@@ -5554,7 +5554,7 @@ token_parse_if_expression(
 
   *matched_length = peek_index;
 
-  if (mass_value_is_compile_time_known(value_condition)) {
+  if (mass_value_is_static(value_condition)) {
     if (!mass_value_ensure_static_of(context, value_condition, &descriptor__bool)) {
       return 0;
     }
@@ -6142,7 +6142,7 @@ token_parse_block_statements(
         goto defer;
       }
 
-      if (mass_value_is_compile_time_known(parse_result)) {
+      if (mass_value_is_static(parse_result)) {
         if (parse_result->descriptor == &descriptor_ast_using) {
           const Module *module = value_as_ast_using(parse_result)->module;
           mass_copy_scope_exports(parser->scope, module->exports.scope);

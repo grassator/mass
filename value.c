@@ -4,7 +4,7 @@
 #include "calling_convention.h"
 
 static inline bool
-mass_value_is_compile_time_known(
+mass_value_is_static(
   const Value *value
 ) {
   if (!value) return false;
@@ -1222,7 +1222,7 @@ function_literal_info_for_args(
         }
       }
       if (param->Generic.is_static) {
-        if (!mass_value_is_compile_time_known(arg)) {
+        if (!mass_value_is_static(arg)) {
           // TODO cleanup memory?
           return 0;
         }
@@ -1273,7 +1273,7 @@ value_as_function(
   assert(value->descriptor->tag == Descriptor_Tag_Function_Instance);
   assert(value->tag == Value_Tag_Forced);
   const Storage *storage = &value->Forced.storage;
-  if(mass_value_is_compile_time_known(value)) {
+  if(mass_value_is_static(value)) {
     void const * const *address_pointer = storage_static_memory_with_bit_size(storage, (Bits){64});
     return (fn_type_opaque)*address_pointer;
   } else if (storage_is_label(storage)) {
