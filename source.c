@@ -3304,6 +3304,7 @@ mass_function_info_init_for_header_and_maybe_body(
         // Handled in :IntrinsicReturnType
         out_info->return_descriptor = 0;
       } else {
+        // TODO figure out how to provide a better error message here :RecursiveInferredType
         out_info->return_descriptor =
           mass_infer_function_return_type(context, out_info, arguments_scope, maybe_body);
         if (mass_has_error(context)) return;
