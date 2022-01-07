@@ -101,13 +101,6 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("External_Symbol")),
     type_external_symbol_value
   );
-  Source_Range Syscall__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Syscall__source_range, "Syscall");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, Syscall__source_range,
-    mass_ensure_symbol(compilation, slice_literal("Syscall")),
-    type_syscall_value
-  );
   Source_Range Compare_Type__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Compare_Type__source_range, "Compare_Type");
   scope_define_enum(
@@ -1161,6 +1154,30 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("storage")),
 &descriptor_storage
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_syscall, "syscall", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_mass_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("parser")),
+&descriptor_parser_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("header")),
+&descriptor_function_header_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("number")),
+&descriptor_i64
     )
   );
   MASS_DEFINE_FUNCTION(

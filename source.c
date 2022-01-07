@@ -4600,6 +4600,38 @@ mass_size_of(
 }
 
 static Value *
+mass_syscall(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args,
+  const Function_Header *header,
+  u64 number
+) {
+  Function_Info *fn_info = mass_allocate(context, Function_Info);
+  mass_function_info_init_for_header_and_maybe_body(context, parser->scope, header, 0, fn_info);
+  if (mass_has_error(context)) return 0;
+  Function_Call_Setup call_setup =
+    calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
+
+  Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, 0);
+
+  Value *overload = value_make(context, fn_descriptor, imm64(number), args.source_range);
+
+  Mass_Function_Call_Lazy_Payload *call_payload =
+    allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
+  *call_payload = (Mass_Function_Call_Lazy_Payload){
+    .overload = overload,
+    .args = args,
+  };
+
+  const Descriptor *lazy_descriptor = fn_info->return_descriptor;
+  Value *result = mass_make_lazy_value(
+    context, parser, args.source_range, call_payload, lazy_descriptor, call_function_overload
+  );
+  return result;
+}
+
+static Value *
 mass_pointer_to_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
@@ -5714,20 +5746,6 @@ mass_make_function_literal(
   Value *body_value,
   Source_Range source_range
 ) {
-  // TODO Move to userland
-  if (value_is_syscall(body_value)) {
-    Function_Info *fn_info = mass_allocate(context, Function_Info);
-    mass_function_info_init_for_header_and_maybe_body(context, parser->scope, header, 0, fn_info);
-    if (mass_has_error(context)) return 0;
-    Function_Call_Setup call_setup =
-      calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
-
-    Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, 0);
-
-    i64 syscall_number = value_as_syscall(body_value)->number;
-    return value_make(context, fn_descriptor, imm64(syscall_number.bits), source_range);
-  }
-
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
   *literal = (Function_Literal){
     .header = *header,

@@ -212,10 +212,6 @@ typedef struct External_Symbol External_Symbol;
 typedef dyn_array_type(External_Symbol *) Array_External_Symbol_Ptr;
 typedef dyn_array_type(const External_Symbol *) Array_Const_External_Symbol_Ptr;
 
-typedef struct Syscall Syscall;
-typedef dyn_array_type(Syscall *) Array_Syscall_Ptr;
-typedef dyn_array_type(const Syscall *) Array_Const_Syscall_Ptr;
-
 typedef struct Import_Symbol Import_Symbol;
 typedef dyn_array_type(Import_Symbol *) Array_Import_Symbol_Ptr;
 typedef dyn_array_type(const Import_Symbol *) Array_Const_Import_Symbol_Ptr;
@@ -893,6 +889,9 @@ static void storage_release_if_temporary
 static Expected_Result mass_expected_result_exact
   (const Descriptor * descriptor, Storage storage);
 
+static Value * mass_syscall
+  (Mass_Context * context, Parser * parser, Value_View args, const Function_Header * header, u64 number);
+
 static Value * value_force
   (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, Value * value);
 
@@ -1249,11 +1248,6 @@ typedef struct External_Symbol {
   Slice symbol_name;
 } External_Symbol;
 typedef dyn_array_type(External_Symbol) Array_External_Symbol;
-
-typedef struct Syscall {
-  i64 number;
-} Syscall;
-typedef dyn_array_type(Syscall) Array_Syscall;
 
 typedef struct Import_Symbol {
   Slice name;
@@ -2422,11 +2416,6 @@ static Descriptor descriptor_array_external_symbol;
 static Descriptor descriptor_array_external_symbol_ptr;
 static Descriptor descriptor_external_symbol_pointer;
 static Descriptor descriptor_external_symbol_pointer_pointer;
-static Descriptor descriptor_syscall;
-static Descriptor descriptor_array_syscall;
-static Descriptor descriptor_array_syscall_ptr;
-static Descriptor descriptor_syscall_pointer;
-static Descriptor descriptor_syscall_pointer_pointer;
 static Descriptor descriptor_import_symbol;
 static Descriptor descriptor_array_import_symbol;
 static Descriptor descriptor_array_import_symbol_ptr;
@@ -2831,6 +2820,7 @@ static Descriptor descriptor_storage_register;
 static Descriptor descriptor_storage_register_temp;
 static Descriptor descriptor_storage_release_if_temporary;
 static Descriptor descriptor_mass_expected_result_exact;
+static Descriptor descriptor_mass_syscall;
 static Descriptor descriptor_value_force;
 static Descriptor descriptor_mass_module_get_impl;
 static Descriptor descriptor_mass_forward_call_to_alias;
@@ -3516,18 +3506,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol, External_Symbol,
 MASS_DEFINE_TYPE_VALUE(external_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol);
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol *, external_symbol_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(array_syscall_ptr, Array_Syscall_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_syscall, Array_Syscall)
-MASS_DEFINE_STRUCT_DESCRIPTOR(syscall, Syscall,
-  {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("number"),
-    .offset = offsetof(Syscall, number),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(syscall);
-DEFINE_VALUE_IS_AS_HELPERS(Syscall, syscall);
-DEFINE_VALUE_IS_AS_HELPERS(Syscall *, syscall_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol_ptr, Array_Import_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol, Import_Symbol,

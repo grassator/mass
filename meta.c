@@ -1343,10 +1343,6 @@ main(void) {
     { "Slice", "symbol_name" },
   })));
 
-  export_compiler(push_type(type_struct("Syscall", (Struct_Item[]){
-    { "i64", "number" },
-  })));
-
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
     { "Label *", "label32" },
@@ -2234,6 +2230,16 @@ main(void) {
     type_function(Default, "mass_expected_result_exact", "Expected_Result", (Argument_Type[]){
       { "const Descriptor *", "descriptor" },
       { "Storage", "storage" },
+    })
+  ));
+
+  export_compiler_custom_name("syscall", push_type(
+    type_function(Default, "mass_syscall", "Value *", (Argument_Type[]){
+      { "Mass_Context *", "context" },
+      { "Parser *", "parser" },
+      { "Value_View", "args" },
+      { "const Function_Header *", "header" },
+      { "u64", "number" },
     })
   ));
 
