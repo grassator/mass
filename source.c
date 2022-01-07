@@ -4737,6 +4737,8 @@ mass_apply(
     const Descriptor *descriptor = *value_as_descriptor_pointer(lhs_value);
     Value *rhs_value = token_parse_single(context, parser, rhs_token);
     return mass_cast_helper(context, parser, descriptor, rhs_value, operands.source_range);
+  } else if (value_is_function_header(lhs_value)) {
+    return mass_function_literal(context, parser, operands);
   } else if (value_is_group_paren(rhs_token)) {
     return mass_call(context, parser, operands);
   } else if (value_is_ast_block(rhs_token)) {
@@ -5712,6 +5714,20 @@ mass_make_function_literal(
   Value *body_value,
   Source_Range source_range
 ) {
+  // TODO Move to userland
+  if (value_is_syscall(body_value)) {
+    Function_Info *fn_info = mass_allocate(context, Function_Info);
+    mass_function_info_init_for_header_and_maybe_body(context, parser->scope, header, 0, fn_info);
+    if (mass_has_error(context)) return 0;
+    Function_Call_Setup call_setup =
+      calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
+
+    Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, 0);
+
+    i64 syscall_number = value_as_syscall(body_value)->number;
+    return value_make(context, fn_descriptor, imm64(syscall_number.bits), source_range);
+  }
+
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
   *literal = (Function_Literal){
     .header = *header,
@@ -5733,6 +5749,9 @@ mass_function_literal(
   Value *header_value = token_parse_single(context, parser, value_view_get(&args_view, 0));
   if (mass_has_error(context)) return 0;
   Value *body_value = value_view_get(&args_view, 1);
+  if (!value_is_ast_block(body_value)) {
+    body_value = token_parse_single(context, parser, body_value);
+  }
   if (!mass_value_ensure_static_of(context, header_value, &descriptor_function_header)) return 0;
   const Function_Header *header = value_as_function_header(header_value);
   return mass_make_function_literal(context, parser, header, body_value, args_view.source_range);
@@ -5865,21 +5884,6 @@ token_parse_function_literal(
   }
 
   if (!mass_value_ensure_static(context, body_value)) return 0;
-
-  // TODO Move to userland
-  if (value_is_syscall(body_value)) {
-    Function_Info *fn_info = mass_allocate(context, Function_Info);
-    mass_function_info_init_for_header_and_maybe_body(context, parser->scope, &header, 0, fn_info);
-    if (mass_has_error(context)) return 0;
-    assert(!is_compile_time);
-    Function_Call_Setup call_setup =
-      calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
-
-    Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, 0);
-
-    i64 syscall_number = value_as_syscall(body_value)->number;
-    return value_make(context, fn_descriptor, imm64(syscall_number.bits), view.source_range);
-  }
   return mass_make_function_literal(context, parser, &header, body_value, view.source_range);
 }
 

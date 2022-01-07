@@ -61,11 +61,6 @@ operator(&) :: 15 'bitwise_and
 operator(- _) :: 16 'negate
 operator(& _) :: 16 'pointer_to
 
-postfix_block :: fn(
-  header : MASS.Function_Header,
-  block : MASS.Ast_Block
-) => (MASS.Function_Literal) MASS.function_literal
-
 cast :: fn(type : Type, value) -> _ MASS.cast
 zero_extend :: fn(type : Type, value) -> _ MASS.zero_extend
 
