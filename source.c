@@ -5547,10 +5547,8 @@ token_parse_if_expression(
   const Symbol *end_symbol
 ) {
   u32 peek_index = 0;
-  Value *keyword = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols._if
-  );
-  if (!keyword) return 0;
+  Value *keyword = value_view_next(&view, &peek_index);
+  assert(value_as_symbol(keyword) == context->compilation->common_symbols._if);
 
   Value *value_condition;
   {
@@ -5784,17 +5782,16 @@ token_parse_function_literal(
   const Symbol *end_symbol
 ) {
   u32 peek_index = 0;
+
+  Value *keyword = value_view_next(&view, &peek_index);
+  const Symbol *keyword_symbol = value_as_symbol(keyword);
+
   bool is_macro = false;
-  Value *keyword = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.fn
-  );
-  if (!keyword) {
-    keyword = value_view_maybe_match_cached_symbol(
-      view, &peek_index, context->compilation->common_symbols.macro
-    );
+  if (keyword_symbol == context->compilation->common_symbols.macro) {
     is_macro = true;
+  } else {
+    assert(keyword_symbol == context->compilation->common_symbols.fn);
   }
-  if (!keyword) return 0;
 
   Value *args = value_view_next(&view, &peek_index);
   if (!value_is_group_paren(args)) {
@@ -5960,35 +5957,6 @@ token_parse_expression(
     repeat:
     if (i >= view.length) break;
 
-    Value_View rest = value_view_rest(&view, i);
-
-    { // if expression
-      u32 match_length = 0;
-      Value *match_result = token_parse_if_expression(context, parser, rest, &match_length, end_symbol);
-      if (mass_has_error(context)) goto defer;
-      if (match_length) {
-        dyn_array_push(value_stack, match_result);
-        i += match_length; // Skip over the matched slice
-        matched_length = i;
-        goto drain;
-      }
-    }
-
-    { // function literal
-      u32 match_length = 0;
-      Value *match_result = token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
-      if (mass_has_error(context)) goto defer;
-      if (match_length) {
-        dyn_array_push(value_stack, match_result);
-        i += match_length; // Skip over the matched slice
-        goto repeat;
-      }
-    }
-
-    Operator_Fixity fixity_mask = is_value_expected
-      ? Operator_Fixity_Infix | Operator_Fixity_Postfix
-      : Operator_Fixity_Prefix;
-
     Value *value = value_view_get(&view, i);
 
     if (value_is_symbol(value)) {
@@ -5996,6 +5964,28 @@ token_parse_expression(
       if (symbol == end_symbol) {
         matched_length = i + 1;
         goto drain;
+      }
+
+      Operator_Fixity fixity_mask = is_value_expected
+        ? Operator_Fixity_Infix | Operator_Fixity_Postfix
+        : Operator_Fixity_Prefix;
+
+      if (
+        symbol == context->compilation->common_symbols.fn ||
+        symbol == context->compilation->common_symbols.macro ||
+        symbol == context->compilation->common_symbols._if
+      ) {
+        Value_View rest = value_view_rest(&view, i);
+        u32 match_length = 0;
+        Value *match_result = symbol == context->compilation->common_symbols._if
+          ? token_parse_if_expression(context, parser, rest, &match_length, end_symbol)
+          : token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
+        if (mass_has_error(context)) goto defer;
+        if (match_length) {
+          dyn_array_push(value_stack, match_result);
+          i += match_length; // Skip over the matched slice
+          goto repeat;
+        }
       }
 
       const Operator *maybe_operator = scope_lookup_operator(context, parser->scope, symbol, fixity_mask);
