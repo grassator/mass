@@ -2042,6 +2042,7 @@ token_parse_operator_definition(
 
   Value *operator_token;
   Operator_Fixity fixity = Operator_Fixity_Prefix;
+  Operator_Associativity associativity = Operator_Associativity_Left;
   u16 argument_count = 1;
 
   // prefix and postfix
@@ -2052,6 +2053,7 @@ token_parse_operator_definition(
       fixity = Operator_Fixity_Postfix;
     }
     if (fixity == Operator_Fixity_Prefix) {
+      associativity = Operator_Associativity_Right;
       if (!value_match_symbol(value_view_get(&definition, 1), slice_literal("_"))) {
         context_parse_error(context, parser, view, peek_index);
         goto err;
@@ -2082,6 +2084,7 @@ token_parse_operator_definition(
       .tag = Operator_Tag_Alias,
       .fixity = fixity,
       .precedence = precendence,
+      .associativity = associativity,
       .Alias = { .symbol = alias },
     };
   } else if (value_is_intrinsic(body)) {
@@ -2089,6 +2092,7 @@ token_parse_operator_definition(
       .tag = Operator_Tag_Intrinsic,
       .fixity = fixity,
       .precedence = precendence,
+      .associativity = associativity,
       .Intrinsic = { .body = body },
     };
   } else {
