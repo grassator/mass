@@ -827,38 +827,6 @@ storage_equal(
   return false;
 }
 
-static inline Value *
-value_i64(
-  Mass_Context *context,
-  Slice digits,
-  Number_Base base,
-  Source_Range source_range
-) {
-  // @Volatile :TokenizerNumbers This code just assumes valid tokens
-  static const u8 digit_decoder[128] = {
-    ['0'] = 0, ['1'] = 1, ['2'] = 2, ['3'] = 3, ['4'] = 4,
-    ['5'] = 5, ['6'] = 6, ['7'] = 7, ['8'] = 8, ['9'] = 9,
-    ['a'] = 10, ['b'] = 11, ['c'] = 12, ['d'] = 13, ['e'] = 14, ['f'] = 15,
-    ['A'] = 10, ['B'] = 11, ['C'] = 12, ['D'] = 13, ['E'] = 14, ['F'] = 15,
-  };
-
-  i64 literal;
-  if (digits.length == 1) {
-    char byte = digits.bytes[0];
-    literal = (i64){ digit_decoder[byte] };
-  } else {
-    u64 bits = 0;
-    for (const char *ch = digits.bytes; ch < digits.bytes + digits.length; ++ch) {
-      assert((u8)*ch < countof(digit_decoder));
-      if (*ch == '_') continue;
-      bits *= base;
-      bits += digit_decoder[*ch];
-    }
-    literal = (i64){ bits };
-  }
-  return value_make(context, &descriptor_i64, storage_immediate(&literal), source_range);
-}
-
 static inline Label *
 allocate_section_memory(
   const Allocator *allocator,
