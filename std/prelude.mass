@@ -71,10 +71,13 @@ is_fixed_array_type :: MASS.constraint_fixed_array_type
 is_struct_type :: MASS.constraint_struct_type
 is_function_instance_type :: MASS.constraint_function_instance_type
 
-string_get :: fn(string : String, offset : i64) => (i8) {
+get :: fn(string : String, offset : i64) -> (i8) {
   using unsigned
   assert(offset < string.length);
   unchecked_get_at_index(string.bytes, offset)
+}
+get :: fn(string : String, offset : i64) => (i8) {
+  get(string, offset)
 }
 
 // TODO runtime version should be implemented in the userland
