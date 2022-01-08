@@ -1603,10 +1603,18 @@ main(void) {
     }),
   }));
 
+  push_type(type_struct("Overload_Match_Summary", (Struct_Item[]){
+    { "u16", "generic_count" },
+    { "u16", "cast_count" },
+    { "u16", "exact_count" },
+    { "_Bool", "compile_time" },
+    { "_Bool", "matched" },
+  }));
+
   push_type(type_struct("Overload_Match_State", (Struct_Item[]){
     { "Value *", "value" },
     { "const Function_Info *", "info" },
-    { "s64", "score" },
+    { "Overload_Match_Summary", "summary" },
   }));
 
   export_compiler(push_type(type_enum("Value_Flags", (Enum_Type_Item[]){

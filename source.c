@@ -3332,24 +3332,21 @@ typedef enum {
   Mass_Argument_Scoring_Flags_Prefer_Compile_Time = 1 << 0,
 } Mass_Argument_Scoring_Flags;
 
-static s64
+static Overload_Match_Summary
 calculate_arguments_match_score(
   Mass_Context *context,
   const Function_Info *descriptor,
   Value_View args_view,
   Mass_Argument_Scoring_Flags scoring_flags
 ) {
-  const s64 MAX_ARG_COUNT = 255;
-  const s64 Score_Cast = 1;
-  const s64 Score_Generic = Score_Cast << 8;
-  const s64 Score_Generic_Constrained = Score_Generic << 8;
-  const s64 Score_Same_Type = Score_Generic_Constrained << 8;
-  const s64 Score_Same_Type_Static = Score_Same_Type << 8;
-  const s64 Score_Exact_Static = Score_Same_Type_Static << 8;
-
-  assert(args_view.length < MAX_ARG_COUNT);
-  s64 score = 0;
-  if (args_view.length > dyn_array_length(descriptor->parameters)) return -1;
+  assert(args_view.length < 65535);
+  if (args_view.length > dyn_array_length(descriptor->parameters)) {
+    return (Overload_Match_Summary){0};
+  }
+  Overload_Match_Summary result = {
+    .compile_time = !!(scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time),
+    .matched = true,
+  };
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Resolved_Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     const Descriptor *target_descriptor = param->descriptor;
@@ -3361,45 +3358,44 @@ calculate_arguments_match_score(
     } else {
       source_arg = value_view_get(&args_view, arg_index);
     }
-    s64 param_score = 0;
+    if (param->was_generic) {
+      result.generic_count += 1;
+    }
     switch(param->tag) {
       case Resolved_Function_Parameter_Tag_Unknown: {
         source_descriptor = value_or_lazy_value_descriptor(source_arg);
         if (same_type(target_descriptor, source_descriptor)) {
-          if (scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time) {
-            param_score = Score_Same_Type_Static;
-          } else {
-            param_score = Score_Same_Type;
+          continue;
+        }
+        if (mass_value_is_static(source_arg)) {
+          source_descriptor = deduce_runtime_descriptor_for_value(
+            context, source_arg, target_descriptor
+          );
+          if (!source_descriptor) {
+            return (Overload_Match_Summary){0};
           }
-          if (param->was_generic) {
-            param_score = param_score >> 2;
-          }
+        }
+        if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
+          result.cast_count += 1;
         } else {
-          if (mass_value_is_static(source_arg)) {
-            source_descriptor = deduce_runtime_descriptor_for_value(
-              context, source_arg, target_descriptor
-            );
-            if (!source_descriptor) return -1;
-          }
-          if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
-            param_score = Score_Cast;
-          } else {
-            return -1;
-          }
+          return (Overload_Match_Summary){0};
         }
       } break;
       case Resolved_Function_Parameter_Tag_Known: {
-        if (!mass_value_is_static(source_arg)) return -1;
+        result.exact_count += 1;
+        if (!mass_value_is_static(source_arg)) {
+          return (Overload_Match_Summary){0};
+        }
         if (!storage_static_equal(
           target_descriptor, &param->Known.storage,
           source_arg->descriptor, &value_as_forced(source_arg)->storage
-        )) return -1;
-        param_score = Score_Exact_Static;
+        )) {
+          return (Overload_Match_Summary){0};
+        }
       } break;
     }
-    score += param_score;
   }
-  return score;
+  return result;
 }
 
 static inline bool
@@ -3471,14 +3467,14 @@ mass_match_overload_candidate(
       }
     }
 
-    s64 score = calculate_arguments_match_score(
+    Overload_Match_Summary summary = calculate_arguments_match_score(
       context, overload_info, args->view, scoring_flags
     );
-    if (score >= 0) {
+    if (summary.matched) {
       dyn_array_push(matches, (Overload_Match_State) {
         .info = overload_info,
         .value = candidate,
-        .score = score,
+        .summary = summary,
       });
     }
   }
@@ -3517,21 +3513,29 @@ mass_match_overload(
   if (dyn_array_length(matches) > 1) {
     const Overload_Match_State *conflict_match = best_match;
     DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
-      if (match->score > best_match->score) {
+      if (
+        match->summary.generic_count < best_match->summary.generic_count ||
+        match->summary.cast_count < best_match->summary.cast_count ||
+        match->summary.exact_count > best_match->summary.exact_count ||
+        match->summary.compile_time > best_match->summary.compile_time
+      ) {
         best_match = match;
       }
-      if (match->score == best_match->score) {
+      if (memcmp(&match->summary, &best_match->summary, sizeof(best_match->summary)) == 0) {
         conflict_match = match;
       }
     }
-    if (conflict_match != best_match && conflict_match->score == best_match->score) {
+    if (
+      conflict_match != best_match &&
+      memcmp(&conflict_match->summary, &best_match->summary, sizeof(best_match->summary)) == 0
+    ) {
       Array_Undecidable_Match undecidable_overloads = dyn_array_make(
         Array_Undecidable_Match,
         .capacity = dyn_array_length(matches),
         .allocator = context->allocator,
       );
       DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
-        if (match->score == best_match->score) {
+        if (memcmp(&match->summary, &best_match->summary, sizeof(best_match->summary)) == 0) {
           dyn_array_push(undecidable_overloads, (Undecidable_Match) {
             .info = match->info,
             .value = match->value,

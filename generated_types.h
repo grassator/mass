@@ -431,6 +431,10 @@ typedef struct Overload_Match_Found Overload_Match_Found;
 typedef dyn_array_type(Overload_Match *) Array_Overload_Match_Ptr;
 typedef dyn_array_type(const Overload_Match *) Array_Const_Overload_Match_Ptr;
 
+typedef struct Overload_Match_Summary Overload_Match_Summary;
+typedef dyn_array_type(Overload_Match_Summary *) Array_Overload_Match_Summary_Ptr;
+typedef dyn_array_type(const Overload_Match_Summary *) Array_Const_Overload_Match_Summary_Ptr;
+
 typedef struct Overload_Match_State Overload_Match_State;
 typedef dyn_array_type(Overload_Match_State *) Array_Overload_Match_State_Ptr;
 typedef dyn_array_type(const Overload_Match_State *) Array_Const_Overload_Match_State_Ptr;
@@ -1643,10 +1647,19 @@ overload_match_as_found(const Overload_Match *overload_match) {
   return &overload_match->Found;
 }
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
+typedef struct Overload_Match_Summary {
+  u16 generic_count;
+  u16 cast_count;
+  u16 exact_count;
+  _Bool compile_time;
+  _Bool matched;
+} Overload_Match_Summary;
+typedef dyn_array_type(Overload_Match_Summary) Array_Overload_Match_Summary;
+
 typedef struct Overload_Match_State {
   Value * value;
   const Function_Info * info;
-  s64 score;
+  Overload_Match_Summary summary;
 } Overload_Match_State;
 typedef dyn_array_type(Overload_Match_State) Array_Overload_Match_State;
 
@@ -2626,6 +2639,11 @@ static Descriptor descriptor_array_overload_match_ptr;
 static Descriptor descriptor_array_const_overload_match_ptr;
 static Descriptor descriptor_overload_match_pointer;
 static Descriptor descriptor_overload_match_pointer_pointer;
+static Descriptor descriptor_overload_match_summary;
+static Descriptor descriptor_array_overload_match_summary;
+static Descriptor descriptor_array_overload_match_summary_ptr;
+static Descriptor descriptor_overload_match_summary_pointer;
+static Descriptor descriptor_overload_match_summary_pointer_pointer;
 static Descriptor descriptor_overload_match_state;
 static Descriptor descriptor_array_overload_match_state;
 static Descriptor descriptor_array_overload_match_state_ptr;
@@ -4441,6 +4459,38 @@ MASS_DEFINE_TYPE_VALUE(overload_match);
 DEFINE_VALUE_IS_AS_HELPERS(Overload_Match, overload_match);
 DEFINE_VALUE_IS_AS_HELPERS(Overload_Match *, overload_match_pointer);
 /*union struct end*/
+MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_summary, Overload_Match_Summary,
+  {
+    .descriptor = &descriptor_i16,
+    .name = slice_literal_fields("generic_count"),
+    .offset = offsetof(Overload_Match_Summary, generic_count),
+  },
+  {
+    .descriptor = &descriptor_i16,
+    .name = slice_literal_fields("cast_count"),
+    .offset = offsetof(Overload_Match_Summary, cast_count),
+  },
+  {
+    .descriptor = &descriptor_i16,
+    .name = slice_literal_fields("exact_count"),
+    .offset = offsetof(Overload_Match_Summary, exact_count),
+  },
+  {
+    .descriptor = &descriptor__bool,
+    .name = slice_literal_fields("compile_time"),
+    .offset = offsetof(Overload_Match_Summary, compile_time),
+  },
+  {
+    .descriptor = &descriptor__bool,
+    .name = slice_literal_fields("matched"),
+    .offset = offsetof(Overload_Match_Summary, matched),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(overload_match_summary);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match_summary_ptr, overload_match_summary_pointer, Array_Overload_Match_Summary_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match_summary, overload_match_summary, Array_Overload_Match_Summary);
+DEFINE_VALUE_IS_AS_HELPERS(Overload_Match_Summary, overload_match_summary);
+DEFINE_VALUE_IS_AS_HELPERS(Overload_Match_Summary *, overload_match_summary_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_state, Overload_Match_State,
   {
     .descriptor = &descriptor_value_pointer,
@@ -4453,9 +4503,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_state, Overload_Match_State,
     .offset = offsetof(Overload_Match_State, info),
   },
   {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("score"),
-    .offset = offsetof(Overload_Match_State, score),
+    .descriptor = &descriptor_overload_match_summary,
+    .name = slice_literal_fields("summary"),
+    .offset = offsetof(Overload_Match_State, summary),
   },
 );
 MASS_DEFINE_TYPE_VALUE(overload_match_state);

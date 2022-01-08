@@ -463,6 +463,10 @@ signed_less :: make_i64_comparison_fn(MASS.Compare_Type.Less)
 signed_less_equal :: make_i64_comparison_fn(MASS.Compare_Type.Less_Equal)
 signed_greater :: make_i64_comparison_fn(MASS.Compare_Type.Greater)
 signed_greater_equal :: make_i64_comparison_fn(MASS.Compare_Type.Greater_Equal)
+equal :: fn(x : i64, y : i64) -> (bool) MASS.generic_equal
+not_equal :: fn(x : i64, y : i64) -> (bool) MASS.generic_not_equal
+equal :: fn(x : i64, y : i64) => (bool) { equal(x, y) }
+not_equal :: fn(x : i64, y : i64) => (bool) { not_equal(x, y) }
 
 unsigned :: module {
   less :: unsigned_less
