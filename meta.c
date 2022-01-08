@@ -2179,6 +2179,7 @@ main(void) {
   export_compiler_custom_name("exports", push_type(type_intrinsic("mass_exports")));
   export_compiler_custom_name("cast", push_type(type_intrinsic("mass_cast")));
   export_compiler_custom_name("zero_extend", push_type(type_intrinsic("mass_zero_extend")));
+  export_compiler_custom_name("parse_type", push_type(type_intrinsic("mass_parse_type")));
   export_compiler_custom_name("type_of", push_type(type_intrinsic("mass_type_of")));
   export_compiler_custom_name("size_of", push_type(type_intrinsic("mass_size_of")));
   export_compiler_custom_name("static_assert", push_type(type_intrinsic("mass_static_assert")));

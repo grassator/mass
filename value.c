@@ -1147,25 +1147,7 @@ function_literal_info_for_parameters(
     if (arg_index < dyn_array_length(source_parameters)) {
       const Resolved_Function_Parameter *source_param = dyn_array_get(source_parameters, arg_index);
       actual_descriptor = source_param->descriptor;
-      // FIXME turn this into a switch
       if(param->tag == Function_Parameter_Tag_Generic) {
-        if (!(literal->header.flags & Function_Header_Flags_Compile_Time) && !param->Generic.is_static) {
-          if (source_param->tag == Resolved_Function_Parameter_Tag_Known) {
-            Value fake_source_value;
-            Storage storage = source_param->Known.storage;
-            value_init(&fake_source_value, source_param->descriptor, storage, source_param->source_range);
-            actual_descriptor = deduce_runtime_descriptor_for_value(context, &fake_source_value, 0);
-            // TODO cleanup memory?
-            if (!actual_descriptor) return 0;
-          }
-        }
-        if (param->Generic.maybe_type_constraint) {
-          actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
-          if (!actual_descriptor) {
-            // TODO cleanup memory?
-            return 0;
-          }
-        }
         if (param->Generic.is_static) {
           if (source_param->tag != Resolved_Function_Parameter_Tag_Known) {
             // TODO cleanup memory?
@@ -1174,6 +1156,24 @@ function_literal_info_for_parameters(
           specialized_param->descriptor = actual_descriptor;
           specialized_param->tag = Function_Parameter_Tag_Exact_Static;
           specialized_param->Exact_Static.storage = source_param->Known.storage;
+        } else {
+          if (!(literal->header.flags & Function_Header_Flags_Compile_Time)) {
+            if (source_param->tag == Resolved_Function_Parameter_Tag_Known) {
+              Value fake_source_value;
+              Storage storage = source_param->Known.storage;
+              value_init(&fake_source_value, source_param->descriptor, storage, source_param->source_range);
+              actual_descriptor = deduce_runtime_descriptor_for_value(context, &fake_source_value, 0);
+              // TODO cleanup memory?
+              if (!actual_descriptor) return 0;
+            }
+          }
+        }
+        if (param->Generic.maybe_type_constraint) {
+          actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
+          if (!actual_descriptor) {
+            // TODO cleanup memory?
+            return 0;
+          }
         }
         specialized_param->descriptor = actual_descriptor;
       }

@@ -973,6 +973,19 @@ spec("source") {
       spec_check_slice(error->Undefined_Variable.name, slice_literal("s33"));
     }
 
+    it("should be able to eval something as a type") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "my_struct_type :: parse_type([x : i64])\n"
+        "checker :: fn() -> (i64) {"
+          "foo := my_struct_type [42]\n"
+          "foo.x"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to get the type_of an expression without evaluating it") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,

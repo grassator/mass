@@ -21,6 +21,7 @@ operator(return _) :: 0 MASS.return
 // `size_of` and `type_of` are essentially function calls with special parsing
 // rules and evaluation behavior, so they get the same precedence as `apply`
 operator(type_of _) :: 20 MASS.type_of
+operator(parse_type _) :: 20 MASS.parse_type
 operator(size_of _) :: 20 MASS.size_of
 
 operator(' _) :: 30 MASS.quote

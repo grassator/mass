@@ -4618,6 +4618,20 @@ static inline Value *mass_generic_not_equal(Mass_Context *context, Parser *parse
   );
 }
 
+static Value *
+mass_parse_type(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args
+) {
+  assert(args.length == 1);
+  Value *value = value_view_get(&args, 0);
+  value = token_parse_single(context, parser, value);
+  if (mass_has_error(context)) return 0;
+  const Descriptor *descriptor = value_ensure_type(context, parser->scope, value, args.source_range);
+  return value_make(context, &descriptor_descriptor_pointer, storage_immediate(&descriptor), args.source_range);
+}
+
 static const Descriptor *
 mass_type_only_token_parse_expression(
   Mass_Context *context,

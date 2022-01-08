@@ -854,6 +854,9 @@ static Value * mass_cast
 static Value * mass_zero_extend
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_parse_type
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_type_of
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2903,6 +2906,7 @@ static Descriptor descriptor_mass_c_struct;
 static Descriptor descriptor_mass_exports;
 static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_zero_extend;
+static Descriptor descriptor_mass_parse_type;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_static_assert;
