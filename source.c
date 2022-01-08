@@ -3664,8 +3664,11 @@ mass_ensure_trampoline(
     return *maybe_trampoline_pointer;
   }
 
+  // Trampoline needs to be compiled in the jit context so we substitute it here
   Mass_Context jit_context = *context;
   jit_context.program = context->compilation->jit.program;
+  context = &jit_context;
+  Program *program = context->program;
 
   // Whenever a trampoline is generated it needs an instance compiled for JIT execution.
   // The `Function_Info` of that instance must not be marked `Compile_Time` otherwise
@@ -3678,18 +3681,24 @@ mass_ensure_trampoline(
   // TODO would be nice to structure the types in such a way that this would be easier to do
   Value *proxy_value;
   {
-    Value *runtime_instance = ensure_function_instance(&jit_context, original, args_view);
-    if (mass_has_error(context)) return 0;
-    assert(runtime_instance->descriptor->tag == Descriptor_Tag_Function_Instance);
     Function_Info *proxy_info = mass_allocate(context, Function_Info);
     *proxy_info = *original_info;
     proxy_info->flags &= ~Function_Info_Flags_Compile_Time;
 
-    Descriptor *proxy_descriptor = allocator_allocate(context->allocator, Descriptor);
-    *proxy_descriptor = *runtime_instance->descriptor;
+    const Calling_Convention *calling_convention = program->default_calling_convention;
+    Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, proxy_info);
+    Descriptor *proxy_descriptor = descriptor_function_instance(
+      context->allocator, proxy_info, call_setup, program
+    );
     proxy_descriptor->Function_Instance.info = proxy_info;
+    Value *runtime_instance = original;
+    if (value_is_function_literal(runtime_instance)) {
+      const Function_Literal *literal = value_as_function_literal(runtime_instance);
+      runtime_instance = mass_function_literal_instance_for_info(context, literal, proxy_info);
+    }
+    if (mass_has_error(context)) return 0;
     const Storage *runtime_storage = &value_as_forced(runtime_instance)->storage;
-    proxy_value = value_make(context, proxy_descriptor, *runtime_storage, runtime_instance->source_range);
+    proxy_value = value_make(context, proxy_descriptor, *runtime_storage, original->source_range);
   }
 
   C_Struct_Aligner struct_aligner = {0};
@@ -3728,8 +3737,6 @@ mass_ensure_trampoline(
   Source_Range return_range;
   INIT_LITERAL_SOURCE_RANGE(&return_range, "()");
 
-  context = &jit_context;
-  Program *program = jit_context.program;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
   Parser body_parser = {
@@ -3828,7 +3835,7 @@ mass_ensure_trampoline(
   *trampoline = (Mass_Trampoline) {
     .args_descriptor = args_struct_descriptor,
     .proc = (Mass_Trampoline_Proc)mass_ensure_jit_function_for_value(
-      &jit_context, proxy_instance, proxy_info
+      context, proxy_instance, proxy_info
     ),
     .original_info = original_info,
   };
