@@ -66,8 +66,9 @@ static bool
 mass_match_overload_or_error(
   Mass_Context *context,
   Value *target,
-  Value_View args_view,
-  Overload_Match_Found *match_found
+  Array_Resolved_Function_Parameter arg_parameters,
+  Overload_Match_Found *match_found,
+  const Source_Range *source_range
 );
 
 static inline Scope *

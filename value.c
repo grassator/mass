@@ -1092,35 +1092,11 @@ descriptor_pointer_to(
   return result;
 }
 
-static Array_Value_Ptr
-mass_fake_argument_array_from_parameters(
-  const Allocator *allocator,
-  Array_Resolved_Function_Parameter parameters
-) {
-  u64 capacity = dyn_array_length(parameters);
-  if (capacity == 0) {
-    return (Array_Value_Ptr){&dyn_array_zero_items};
-  }
-  Array_Value_Ptr fake_args = dyn_array_make(Array_Value_Ptr, .allocator = allocator, .capacity = capacity);
-  // FIXME :FakeArgs this should be merged with the return type inference and take care of params with known storage
-  DYN_ARRAY_FOREACH(Resolved_Function_Parameter, param, parameters) {
-    assert(param->descriptor);
-    Value *fake_value = allocator_allocate(allocator, Value);
-    *fake_value = (Value){
-      .tag = Value_Tag_Lazy,
-      .descriptor = param->descriptor,
-      .source_range = param->source_range,
-    };
-    dyn_array_push(fake_args, fake_value);
-  }
-  return fake_args;
-}
-
 static Function_Info *
-function_literal_info_for_args(
+function_literal_info_for_parameters(
   Mass_Context *context,
   const Function_Literal *literal,
-  Value_View args
+  Array_Resolved_Function_Parameter source_parameters
 ) {
   if (literal->header.generic_parameter_count == 0) {
     if (dyn_array_is_initialized(literal->specializations)) {
@@ -1142,10 +1118,10 @@ function_literal_info_for_args(
   }
 
   DYN_ARRAY_FOREACH(Function_Specialization, specialization, mutable_literal->specializations) {
-    if (dyn_array_length(specialization->descriptors) != args.length) continue;
+    if (dyn_array_length(specialization->descriptors) != dyn_array_length(source_parameters)) continue;
     for (u64 i = 0; i < dyn_array_length(specialization->descriptors); ++i) {
       const Descriptor *cached_descriptor = *dyn_array_get(specialization->descriptors, i);
-      const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(value_view_get(&args, i));
+      const Descriptor *actual_descriptor = dyn_array_get(source_parameters, i)->descriptor;
       if (!same_type(cached_descriptor, actual_descriptor)) goto not_matched;
     }
     return specialization->info;
@@ -1160,48 +1136,55 @@ function_literal_info_for_args(
 
   Array_Const_Descriptor_Ptr cache_descriptors = dyn_array_make(
     Array_Const_Descriptor_Ptr,
-    .capacity = args.length,
+    .capacity = dyn_array_length(source_parameters),
     .allocator = context->allocator,
   );
 
   for (u64 arg_index = 0; arg_index < dyn_array_length(literal->header.parameters); ++arg_index) {
     const Function_Parameter *param = dyn_array_get(literal->header.parameters, arg_index);
     Function_Parameter *specialized_param = dyn_array_push(specialized_header.parameters, *param);
-    Value *arg;
-    if (arg_index >= args.length) {
-      if (!specialized_param->maybe_default_value) {
-        panic("Calls to fns that don't have defaults to fill in missing args must be handled earlier");
-      }
-      arg = specialized_param->maybe_default_value;
-    } else {
-      arg = value_view_get(&args, arg_index);
-    }
-    const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(arg);
-    // FIXME turn this into a switch
-    if(param->tag == Function_Parameter_Tag_Generic) {
-      if (!(literal->header.flags & Function_Header_Flags_Compile_Time) && !param->Generic.is_static) {
-        actual_descriptor = deduce_runtime_descriptor_for_value(context, arg, 0);
-        // TODO cleanup memory?
-        if (!actual_descriptor) return 0;
-      }
-      if (param->Generic.maybe_type_constraint) {
-        actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
-        if (!actual_descriptor) {
-          // TODO cleanup memory?
-          return 0;
+    const Descriptor *actual_descriptor;
+    if (arg_index < dyn_array_length(source_parameters)) {
+      const Resolved_Function_Parameter *source_param = dyn_array_get(source_parameters, arg_index);
+      actual_descriptor = source_param->descriptor;
+      // FIXME turn this into a switch
+      if(param->tag == Function_Parameter_Tag_Generic) {
+        if (!(literal->header.flags & Function_Header_Flags_Compile_Time) && !param->Generic.is_static) {
+          if (source_param->tag == Resolved_Function_Parameter_Tag_Known) {
+            Value fake_source_value;
+            Storage storage = source_param->Known.storage;
+            value_init(&fake_source_value, source_param->descriptor, storage, source_param->source_range);
+            actual_descriptor = deduce_runtime_descriptor_for_value(context, &fake_source_value, 0);
+            // TODO cleanup memory?
+            if (!actual_descriptor) return 0;
+          }
         }
-      }
-      if (param->Generic.is_static) {
-        if (!mass_value_is_static(arg)) {
-          // TODO cleanup memory?
-          return 0;
+        if (param->Generic.maybe_type_constraint) {
+          actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
+          if (!actual_descriptor) {
+            // TODO cleanup memory?
+            return 0;
+          }
+        }
+        if (param->Generic.is_static) {
+          if (source_param->tag != Resolved_Function_Parameter_Tag_Known) {
+            // TODO cleanup memory?
+            return 0;
+          }
+          specialized_param->descriptor = actual_descriptor;
+          specialized_param->tag = Function_Parameter_Tag_Exact_Static;
+          specialized_param->Exact_Static.storage = source_param->Known.storage;
         }
         specialized_param->descriptor = actual_descriptor;
-        specialized_param->tag = Function_Parameter_Tag_Exact_Static;
-        specialized_param->Exact_Static.storage = value_as_forced(arg)->storage;
       }
-      specialized_param->descriptor = actual_descriptor;
+    } else {
+      if (!param->maybe_default_value) {
+        panic("Calls to fns that don't have defaults to fill in missing args must be handled earlier");
+      }
+      actual_descriptor = value_or_lazy_value_descriptor(param->maybe_default_value);
     }
+
+
     // In the presence of implicit casts it is unclear if this should use declared types or not.
     // On one hand with actual types we might generate identical copies, on the other hand
     // searching for a match becomes faster. Do not know what is better.

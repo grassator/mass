@@ -641,12 +641,9 @@ deduce_runtime_descriptor_for_value(
       }
     }
     if (mass_has_error(context)) return 0;
-    Array_Value_Ptr fake_args =
-      mass_fake_argument_array_from_parameters(context->temp_allocator, parameters);
-    Value_View args_view = value_view_from_value_array(fake_args, &value->source_range);
 
     Overload_Match_Found match_found;
-    if (!mass_match_overload_or_error(context, value, args_view, &match_found)) {
+    if (!mass_match_overload_or_error(context, value, parameters, &match_found, &value->source_range)) {
       return 0;
     }
     Function_Call_Setup call_setup =
@@ -948,12 +945,8 @@ mass_assign_helper(
       source->descriptor == &descriptor_function_literal ||
       source->descriptor == &descriptor_overload
     ) {
-      Array_Value_Ptr fake_args =
-        mass_fake_argument_array_from_parameters(context->temp_allocator, target_info->parameters);
-      Value_View args_view = value_view_from_value_array(fake_args, &target->source_range);
-
       Overload_Match_Found match_found;
-      if (!mass_match_overload_or_error(context, source, args_view, &match_found)) {
+      if (!mass_match_overload_or_error(context, source, target_info->parameters, &match_found,&target->source_range)) {
         return;
       }
 
@@ -3329,7 +3322,7 @@ mass_function_info_init_for_header_and_maybe_body(
 }
 
 typedef struct {
-  Value_View view;
+  Array_Resolved_Function_Parameter parameters;
   bool all_arguments_are_compile_time_known;
 } Mass_Overload_Match_Args;
 
@@ -3341,12 +3334,12 @@ typedef enum {
 static Overload_Match_Summary
 calculate_arguments_match_score(
   Mass_Context *context,
-  const Function_Info *descriptor,
-  Value_View args_view,
+  const Function_Info *info,
+  Array_Resolved_Function_Parameter source_params,
   Mass_Argument_Scoring_Flags scoring_flags
 ) {
-  assert(args_view.length < 65535);
-  if (args_view.length > dyn_array_length(descriptor->parameters)) {
+  assert(dyn_array_length(source_params) < 65535);
+  if (dyn_array_length(source_params) > dyn_array_length(info->parameters)) {
     return (Overload_Match_Summary){0};
   }
   Overload_Match_Summary result = {
@@ -3355,29 +3348,28 @@ calculate_arguments_match_score(
     .inverted_generic_count = UINT16_MAX,
     .inverted_cast_count = UINT16_MAX,
   };
-  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
-    Resolved_Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
-    const Descriptor *target_descriptor = param->descriptor;
-    Value *source_arg = 0;
-    const Descriptor *source_descriptor;
-    if (arg_index >= args_view.length) {
-      assert(param->maybe_default_value);
-      source_arg = param->maybe_default_value;
-    } else {
-      source_arg = value_view_get(&args_view, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
+    Resolved_Function_Parameter *target_param = dyn_array_get(info->parameters, arg_index);
+    if (arg_index >= dyn_array_length(source_params)) {
+      continue; // Default params always match
     }
-    if (param->was_generic) {
+    const Resolved_Function_Parameter *source_param = dyn_array_get(source_params, arg_index);
+    const Descriptor *target_descriptor = target_param->descriptor;
+    if (target_param->was_generic) {
       result.inverted_generic_count -= 1;
     }
-    switch(param->tag) {
+    const Descriptor *source_descriptor = source_param->descriptor;
+    switch(target_param->tag) {
       case Resolved_Function_Parameter_Tag_Unknown: {
-        source_descriptor = value_or_lazy_value_descriptor(source_arg);
         if (same_type(target_descriptor, source_descriptor)) {
           continue;
         }
-        if (mass_value_is_static(source_arg)) {
+        if (source_param->tag == Resolved_Function_Parameter_Tag_Known) {
+          Value fake_source_value;
+          Storage storage = source_param->Known.storage;
+          value_init(&fake_source_value, source_param->descriptor, storage, source_param->source_range);
           source_descriptor = deduce_runtime_descriptor_for_value(
-            context, source_arg, target_descriptor
+            context, &fake_source_value, target_descriptor
           );
           if (!source_descriptor) {
             return (Overload_Match_Summary){0};
@@ -3391,12 +3383,12 @@ calculate_arguments_match_score(
       } break;
       case Resolved_Function_Parameter_Tag_Known: {
         result.exact_count += 1;
-        if (!mass_value_is_static(source_arg)) {
+        if (source_param->tag != Resolved_Function_Parameter_Tag_Known) {
           return (Overload_Match_Summary){0};
         }
         if (!storage_static_equal(
-          target_descriptor, &param->Known.storage,
-          source_arg->descriptor, &value_as_forced(source_arg)->storage
+          target_descriptor, &target_param->Known.storage,
+          source_descriptor, &source_param->Known.storage
         )) {
           return (Overload_Match_Summary){0};
         }
@@ -3447,7 +3439,9 @@ mass_match_overload_candidate(
         if (!args->all_arguments_are_compile_time_known) return;
         scoring_flags |= Mass_Argument_Scoring_Flags_Prefer_Compile_Time;
       }
-      if (!match_overload_argument_count(literal->header.parameters, args->view.length)) return;
+      if (!match_overload_argument_count(literal->header.parameters, dyn_array_length(args->parameters))) {
+        return;
+      }
       Function_Info *specialized_info;
       {
         // :OverloadLock
@@ -3457,7 +3451,7 @@ mass_match_overload_candidate(
         //    pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
         // Without the lock the second literal will infinitely recurse
         *literal->overload_lock_count += 1;
-        specialized_info = function_literal_info_for_args(context, literal, args->view);
+        specialized_info = function_literal_info_for_parameters(context, literal, args->parameters);
         *literal->overload_lock_count -= 1;
       }
       overload_info = specialized_info;
@@ -3476,7 +3470,7 @@ mass_match_overload_candidate(
     }
 
     Overload_Match_Summary summary = calculate_arguments_match_score(
-      context, overload_info, args->view, scoring_flags
+      context, overload_info, args->parameters, scoring_flags
     );
     if (summary.matched) {
       dyn_array_push(matches, (Overload_Match_State) {
@@ -3492,14 +3486,15 @@ static Overload_Match
 mass_match_overload(
   Mass_Context *context,
   Value *value,
-  Value_View args_view
+  Array_Resolved_Function_Parameter parameters
 ) {
   Mass_Overload_Match_Args args = {
-    .view = args_view,
+    .parameters = parameters,
     .all_arguments_are_compile_time_known = true,
   };
-  for (u64 i = 0; i < args_view.length; ++i) {
-    if (!mass_value_is_static(value_view_get(&args_view, i))) {
+  for (u64 i = 0; i < dyn_array_length(parameters); ++i) {
+    const Resolved_Function_Parameter *param = dyn_array_get(parameters, i);
+    if (param->tag != Resolved_Function_Parameter_Tag_Known) {
       args.all_arguments_are_compile_time_known = false;
       break;
     }
@@ -3562,30 +3557,33 @@ static bool
 mass_match_overload_or_error(
   Mass_Context *context,
   Value *target,
-  Value_View args_view,
-  Overload_Match_Found *match_found
+  Array_Resolved_Function_Parameter arg_parameters,
+  Overload_Match_Found *match_found,
+  const Source_Range *source_range
 ) {
-  Overload_Match match = mass_match_overload(context, target, args_view);
+  Overload_Match match = mass_match_overload(context, target, arg_parameters);
   if (mass_has_error(context)) return 0;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
-      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
+      // FIXMEEEEEEEEEEEEEE
+      Array_Value_Ptr error_args = {0};//value_view_to_value_array(context->allocator, args_view);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
-        .source_range = args_view.source_range,
+        .source_range = *source_range,
         .No_Matching_Overload = { .target = target, .arguments = error_args },
       });
       return false;
     }
     case Overload_Match_Tag_Undecidable: {
-      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
+      // FIXMEEEEEEEEEEEEEE
+      Array_Value_Ptr error_args = {0};//value_view_to_value_array(context->allocator, args_view);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Undecidable_Overload,
         .Undecidable_Overload = {
           .matches = match.Undecidable.matches,
           .arguments = error_args,
         },
-        .source_range = args_view.source_range,
+        .source_range = *source_range,
       });
       return false;
     }
@@ -3903,10 +3901,38 @@ token_handle_function_call(
   Value_View args_view,
   Source_Range source_range
 ) {
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Resolved_Function_Parameter arg_parameters = dyn_array_make(
+    Array_Resolved_Function_Parameter,
+    .capacity = args_view.length,
+    .allocator = context->temp_allocator,
+  );
+  for (u64 i = 0; i < args_view.length; ++i) {
+    Value *arg = value_view_get(&args_view, i);
+    const Descriptor *descriptor = value_or_lazy_value_descriptor(arg);
+    if (mass_value_is_static(arg)) {
+      dyn_array_push(arg_parameters, (Resolved_Function_Parameter) {
+        .tag = Resolved_Function_Parameter_Tag_Known,
+        .Known = {.storage = value_as_forced(arg)->storage},
+        .descriptor = descriptor,
+        .source_range = arg->source_range,
+      });
+    } else {
+      if (descriptor_is_implicit_pointer(descriptor)) {
+        descriptor = descriptor_as_pointer_to(descriptor)->descriptor;
+      }
+      dyn_array_push(arg_parameters, (Resolved_Function_Parameter) {
+        .tag = Resolved_Function_Parameter_Tag_Unknown,
+        .descriptor = descriptor,
+        .source_range = arg->source_range,
+      });
+    }
+  }
   Overload_Match_Found match_found;
-  if (!mass_match_overload_or_error(context, target_expression, args_view, &match_found)) {
+  if (!mass_match_overload_or_error(context, target_expression, arg_parameters, &match_found, &args_view.source_range)) {
     return 0;
   }
+  context_temp_reset_to_mark(context, temp_mark);
 
   Value *overload = match_found.value;
   const Function_Info *info = match_found.info;
@@ -6820,7 +6846,8 @@ mass_run_script(
   Function_Literal *literal = mass_make_fake_function_literal(
     context, &parser, fake_function_body, &descriptor_void, &source_range
   );
-  const Function_Info *entry_info = function_literal_info_for_args(context, literal, (Value_View){0});
+  Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
+  const Function_Info *entry_info = function_literal_info_for_parameters(context, literal, params);
   context->program->entry_point = mass_function_literal_instance_for_info(context, literal, entry_info);
 
   if (mass_has_error(context)) return;

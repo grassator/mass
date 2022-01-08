@@ -762,13 +762,14 @@ static Value *
 ensure_function_instance(
   Mass_Context *context,
   Value *fn_value,
-  Value_View args
+  Array_Resolved_Function_Parameter source_parameters
 ) {
   if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
     return fn_value;
   }
   const Function_Literal *literal = value_as_function_literal(fn_value);
-  const Function_Info *fn_info = function_literal_info_for_args(context, literal, args);
+  const Function_Info *fn_info =
+    function_literal_info_for_parameters(context, literal, source_parameters);
   return mass_function_literal_instance_for_info(context, literal, fn_info);
 }
 
@@ -819,7 +820,8 @@ program_init_startup_code(
     );
   }
 
-  Value *entry_instance = ensure_function_instance(context, program->entry_point, (Value_View){0});
+  Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
+  Value *entry_instance = ensure_function_instance(context, program->entry_point, params);
   assert(entry_instance->tag == Value_Tag_Forced);
   push_eagerly_encoded_assembly(
     &builder.code_block, source_range,

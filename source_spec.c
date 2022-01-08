@@ -129,10 +129,7 @@ test_program_source_base(
       context, literal->own_scope, &literal->header, literal->body, &info
     );
     if (mass_has_error(context)) return 0;
-    Array_Value_Ptr fake_args =
-      mass_fake_argument_array_from_parameters(context->allocator, info.parameters);
-    Value_View args_view = value_view_from_value_array(fake_args, &symbol_source_range);
-    return ensure_function_instance(context, value, args_view);
+    return ensure_function_instance(context, value, info.parameters);
   }
   return value;
 }
@@ -2708,7 +2705,8 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/folding"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
+      Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
+      ensure_function_instance(&test_context, test_program->entry_point, params);
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/folding.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2719,7 +2717,8 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/print"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
+      Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
+      ensure_function_instance(&test_context, test_program->entry_point, params);
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/print.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2742,7 +2741,8 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
+      Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
+      ensure_function_instance(&test_context, test_program->entry_point, params);
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }
