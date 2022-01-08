@@ -3217,7 +3217,6 @@ struct Overload_Match_State {
   s64 score;
 };
 
-// TODO split this into resolving parameters and return type.
 static void
 mass_function_info_init_for_header_and_maybe_body(
   Mass_Context *context,
@@ -3227,6 +3226,7 @@ mass_function_info_init_for_header_and_maybe_body(
   Function_Info *out_info
 ) {
   Mass_Context temp_context = mass_context_from_compilation(context->compilation);
+  Temp_Mark temp_mark = context_temp_mark(&temp_context);
   Parser args_parser = {
     .flags = Parser_Flags_None,
     .scope = scope_make(temp_context.temp_allocator, arguments_scope),
@@ -3240,8 +3240,6 @@ mass_function_info_init_for_header_and_maybe_body(
       .capacity = dyn_array_length(header->parameters),
     ),
   };
-
-  Temp_Mark temp_mark = context_temp_mark(&temp_context);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, header->parameters) {
     Source_Range source_range = param->source_range;
