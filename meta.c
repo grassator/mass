@@ -1604,8 +1604,8 @@ main(void) {
   }));
 
   push_type(type_struct("Overload_Match_Summary", (Struct_Item[]){
-    { "u16", "generic_count" },
-    { "u16", "cast_count" },
+    { "u16", "inverted_generic_count" },
+    { "u16", "inverted_cast_count" },
     { "u16", "exact_count" },
     { "_Bool", "compile_time" },
     { "_Bool", "matched" },

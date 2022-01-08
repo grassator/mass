@@ -1648,8 +1648,8 @@ overload_match_as_found(const Overload_Match *overload_match) {
 }
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
 typedef struct Overload_Match_Summary {
-  u16 generic_count;
-  u16 cast_count;
+  u16 inverted_generic_count;
+  u16 inverted_cast_count;
   u16 exact_count;
   _Bool compile_time;
   _Bool matched;
@@ -4462,13 +4462,13 @@ DEFINE_VALUE_IS_AS_HELPERS(Overload_Match *, overload_match_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_summary, Overload_Match_Summary,
   {
     .descriptor = &descriptor_i16,
-    .name = slice_literal_fields("generic_count"),
-    .offset = offsetof(Overload_Match_Summary, generic_count),
+    .name = slice_literal_fields("inverted_generic_count"),
+    .offset = offsetof(Overload_Match_Summary, inverted_generic_count),
   },
   {
     .descriptor = &descriptor_i16,
-    .name = slice_literal_fields("cast_count"),
-    .offset = offsetof(Overload_Match_Summary, cast_count),
+    .name = slice_literal_fields("inverted_cast_count"),
+    .offset = offsetof(Overload_Match_Summary, inverted_cast_count),
   },
   {
     .descriptor = &descriptor_i16,

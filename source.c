@@ -3346,6 +3346,8 @@ calculate_arguments_match_score(
   Overload_Match_Summary result = {
     .compile_time = !!(scoring_flags & Mass_Argument_Scoring_Flags_Prefer_Compile_Time),
     .matched = true,
+    .inverted_generic_count = UINT16_MAX,
+    .inverted_cast_count = UINT16_MAX,
   };
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Resolved_Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
@@ -3359,7 +3361,7 @@ calculate_arguments_match_score(
       source_arg = value_view_get(&args_view, arg_index);
     }
     if (param->was_generic) {
-      result.generic_count += 1;
+      result.inverted_generic_count -= 1;
     }
     switch(param->tag) {
       case Resolved_Function_Parameter_Tag_Unknown: {
@@ -3376,7 +3378,7 @@ calculate_arguments_match_score(
           }
         }
         if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
-          result.cast_count += 1;
+          result.inverted_cast_count -= 1;
         } else {
           return (Overload_Match_Summary){0};
         }
@@ -3513,12 +3515,7 @@ mass_match_overload(
   if (dyn_array_length(matches) > 1) {
     const Overload_Match_State *conflict_match = best_match;
     DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
-      if (
-        match->summary.generic_count < best_match->summary.generic_count ||
-        match->summary.cast_count < best_match->summary.cast_count ||
-        match->summary.exact_count > best_match->summary.exact_count ||
-        match->summary.compile_time > best_match->summary.compile_time
-      ) {
+      if (memcmp(&match->summary, &best_match->summary, sizeof(best_match->summary)) > 0) {
         best_match = match;
       }
       if (memcmp(&match->summary, &best_match->summary, sizeof(best_match->summary)) == 0) {
