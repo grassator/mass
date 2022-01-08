@@ -421,6 +421,10 @@ typedef struct Overload Overload;
 typedef dyn_array_type(Overload *) Array_Overload_Ptr;
 typedef dyn_array_type(const Overload *) Array_Const_Overload_Ptr;
 
+typedef struct Undecidable_Match Undecidable_Match;
+typedef dyn_array_type(Undecidable_Match *) Array_Undecidable_Match_Ptr;
+typedef dyn_array_type(const Undecidable_Match *) Array_Const_Undecidable_Match_Ptr;
+
 typedef struct Overload_Match Overload_Match;
 typedef struct Overload_Match_Undecidable Overload_Match_Undecidable;
 typedef struct Overload_Match_Found Overload_Match_Found;
@@ -1603,6 +1607,12 @@ typedef struct Overload {
 } Overload;
 typedef dyn_array_type(Overload) Array_Overload;
 
+typedef struct Undecidable_Match {
+  const Function_Info * info;
+  Value * value;
+} Undecidable_Match;
+typedef dyn_array_type(Undecidable_Match) Array_Undecidable_Match;
+
 typedef enum {
   Overload_Match_Tag_No_Match = 0,
   Overload_Match_Tag_Undecidable = 1,
@@ -1610,8 +1620,7 @@ typedef enum {
 } Overload_Match_Tag;
 
 typedef struct Overload_Match_Undecidable {
-  const Function_Info * a;
-  const Function_Info * b;
+  Array_Undecidable_Match matches;
 } Overload_Match_Undecidable;
 typedef struct Overload_Match_Found {
   Value * value;
@@ -2061,8 +2070,8 @@ typedef struct Mass_Error_No_Matching_Overload {
   Array_Value_Ptr arguments;
 } Mass_Error_No_Matching_Overload;
 typedef struct Mass_Error_Undecidable_Overload {
-  const Function_Info * a;
-  const Function_Info * b;
+  Array_Undecidable_Match matches;
+  Array_Value_Ptr arguments;
 } Mass_Error_Undecidable_Overload;
 typedef struct Mass_Error {
   Mass_Error_Tag tag;
@@ -2608,6 +2617,11 @@ static Descriptor descriptor_array_overload;
 static Descriptor descriptor_array_overload_ptr;
 static Descriptor descriptor_overload_pointer;
 static Descriptor descriptor_overload_pointer_pointer;
+static Descriptor descriptor_undecidable_match;
+static Descriptor descriptor_array_undecidable_match;
+static Descriptor descriptor_array_undecidable_match_ptr;
+static Descriptor descriptor_undecidable_match_pointer;
+static Descriptor descriptor_undecidable_match_pointer_pointer;
 static Descriptor descriptor_overload_match;
 static Descriptor descriptor_array_overload_match;
 static Descriptor descriptor_array_overload_match_ptr;
@@ -4361,6 +4375,23 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_ptr, overload_pointer, Array_Overloa
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload, overload, Array_Overload);
 DEFINE_VALUE_IS_AS_HELPERS(Overload, overload);
 DEFINE_VALUE_IS_AS_HELPERS(Overload *, overload_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(undecidable_match, Undecidable_Match,
+  {
+    .descriptor = &descriptor_function_info_pointer,
+    .name = slice_literal_fields("info"),
+    .offset = offsetof(Undecidable_Match, info),
+  },
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("value"),
+    .offset = offsetof(Undecidable_Match, value),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(undecidable_match);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_undecidable_match_ptr, undecidable_match_pointer, Array_Undecidable_Match_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_undecidable_match, undecidable_match, Array_Undecidable_Match);
+DEFINE_VALUE_IS_AS_HELPERS(Undecidable_Match, undecidable_match);
+DEFINE_VALUE_IS_AS_HELPERS(Undecidable_Match *, undecidable_match_pointer);
 /*union struct start */
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match_ptr, overload_match_pointer, Array_Overload_Match_Ptr);
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match, overload_match, Array_Overload_Match);
@@ -4372,14 +4403,9 @@ static C_Enum_Item overload_match_tag_items[] = {
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_undecidable, Overload_Match_Undecidable,
   {
-    .descriptor = &descriptor_function_info_pointer,
-    .name = slice_literal_fields("a"),
-    .offset = offsetof(Overload_Match_Undecidable, a),
-  },
-  {
-    .descriptor = &descriptor_function_info_pointer,
-    .name = slice_literal_fields("b"),
-    .offset = offsetof(Overload_Match_Undecidable, b),
+    .descriptor = &descriptor_array_undecidable_match,
+    .name = slice_literal_fields("matches"),
+    .offset = offsetof(Overload_Match_Undecidable, matches),
   },
 );
 MASS_DEFINE_TYPE_VALUE(overload_match_undecidable);
@@ -5452,14 +5478,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_no_matching_overload, Mass_Error_No_Mat
 MASS_DEFINE_TYPE_VALUE(mass_error_no_matching_overload);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undecidable_overload, Mass_Error_Undecidable_Overload,
   {
-    .descriptor = &descriptor_function_info_pointer,
-    .name = slice_literal_fields("a"),
-    .offset = offsetof(Mass_Error_Undecidable_Overload, a),
+    .descriptor = &descriptor_array_undecidable_match,
+    .name = slice_literal_fields("matches"),
+    .offset = offsetof(Mass_Error_Undecidable_Overload, matches),
   },
   {
-    .descriptor = &descriptor_function_info_pointer,
-    .name = slice_literal_fields("b"),
-    .offset = offsetof(Mass_Error_Undecidable_Overload, b),
+    .descriptor = &descriptor_array_value_ptr,
+    .name = slice_literal_fields("arguments"),
+    .offset = offsetof(Mass_Error_Undecidable_Overload, arguments),
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undecidable_overload);

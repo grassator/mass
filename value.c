@@ -288,9 +288,11 @@ mass_error_to_string(
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
       APPEND_LITERAL("Could not decide which overload is better: \n  ");
-      mass_error_append_function_signature_string(result, overloads->a);
-      APPEND_LITERAL("\n  ");
-      mass_error_append_function_signature_string(result, overloads->b);
+      for (u64 i = 0; i < dyn_array_length(overloads->matches); ++i) {
+        if (i != 0) APPEND_LITERAL("\n  ");
+        const Undecidable_Match *match = dyn_array_get(overloads->matches, i);
+        mass_error_append_function_signature_string(result, match->info);
+      }
     } break;
     case Mass_Error_Tag_Non_Function_Overload: {
       APPEND_LITERAL("Trying to define a non-function overload ");

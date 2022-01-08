@@ -1587,11 +1587,15 @@ main(void) {
     { "Value *", "next" },
   }));
 
+  push_type(type_struct("Undecidable_Match", (Struct_Item[]){
+    { "const Function_Info *", "info" },
+    { "Value *", "value" },
+  }));
+
   push_type(type_union("Overload_Match", (Struct_Type[]){
     struct_empty("No_Match"),
     struct_fields("Undecidable", (Struct_Item[]){
-      { "const Function_Info *", "a" },
-      { "const Function_Info *", "b" },
+      { "Array_Undecidable_Match", "matches" },
     }),
     struct_fields("Found", (Struct_Item[]){
       { "Value *", "value" },
@@ -1898,8 +1902,8 @@ main(void) {
       { "Array_Value_Ptr", "arguments" },
     }),
     struct_fields("Undecidable_Overload", (Struct_Item[]){
-      { "const Function_Info *", "a" },
-      { "const Function_Info *", "b" },
+      { "Array_Undecidable_Match", "matches" },
+      { "Array_Value_Ptr", "arguments" },
     }),
     struct_empty("Non_Function_Overload"),
     struct_empty("No_Runtime_Use"),

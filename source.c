@@ -3511,18 +3511,37 @@ mass_match_overload(
     return (Overload_Match){.tag = Overload_Match_Tag_No_Match};
   }
   const Overload_Match_State *best_match = dyn_array_get(matches, 0);
+  // The code below is extremely performance-sensitive for programs with a lot of overloads.
+  // It is also really hard to guess which version optimized by Clang performs best
+  // so make sure to check performance numbers even when making small changes!
   if (dyn_array_length(matches) > 1) {
+    const Overload_Match_State *conflict_match = best_match;
     DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
-      if (match->score > best_match->score) best_match = match;
-    }
-    DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
-      if (match != best_match && match->score == best_match->score) {
-        // TODO copy all conflicting overloads and usem them in the error
-        return (Overload_Match){
-          .tag = Overload_Match_Tag_Undecidable,
-          .Undecidable = { best_match->info, match->info },
-        };
+      if (match->score > best_match->score) {
+        best_match = match;
       }
+      if (match->score == best_match->score) {
+        conflict_match = match;
+      }
+    }
+    if (conflict_match != best_match && conflict_match->score == best_match->score) {
+      Array_Undecidable_Match undecidable_overloads = dyn_array_make(
+        Array_Undecidable_Match,
+        .capacity = dyn_array_length(matches),
+        .allocator = context->allocator,
+      );
+      DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
+        if (match->score == best_match->score) {
+          dyn_array_push(undecidable_overloads, (Undecidable_Match) {
+            .info = match->info,
+            .value = match->value,
+          });
+        }
+      }
+      return (Overload_Match){
+        .tag = Overload_Match_Tag_Undecidable,
+        .Undecidable = { undecidable_overloads },
+      };
     }
   }
   return (Overload_Match){
@@ -3552,9 +3571,13 @@ mass_match_overload_or_error(
       return false;
     }
     case Overload_Match_Tag_Undecidable: {
+      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Undecidable_Overload,
-        .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
+        .Undecidable_Overload = {
+          .matches = match.Undecidable.matches,
+          .arguments = error_args,
+        },
         .source_range = args_view.source_range,
       });
       return false;
