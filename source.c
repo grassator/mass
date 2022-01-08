@@ -3565,24 +3565,17 @@ mass_match_overload_or_error(
   if (mass_has_error(context)) return 0;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
-      // FIXMEEEEEEEEEEEEEE
-      Array_Value_Ptr error_args = {0};//value_view_to_value_array(context->allocator, args_view);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = *source_range,
-        .No_Matching_Overload = { .target = target, .arguments = error_args },
+        .No_Matching_Overload = { .target = target },
       });
       return false;
     }
     case Overload_Match_Tag_Undecidable: {
-      // FIXMEEEEEEEEEEEEEE
-      Array_Value_Ptr error_args = {0};//value_view_to_value_array(context->allocator, args_view);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Undecidable_Overload,
-        .Undecidable_Overload = {
-          .matches = match.Undecidable.matches,
-          .arguments = error_args,
-        },
+        .Undecidable_Overload = { .matches = match.Undecidable.matches },
         .source_range = *source_range,
       });
       return false;

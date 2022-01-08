@@ -1906,11 +1906,9 @@ main(void) {
     struct_empty("Epoch_Mismatch"),
     struct_fields("No_Matching_Overload", (Struct_Item[]){
       { "Value *", "target" },
-      { "Array_Value_Ptr", "arguments" },
     }),
     struct_fields("Undecidable_Overload", (Struct_Item[]){
       { "Array_Undecidable_Match", "matches" },
-      { "Array_Value_Ptr", "arguments" },
     }),
     struct_empty("Non_Function_Overload"),
     struct_empty("No_Runtime_Use"),

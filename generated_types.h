@@ -2081,11 +2081,9 @@ typedef struct Mass_Error_Type_Mismatch {
 } Mass_Error_Type_Mismatch;
 typedef struct Mass_Error_No_Matching_Overload {
   Value * target;
-  Array_Value_Ptr arguments;
 } Mass_Error_No_Matching_Overload;
 typedef struct Mass_Error_Undecidable_Overload {
   Array_Undecidable_Match matches;
-  Array_Value_Ptr arguments;
 } Mass_Error_Undecidable_Overload;
 typedef struct Mass_Error {
   Mass_Error_Tag tag;
@@ -5525,11 +5523,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_no_matching_overload, Mass_Error_No_Mat
     .name = slice_literal_fields("target"),
     .offset = offsetof(Mass_Error_No_Matching_Overload, target),
   },
-  {
-    .descriptor = &descriptor_array_value_ptr,
-    .name = slice_literal_fields("arguments"),
-    .offset = offsetof(Mass_Error_No_Matching_Overload, arguments),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_no_matching_overload);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undecidable_overload, Mass_Error_Undecidable_Overload,
@@ -5537,11 +5530,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undecidable_overload, Mass_Error_Undeci
     .descriptor = &descriptor_array_undecidable_match,
     .name = slice_literal_fields("matches"),
     .offset = offsetof(Mass_Error_Undecidable_Overload, matches),
-  },
-  {
-    .descriptor = &descriptor_array_value_ptr,
-    .name = slice_literal_fields("arguments"),
-    .offset = offsetof(Mass_Error_Undecidable_Overload, arguments),
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undecidable_overload);
