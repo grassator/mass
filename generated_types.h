@@ -427,6 +427,10 @@ typedef struct Overload_Match_Found Overload_Match_Found;
 typedef dyn_array_type(Overload_Match *) Array_Overload_Match_Ptr;
 typedef dyn_array_type(const Overload_Match *) Array_Const_Overload_Match_Ptr;
 
+typedef struct Overload_Match_State Overload_Match_State;
+typedef dyn_array_type(Overload_Match_State *) Array_Overload_Match_State_Ptr;
+typedef dyn_array_type(const Overload_Match_State *) Array_Const_Overload_Match_State_Ptr;
+
 typedef enum Value_Flags {
   Value_Flags_None = 0,
   Value_Flags_Constant = 1,
@@ -1632,6 +1636,13 @@ overload_match_as_found(const Overload_Match *overload_match) {
   return &overload_match->Found;
 }
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
+typedef struct Overload_Match_State {
+  Value * value;
+  const Function_Info * info;
+  s64 score;
+} Overload_Match_State;
+typedef dyn_array_type(Overload_Match_State) Array_Overload_Match_State;
+
 typedef enum {
   Value_Tag_Lazy = 0,
   Value_Tag_Forced = 1,
@@ -2603,6 +2614,11 @@ static Descriptor descriptor_array_overload_match_ptr;
 static Descriptor descriptor_array_const_overload_match_ptr;
 static Descriptor descriptor_overload_match_pointer;
 static Descriptor descriptor_overload_match_pointer_pointer;
+static Descriptor descriptor_overload_match_state;
+static Descriptor descriptor_array_overload_match_state;
+static Descriptor descriptor_array_overload_match_state_ptr;
+static Descriptor descriptor_overload_match_state_pointer;
+static Descriptor descriptor_overload_match_state_pointer_pointer;
 static Descriptor descriptor_value_flags;
 static Descriptor descriptor_array_value_flags;
 static Descriptor descriptor_array_value_flags_ptr;
@@ -4401,6 +4417,28 @@ MASS_DEFINE_TYPE_VALUE(overload_match);
 DEFINE_VALUE_IS_AS_HELPERS(Overload_Match, overload_match);
 DEFINE_VALUE_IS_AS_HELPERS(Overload_Match *, overload_match_pointer);
 /*union struct end*/
+MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_state, Overload_Match_State,
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("value"),
+    .offset = offsetof(Overload_Match_State, value),
+  },
+  {
+    .descriptor = &descriptor_function_info_pointer,
+    .name = slice_literal_fields("info"),
+    .offset = offsetof(Overload_Match_State, info),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("score"),
+    .offset = offsetof(Overload_Match_State, score),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(overload_match_state);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match_state_ptr, overload_match_state_pointer, Array_Overload_Match_State_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_overload_match_state, overload_match_state, Array_Overload_Match_State);
+DEFINE_VALUE_IS_AS_HELPERS(Overload_Match_State, overload_match_state);
+DEFINE_VALUE_IS_AS_HELPERS(Overload_Match_State *, overload_match_state_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(value_flags, Value_Flags)
 static C_Enum_Item value_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },

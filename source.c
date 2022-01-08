@@ -3334,12 +3334,6 @@ typedef enum {
   Mass_Argument_Scoring_Flags_Prefer_Compile_Time = 1 << 0,
 } Mass_Argument_Scoring_Flags;
 
-typedef struct {
-  Value *value;
-  const Function_Info *info;
-  s64 score;
-} Overload_Match_State;
-
 static s64
 calculate_arguments_match_score(
   Mass_Context *context,
@@ -3429,14 +3423,13 @@ mass_match_overload_candidate(
   Mass_Context *context,
   Value *candidate,
   const Mass_Overload_Match_Args *args,
-  Overload_Match_State *match,
-  Overload_Match_State *best_conflict_match
+  Array_Overload_Match_State matches
 ) {
   if (mass_has_error(context)) return;
   if (value_is_overload(candidate)) {
     const Overload *overload = value_as_overload(candidate);
-    mass_match_overload_candidate(context, overload->value, args, match, best_conflict_match);
-    mass_match_overload_candidate(context, overload->next, args, match, best_conflict_match);
+    mass_match_overload_candidate(context, overload->value, args, matches);
+    mass_match_overload_candidate(context, overload->next, args, matches);
   } else {
     Mass_Argument_Scoring_Flags scoring_flags = 0;
     const Function_Info *overload_info;
@@ -3481,16 +3474,12 @@ mass_match_overload_candidate(
     s64 score = calculate_arguments_match_score(
       context, overload_info, args->view, scoring_flags
     );
-    if (score > match->score) {
-      match->info = overload_info;
-      match->value = candidate;
-      match->score = score;
-    } else {
-      if (score == match->score && score > best_conflict_match->score) {
-        *best_conflict_match = *match;
-        match->info = overload_info;
-        match->value = candidate;
-      }
+    if (score >= 0) {
+      dyn_array_push(matches, (Overload_Match_State) {
+        .info = overload_info,
+        .value = candidate,
+        .score = score,
+      });
     }
   }
 }
@@ -3501,8 +3490,6 @@ mass_match_overload(
   Value *value,
   Value_View args_view
 ) {
-  Overload_Match_State match = { .score = -1 };
-  Overload_Match_State best_conflict_match = match;
   Mass_Overload_Match_Args args = {
     .view = args_view,
     .all_arguments_are_compile_time_known = true,
@@ -3513,24 +3500,36 @@ mass_match_overload(
       break;
     }
   }
-  mass_match_overload_candidate(context, value, &args, &match, &best_conflict_match);
-
-  if (match.score == -1) {
+  // TODO Store overload count on the Overload to know how much to reserve here
+  Array_Overload_Match_State matches = dyn_array_make(
+    Array_Overload_Match_State,
+    .capacity = 16,
+    .allocator = context->temp_allocator,
+  );
+  mass_match_overload_candidate(context, value, &args, matches);
+  if (!dyn_array_length(matches)) {
     return (Overload_Match){.tag = Overload_Match_Tag_No_Match};
   }
-  if (match.score == best_conflict_match.score) {
-    return (Overload_Match){
-      .tag = Overload_Match_Tag_Undecidable,
-      .Undecidable = { match.info, best_conflict_match.info },
-    };
+  const Overload_Match_State *best_match = dyn_array_get(matches, 0);
+  if (dyn_array_length(matches) > 1) {
+    DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
+      if (match->score > best_match->score) best_match = match;
+    }
+    DYN_ARRAY_FOREACH(Overload_Match_State, match, matches) {
+      if (match != best_match && match->score == best_match->score) {
+        // TODO copy all conflicting overloads and usem them in the error
+        return (Overload_Match){
+          .tag = Overload_Match_Tag_Undecidable,
+          .Undecidable = { best_match->info, match->info },
+        };
+      }
+    }
   }
   return (Overload_Match){
     .tag = Overload_Match_Tag_Found,
-    .Found = {
-      .value = match.value,
-      .info = match.info,
-    },
+    .Found = { .value = best_match->value, .info = best_match->info },
   };
+
 }
 
 static bool
