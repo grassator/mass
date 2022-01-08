@@ -1122,7 +1122,7 @@ function_literal_info_for_args(
   const Function_Literal *literal,
   Value_View args
 ) {
-  if (!(literal->header.flags & Function_Header_Flags_Generic)) {
+  if (literal->header.generic_parameter_count == 0) {
     if (dyn_array_is_initialized(literal->specializations)) {
       assert(dyn_array_length(literal->specializations) == 1);
       return dyn_array_get(literal->specializations, 0)->info;

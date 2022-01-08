@@ -628,7 +628,7 @@ deduce_runtime_descriptor_for_value(
         if (literal->header.flags & Function_Header_Flags_Macro) {
           return 0;
         }
-        if (literal->header.flags & Function_Header_Flags_Generic) {
+        if (literal->header.generic_parameter_count > 0) {
           return 0;
         }
         Function_Info info;
@@ -5905,7 +5905,7 @@ token_parse_function_literal(
   };
   DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
     if (param->tag == Function_Parameter_Tag_Generic) {
-      header.flags |= Function_Header_Flags_Generic;
+      header.generic_parameter_count += 1;
       break;
     }
   }

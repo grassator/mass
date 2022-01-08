@@ -1730,10 +1730,9 @@ main(void) {
 
   push_type(type_enum("Function_Header_Flags", (Enum_Type_Item[]){
     { "None", 0 },
-    { "Generic", 1 << 0 },
-    { "Macro", 1 << 1 },
-    { "Intrinsic", 1 << 2 },
-    { "Compile_Time", 1 << 3 },
+    { "Macro", 1 << 0 },
+    { "Intrinsic", 1 << 1 },
+    { "Compile_Time", 1 << 2 },
   }));
 
   push_type(type_struct("Function_Specialization", (Struct_Item[]){
@@ -1743,7 +1742,7 @@ main(void) {
 
   export_compiler(push_type(type_struct("Function_Header", (Struct_Item[]){
     { "Function_Header_Flags", "flags"},
-    { "u32", "_flags_padding"},
+    { "u32", "generic_parameter_count"},
     { "Array_Function_Parameter", "parameters"},
     { "Function_Return", "returns"},
   })));

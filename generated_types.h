@@ -517,18 +517,16 @@ typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 
 typedef enum Function_Header_Flags {
   Function_Header_Flags_None = 0,
-  Function_Header_Flags_Generic = 1,
-  Function_Header_Flags_Macro = 2,
-  Function_Header_Flags_Intrinsic = 4,
-  Function_Header_Flags_Compile_Time = 8,
+  Function_Header_Flags_Macro = 1,
+  Function_Header_Flags_Intrinsic = 2,
+  Function_Header_Flags_Compile_Time = 4,
 } Function_Header_Flags;
 
 const char *function_header_flags_name(Function_Header_Flags value) {
   if (value == 0) return "Function_Header_Flags_None";
-  if (value == 1) return "Function_Header_Flags_Generic";
-  if (value == 2) return "Function_Header_Flags_Macro";
-  if (value == 4) return "Function_Header_Flags_Intrinsic";
-  if (value == 8) return "Function_Header_Flags_Compile_Time";
+  if (value == 1) return "Function_Header_Flags_Macro";
+  if (value == 2) return "Function_Header_Flags_Intrinsic";
+  if (value == 4) return "Function_Header_Flags_Compile_Time";
   assert(!"Unexpected value for enum Function_Header_Flags");
   return 0;
 };
@@ -1857,7 +1855,7 @@ typedef dyn_array_type(Function_Specialization) Array_Function_Specialization;
 
 typedef struct Function_Header {
   Function_Header_Flags flags;
-  u32 _flags_padding;
+  u32 generic_parameter_count;
   Array_Function_Parameter parameters;
   Function_Return returns;
 } Function_Header;
@@ -4921,10 +4919,9 @@ DEFINE_VALUE_IS_AS_HELPERS(Function_Info *, function_info_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(function_header_flags, Function_Header_Flags)
 static C_Enum_Item function_header_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Generic"), .value = 1 },
-{ .name = slice_literal_fields("Macro"), .value = 2 },
-{ .name = slice_literal_fields("Intrinsic"), .value = 4 },
-{ .name = slice_literal_fields("Compile_Time"), .value = 8 },
+{ .name = slice_literal_fields("Macro"), .value = 1 },
+{ .name = slice_literal_fields("Intrinsic"), .value = 2 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
 };
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags, function_header_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags *, function_header_flags_pointer);
@@ -4950,6 +4947,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_header, Function_Header,
     .descriptor = &descriptor_function_header_flags,
     .name = slice_literal_fields("flags"),
     .offset = offsetof(Function_Header, flags),
+  },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("generic_parameter_count"),
+    .offset = offsetof(Function_Header, generic_parameter_count),
   },
   {
     .descriptor = &descriptor_array_function_parameter,
