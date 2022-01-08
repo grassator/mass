@@ -1792,7 +1792,7 @@ typedef struct Resolved_Function_Parameter_Known {
 typedef struct Resolved_Function_Parameter {
   Resolved_Function_Parameter_Tag tag;
   char _tag_padding[4];
-  s64 score_shift;
+  u64 was_generic;
   const Descriptor * descriptor;
   const Symbol * symbol;
   Source_Range source_range;
@@ -4802,8 +4802,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(resolved_function_parameter, Resolved_Function_Par
   },
   {
     .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("score_shift"),
-    .offset = offsetof(Resolved_Function_Parameter, score_shift),
+    .name = slice_literal_fields("was_generic"),
+    .offset = offsetof(Resolved_Function_Parameter, was_generic),
   },
   {
     .descriptor = &descriptor_descriptor_pointer,

@@ -1565,7 +1565,7 @@
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
-    <Item Name="score_shift">score_shift</Item>
+    <Item Name="was_generic">was_generic</Item>
     <Item Name="descriptor">descriptor</Item>
     <Item Name="symbol">symbol</Item>
     <Item Name="source_range">source_range</Item>

@@ -3266,12 +3266,10 @@ mass_function_info_init_for_header_and_maybe_body(
           descriptor = value_ensure_type(&temp_context, args_parser.scope, type_value, source_range);
           if (mass_has_error(&temp_context)) goto err;
         }
-        s64 score_shift = 0;
+        bool was_generic = false;
         if (param->tag == Function_Parameter_Tag_Generic) {
-          if (param->Generic.maybe_type_constraint) {
-            score_shift = 1;
-          } else {
-            score_shift = 4;
+          if (!param->Generic.maybe_type_constraint) {
+            was_generic = true;
           }
         }
         dyn_array_push(out_info->parameters, (Resolved_Function_Parameter) {
@@ -3279,7 +3277,7 @@ mass_function_info_init_for_header_and_maybe_body(
           .descriptor = descriptor,
           .symbol = param->symbol,
           .source_range = param->source_range,
-          .score_shift = score_shift,
+          .was_generic = was_generic,
           .maybe_default_value = param->maybe_default_value,
         });
       } break;
@@ -3373,6 +3371,9 @@ calculate_arguments_match_score(
           } else {
             param_score = Score_Same_Type;
           }
+          if (param->was_generic) {
+            param_score = param_score >> 2;
+          }
         } else {
           if (mass_value_is_static(source_arg)) {
             source_descriptor = deduce_runtime_descriptor_for_value(
@@ -3396,8 +3397,7 @@ calculate_arguments_match_score(
         param_score = Score_Exact_Static;
       } break;
     }
-    // FIXME @Hack this is just enough to pass the test but is not robust
-    score += param_score >> param->score_shift;
+    score += param_score;
   }
   return score;
 }

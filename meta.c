@@ -1696,7 +1696,7 @@ main(void) {
       { "Storage", "storage" },
     }),
   }), (Struct_Item[]){
-    { "s64", "score_shift" },
+    { "u64", "was_generic" },
     { "const Descriptor *", "descriptor" },
     { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
