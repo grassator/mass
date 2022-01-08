@@ -3211,12 +3211,6 @@ call_function_overload(
   return expected_value;
 }
 
-struct Overload_Match_State {
-  Value *value;
-  const Function_Info *info;
-  s64 score;
-};
-
 static void
 mass_function_info_init_for_header_and_maybe_body(
   Mass_Context *context,
@@ -3340,6 +3334,12 @@ typedef enum {
   Mass_Argument_Scoring_Flags_Prefer_Compile_Time = 1 << 0,
 } Mass_Argument_Scoring_Flags;
 
+typedef struct {
+  Value *value;
+  const Function_Info *info;
+  s64 score;
+} Overload_Match_State;
+
 static s64
 calculate_arguments_match_score(
   Mass_Context *context,
@@ -3429,8 +3429,8 @@ mass_match_overload_candidate(
   Mass_Context *context,
   Value *candidate,
   const Mass_Overload_Match_Args *args,
-  struct Overload_Match_State *match,
-  struct Overload_Match_State *best_conflict_match
+  Overload_Match_State *match,
+  Overload_Match_State *best_conflict_match
 ) {
   if (mass_has_error(context)) return;
   if (value_is_overload(candidate)) {
@@ -3501,8 +3501,8 @@ mass_match_overload(
   Value *value,
   Value_View args_view
 ) {
-  struct Overload_Match_State match = { .score = -1 };
-  struct Overload_Match_State best_conflict_match = match;
+  Overload_Match_State match = { .score = -1 };
+  Overload_Match_State best_conflict_match = match;
   Mass_Overload_Match_Args args = {
     .view = args_view,
     .all_arguments_are_compile_time_known = true,
