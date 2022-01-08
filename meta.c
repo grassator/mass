@@ -525,11 +525,11 @@ print_scope_define_function(
   for (uint64_t i = 0; i < function->argument_count; ++i) {
     Argument_Type *arg = &function->arguments[i];
     if (i != 0) fprintf(file, ",\n");
-    fprintf(file, "    function_parameter(\n");
-    fprintf(file, "      mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", arg->name);
-    fprintf(file, "&");
+    fprintf(file, "    (Resolved_Function_Parameter) {\n");
+    fprintf(file, "      .symbol = mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", arg->name);
+    fprintf(file, "      .descriptor = &");
     print_mass_struct_descriptor_type(file, arg->type);
-    fprintf(file, "\n    )");
+    fprintf(file, "\n    }");
   }
   fprintf(file, "\n  );\n");
 }
@@ -980,7 +980,7 @@ print_mass_descriptor_and_type(
         for (uint64_t i = 0; i < function->argument_count; ++i) {
           Argument_Type *arg = &function->arguments[i];
           fprintf(file, ",\n  {\n");
-          fprintf(file, "    .tag = Function_Parameter_Tag_Runtime,\n");
+          fprintf(file, "    .tag = Resolved_Function_Parameter_Tag_Unknown,\n");
           {
             fprintf(file, "    .descriptor = &");
             print_mass_struct_descriptor_type(file, arg->type);
@@ -1680,6 +1680,19 @@ main(void) {
     { "Value *", "maybe_default_value" },
   }));
 
+  push_type(add_common_fields(type_union("Resolved_Function_Parameter", (Struct_Type[]){
+    struct_empty("Unknown"),
+    struct_fields("Known", (Struct_Item[]){
+      { "Storage", "storage" },
+    }),
+  }), (Struct_Item[]){
+    { "s64", "score_shift" },
+    { "const Descriptor *", "descriptor" },
+    { "const Symbol *", "symbol" },
+    { "Source_Range", "source_range" },
+    { "Value *", "maybe_default_value" },
+  }));
+
   push_type(type_enum("Function_Info_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Compile_Time", 1 << 1 },
@@ -1701,7 +1714,7 @@ main(void) {
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Function_Info_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Array_Function_Parameter", "parameters" },
+    { "Array_Resolved_Function_Parameter", "parameters" },
     { "const Descriptor *", "return_descriptor" },
   }));
 

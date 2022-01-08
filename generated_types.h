@@ -475,6 +475,11 @@ typedef struct Function_Parameter_Exact_Static Function_Parameter_Exact_Static;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
 typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
 
+typedef struct Resolved_Function_Parameter Resolved_Function_Parameter;
+typedef struct Resolved_Function_Parameter_Known Resolved_Function_Parameter_Known;
+typedef dyn_array_type(Resolved_Function_Parameter *) Array_Resolved_Function_Parameter_Ptr;
+typedef dyn_array_type(const Resolved_Function_Parameter *) Array_Const_Resolved_Function_Parameter_Ptr;
+
 typedef enum Function_Info_Flags {
   Function_Info_Flags_None = 0,
   Function_Info_Flags_Compile_Time = 2,
@@ -1759,6 +1764,32 @@ function_parameter_as_exact_static(const Function_Parameter *function_parameter)
 }
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
 typedef enum {
+  Resolved_Function_Parameter_Tag_Unknown = 0,
+  Resolved_Function_Parameter_Tag_Known = 1,
+} Resolved_Function_Parameter_Tag;
+
+typedef struct Resolved_Function_Parameter_Known {
+  Storage storage;
+} Resolved_Function_Parameter_Known;
+typedef struct Resolved_Function_Parameter {
+  Resolved_Function_Parameter_Tag tag;
+  char _tag_padding[4];
+  s64 score_shift;
+  const Descriptor * descriptor;
+  const Symbol * symbol;
+  Source_Range source_range;
+  Value * maybe_default_value;
+  union {
+    Resolved_Function_Parameter_Known Known;
+  };
+} Resolved_Function_Parameter;
+static inline const Resolved_Function_Parameter_Known *
+resolved_function_parameter_as_known(const Resolved_Function_Parameter *resolved_function_parameter) {
+  assert(resolved_function_parameter->tag == Resolved_Function_Parameter_Tag_Known);
+  return &resolved_function_parameter->Known;
+}
+typedef dyn_array_type(Resolved_Function_Parameter) Array_Resolved_Function_Parameter;
+typedef enum {
   Function_Return_Tag_Inferred = 0,
   Function_Return_Tag_Generic = 1,
   Function_Return_Tag_Exact = 2,
@@ -1793,7 +1824,7 @@ typedef dyn_array_type(Function_Return) Array_Function_Return;
 typedef struct Function_Info {
   Function_Info_Flags flags;
   u32 _flags_padding;
-  Array_Function_Parameter parameters;
+  Array_Resolved_Function_Parameter parameters;
   const Descriptor * return_descriptor;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
@@ -2612,6 +2643,12 @@ static Descriptor descriptor_array_function_parameter_ptr;
 static Descriptor descriptor_array_const_function_parameter_ptr;
 static Descriptor descriptor_function_parameter_pointer;
 static Descriptor descriptor_function_parameter_pointer_pointer;
+static Descriptor descriptor_resolved_function_parameter;
+static Descriptor descriptor_array_resolved_function_parameter;
+static Descriptor descriptor_array_resolved_function_parameter_ptr;
+static Descriptor descriptor_array_const_resolved_function_parameter_ptr;
+static Descriptor descriptor_resolved_function_parameter_pointer;
+static Descriptor descriptor_resolved_function_parameter_pointer_pointer;
 static Descriptor descriptor_function_info_flags;
 static Descriptor descriptor_array_function_info_flags;
 static Descriptor descriptor_array_function_info_flags_ptr;
@@ -4591,15 +4628,15 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_intrinsic_proc,
   &descriptor_value_pointer,
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_mass_context_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_parser_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_value_view,
   }
 )
@@ -4679,6 +4716,63 @@ MASS_DEFINE_TYPE_VALUE(function_parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Parameter, function_parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Parameter *, function_parameter_pointer);
 /*union struct end*/
+/*union struct start */
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_resolved_function_parameter_ptr, resolved_function_parameter_pointer, Array_Resolved_Function_Parameter_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_resolved_function_parameter, resolved_function_parameter, Array_Resolved_Function_Parameter);
+MASS_DEFINE_OPAQUE_C_TYPE(resolved_function_parameter_tag, Resolved_Function_Parameter_Tag)
+static C_Enum_Item resolved_function_parameter_tag_items[] = {
+{ .name = slice_literal_fields("Unknown"), .value = 0 },
+{ .name = slice_literal_fields("Known"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(resolved_function_parameter_known, Resolved_Function_Parameter_Known,
+  {
+    .descriptor = &descriptor_storage,
+    .name = slice_literal_fields("storage"),
+    .offset = offsetof(Resolved_Function_Parameter_Known, storage),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(resolved_function_parameter_known);
+MASS_DEFINE_STRUCT_DESCRIPTOR(resolved_function_parameter, Resolved_Function_Parameter,
+  {
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_resolved_function_parameter_tag,
+    .offset = offsetof(Resolved_Function_Parameter, tag),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("score_shift"),
+    .offset = offsetof(Resolved_Function_Parameter, score_shift),
+  },
+  {
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .offset = offsetof(Resolved_Function_Parameter, descriptor),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("symbol"),
+    .offset = offsetof(Resolved_Function_Parameter, symbol),
+  },
+  {
+    .descriptor = &descriptor_source_range,
+    .name = slice_literal_fields("source_range"),
+    .offset = offsetof(Resolved_Function_Parameter, source_range),
+  },
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("maybe_default_value"),
+    .offset = offsetof(Resolved_Function_Parameter, maybe_default_value),
+  },
+  {
+    .name = slice_literal_fields("Known"),
+    .descriptor = &descriptor_resolved_function_parameter_known,
+    .offset = offsetof(Resolved_Function_Parameter, Known),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(resolved_function_parameter);
+DEFINE_VALUE_IS_AS_HELPERS(Resolved_Function_Parameter, resolved_function_parameter);
+DEFINE_VALUE_IS_AS_HELPERS(Resolved_Function_Parameter *, resolved_function_parameter_pointer);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(function_info_flags, Function_Info_Flags)
 static C_Enum_Item function_info_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -4745,7 +4839,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
     .offset = offsetof(Function_Info, flags),
   },
   {
-    .descriptor = &descriptor_array_function_parameter,
+    .descriptor = &descriptor_array_resolved_function_parameter,
     .name = slice_literal_fields("parameters"),
     .offset = offsetof(Function_Info, parameters),
   },
@@ -5141,7 +5235,7 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_type_constraint_proc,
   &descriptor_descriptor_pointer,
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_descriptor_pointer,
   }
 )
@@ -5523,11 +5617,11 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   calling_convention_call_setup_proc,
   &descriptor_function_call_setup,
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_allocator_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_function_info_pointer,
   }
 )
@@ -5552,11 +5646,11 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_trampoline_proc,
   &descriptor_void,
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_void_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_void_pointer,
   }
 )
@@ -5899,23 +5993,23 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   lazy_value_proc,
   &descriptor_value_pointer,
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_mass_context_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_function_builder_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_expected_result_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_source_range_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_void_pointer,
   }
 )
@@ -5923,19 +6017,19 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   token_statement_matcher_proc,
   &descriptor__bool,
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_mass_context_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_parser_pointer,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_value_view,
   },
   {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_value_lazy_pointer,
   }
 )

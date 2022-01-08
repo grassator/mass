@@ -563,32 +563,26 @@ mass_infer_function_return_type(
     .module = 0, // FIXME provide module here
   };
 
+  // FIXME :FakeArgs
   for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
-    const Function_Parameter *def_param = dyn_array_get(info->parameters, i);
+    const Resolved_Function_Parameter *def_param = dyn_array_get(info->parameters, i);
     assert(def_param->descriptor);
     assert(def_param->symbol);
-    Value *arg_value;
+    Value *arg_value = 0;
     const Descriptor *descriptor = def_param->descriptor;
     const Source_Range *source_range = &def_param->source_range;
     switch(def_param->tag) {
-      case Function_Parameter_Tag_Generic: {
-        if (def_param->Generic.is_static) panic("TODO");
-      } // fallthrough
-      case Function_Parameter_Tag_Runtime: {
+      case Resolved_Function_Parameter_Tag_Unknown: {
         // We don't need payload or the proc, because in this pass we do not expect
         // any of the values to be forced. In fact this will act as a free assertion.
         void *payload = 0;
         Lazy_Value_Proc proc = 0;
         arg_value = mass_make_lazy_value(context, &body_parser, *source_range, payload, descriptor, proc);
       } break;
-      case Function_Parameter_Tag_Exact_Static: {
+      case Resolved_Function_Parameter_Tag_Known: {
         // Exact static parameters are defined as static, since they might influence the inference
-        Storage storage = def_param->Exact_Static.storage;
+        Storage storage = def_param->Known.storage;
         arg_value = value_make(context, descriptor, storage, *source_range);
-      } break;
-      default: {
-        arg_value = 0;
-        panic("UNREACHEABLE");
       } break;
     }
     arg_value->flags |= Value_Flags_Constant;
@@ -704,8 +698,8 @@ mass_function_literal_instance_for_info(
       // This is great for performance, but can cause mismatches between the indexes the parameters
       // defined in the `Function_Info` and ones in the call setup. To make sure parameters are
       // mapped correctly, `Function_Call_Parameter` keeps track of the original index.
-      const Function_Parameter *def_param = dyn_array_get(fn_info->parameters, call_param->original_index);
-      assert(def_param->tag == Function_Parameter_Tag_Runtime || def_param->tag == Function_Parameter_Tag_Generic);
+      const Resolved_Function_Parameter *def_param = dyn_array_get(fn_info->parameters, call_param->original_index);
+      assert(def_param->tag == Resolved_Function_Parameter_Tag_Unknown);
       Value *arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->symbol;
@@ -714,19 +708,12 @@ mass_function_literal_instance_for_info(
       }
     }
     for (u64 i = 0; i < dyn_array_length(fn_info->parameters); ++i) {
-      const Function_Parameter *param = dyn_array_get(fn_info->parameters, i);
-      switch(param->tag) {
-        case Function_Parameter_Tag_Runtime:
-        case Function_Parameter_Tag_Generic: {
-          // Handled above
-        } break;
-        case Function_Parameter_Tag_Exact_Static: {
-          const Storage *storage = &param->Exact_Static.storage;
-          Value *arg_value = value_make(context, param->descriptor, *storage, param->source_range);
-          arg_value->flags |= Value_Flags_Constant;
-          scope_define_value(body_scope, VALUE_STATIC_EPOCH, param->source_range, param->symbol, arg_value);
-        } break;
-      }
+      const Resolved_Function_Parameter *param = dyn_array_get(fn_info->parameters, i);
+      if (param->tag != Resolved_Function_Parameter_Tag_Known) continue;
+
+      Value *arg_value = value_make(context, param->descriptor, param->Known.storage, param->source_range);
+      arg_value->flags |= Value_Flags_Constant;
+      scope_define_value(body_scope, VALUE_STATIC_EPOCH, param->source_range, param->symbol, arg_value);
     }
   }
   register_acquire_bitset(builder, call_setup.parameter_registers_bitset.bits);

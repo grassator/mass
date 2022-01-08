@@ -756,8 +756,8 @@ calling_convention_x86_64_system_v_call_setup_proc(
 
   u64 stack_offset = 0;
   for(u64 param_index = 0; param_index < dyn_array_length(function->parameters); ++param_index) {
-    Function_Parameter *param = dyn_array_get(function->parameters, param_index);
-    if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
+    Resolved_Function_Parameter *param = dyn_array_get(function->parameters, param_index);
+    if (param->tag == Resolved_Function_Parameter_Tag_Known) continue;
     System_V_Classification classification =
       x86_64_system_v_classify(param->descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
@@ -828,8 +828,8 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
 
   u64 stack_offset = 0;
   for(u64 param_index = 0; param_index < dyn_array_length(function->parameters); ++param_index) {
-    Function_Parameter *param = dyn_array_get(function->parameters, param_index);
-    if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
+    Resolved_Function_Parameter *param = dyn_array_get(function->parameters, param_index);
+    if (param->tag == Resolved_Function_Parameter_Tag_Known) continue;
 
     System_V_Classification classification =
       x86_64_system_v_classify(param->descriptor);
@@ -911,8 +911,8 @@ calling_convention_x86_64_windows_call_setup_proc(
   u64 argument_index = is_indirect_return ? 1 : 0;
 
   for(u64 param_index = 0; param_index < dyn_array_length(function->parameters); ++param_index) {
-    Function_Parameter *param = dyn_array_get(function->parameters, param_index);
-    if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
+    Resolved_Function_Parameter *param = dyn_array_get(function->parameters, param_index);
+    if (param->tag == Resolved_Function_Parameter_Tag_Known) continue;
     Function_Call_Parameter item = {
       .flags = Function_Call_Parameter_Flags_None,
       .descriptor = param->descriptor,

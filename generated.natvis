@@ -1475,6 +1475,50 @@
     <Item Name="Exact_Static" Condition="tag == Function_Parameter_Tag_Exact_Static">Exact_Static</Item>
   </Expand>
 </Type>
+<Type Name="Array_Resolved_Function_Parameter">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Resolved_Function_Parameter_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Resolved_Function_Parameter_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Resolved_Function_Parameter">
+  <DisplayString Condition="tag == Resolved_Function_Parameter_Tag_Unknown">
+    Unknown
+  </DisplayString>
+  <DisplayString Condition="tag == Resolved_Function_Parameter_Tag_Known">
+    Known { Known }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="score_shift">score_shift</Item>
+    <Item Name="descriptor">descriptor</Item>
+    <Item Name="symbol">symbol</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="maybe_default_value">maybe_default_value</Item>
+    <Item Name="Known" Condition="tag == Resolved_Function_Parameter_Tag_Known">Known</Item>
+  </Expand>
+</Type>
 <Type Name="Array_Function_Return">
   <Expand>
     <Item Name="[length]">data->length</Item>

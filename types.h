@@ -107,8 +107,8 @@
   )
 
 #define MASS_DEFINE_FUNCTION_DESCRIPTOR(_NAME_, _RETURN_DESCRIPTOR_, ...)\
-  dyn_array_struct(Function_Parameter) descriptor_##_NAME_##__parameters = {\
-    .length = countof((const Function_Parameter[]){__VA_ARGS__}),\
+  dyn_array_struct(Resolved_Function_Parameter) descriptor_##_NAME_##__parameters = {\
+    .length = countof((const Resolved_Function_Parameter[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
   };\
   static Function_Info descriptor_##_NAME_##__info = {\
@@ -159,10 +159,10 @@
   }
 
 #define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
-  Function_Parameter raw_parameters[] = {__VA_ARGS__};\
+  Resolved_Function_Parameter raw_parameters[] = {__VA_ARGS__};\
   u64 arg_length = countof(raw_parameters);\
-  Array_Function_Parameter parameters = \
-    dyn_array_make(Array_Function_Parameter, .allocator = allocator, .capacity = arg_length);\
+  Array_Resolved_Function_Parameter parameters = \
+    dyn_array_make(Array_Resolved_Function_Parameter, .allocator = allocator, .capacity = arg_length);\
   for (u64 i = 0; i < arg_length; ++i) {\
     dyn_array_push(parameters, raw_parameters[i]);\
   }\

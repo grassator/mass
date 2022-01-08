@@ -83,7 +83,7 @@ mass_error_append_function_signature_string(
 ) {
   APPEND_LITERAL("(");
   bool first = true;
-  DYN_ARRAY_FOREACH(Function_Parameter, arg, info->parameters) {
+  DYN_ARRAY_FOREACH(Resolved_Function_Parameter, arg, info->parameters) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
     APPEND_SLICE(arg->symbol->name);
@@ -348,8 +348,8 @@ same_function_signature(
     return false;
   }
   for (u64 i = 0; i < dyn_array_length(a_info->parameters); ++i) {
-    Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
-    Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
+    Resolved_Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
+    Resolved_Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
     if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
   }
   return true;
@@ -1044,7 +1044,7 @@ function_info_init(
   const Descriptor* return_descriptor
 ) {
   *info = (Function_Info) {
-    .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
+    .parameters = (Array_Resolved_Function_Parameter){&dyn_array_zero_items},
     .return_descriptor = return_descriptor,
   };
 }
@@ -1093,15 +1093,15 @@ descriptor_pointer_to(
 static Array_Value_Ptr
 mass_fake_argument_array_from_parameters(
   const Allocator *allocator,
-  Array_Function_Parameter parameters
+  Array_Resolved_Function_Parameter parameters
 ) {
   u64 capacity = dyn_array_length(parameters);
   if (capacity == 0) {
     return (Array_Value_Ptr){&dyn_array_zero_items};
   }
   Array_Value_Ptr fake_args = dyn_array_make(Array_Value_Ptr, .allocator = allocator, .capacity = capacity);
-  DYN_ARRAY_FOREACH(Function_Parameter, param, parameters) {
-    assert(param->tag == Function_Parameter_Tag_Runtime);
+  // FIXME :FakeArgs this should be merged with the return type inference and take care of params with known storage
+  DYN_ARRAY_FOREACH(Resolved_Function_Parameter, param, parameters) {
     assert(param->descriptor);
     Value *fake_value = allocator_allocate(allocator, Value);
     *fake_value = (Value){

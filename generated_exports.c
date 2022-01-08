@@ -559,1134 +559,1134 @@ compiler_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     push_instruction, "push_instruction", &descriptor_void,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("code_block")),
-&descriptor_code_block_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("instruction")),
-&descriptor_instruction
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("code_block")),
+      .descriptor = &descriptor_code_block_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("instruction")),
+      .descriptor = &descriptor_instruction
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_intrinsic, "intrinsic", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_apply, "apply", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_call, "call", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_using, "using", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_return, "return", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_operator_assignment, "operator_assignment", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_define_inferred, "define_inferred", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_quote, "quote", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_unquote, "unquote", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_comma, "comma", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_function_literal, "function_literal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_dereference, "dereference", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_array_like_get, "unchecked_get_at_index", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_struct_get, "struct_get", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_named_accessor, "named_accessor", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_typed_symbol, "typed_symbol", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_pointer_to, "pointer_to", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_pointer_to_type, "pointer_to_type", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_eval, "eval", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_inline_module, "inline_module", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_c_struct, "c_struct", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_exports, "exports", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_cast, "cast", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_zero_extend, "zero_extend", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_type_of, "type_of", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_size_of, "size_of", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_static_assert, "static_assert", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     allocator_allocate_bytes, "allocator_allocate_bytes", &descriptor_void_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("allocator")),
-&descriptor_allocator_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("byte_size")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("byte_alignment")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("byte_size")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("byte_alignment")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_constraint_integer_type, "constraint_integer_type", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_constraint_float_type, "constraint_float_type", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_constraint_pointer_type, "constraint_pointer_type", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_constraint_struct_type, "constraint_struct_type", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_constraint_fixed_array_type, "constraint_fixed_array_type", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_constraint_function_instance_type, "constraint_function_instance_type", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     descriptor_pointer_to, "descriptor_pointer_to", &descriptor_descriptor_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("compilation")),
-&descriptor_compilation_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("compilation")),
+      .descriptor = &descriptor_compilation_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     same_type, "same_type", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_descriptor_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_descriptor_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_descriptor_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     register_acquire_temp, "register_acquire_temp", &descriptor_register,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("builder")),
-&descriptor_function_builder_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     register_release, "register_release", &descriptor_void,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("builder")),
-&descriptor_function_builder_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("reg")),
-&descriptor_register
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("reg")),
+      .descriptor = &descriptor_register
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     storage_register, "storage_register", &descriptor_storage,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("reg")),
-&descriptor_register
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("bit_size")),
-&descriptor_bits
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("reg")),
+      .descriptor = &descriptor_register
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("bit_size")),
+      .descriptor = &descriptor_bits
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     storage_register_temp, "storage_register_temp", &descriptor_storage,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("builder")),
-&descriptor_function_builder_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("bit_size")),
-&descriptor_bits
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("bit_size")),
+      .descriptor = &descriptor_bits
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     storage_release_if_temporary, "storage_release_if_temporary", &descriptor_void,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("builder")),
-&descriptor_function_builder_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("storage")),
-&descriptor_storage_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("storage")),
+      .descriptor = &descriptor_storage_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_expected_result_exact, "expected_result_exact", &descriptor_expected_result,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("descriptor")),
-&descriptor_descriptor_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("storage")),
-&descriptor_storage
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("storage")),
+      .descriptor = &descriptor_storage
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_syscall, "syscall", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("header")),
-&descriptor_function_header_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("number")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("header")),
+      .descriptor = &descriptor_function_header_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("number")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     value_force, "value_force", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("builder")),
-&descriptor_function_builder_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("expected_result")),
-&descriptor_expected_result_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("value")),
-&descriptor_value_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("expected_result")),
+      .descriptor = &descriptor_expected_result_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("value")),
+      .descriptor = &descriptor_value_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_module_get_impl, "module_get", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("module")),
-&descriptor_module_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("symbol")),
-&descriptor_symbol_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("source_range")),
-&descriptor_source_range_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("module")),
+      .descriptor = &descriptor_module_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("symbol")),
+      .descriptor = &descriptor_symbol_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("source_range")),
+      .descriptor = &descriptor_source_range_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_forward_call_to_alias, "forward_call_to_alias", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("symbol")),
-&descriptor_symbol_pointer
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("symbol")),
+      .descriptor = &descriptor_symbol_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_logical_shift_left, "i64_logical_shift_left", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_logical_shift_right, "i64_logical_shift_right", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_bitwise_and, "i64_bitwise_and", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_bitwise_or, "i64_bitwise_or", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_add, "i64_add", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_subtract, "i64_subtract", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_multiply, "i64_signed_multiply", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_multiply, "i64_unsigned_multiply", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_divide, "i64_signed_divide", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_divide, "i64_unsigned_divide", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_remainder, "i64_signed_remainder", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_remainder, "i64_unsigned_remainder", &descriptor_i64,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_less, "i64_signed_less", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_less, "i64_unsigned_less", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_less_equal, "i64_signed_less_equal", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_less_equal, "i64_unsigned_less_equal", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_greater, "i64_signed_greater", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_greater, "i64_unsigned_greater", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_signed_greater_equal, "i64_signed_greater_equal", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     mass_i64_unsigned_greater_equal, "i64_unsigned_greater_equal", &descriptor__bool,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("a")),
-&descriptor_i64
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("b")),
-&descriptor_i64
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_i64
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_i64
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_add, "integer_add", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_subtract, "integer_subtract", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_multiply, "integer_multiply", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_divide, "integer_divide", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_remainder, "integer_remainder", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_less, "integer_less", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_greater, "integer_greater", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_less_equal, "integer_less_equal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_greater_equal, "integer_greater_equal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_equal, "integer_equal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_integer_not_equal, "integer_not_equal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_generic_equal, "generic_equal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_generic_not_equal, "generic_not_equal", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   Source_Range Allocator__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Allocator__source_range, "Allocator");
@@ -1717,34 +1717,34 @@ global_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_get, "__get", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_import, "__import", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_mass_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("parser")),
-&descriptor_parser_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("args")),
-&descriptor_value_view
-    )
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
   );
   Source_Range bool__source_range;
   INIT_LITERAL_SOURCE_RANGE(&bool__source_range, "bool");
