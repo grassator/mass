@@ -2784,47 +2784,33 @@ mass_handle_macro_call(
   for(u64 i = 0; i < dyn_array_length(literal->header.parameters); ++i) {
     if (mass_has_error(context)) goto err;
     Function_Parameter *param = dyn_array_get(literal->header.parameters, i);
-    if (param->symbol) {
-      Value *arg_value;
-      if (i >= args_view.length) {
-        arg_value = param->maybe_default_value;
-      } else {
-        arg_value = value_view_get(&args_view, i);
+    Value *arg_value = value_view_get(&args_view, i); // :ArgumentNormalization
+
+    // Macro parameters, like function ones are expected to be non-lazy values
+    // in the compiler and should not have side effects when accessed multiple times
+    // in the body of the macro.
+    //
+    // This assumption holds if the argument is exactly the right type and is statically known
+    Value *param_value;
+    if (mass_value_is_static(arg_value)) {
+      if (param->descriptor) { // :ArgumentNormalization
+        assert(same_type(param->descriptor, arg_value->descriptor));
       }
-
-      Epoch arg_epoch =
-        mass_value_is_static(arg_value) ? VALUE_STATIC_EPOCH : parser->epoch;
-
-      bool needs_casting = (
-        // FIXME pass in resolved Function_Info from call and remove a guard on the next line
-        param->descriptor &&
-        !same_type(param->descriptor, arg_value->descriptor)
-      );
-
-      // Macro parameters, like function ones are expected to be non-lazy values
-      // in the compiler and should not have side effects when accessed multiple times
-      // in the body of the macro.
-      //
-      // This assumption holds if the argument is exactly the right type and is statically known
-      Value *param_value;
-      if (mass_value_is_static(arg_value) && !needs_casting) {
-        param_value = arg_value;
-      } else {
-        // Otherwise we will create a temp copy
-        // TODO should this be forced or is first access ok?
-        Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
-        *payload = (Mass_Value_Lazy_Payload) {.value = arg_value};
-        param_value = mass_make_lazy_value(
-          context, parser, param->source_range,
-          payload, value_or_lazy_value_descriptor(arg_value),
-          mass_macro_temp_param_lazy_proc
-        );
-      }
-
-      scope_define_value(
-        body_scope, arg_epoch, param->source_range, param->symbol, param_value
+      param_value = arg_value;
+    } else {
+      // Otherwise we will create a temp copy
+      // TODO should this be forced or is first access ok?
+      Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
+      *payload = (Mass_Value_Lazy_Payload) {.value = arg_value};
+      param_value = mass_make_lazy_value(
+        context, parser, param->source_range,
+        payload, value_or_lazy_value_descriptor(arg_value),
+        mass_macro_temp_param_lazy_proc
       );
     }
+
+    Epoch arg_epoch = mass_value_is_static(arg_value) ? VALUE_STATIC_EPOCH : parser->epoch;
+    scope_define_value(body_scope, arg_epoch, param->source_range, param->symbol, param_value);
   }
 
   Parser body_parser = *parser;
@@ -3891,10 +3877,11 @@ token_handle_function_call(
   Value *overload = match_found.value;
   const Function_Info *info = match_found.info;
 
-  // This normalization is required for a few reasons:
+  // :ArgumentNormalization
+  // This is required for a few reasons:
   //   1. `args_view` might point to temp memory
   //   2. Default args are substituted. Required for trampolines and intrinsics to work.
-  //   3. Implicits casts for static args are done at compile time. Required for trampolines
+  //   3. Implicits casts for static args are done at compile time. Required for trampolines, macros
   //      and intrinsics to work. Also provides a nice optimization for runtime.
   u64 normalized_arg_count = dyn_array_length(info->parameters);
   Value_View normalized_args = {
