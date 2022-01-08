@@ -2864,6 +2864,7 @@ typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 typedef struct {
   Value_View args;
   Value *overload;
+  const Function_Info *info;
 } Mass_Function_Call_Lazy_Payload;
 
 static void
@@ -2913,10 +2914,15 @@ call_function_overload(
   Value_View args_view = payload->args;
 
   Expected_Result instance_expected_result = expected_result_any(0);
-  Value *runtime_value = value_force(context, builder, &instance_expected_result, payload->overload);
+  Value *runtime_value = payload->overload;
+  if (value_is_function_literal(runtime_value)) {
+    const Function_Literal *literal = value_as_function_literal(runtime_value);
+    runtime_value = mass_function_literal_instance_for_info(context, literal, payload->info);
+  } else {
+    runtime_value = value_force(context, builder, &instance_expected_result, payload->overload);
+  }
   if (mass_has_error(context)) return 0;
 
-  runtime_value = ensure_function_instance(context, runtime_value, args_view);
   if (mass_has_error(context)) return 0;
 
   const Storage *runtime_storage = &value_as_forced(runtime_value)->storage;
@@ -3995,6 +4001,7 @@ token_handle_function_call(
   *call_payload = (Mass_Function_Call_Lazy_Payload){
     .overload = overload,
     .args = normalized_args,
+    .info = info,
   };
 
   const Descriptor *lazy_descriptor = info->return_descriptor;
