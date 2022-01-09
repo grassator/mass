@@ -3674,21 +3674,13 @@ mass_intrinsic_call(
   if (!result) return 0;
 
   // :IntrinsicReturnType
-  if (expected_descriptor) {
-    const Descriptor *actual = value_or_lazy_value_descriptor(result);
-    if (!same_type(expected_descriptor, actual)) {
-      // FIXME this should only happen if the fn/call is not compile-time
-      const Descriptor *runtime = deduce_runtime_descriptor_for_value(context, result, expected_descriptor);
-      if (mass_has_error(context)) return 0;
-      if (!runtime || !same_type(expected_descriptor, runtime)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = args_view.source_range,
-          .Type_Mismatch = { .expected = expected_descriptor, .actual = actual },
-        });
-        return 0;
-      }
-    }
+  if (expected_descriptor && !same_type(expected_descriptor, result->descriptor)) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = args_view.source_range,
+      .Type_Mismatch = { .expected = expected_descriptor, .actual = result->descriptor },
+    });
+    return 0;
   }
   return result;
 }
