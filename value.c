@@ -390,7 +390,15 @@ same_type(
         a->Fixed_Array.length == b->Fixed_Array.length;
     }
     case Descriptor_Tag_Struct: {
-      return a == b;
+      if (dyn_array_length(a->Struct.fields) != dyn_array_length(b->Struct.fields)) {
+        return false;
+      }
+      for (u64 i = 0; i < dyn_array_length(a->Struct.fields); ++i) {
+        const Descriptor *a_field = dyn_array_get(a->Struct.fields, i)->descriptor;
+        const Descriptor *b_field = dyn_array_get(b->Struct.fields, i)->descriptor;
+        if (!same_type(a_field, b_field)) return false;
+      }
+      return true;
     }
     case Descriptor_Tag_Raw: {
       return true;
