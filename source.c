@@ -792,70 +792,74 @@ deduce_runtime_descriptor_for_value(
   Value *value,
   const Descriptor *maybe_desired_descriptor
 ) {
-  const Descriptor *original_descriptor = value_or_lazy_value_descriptor(value);
-  if (descriptor_is_implicit_pointer(original_descriptor)) {
-    return descriptor_as_pointer_to(original_descriptor)->descriptor;
+  const Descriptor *deduced_descriptor = value_or_lazy_value_descriptor(value);
+
+  if (descriptor_is_implicit_pointer(deduced_descriptor)) {
+    deduced_descriptor = descriptor_as_pointer_to(deduced_descriptor)->descriptor;
   }
 
-  if (!mass_value_is_static(value)) {
-    return original_descriptor;
-  }
-
-  if (value->descriptor == &descriptor_i64) {
-    if (maybe_desired_descriptor && maybe_desired_descriptor != &descriptor_i64) {
-      Literal_Cast_Result cast_result =
-        value_i64_cast_to(value, maybe_desired_descriptor, &(u64){0}, &(u64){0});
-      if (cast_result == Literal_Cast_Result_Success) {
-        return maybe_desired_descriptor;
-      } else {
-        return 0;
-      }
-    }
-    return original_descriptor;
-  }
-
-  if (value->descriptor == &descriptor_tuple) {
-    const Tuple *tuple = value_as_tuple(value);
-    return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
-  }
-
-  if (value->descriptor == &descriptor_overload || value->descriptor == &descriptor_function_literal) {
-    Array_Resolved_Function_Parameter parameters;
-    if (maybe_desired_descriptor) {
-      assert(maybe_desired_descriptor->tag == Descriptor_Tag_Function_Instance);
-      parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
-    } else {
-      if (value->descriptor == &descriptor_function_literal) {
-        const Function_Literal *literal = value_as_function_literal(value);
-        if (literal->header.flags & Function_Header_Flags_Macro) {
+  if (mass_value_is_static(value)) {
+    if (value->descriptor == &descriptor_i64) {
+      if (maybe_desired_descriptor && maybe_desired_descriptor != &descriptor_i64) {
+        Literal_Cast_Result cast_result =
+          value_i64_cast_to(value, maybe_desired_descriptor, &(u64){0}, &(u64){0});
+        if (cast_result != Literal_Cast_Result_Success) {
           return 0;
         }
-        if (literal->header.generic_parameter_count > 0) {
+        deduced_descriptor = maybe_desired_descriptor;
+      }
+    } else if (value->descriptor == &descriptor_tuple) {
+      const Tuple *tuple = value_as_tuple(value);
+      deduced_descriptor = anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
+    } else if (
+      value->descriptor == &descriptor_overload ||
+      value->descriptor == &descriptor_function_literal
+    ) {
+      Array_Resolved_Function_Parameter parameters;
+      if (maybe_desired_descriptor) {
+        assert(maybe_desired_descriptor->tag == Descriptor_Tag_Function_Instance);
+        parameters = maybe_desired_descriptor->Function_Instance.info->parameters;
+      } else {
+        if (value->descriptor == &descriptor_function_literal) {
+          const Function_Literal *literal = value_as_function_literal(value);
+          if (literal->header.flags & Function_Header_Flags_Macro) {
+            return 0;
+          }
+          if (literal->header.generic_parameter_count > 0) {
+            return 0;
+          }
+          Function_Info info;
+          mass_function_info_init_for_header_and_maybe_body(
+            context, literal->own_scope, &literal->header, literal->body, &info
+          );
+          parameters = info.parameters;
+        } else {
           return 0;
         }
-        Function_Info info;
-        mass_function_info_init_for_header_and_maybe_body(
-          context, literal->own_scope, &literal->header, literal->body, &info
-        );
-        parameters = info.parameters;
-      } else {
+      }
+      if (mass_has_error(context)) return 0;
+
+      // TODO this should not use `or_error` variant
+      Overload_Match_Found match_found;
+      if (!mass_match_overload_or_error(context, value, parameters, &match_found, &value->source_range)) {
         return 0;
       }
+      Function_Call_Setup call_setup =
+        context->program->default_calling_convention->call_setup_proc(context->allocator, match_found.info);
+      deduced_descriptor = descriptor_function_instance(
+        context->allocator, match_found.info, call_setup, context->program
+      );
     }
-    if (mass_has_error(context)) return 0;
+  }
 
-    Overload_Match_Found match_found;
-    if (!mass_match_overload_or_error(context, value, parameters, &match_found, &value->source_range)) {
+  if (maybe_desired_descriptor) {
+    if (!deduced_descriptor) return 0;
+    if (!same_type_or_can_implicitly_move_cast(maybe_desired_descriptor, deduced_descriptor)) {
       return 0;
     }
-    Function_Call_Setup call_setup =
-      context->program->default_calling_convention->call_setup_proc(context->allocator, match_found.info);
-    return descriptor_function_instance(
-      context->allocator, match_found.info, call_setup, context->program
-    );
   }
 
-  return original_descriptor;
+  return deduced_descriptor;
 }
 
 typedef struct {
@@ -3673,9 +3677,10 @@ mass_intrinsic_call(
   if (expected_descriptor) {
     const Descriptor *actual = value_or_lazy_value_descriptor(result);
     if (!same_type(expected_descriptor, actual)) {
+      // FIXME this should only happen if the fn/call is not compile-time
       const Descriptor *runtime = deduce_runtime_descriptor_for_value(context, result, expected_descriptor);
-      if (!runtime) return 0;
-      if (!same_type(expected_descriptor, runtime)) {
+      if (mass_has_error(context)) return 0;
+      if (!runtime || !same_type(expected_descriptor, runtime)) {
         mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = args_view.source_range,
