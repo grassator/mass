@@ -1117,6 +1117,7 @@ function_literal_info_for_parameters(
     );
   }
 
+  // FIXME this needs to take into account exact static args coming from static generics
   DYN_ARRAY_FOREACH(Function_Specialization, specialization, mutable_literal->specializations) {
     if (dyn_array_length(specialization->descriptors) != dyn_array_length(source_parameters)) continue;
     for (u64 i = 0; i < dyn_array_length(specialization->descriptors); ++i) {
@@ -1129,8 +1130,11 @@ function_literal_info_for_parameters(
   }
 
   Function_Header specialized_header = literal->header;
-  specialized_header.parameters = dyn_array_make(Array_Function_Parameter,
-    .allocator = context->allocator,
+  specialized_header.parameters = dyn_array_make(
+    Array_Function_Parameter,
+    // It is ok to use a temp allocator here because Function_Info will get a new
+    // array of `Resolved_Function_Parameter`s
+    .allocator = context->temp_allocator,
     .capacity = dyn_array_length(literal->header.parameters),
   );
 
