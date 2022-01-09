@@ -2972,8 +2972,7 @@ call_function_overload(
     Function_Call_Parameter *call_param = dyn_array_get(call_setup->parameters, i);
     Value *target_param = dyn_array_push_uninitialized(target_params);
     value_init(target_param, call_param->descriptor, call_param->storage, *source_range);
-    if (i >= args_view.length) {
-      assert(call_param->flags & Function_Call_Parameter_Flags_Uninitialized);
+    if (call_param->flags & Function_Call_Parameter_Flags_Uninitialized) {
       Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
       Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
       dyn_array_push(temp_arguments, arg_value);
