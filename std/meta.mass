@@ -71,6 +71,6 @@ immediate :: fn(
   static_value
 }
 
-reify :: macro(value : &Value, type : Type) {
+reify :: fn(value : &Value, @type : Type) -> _ {
   cast(&type, pointer_from_static_value(value, type))
 }

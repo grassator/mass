@@ -12,7 +12,7 @@ native_stdout :: fn(buffer : &i8, size : i64) -> () {
   }
 }
 
-print :: macro(string : String) -> () {
+print :: fn(string : String) -> () {
   native_stdout(string.bytes, string.length)
 }
 

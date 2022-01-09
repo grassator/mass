@@ -2,7 +2,7 @@ exports [.sys_write, .sys_exit, .STDOUT_FILENO]
 
 STDOUT_FILENO :: 1
 
-make_syscall :: macro(signature : MASS.Function_Header, number : i64) {
+make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Function_Literal) {
   signature (intrinsic {
     using unsigned
     // AMD64 ABI A.2.1.4

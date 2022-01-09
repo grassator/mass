@@ -227,7 +227,7 @@ logical_shift_right :: fn(x : i64, y : i64) => (i64) { MASS.i64_logical_shift_ri
 bitwise_or :: fn(x : i64, y : i64) => (i64) { MASS.i64_bitwise_or(x, y) }
 bitwise_and :: fn(x : i64, y : i64) => (i64) { MASS.i64_bitwise_and(x, y) }
 
-make_arithmetic_operations_module :: macro(type : Type) {
+make_arithmetic_operations_module :: fn(@type : Type) => (MASS.Module) {
   module {
     add :: fn(x : type, y : type) -> (type) MASS.integer_add
     subtract :: fn(x : type, y : type) -> (type) MASS.integer_subtract
@@ -449,7 +449,7 @@ compare :: fn(
   lazy_value
 }
 
-make_i64_comparison_fn :: macro(compare_type) {
+make_i64_comparison_fn :: fn(@compare_type : MASS.Compare_Type) => _ {
   fn(x : i64, y : i64) -> (bool) intrinsic {
     compare(context, parser, arguments, compare_type)
   }
@@ -527,7 +527,7 @@ using {
 
 Allocator :: MASS.Allocator
 
-allocate :: macro(allocator : &MASS.Allocator, type : Type) {
+allocate :: fn(allocator : &MASS.Allocator, @type : Type) -> _ {
   cast(&type, MASS.allocator_allocate_bytes(
     allocator,
     MASS.i64_unsigned_divide((type.*).bit_size.as_u64, 8),
