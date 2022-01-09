@@ -3659,19 +3659,24 @@ mass_intrinsic_call(
   const Descriptor *expected_descriptor,
   Value_View args_view
 ) {
-  // TODO only do this check in debug but that requires `descriptor_mass_intrinsic_proc`
-  //      to have proper symbols in the parameter definitions.
-  const Descriptor *intrinsic_descriptor =
+  Mass_Intrinsic_Proc proc;
+  Mass_Intrinsic_Proc *maybe_cached_proc =
+    hash_map_get(context->compilation->intrinsic_proc_cache_map, overload);
+  if (maybe_cached_proc) {
+    proc = *maybe_cached_proc;
+  } else {
+    const Descriptor *intrinsic_descriptor =
     deduce_runtime_descriptor_for_value(context, overload, &descriptor_mass_intrinsic_proc);
-  assert(!mass_has_error(context));
-  assert(intrinsic_descriptor);
-  const Function_Info *intrinsic_info = descriptor_as_function_instance(intrinsic_descriptor)->info;
-  Mass_Intrinsic_Proc jitted_code =
-    (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(context, overload, intrinsic_info);
-  if (mass_has_error(context)) return 0;
+    assert(!mass_has_error(context));
+    assert(intrinsic_descriptor);
+    const Function_Info *intrinsic_info = descriptor_as_function_instance(intrinsic_descriptor)->info;
+    proc = (Mass_Intrinsic_Proc)mass_ensure_jit_function_for_value(context, overload, intrinsic_info);
+    if (mass_has_error(context)) return 0;
+    hash_map_set(context->compilation->intrinsic_proc_cache_map, overload, proc);
+  }
 
-  Value *result = jitted_code(context, parser, args_view);
-  if (!result) return 0;
+  Value *result = proc(context, parser, args_view);
+  if (mass_has_error(context)) return 0;
 
   // :IntrinsicReturnType
   if (expected_descriptor && !same_type(expected_descriptor, result->descriptor)) {

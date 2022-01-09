@@ -703,6 +703,8 @@ typedef struct Static_Pointer_Length_Map Static_Pointer_Length_Map;
 
 typedef struct Descriptor_Pointer_To_Cache_Map Descriptor_Pointer_To_Cache_Map;
 
+typedef struct Intrinsic_Proc_Cache_Map Intrinsic_Proc_Cache_Map;
+
 typedef struct Common_Symbols Common_Symbols;
 typedef dyn_array_type(Common_Symbols *) Array_Common_Symbols_Ptr;
 typedef dyn_array_type(const Common_Symbols *) Array_Const_Common_Symbols_Ptr;
@@ -2259,6 +2261,7 @@ typedef dyn_array_type(Jit) Array_Jit;
 
 hash_map_template(Static_Pointer_Length_Map, const void *, u64, hash_pointer, const_void_pointer_equal)
 hash_map_template(Descriptor_Pointer_To_Cache_Map, const Descriptor *, const Descriptor *, hash_pointer, const_void_pointer_equal)
+hash_map_template(Intrinsic_Proc_Cache_Map, const Value *, Mass_Intrinsic_Proc, hash_pointer, const_void_pointer_equal)
 typedef struct Common_Symbols {
   const Symbol * apply;
   const Symbol * fn;
@@ -2310,6 +2313,7 @@ typedef struct Compilation {
   Operator_Symbol_Map * prefix_operator_symbol_map;
   Operator_Symbol_Map * infix_or_suffix_operator_symbol_map;
   Descriptor_Pointer_To_Cache_Map * descriptor_pointer_to_cache_map;
+  Intrinsic_Proc_Cache_Map * intrinsic_proc_cache_map;
   Common_Symbols common_symbols;
   Operator apply_operator;
 } Compilation;
@@ -2838,6 +2842,7 @@ static Descriptor descriptor_jit_pointer;
 static Descriptor descriptor_jit_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_length_map, Static_Pointer_Length_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_pointer_to_cache_map, Descriptor_Pointer_To_Cache_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(intrinsic_proc_cache_map, Intrinsic_Proc_Cache_Map);
 static Descriptor descriptor_common_symbols;
 static Descriptor descriptor_array_common_symbols;
 static Descriptor descriptor_array_common_symbols_ptr;
@@ -6080,6 +6085,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
     .descriptor = &descriptor_descriptor_pointer_to_cache_map_pointer,
     .name = slice_literal_fields("descriptor_pointer_to_cache_map"),
     .offset = offsetof(Compilation, descriptor_pointer_to_cache_map),
+  },
+  {
+    .descriptor = &descriptor_intrinsic_proc_cache_map_pointer,
+    .name = slice_literal_fields("intrinsic_proc_cache_map"),
+    .offset = offsetof(Compilation, intrinsic_proc_cache_map),
   },
   {
     .descriptor = &descriptor_common_symbols,

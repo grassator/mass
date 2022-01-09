@@ -2040,6 +2040,13 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
+  push_type(type_hash_map("Intrinsic_Proc_Cache_Map", {
+    .key_type = "const Value *",
+    .value_type = "Mass_Intrinsic_Proc",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
+  }));
+
   push_type(type_struct("Common_Symbols", (Struct_Item[]){
     { "const Symbol *", "apply" },
     { "const Symbol *", "fn" },
@@ -2090,6 +2097,7 @@ main(void) {
     { "Operator_Symbol_Map *", "prefix_operator_symbol_map" },
     { "Operator_Symbol_Map *", "infix_or_suffix_operator_symbol_map" },
     { "Descriptor_Pointer_To_Cache_Map *", "descriptor_pointer_to_cache_map"},
+    { "Intrinsic_Proc_Cache_Map *", "intrinsic_proc_cache_map" },
     { "Common_Symbols", "common_symbols" },
     { "Operator", "apply_operator" },
   })));

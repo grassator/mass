@@ -1339,6 +1339,7 @@ compilation_init(
     .prefix_operator_symbol_map = hash_map_make(Operator_Symbol_Map, .initial_capacity = 128),
     .infix_or_suffix_operator_symbol_map = hash_map_make(Operator_Symbol_Map, .initial_capacity = 128),
     .descriptor_pointer_to_cache_map = hash_map_make(Descriptor_Pointer_To_Cache_Map, .initial_capacity = 256),
+    .intrinsic_proc_cache_map = hash_map_make(Intrinsic_Proc_Cache_Map, .initial_capacity = 128),
     .jit = {0},
   };
 
@@ -1422,6 +1423,7 @@ compilation_deinit(
   hash_map_destroy(compilation->infix_or_suffix_operator_symbol_map);
   hash_map_destroy(compilation->trampoline_map);
   hash_map_destroy(compilation->descriptor_pointer_to_cache_map);
+  hash_map_destroy(compilation->intrinsic_proc_cache_map);
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);
