@@ -368,10 +368,12 @@ same_type(
   if (descriptor_is_implicit_pointer(b)) {
     b = b->Pointer_To.descriptor;
   }
+  if (a == b) return true;
   if (a->brand != b->brand) return false;
   if (a->tag != b->tag) return false;
   if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
   if (a->bit_alignment.as_u64 != b->bit_alignment.as_u64) return false;
+
   switch(a->tag) {
     case Descriptor_Tag_Void:
     case Descriptor_Tag_Float: {
