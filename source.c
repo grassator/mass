@@ -2942,8 +2942,7 @@ mass_handle_macro_call(
     } break;
     case Function_Return_Tag_Exact: {
       const Descriptor *expected = literal->header.returns.Exact.descriptor;
-      // TODO should this actually perform a cast?
-      if (!same_type_or_can_implicitly_move_cast(expected, actual_return_descriptor)) {
+      if (expected->tag != Descriptor_Tag_Void && !same_type(expected, actual_return_descriptor)) {
         mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = body_value->source_range,
