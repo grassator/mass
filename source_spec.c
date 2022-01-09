@@ -857,25 +857,23 @@ spec("source") {
     }
 
     it("should support default arguments") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "test_default :: fn(x : s64, y : s64 = 20) -> (s64) { x + y }\n"
-        "test :: fn() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+        "test_default :: fn(x : i64, y : i64 = 20) -> (i64) { x + y }\n"
+        "test :: fn() -> (i64) { (test_default(20) + \n test_default(0, 2)) }"
       );
       check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual == 42);
+      check(checker() == 42);
     }
 
     it("should support default arguments with inference") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "test_default :: fn(x : s64, y := 20) -> (s64) { x + y }\n"
-        "test :: fn() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+        "test_default :: fn(x : i64, y := 20) -> (i64) { x + y }\n"
+        "test :: fn() -> (i64) { (test_default(20) + \n test_default(0, 2)) }"
       );
       check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
-      check(actual == 42);
+      check(checker() == 42);
     }
 
     it("should disallow default arguments coming after non-default ones") {
