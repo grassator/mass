@@ -602,6 +602,189 @@ anonymous_struct_descriptor_from_tuple(
   return tuple_descriptor;
 }
 
+typedef void(*Mass_Report_Tuple_Error_Proc)(
+  Mass_Context *,
+  Mass_Error
+);
+typedef bool(*Mass_Process_Tuple_Item_Proc)(
+  Mass_Context *,
+  const Descriptor *,
+  u64 offset,
+  Value *tuple_item,
+  const Source_Range *source_range,
+  void *payload
+);
+
+static bool
+mass_process_tuple_as_descriptor(
+  Mass_Context *context,
+  const Tuple *tuple,
+  const Descriptor *descriptor,
+  const Source_Range *source_range,
+  Mass_Report_Tuple_Error_Proc report_error_proc,
+  Mass_Process_Tuple_Item_Proc process_item_at_offset_proc,
+  void *payload
+) {
+  Temp_Mark temp_mark = context_temp_mark(context);
+  if (descriptor->tag == Descriptor_Tag_Struct) {
+    assert(descriptor->tag == Descriptor_Tag_Struct);
+    Array_Struct_Field fields = descriptor->Struct.fields;
+    Struct_Field_Set *assigned_set = hash_map_make(
+      Struct_Field_Set,
+      .initial_capacity = dyn_array_length(fields) * 2,
+      .allocator = context->temp_allocator,
+    );
+
+    u64 field_index = 0;
+    for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
+      Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+      const Struct_Field *field;
+      Value *field_source;
+      if (value_is_named_accessor(tuple_item)) {
+        const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
+        Scope_Entry *entry = scope_lookup(tuple->scope_where_it_was_created, symbol);
+        if (!entry) {
+          // This is a hard error instead of a callback because it is just a syntax sugar expansion
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Undefined_Variable,
+            .Undefined_Variable = { .name = symbol->name },
+            .source_range = tuple_item->source_range,
+          });
+          goto err;
+        }
+        // This is a hard error instead of a callback because it is just a syntax sugar expansion
+        if (entry->epoch.as_u64 != tuple->epoch.as_u64) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Epoch_Mismatch,
+            .source_range = tuple_item->source_range,
+          });
+          goto err;
+        }
+        field_source = scope_entry_force_value(context, entry);
+        if (!struct_find_field_by_name(descriptor, symbol->name, &field, &field_index)) {
+          report_error_proc(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Unknown_Field,
+            .source_range = tuple_item->source_range,
+            .Unknown_Field = { .name = symbol->name, .type = descriptor },
+          });
+          goto err;
+        }
+      } else if (value_is_assignment(tuple_item)) {
+        const Assignment *assignment = value_as_assignment(tuple_item);
+        field_source = assignment->source;
+        if (!mass_value_ensure_static_of(context, assignment->target, &descriptor_named_accessor)) {
+          goto err;
+        }
+        const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
+        if (!struct_find_field_by_name(descriptor, accessor->symbol->name, &field, &field_index)) {
+          report_error_proc(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Unknown_Field,
+            .source_range = tuple_item->source_range,
+            .Unknown_Field = { .name = accessor->symbol->name, .type = descriptor },
+          });
+          goto err;
+        }
+      } else {
+        field_source = tuple_item;
+        if (field_index >= dyn_array_length(fields)) {
+          Slice message = slice_literal("Tuple has too many items for the struct it is assigned to");
+          // FIXME :TupleAssignError need a better error here?
+          report_error_proc(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Type_Mismatch,
+            .source_range = tuple_item->source_range,
+            .Type_Mismatch = { .expected = descriptor, .actual = &descriptor_tuple },
+            .detailed_message = message,
+          });
+          goto err;
+        }
+        field = dyn_array_get(fields, field_index);
+      }
+      field_index += 1;
+      if (hash_map_has(assigned_set, field)) {
+        report_error_proc(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Redefinition,
+          .source_range = tuple_item->source_range,
+          .Redefinition = { .name = field->name },
+        });
+        goto err;
+      }
+
+      bool success = process_item_at_offset_proc(
+        context, field->descriptor, field->offset, field_source, source_range, payload
+      );
+      if (!success) goto err;
+
+      Range_u64 field_overlap_range = {
+        .from = field->offset,
+        .to = field->offset + descriptor_byte_size(field->descriptor),
+      };
+      // Skip overlapped fields for unions
+      // TODO @Speed if sorting is guaranteed can look only forward and back
+      for (u64 i = 0; i < dyn_array_length(fields); ++i) {
+        const Struct_Field *a_field = dyn_array_get(fields, i);
+        if (range_contains(field_overlap_range, a_field->offset)) {
+          hash_map_set(assigned_set, a_field, 1);
+        }
+      }
+      if (mass_has_error(context)) goto err;
+    }
+
+    if ((dyn_array_length(fields) != assigned_set->occupied)) {
+      Slice message = slice_literal(
+        "Tuple does not have enough items to match the struct it is assigned to"
+      );
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+          // FIXME :TupleAssignError need a better error here?
+        .Type_Mismatch = { .expected = descriptor, .actual = &descriptor_tuple },
+        .detailed_message = message,
+      });
+      goto err;
+    }
+  } else if (descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    u64 length = descriptor->Fixed_Array.length;
+    if ((length != dyn_array_length(tuple->items))) {
+      Slice message = length > dyn_array_length(tuple->items)
+        ? slice_literal("Tuple does not have enough items to match the array it is assigned to")
+        : slice_literal("Tuple has too many items for the struct it is assigned to");
+      report_error_proc(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = *source_range,
+          // FIXME :TupleAssignError need a better error here?
+        .Type_Mismatch = { .expected = descriptor, .actual = &descriptor_tuple },
+        .detailed_message = message,
+      });
+      goto err;
+    }
+    const Descriptor *item_descriptor = descriptor->Fixed_Array.item;
+    u64 item_byte_size = descriptor_byte_size(item_descriptor);
+
+    for (u64 index = 0; index < length; ++index) {
+      Value *tuple_item = *dyn_array_get(tuple->items, index);
+      bool success = process_item_at_offset_proc(
+        context, item_descriptor, item_byte_size * index, tuple_item, source_range, payload
+      );
+      if (!success) goto err;
+    }
+  } else {
+    report_error_proc(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = *source_range,
+      // FIXME :TupleAssignError need a better error here?
+      .Type_Mismatch = { .expected = descriptor, .actual = &descriptor_tuple },
+    });
+    goto err;
+  }
+
+  context_temp_reset_to_mark(context, temp_mark);
+  return true;
+
+  err:
+  context_temp_reset_to_mark(context, temp_mark);
+  return false;
+}
+
 // TODO make this function produce a better error on failure
 static const Descriptor *
 deduce_runtime_descriptor_for_value(
@@ -675,6 +858,29 @@ deduce_runtime_descriptor_for_value(
   return original_descriptor;
 }
 
+typedef struct {
+  Storage base_storage;
+  Function_Builder *builder;
+} Mass_Assign_Tuple_Item_Proc_Payload;
+
+static inline bool
+mass_assign_tuple_item_proc(
+  Mass_Context *context,
+  const Descriptor *item_descriptor,
+  u64 offset,
+  Value *source,
+  const Source_Range *source_range,
+  Mass_Assign_Tuple_Item_Proc_Payload *payload
+) {
+  Storage item_storage = storage_with_offset_and_bit_size(
+    &payload->base_storage, u64_to_s32(offset), item_descriptor->bit_size
+  );
+  Value target_value;
+  value_init(&target_value, item_descriptor, item_storage, *source_range);
+  mass_assign_helper(context, payload->builder, &target_value, source, source_range);
+  return !mass_has_error(context);
+}
+
 static void
 assign_tuple(
   Mass_Context *context,
@@ -684,165 +890,15 @@ assign_tuple(
   const Source_Range *source_range
 ) {
   const Tuple *tuple = value_as_tuple(source);
-  Temp_Mark temp_mark = context_temp_mark(context);
-  if (target->descriptor->tag == Descriptor_Tag_Struct) {
-    Array_Struct_Field fields = target->descriptor->Struct.fields;
-    Struct_Field_Set *assigned_set = hash_map_make(
-      Struct_Field_Set,
-      .initial_capacity = dyn_array_length(fields) * 2,
-      .allocator = context->temp_allocator,
-    );
 
-    u64 field_index = 0;
-    for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
-      Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
-      const Struct_Field *field;
-      Value *field_source;
-      if (value_is_named_accessor(tuple_item)) {
-        const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
-        Scope_Entry *entry = scope_lookup(tuple->scope_where_it_was_created, symbol);
-        if (!entry) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Undefined_Variable,
-            .Undefined_Variable = { .name = symbol->name },
-            .source_range = tuple_item->source_range,
-          });
-          goto err;
-        }
-        if (entry->epoch.as_u64 != tuple->epoch.as_u64) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Epoch_Mismatch,
-            .source_range = source->source_range,
-          });
-          goto err;
-        }
-        field_source = scope_entry_force_value(context, entry);
-        if (!struct_find_field_by_name(target->descriptor, symbol->name, &field, &field_index)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Unknown_Field,
-            .source_range = tuple_item->source_range,
-            .Unknown_Field = { .name = symbol->name, .type = target->descriptor },
-          });
-          goto err;
-        }
-      } else if (value_is_assignment(tuple_item)) {
-        const Assignment *assignment = value_as_assignment(tuple_item);
-        field_source = assignment->source;
-        if (!mass_value_ensure_static_of(context, assignment->target, &descriptor_named_accessor)) {
-          goto err;
-        }
-        const Named_Accessor *accessor = value_as_named_accessor(assignment->target);
-        if (!struct_find_field_by_name(target->descriptor, accessor->symbol->name, &field, &field_index)) {
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Unknown_Field,
-            .source_range = tuple_item->source_range,
-            .Unknown_Field = { .name = accessor->symbol->name, .type = target->descriptor },
-          });
-          goto err;
-        }
-      } else {
-        field_source = tuple_item;
-        if (field_index >= dyn_array_length(fields)) {
-          Slice message = slice_literal("Tuple has too many items for the struct it is assigned to");
-          mass_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Type_Mismatch,
-            .source_range = *source_range,
-            .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-            .detailed_message = message,
-          });
-          goto err;
-        }
-        field = dyn_array_get(fields, field_index);
-      }
-      field_index += 1;
-      if (hash_map_has(assigned_set, field)) {
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Redefinition,
-          .source_range = tuple_item->source_range,
-          .Redefinition = { .name = field->name },
-        });
-        goto err;
-      }
-
-      const Storage *target_storage = &value_as_forced(target)->storage;
-      Value target_field = {
-        .tag = Value_Tag_Forced,
-        .descriptor = field->descriptor,
-        .Forced.storage = storage_with_offset_and_bit_size(
-          target_storage, u64_to_s32(field->offset), field->descriptor->bit_size
-        ),
-        .source_range = target->source_range,
-      };
-      mass_assign_helper(context, builder, &target_field, field_source, source_range);
-      Range_u64 field_overlap_range = {
-        .from = field->offset,
-        .to = field->offset + descriptor_byte_size(field->descriptor),
-      };
-      // Skip overlapped fields for unions
-      // TODO @Speed if sorting is guaranteed can look only forward and back
-      for (u64 i = 0; i < dyn_array_length(fields); ++i) {
-        const Struct_Field *a_field = dyn_array_get(fields, i);
-        if (range_contains(field_overlap_range, a_field->offset)) {
-          hash_map_set(assigned_set, a_field, 1);
-        }
-      }
-      if (mass_has_error(context)) goto err;
-    }
-
-    if ((dyn_array_length(fields) != assigned_set->occupied)) {
-      Slice message = slice_literal(
-        "Tuple does not have enough items to match the struct it is assigned to"
-      );
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = *source_range,
-        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-        .detailed_message = message,
-      });
-      goto err;
-    }
-  } else if (target->descriptor->tag == Descriptor_Tag_Fixed_Array) {
-    const Storage *target_storage = &value_as_forced(target)->storage;
-    u64 length = target->descriptor->Fixed_Array.length;
-    if ((length != dyn_array_length(tuple->items))) {
-      Slice message = length > dyn_array_length(tuple->items)
-        ? slice_literal("Tuple does not have enough items to match the array it is assigned to")
-        : slice_literal("Tuple has too many items for the struct it is assigned to");
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = *source_range,
-        .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-        .detailed_message = message,
-      });
-      goto err;
-    }
-
-    const Descriptor *item_descriptor = target->descriptor->Fixed_Array.item;
-    u64 item_byte_size = descriptor_byte_size(item_descriptor);
-    for (u64 index = 0; index < length; ++index) {
-      Value *tuple_item = *dyn_array_get(tuple->items, index);
-      s32 byte_offset = u64_to_s32(item_byte_size * index);
-      Value target_field = {
-        .tag = Value_Tag_Forced,
-        .descriptor = item_descriptor,
-        .Forced.storage = storage_with_offset_and_bit_size(
-          target_storage, byte_offset, item_descriptor->bit_size
-        ),
-        .source_range = target->source_range,
-      };
-      mass_assign_helper(context, builder, &target_field, tuple_item, source_range);
-      if (mass_has_error(context)) goto err;
-    }
-  } else {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = *source_range,
-      .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-    });
-  }
-
-  err:
-  context_temp_reset_to_mark(context, temp_mark);
+  Mass_Assign_Tuple_Item_Proc_Payload payload = {
+    .base_storage = value_as_forced(target)->storage,
+    .builder = builder,
+  };
+  mass_process_tuple_as_descriptor(
+    context, tuple, target->descriptor, source_range,
+    mass_error, mass_assign_tuple_item_proc, &payload
+  );
 }
 
 static void
