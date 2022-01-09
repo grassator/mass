@@ -62,6 +62,13 @@ mass_function_info_init_for_header_and_maybe_body(
   Function_Info *out_info
 );
 
+static Overload_Match
+mass_match_overload(
+  Mass_Context *context,
+  Value *value,
+  Array_Resolved_Function_Parameter parameters
+);
+
 static bool
 mass_match_overload_or_error(
   Mass_Context *context,

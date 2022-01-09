@@ -872,22 +872,19 @@ deduce_runtime_descriptor_for_value(
           mass_function_info_init_for_header_and_maybe_body(
             context, literal->own_scope, &literal->header, literal->body, &info
           );
+          if (mass_has_error(context)) return 0;
           parameters = info.parameters;
         } else {
           return 0;
         }
       }
-      if (mass_has_error(context)) return 0;
 
-      // TODO this should not use `or_error` variant
-      Overload_Match_Found match_found;
-      if (!mass_match_overload_or_error(context, value, parameters, &match_found, &value->source_range)) {
-        return 0;
-      }
+      Overload_Match match = mass_match_overload(context, value, parameters);
+      if (match.tag != Overload_Match_Tag_Found) return 0;
       Function_Call_Setup call_setup =
-        context->program->default_calling_convention->call_setup_proc(context->allocator, match_found.info);
+        context->program->default_calling_convention->call_setup_proc(context->allocator, match.Found.info);
       deduced_descriptor = descriptor_function_instance(
-        context->allocator, match_found.info, call_setup, context->program
+        context->allocator, match.Found.info, call_setup, context->program
       );
     }
   }
@@ -1757,6 +1754,18 @@ mass_parse_single_function_parameter(
     const Descriptor *constraint_descriptor =
       deduce_runtime_descriptor_for_value(context, constraint, &descriptor_mass_type_constraint_proc);
     if (mass_has_error(context)) goto err;
+    if (!constraint_descriptor) {
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .Type_Mismatch = {
+          .expected = &descriptor_mass_type_constraint_proc,
+          .actual = constraint->descriptor,
+        },
+        .source_range = constraint_expression.source_range,
+        .detailed_message = slice_literal("Invalid function signature for a type constraint"),
+      });
+      goto err;
+    }
     const Function_Info *constraint_info = descriptor_as_function_instance(constraint_descriptor)->info;
     Mass_Type_Constraint_Proc maybe_type_constraint =
       (Mass_Type_Constraint_Proc)mass_ensure_jit_function_for_value(context, constraint, constraint_info);

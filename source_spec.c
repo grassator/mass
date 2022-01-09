@@ -1309,7 +1309,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_No_Matching_Overload);
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
     }
   }
 
