@@ -5037,6 +5037,17 @@ mass_handle_assignment_lazy_proc(
   Value *target = value_force(context, builder, &expected_target, payload->target);
   if (mass_has_error(context)) return 0;
 
+  const Descriptor *deduced_source_descriptor =
+    deduce_runtime_descriptor_for_value(context, payload->source, target_descriptor);
+  if (!deduced_source_descriptor) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = *source_range,
+      .Type_Mismatch = { .expected = target_descriptor, .actual = payload->source->descriptor },
+    });
+    return 0;
+  }
+
   value_force_exact(context, builder, target, payload->source);
   storage_release_if_temporary(builder, &value_as_forced(target)->storage);
   if (mass_has_error(context)) return 0;
@@ -5082,7 +5093,9 @@ mass_operator_assignment(
   Value_View operands
 ) {
   Value *target = token_parse_single(context, parser, value_view_get(&operands, 0));
+  if (mass_has_error(context)) return 0;
   Value *source = token_parse_single(context, parser, value_view_get(&operands, 1));
+  if (mass_has_error(context)) return 0;
 
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);

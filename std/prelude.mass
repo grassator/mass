@@ -490,7 +490,7 @@ equal :: fn(x, accessor : MASS.Named_Accessor) -> _ intrinsic {
   named_value := MASS.module_get(context, (x_descriptor.*).own_module, accessor.symbol, &arguments.source_range)
   values : (&MASS.Value) * 2 = [arguments.0, named_value]
   new_args : MASS.Value_View = arguments
-  new_args.values = &values
+  new_args.values = &values.0
   MASS.forward_call_to_alias(context, parser, new_args, & 'equal)
 }
 
