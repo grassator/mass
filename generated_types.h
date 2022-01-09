@@ -1864,7 +1864,7 @@ typedef struct Function_Info {
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
 typedef struct Function_Specialization {
-  Array_Const_Descriptor_Ptr descriptors;
+  Array_Function_Parameter parameters;
   Function_Info * info;
 } Function_Specialization;
 typedef dyn_array_type(Function_Specialization) Array_Function_Specialization;
@@ -4979,9 +4979,9 @@ DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags, function_header_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Header_Flags *, function_header_flags_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_specialization, Function_Specialization,
   {
-    .descriptor = &descriptor_array_const_descriptor_ptr,
-    .name = slice_literal_fields("descriptors"),
-    .offset = offsetof(Function_Specialization, descriptors),
+    .descriptor = &descriptor_array_function_parameter,
+    .name = slice_literal_fields("parameters"),
+    .offset = offsetof(Function_Specialization, parameters),
   },
   {
     .descriptor = &descriptor_function_info_pointer,

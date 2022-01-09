@@ -1744,7 +1744,7 @@ main(void) {
   }));
 
   push_type(type_struct("Function_Specialization", (Struct_Item[]){
-    { "Array_Const_Descriptor_Ptr", "descriptors" },
+    { "Array_Function_Parameter", "parameters" },
     { "Function_Info *", "info" },
   }));
 

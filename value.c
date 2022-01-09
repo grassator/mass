@@ -1117,83 +1117,97 @@ function_literal_info_for_parameters(
     );
   }
 
-  // FIXME this needs to take into account exact static args coming from static generics
-  DYN_ARRAY_FOREACH(Function_Specialization, specialization, mutable_literal->specializations) {
-    if (dyn_array_length(specialization->descriptors) != dyn_array_length(source_parameters)) continue;
-    for (u64 i = 0; i < dyn_array_length(specialization->descriptors); ++i) {
-      const Descriptor *cached_descriptor = *dyn_array_get(specialization->descriptors, i);
-      const Descriptor *actual_descriptor = dyn_array_get(source_parameters, i)->descriptor;
-      if (!same_type(cached_descriptor, actual_descriptor)) goto not_matched;
+  Array_Function_Parameter temp_specialized_parameters = dyn_array_make(
+    Array_Function_Parameter,
+    .allocator = context->temp_allocator,
+    .capacity = dyn_array_length(literal->header.parameters),
+  );
+
+  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->header.parameters); ++arg_index) {
+    const Function_Parameter *param = dyn_array_get(literal->header.parameters, arg_index);
+    Function_Parameter *specialized_param = dyn_array_push(temp_specialized_parameters, *param);
+
+    if (arg_index >= dyn_array_length(source_parameters)) continue; // No specialization for default args
+    if (param->tag != Function_Parameter_Tag_Generic) continue;
+
+    const Resolved_Function_Parameter *source_param = dyn_array_get(source_parameters, arg_index);
+    const Descriptor *actual_descriptor = source_param->descriptor;
+    if (param->Generic.is_static) { // :StaticGenericToExactStatic
+      if (source_param->tag != Resolved_Function_Parameter_Tag_Known) return 0;
+      specialized_param->descriptor = actual_descriptor;
+      specialized_param->tag = Function_Parameter_Tag_Exact_Static;
+      specialized_param->Exact_Static.storage = source_param->Known.storage;
+    } else {
+      if (!(literal->header.flags & Function_Header_Flags_Compile_Time)) {
+        if (source_param->tag == Resolved_Function_Parameter_Tag_Known) {
+          Value fake_source_value;
+          Storage storage = source_param->Known.storage;
+          value_init(&fake_source_value, source_param->descriptor, storage, source_param->source_range);
+          actual_descriptor = deduce_runtime_descriptor_for_value(context, &fake_source_value, 0);
+          if (!actual_descriptor) return 0;
+        }
+      }
+    }
+    if (param->Generic.maybe_type_constraint) {
+      actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
+      if (!actual_descriptor) return 0;
+    }
+    specialized_param->descriptor = actual_descriptor;
+  }
+
+  DYN_ARRAY_FOREACH(Function_Specialization, specialization, literal->specializations) {
+    if (dyn_array_length(specialization->parameters) != dyn_array_length(temp_specialized_parameters)) continue;
+    for (u64 i = 0; i < dyn_array_length(specialization->parameters); ++i) {
+      const Function_Parameter *cached = dyn_array_get(specialization->parameters, i);
+      const Function_Parameter *current = dyn_array_get(temp_specialized_parameters, i);
+      if (cached->tag != current->tag) {
+        panic("Specialized parameter tag should not depend on source parameters");
+      }
+      switch(cached->tag) {
+        case Function_Parameter_Tag_Runtime: {
+          // Can be null but must be the same since we don't modify `Runtime` params above
+          assert(cached->descriptor == current->descriptor);
+        } break;
+        case Function_Parameter_Tag_Generic: {
+          if (!same_type(cached->descriptor, current->descriptor)) goto not_matched;
+        } break;
+        case Function_Parameter_Tag_Exact_Static: {
+          const Function_Parameter *unspecialized = dyn_array_get(literal->header.parameters, i);
+          // :StaticGenericToExactStatic
+          // Only need to compare exact static args if they were created above, as hardcoded
+          // `Exact_Static` args aren't supposed to change anyway
+          if (unspecialized->tag == Function_Parameter_Tag_Generic) {
+            assert(unspecialized->Generic.is_static);
+            if (cached->descriptor != current->descriptor) goto not_matched;
+            if (!storage_static_equal(
+              cached->descriptor, &cached->Exact_Static.storage,
+              current->descriptor, &current->Exact_Static.storage
+            )) {
+              goto not_matched;
+            }
+          } else {
+            assert(cached->descriptor == current->descriptor);
+          }
+        } break;
+      }
     }
     return specialization->info;
     not_matched:;
   }
 
-  Function_Header specialized_header = literal->header;
-  specialized_header.parameters = dyn_array_make(
+  // The cache didn't match so we need a permanent copy of the parameters
+  // for the key of the new cache entry
+  Array_Function_Parameter specialized_parameters = dyn_array_make(
     Array_Function_Parameter,
-    // It is ok to use a temp allocator here because Function_Info will get a new
-    // array of `Resolved_Function_Parameter`s
-    .allocator = context->temp_allocator,
-    .capacity = dyn_array_length(literal->header.parameters),
-  );
-
-  Array_Const_Descriptor_Ptr cache_descriptors = dyn_array_make(
-    Array_Const_Descriptor_Ptr,
-    .capacity = dyn_array_length(source_parameters),
     .allocator = context->allocator,
+    .capacity = dyn_array_length(temp_specialized_parameters),
   );
-
-  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->header.parameters); ++arg_index) {
-    const Function_Parameter *param = dyn_array_get(literal->header.parameters, arg_index);
-    Function_Parameter *specialized_param = dyn_array_push(specialized_header.parameters, *param);
-    const Descriptor *actual_descriptor;
-    if (arg_index < dyn_array_length(source_parameters)) {
-      const Resolved_Function_Parameter *source_param = dyn_array_get(source_parameters, arg_index);
-      actual_descriptor = source_param->descriptor;
-      if(param->tag == Function_Parameter_Tag_Generic) {
-        if (param->Generic.is_static) {
-          if (source_param->tag != Resolved_Function_Parameter_Tag_Known) {
-            // TODO cleanup memory?
-            return 0;
-          }
-          specialized_param->descriptor = actual_descriptor;
-          specialized_param->tag = Function_Parameter_Tag_Exact_Static;
-          specialized_param->Exact_Static.storage = source_param->Known.storage;
-        } else {
-          if (!(literal->header.flags & Function_Header_Flags_Compile_Time)) {
-            if (source_param->tag == Resolved_Function_Parameter_Tag_Known) {
-              Value fake_source_value;
-              Storage storage = source_param->Known.storage;
-              value_init(&fake_source_value, source_param->descriptor, storage, source_param->source_range);
-              actual_descriptor = deduce_runtime_descriptor_for_value(context, &fake_source_value, 0);
-              // TODO cleanup memory?
-              if (!actual_descriptor) return 0;
-            }
-          }
-        }
-        if (param->Generic.maybe_type_constraint) {
-          actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
-          if (!actual_descriptor) {
-            // TODO cleanup memory?
-            return 0;
-          }
-        }
-        specialized_param->descriptor = actual_descriptor;
-      }
-    } else {
-      if (!param->maybe_default_value) {
-        panic("Calls to fns that don't have defaults to fill in missing args must be handled earlier");
-      }
-      actual_descriptor = value_or_lazy_value_descriptor(param->maybe_default_value);
-    }
-
-
-    // In the presence of implicit casts it is unclear if this should use declared types or not.
-    // On one hand with actual types we might generate identical copies, on the other hand
-    // searching for a match becomes faster. Do not know what is better.
-    dyn_array_push(cache_descriptors, actual_descriptor);
+  DYN_ARRAY_FOREACH(Function_Parameter, param, temp_specialized_parameters) {
+    dyn_array_push(specialized_parameters, *param);
   }
+
+  Function_Header specialized_header = literal->header;
+  specialized_header.parameters = specialized_parameters;
 
   Function_Info *specialized_info = mass_allocate(context, Function_Info);
   mass_function_info_init_for_header_and_maybe_body(
@@ -1207,7 +1221,7 @@ function_literal_info_for_parameters(
   }
 
   dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
-    .descriptors = cache_descriptors,
+    .parameters = specialized_parameters,
     .info = specialized_info,
   });
 
