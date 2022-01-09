@@ -124,9 +124,11 @@ debugger :: fn() -> () intrinsic {
     payload : &Void
   ) -> (&MASS.Value) {
     {
-      instruction : MASS.Instruction
-      instruction.tag = MASS.Instruction_Tag.Location
-      instruction.Location.source_range = source_range.*
+      MASS.push_instruction(&builder.code_block, MASS.Instruction [
+        .tag = MASS.Instruction_Tag.Location,
+        .scope = 0,
+        .Location = [source_range.*]
+      ]);
     }
 
     {
@@ -322,13 +324,11 @@ add_or_subtract :: fn(
     }
 
     {
-      instruction := MASS.Instruction [
+      MASS.push_instruction(&builder.code_block, MASS.Instruction [
         .tag = MASS.Instruction_Tag.Location,
         .scope = 0,
         .Location = [source_range.*]
-      ]
-      // TODO support inline tuple in the call
-      MASS.push_instruction(&builder.code_block, instruction);
+      ]);
     }
 
     {
