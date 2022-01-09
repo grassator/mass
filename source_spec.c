@@ -1430,17 +1430,17 @@ spec("source") {
     }
 
     it("should be able to define, assign and lookup an i64 variable on the stack") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "foo :: fn() -> (s64) { y : s64; y = 10; x := 21; x = 32; x + y }"
+        "foo :: fn() -> (i64) { y := 10; x := 21; x = 32; x + y }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
     it("should be able to assign to a void value") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "foo :: fn() -> (s64) { () = 10; 42 }"
+        "foo :: fn() -> (i64) { () = 10; 42 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1784,8 +1784,8 @@ spec("source") {
     it("should not be able to use runtime values in a static context inside a macro") {
       test_program_inline_source_base(
         "test", &test_context,
-        "comptime :: macro(x : s64) -> (s64) { @( x ) }\n"
-        "test :: fn() -> (s64) { foo := 42; comptime(foo) }"
+        "comptime :: macro(x : i64) -> (i64) { @( x ) }\n"
+        "test :: fn() -> (i64) { foo := 42; comptime(foo) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -2262,10 +2262,10 @@ spec("source") {
     }
 
     it("should support using tuple as a type") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "tuple_id :: fn(x : [s64]) -> (s64) { x.0 }\n"
-        "test :: fn() -> (s64) {"
+        "tuple_id :: fn(x : [i64]) -> (i64) { x.0 }\n"
+        "test :: fn() -> (i64) {"
           "tuple := [42]\n"
           "tuple_id(tuple)"
         "}"
