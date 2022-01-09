@@ -804,7 +804,11 @@ deduce_runtime_descriptor_for_value(
   Value *value,
   const Descriptor *maybe_desired_descriptor
 ) {
-  const Descriptor *deduced_descriptor = value_or_lazy_value_descriptor(value);
+  if (maybe_desired_descriptor && maybe_desired_descriptor->tag == Descriptor_Tag_Void) {
+    return maybe_desired_descriptor;
+  }
+
+  const Descriptor *deduced_descriptor = value->descriptor;
 
   if (descriptor_is_implicit_pointer(deduced_descriptor)) {
     deduced_descriptor = descriptor_as_pointer_to(deduced_descriptor)->descriptor;
@@ -813,10 +817,17 @@ deduce_runtime_descriptor_for_value(
   if (mass_value_is_static(value)) {
     if (value->descriptor == &descriptor_i64) {
       if (maybe_desired_descriptor && maybe_desired_descriptor != &descriptor_i64) {
-        Literal_Cast_Result cast_result =
-          value_i64_cast_to(value, maybe_desired_descriptor, &(u64){0}, &(u64){0});
-        if (cast_result != Literal_Cast_Result_Success) {
-          return 0;
+        if (maybe_desired_descriptor->tag == Descriptor_Tag_Pointer_To) {
+          u64 bits = value_as_i64(value)->bits;
+          if (bits != 0) {
+            return 0;
+          }
+        } else {
+          Literal_Cast_Result cast_result =
+            value_i64_cast_to(value, maybe_desired_descriptor, &(u64){0}, &(u64){0});
+          if (cast_result != Literal_Cast_Result_Success) {
+            return 0;
+          }
         }
         deduced_descriptor = maybe_desired_descriptor;
       }
