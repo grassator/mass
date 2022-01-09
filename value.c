@@ -358,18 +358,13 @@ same_function_signature(
 }
 
 static bool
-same_type(
+same_type_unbranded(
   const Descriptor *a,
   const Descriptor *b
 ) {
-  if (descriptor_is_implicit_pointer(a)) {
-    a = a->Pointer_To.descriptor;
-  }
-  if (descriptor_is_implicit_pointer(b)) {
-    b = b->Pointer_To.descriptor;
-  }
+  assert(!descriptor_is_implicit_pointer(a));
+  assert(!descriptor_is_implicit_pointer(b));
   if (a == b) return true;
-  if (a->brand != b->brand) return false;
   if (a->tag != b->tag) return false;
   if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
   if (a->bit_alignment.as_u64 != b->bit_alignment.as_u64) return false;
@@ -411,6 +406,21 @@ same_type(
       return false;
     }
   }
+}
+
+static bool
+same_type(
+  const Descriptor *a,
+  const Descriptor *b
+) {
+  if (descriptor_is_implicit_pointer(a)) {
+    a = a->Pointer_To.descriptor;
+  }
+  if (descriptor_is_implicit_pointer(b)) {
+    b = b->Pointer_To.descriptor;
+  }
+  if (a->brand != b->brand) return false;
+  return same_type_unbranded(a, b);
 }
 
 static inline u64

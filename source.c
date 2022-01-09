@@ -891,7 +891,16 @@ deduce_runtime_descriptor_for_value(
 
   if (maybe_desired_descriptor) {
     if (!deduced_descriptor) return 0;
-    if (!same_type_or_can_implicitly_move_cast(maybe_desired_descriptor, deduced_descriptor)) {
+    if (
+      (!deduced_descriptor->brand && maybe_desired_descriptor->brand) ||
+      (deduced_descriptor->brand && !maybe_desired_descriptor->brand)
+    ) {
+      if (same_type_unbranded(maybe_desired_descriptor, deduced_descriptor)) {
+        deduced_descriptor = maybe_desired_descriptor;
+      } else {
+        return 0;
+      }
+    } else if (!same_type(maybe_desired_descriptor, deduced_descriptor)) {
       return 0;
     }
   }
@@ -3482,9 +3491,6 @@ calculate_arguments_match_score(
           if (!source_descriptor) {
             return (Overload_Match_Summary){0};
           }
-        }
-        if (same_type_or_can_implicitly_move_cast(target_descriptor, source_descriptor)) {
-          result.inverted_cast_count -= 1;
         } else {
           return (Overload_Match_Summary){0};
         }

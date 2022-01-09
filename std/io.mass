@@ -49,5 +49,5 @@ print :: fn(x : s64) {
     buffer.(digit_index) = cast(i8, cast(u8, zero_code) + digit)
     integer = integer / 10
   }
-  native_stdout(&buffer, cast(i64, output_size))
+  native_stdout(&buffer.0, cast(i64, output_size))
 }
