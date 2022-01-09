@@ -350,7 +350,7 @@ add_or_subtract :: fn(
     .flags = MASS.Value_Flags.None,
     .descriptor = i64,
     .source_range = arguments.source_range,
-    .Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
+    .Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload = cast(&Void, payload)]
   ]
 
   lazy_value
@@ -444,7 +444,7 @@ compare :: fn(
     .flags = MASS.Value_Flags.None,
     .descriptor = bool,
     .source_range = arguments.source_range,
-    .Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload]
+    .Lazy = [.epoch = parser.epoch, .proc = lazy_value_proc, .payload = cast(&Void, payload)]
   ]
   lazy_value
 }
@@ -572,8 +572,8 @@ external :: fn(
   [library_name, symbol_name]
 }
 
-os :: MASS.Os
-get_target_os :: fn() -> (os) intrinsic {
+Os :: MASS.Os
+get_target_os :: fn() -> (Os) intrinsic {
   meta :: import("std/meta")
   meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }

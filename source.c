@@ -1146,7 +1146,7 @@ mass_assign_helper(
   }
 
   if (mass_has_error(context)) return;
-  if (same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) {
+  if (same_type(target->descriptor, source->descriptor)) {
     if (mass_value_is_static(target)) {
       assert(mass_value_is_static(source));
       assert(same_type(target->descriptor, source->descriptor));

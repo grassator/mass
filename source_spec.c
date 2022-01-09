@@ -2780,7 +2780,7 @@ spec("source") {
     it("should be able to determine the OS type") {
       Os(*checker)(void) = (Os(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> (i32) { get_target_os()}\n"
+        "checker :: fn() -> (Os) { get_target_os()}\n"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == Os_Windows);
@@ -2793,7 +2793,7 @@ spec("source") {
     it("should be able to determine the OS type") {
       Os(*checker)(void) = (Os(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> (i32) { get_target_os()}\n"
+        "checker :: fn() -> (Os) { get_target_os()}\n"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == Os_Linux);
