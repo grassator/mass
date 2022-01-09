@@ -1114,7 +1114,7 @@ mass_assign_helper(
   }
 
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
-    if (!same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) goto err;
+    if (!types_equal(target->descriptor, source->descriptor, Brand_Comparison_Mode_One_Unbranded)) goto err;
 
     DYN_ARRAY_FOREACH(Struct_Field, field, source->descriptor->Struct.fields) {
       Value source_field = {
@@ -2253,7 +2253,7 @@ mass_import(
 ) {
   if (args.length != 1) goto parse_err;
   Value *file_path_value = token_parse_single(context, parser, value_view_get(&args, 0));
-  if (!same_type_or_can_implicitly_move_cast(&descriptor_slice, file_path_value->descriptor)) {
+  if (!types_equal(&descriptor_slice, file_path_value->descriptor, Brand_Comparison_Mode_One_Unbranded)) {
     goto parse_err;
   }
   Slice file_path = mass_slice_from_slice_like(file_path_value);
@@ -4066,7 +4066,7 @@ token_handle_function_call(
         ? param->maybe_default_value
         : value_view_get(&args_view, i);
       assert(source);
-      // TODO @Speed it should be possible to save if all args are exact match in Overload_Match_Found
+      // TODO @Speed might avoid this check if all args are exact match in Overload_Match_Found
       if (!same_type(param->descriptor, source->descriptor)) {
         // TODO instead of this code maybe it would be more robust (and performant?)
         //      to create compile-time casting functions. This would also allow to have
@@ -4074,8 +4074,8 @@ token_handle_function_call(
         //      must match arguments exactly (no implicit casts).
         const Descriptor *runtime_source_descriptor =
           deduce_runtime_descriptor_for_value(context, source, param->descriptor);
-        if (!same_type_or_can_implicitly_move_cast(param->descriptor, runtime_source_descriptor)) {
-          panic("We should not have matched an overload if the value is not assignable");
+        if (!runtime_source_descriptor) {
+          panic("We should not have matched an overload if we couldn't deduce the type");
         }
         bool can_static_cast = mass_value_is_static(source);
         if (param->descriptor->tag == Descriptor_Tag_Function_Instance) {
@@ -4088,6 +4088,10 @@ token_handle_function_call(
           const Tuple *tuple = value_as_tuple(source);
           for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
             Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+            // FIXME!!!!!!!!!!
+            // this is wrong since the tuple contains Assignment and Named_Accessor
+            // entries that are always static. Maybe those should be resolved eagerly for
+            // the easy of managing the tuple?
             if (!mass_value_is_static(tuple_item)) {
               can_static_cast = false;
               break;
