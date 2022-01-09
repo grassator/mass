@@ -785,6 +785,18 @@ mass_process_tuple_as_descriptor(
   return false;
 }
 
+static inline bool
+mass_deduce_tuple_item_proc(
+  Mass_Context *context,
+  const Descriptor *item_descriptor,
+  u64 offset,
+  Value *source,
+  const Source_Range *source_range,
+  void *payload
+) {
+  return !!deduce_runtime_descriptor_for_value(context, source, item_descriptor);
+}
+
 // TODO make this function produce a better error on failure
 static const Descriptor *
 deduce_runtime_descriptor_for_value(
@@ -810,7 +822,35 @@ deduce_runtime_descriptor_for_value(
       }
     } else if (value->descriptor == &descriptor_tuple) {
       const Tuple *tuple = value_as_tuple(value);
-      deduced_descriptor = anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
+      if (maybe_desired_descriptor) {
+        switch(maybe_desired_descriptor->tag) {
+          case Descriptor_Tag_Raw:
+          case Descriptor_Tag_Integer:
+          case Descriptor_Tag_Float:
+          case Descriptor_Tag_Pointer_To:
+          case Descriptor_Tag_Function_Instance: {
+            // Can not convert to any of these
+            return 0;
+          } break;
+          case Descriptor_Tag_Void: {
+            deduced_descriptor = maybe_desired_descriptor;
+          } break;
+          case Descriptor_Tag_Fixed_Array:
+          case Descriptor_Tag_Struct: {
+            bool success = mass_process_tuple_as_descriptor(
+              context, tuple, maybe_desired_descriptor, &value->source_range,
+              mass_error, mass_deduce_tuple_item_proc, 0
+            );
+            if (success) {
+              deduced_descriptor = maybe_desired_descriptor;
+            } else {
+              return 0;
+            }
+          } break;
+        }
+      } else {
+        deduced_descriptor = anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
+      }
     } else if (
       value->descriptor == &descriptor_overload ||
       value->descriptor == &descriptor_function_literal
