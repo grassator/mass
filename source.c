@@ -483,6 +483,25 @@ c_struct_aligner_end(
   }
 }
 
+static inline bool
+struct_find_field_by_name(
+  const Descriptor *descriptor,
+  Slice field_name,
+  const Struct_Field **out_field,
+  u64 *out_index
+) {
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  for(u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
+    const Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+    if (slice_equal(field->name, field_name)) {
+      *out_field = field;
+      *out_index = i;
+      return true;
+    }
+  }
+  return false;
+}
+
 typedef enum {
   Tuple_Eval_Mode_Value,
   Tuple_Eval_Mode_Type,
@@ -654,25 +673,6 @@ deduce_runtime_descriptor_for_value(
   }
 
   return original_descriptor;
-}
-
-static inline bool
-struct_find_field_by_name(
-  const Descriptor *descriptor,
-  Slice field_name,
-  const Struct_Field **out_field,
-  u64 *out_index
-) {
-  assert(descriptor->tag == Descriptor_Tag_Struct);
-  for(u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
-    const Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
-    if (slice_equal(field->name, field_name)) {
-      *out_field = field;
-      *out_index = i;
-      return true;
-    }
-  }
-  return false;
 }
 
 static void
