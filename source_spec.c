@@ -837,7 +837,7 @@ spec("source") {
         "foo :: fn(x : [s64]) -> (s64) { 21 }\n"
         "foo :: fn(x : [Bar]) -> (s64) { 42 }\n"
         "checker :: fn() -> (s64) {\n"
-          "bar : Bar = [1]\n"
+          "bar := Bar [1]\n"
           "foo([bar])\n"
         "}"
       );
@@ -1002,7 +1002,7 @@ spec("source") {
     it("should be able to get the fields of the descriptor provided from type_of") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "foo : i64 = 0\n"
+        "foo :: 0\n"
         "id :: fn(x : type_of(foo)) -> (type_of(foo)) { x }\n"
         "checker :: fn() -> (i64) {"
           "id(42)"
@@ -1072,7 +1072,7 @@ spec("source") {
         "checker", &test_context,
         "foo :: fn(x : i64) => (i64) { 21 }\n"
         "foo :: fn(x : i64) -> (i64) { 42 }\n"
-        "checker :: fn() -> (i64) { x : i64 = 1; foo(x) }"
+        "checker :: fn() -> (i64) { x := 1; foo(x) }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
