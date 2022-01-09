@@ -1233,13 +1233,27 @@ spec("source") {
     it("should support fns requiring staticly known args") {
       u64 (*checker)() = (u64 (*)())test_program_inline_source_function(
         "checker", &test_context,
-        "static_i64_identity :: fn(@x : i64) -> (i64) { internal :: x; internal }\n"
-        "checker :: fn() -> (u64) {\n"
+        "static_i64_identity :: fn(@x) -> (x) { internal :: x; internal }\n"
+        "checker :: fn() -> (i64) {\n"
           "static_i64_identity(42)\n"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
+    }
+
+    it("should report an error if a static generic arg is not of the specified type") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "static_i64_identity :: fn(@x : i64) -> (i64) { internal :: x; internal }\n"
+        "checker :: fn() -> (i64) {\n"
+          "static_i64_identity(())\n"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(same_type(error->Type_Mismatch.expected, &descriptor_i64));
     }
 
     it("should support fns requiring staticly known templated parameters") {
