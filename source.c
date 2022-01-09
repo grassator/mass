@@ -935,26 +935,6 @@ mass_assign_tuple_item_proc(
 }
 
 static void
-assign_tuple(
-  Mass_Context *context,
-  Function_Builder *builder,
-  Value *target,
-  Value *source,
-  const Source_Range *source_range
-) {
-  const Tuple *tuple = value_as_tuple(source);
-
-  Mass_Assign_Tuple_Item_Proc_Payload payload = {
-    .base_storage = value_as_forced(target)->storage,
-    .builder = builder,
-  };
-  mass_process_tuple_as_descriptor(
-    context, tuple, target->descriptor, source_range,
-    mass_error, mass_assign_tuple_item_proc, &payload
-  );
-}
-
-static void
 mass_assign_helper(
   Mass_Context *context,
   Function_Builder *builder,
@@ -1041,7 +1021,16 @@ mass_assign_helper(
   }
 
   if (value_is_tuple(source)) {
-    assign_tuple(context, builder, target, source, source_range);
+    const Tuple *tuple = value_as_tuple(source);
+
+    Mass_Assign_Tuple_Item_Proc_Payload payload = {
+      .base_storage = value_as_forced(target)->storage,
+      .builder = builder,
+    };
+    mass_process_tuple_as_descriptor(
+      context, tuple, target->descriptor, source_range,
+      mass_error, mass_assign_tuple_item_proc, &payload
+    );
     return;
   }
 
