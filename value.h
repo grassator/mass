@@ -398,12 +398,6 @@ descriptor_array_of(
   u64 length
 );
 
-static inline bool
-same_value_type(
-  const Value *a,
-  const Value *b
-);
-
 static void
 source_range_print_start_position(
   Compilation *compilation,

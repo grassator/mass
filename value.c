@@ -357,13 +357,37 @@ same_function_signature(
   return true;
 }
 
+typedef enum {
+  Brand_Comparison_Mode_Strict,
+  Brand_Comparison_Mode_Ignore,
+  Brand_Comparison_Mode_One_Unbranded,
+} Brand_Comparison_Mode;
+
 static bool
-same_type_unbranded(
+types_equal(
   const Descriptor *a,
-  const Descriptor *b
+  const Descriptor *b,
+  Brand_Comparison_Mode brand_comparison_mode
 ) {
-  assert(!descriptor_is_implicit_pointer(a));
-  assert(!descriptor_is_implicit_pointer(b));
+  if (descriptor_is_implicit_pointer(a)) {
+    a = a->Pointer_To.descriptor;
+  }
+  if (descriptor_is_implicit_pointer(b)) {
+    b = b->Pointer_To.descriptor;
+  }
+  if (a->brand != b->brand) {
+    switch (brand_comparison_mode) {
+      case Brand_Comparison_Mode_Strict: {
+        return false;
+      } break;
+      case Brand_Comparison_Mode_Ignore: {
+        // nothing to do
+      } break;
+      case Brand_Comparison_Mode_One_Unbranded: {
+        if (a->brand && b->brand) return false;
+      } break;
+    }
+  }
   if (a == b) return true;
   if (a->tag != b->tag) return false;
   if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
@@ -378,10 +402,10 @@ same_type_unbranded(
       return a->Integer.is_signed == b->Integer.is_signed;
     }
     case Descriptor_Tag_Pointer_To: {
-      return same_type(a->Pointer_To.descriptor, b->Pointer_To.descriptor);
+      return types_equal(a->Pointer_To.descriptor, b->Pointer_To.descriptor, brand_comparison_mode);
     }
     case Descriptor_Tag_Fixed_Array: {
-      return same_type(a->Fixed_Array.item, b->Fixed_Array.item) &&
+      return types_equal(a->Fixed_Array.item, b->Fixed_Array.item, brand_comparison_mode) &&
         a->Fixed_Array.length == b->Fixed_Array.length;
     }
     case Descriptor_Tag_Struct: {
@@ -391,7 +415,7 @@ same_type_unbranded(
       for (u64 i = 0; i < dyn_array_length(a->Struct.fields); ++i) {
         const Descriptor *a_field = dyn_array_get(a->Struct.fields, i)->descriptor;
         const Descriptor *b_field = dyn_array_get(b->Struct.fields, i)->descriptor;
-        if (!same_type(a_field, b_field)) return false;
+        if (!types_equal(a_field, b_field, brand_comparison_mode)) return false;
       }
       return true;
     }
@@ -408,19 +432,12 @@ same_type_unbranded(
   }
 }
 
-static bool
+static inline bool
 same_type(
   const Descriptor *a,
   const Descriptor *b
 ) {
-  if (descriptor_is_implicit_pointer(a)) {
-    a = a->Pointer_To.descriptor;
-  }
-  if (descriptor_is_implicit_pointer(b)) {
-    b = b->Pointer_To.descriptor;
-  }
-  if (a->brand != b->brand) return false;
-  return same_type_unbranded(a, b);
+  return types_equal(a, b, Brand_Comparison_Mode_Strict);
 }
 
 static inline u64

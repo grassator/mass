@@ -895,7 +895,10 @@ deduce_runtime_descriptor_for_value(
       (!deduced_descriptor->brand && maybe_desired_descriptor->brand) ||
       (deduced_descriptor->brand && !maybe_desired_descriptor->brand)
     ) {
-      if (same_type_unbranded(maybe_desired_descriptor, deduced_descriptor)) {
+      // TODO Figure out why can't just call this version right away.
+      //      The only idea I have right now is that some code is doing pointer
+      //      compares of the descriptors, and assignment below messes with that.
+      if (types_equal(maybe_desired_descriptor, deduced_descriptor, Brand_Comparison_Mode_One_Unbranded)) {
         deduced_descriptor = maybe_desired_descriptor;
       } else {
         return 0;
