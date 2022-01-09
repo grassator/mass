@@ -6026,7 +6026,6 @@ token_parse_expression(
   u32 matched_length = view.length;
 
   for (u32 i = 0; ; ++i) {
-    repeat:
     if (i >= view.length) break;
 
     Value *value = value_view_get(&view, i);
@@ -6050,19 +6049,17 @@ token_parse_expression(
       ) {
         Value_View rest = value_view_rest(&view, i);
         u32 match_length = 0;
-        Value *match_result;
         if (symbol == context->compilation->common_symbols._if) {
-          match_result = token_parse_if_expression(context, parser, rest, &match_length, end_symbol);
+          value = token_parse_if_expression(context, parser, rest, &match_length, end_symbol);
         } else if (symbol == context->compilation->common_symbols._while) {
-          match_result = token_parse_while(context, parser, rest, &match_length, end_symbol);
+          value = token_parse_while(context, parser, rest, &match_length, end_symbol);
         } else {
-          match_result = token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
+          value = token_parse_function_literal(context, parser, rest, &match_length, end_symbol);
         }
         if (mass_has_error(context)) goto defer;
         if (match_length) {
-          dyn_array_push(value_stack, match_result);
           i += match_length; // Skip over the matched slice
-          goto repeat;
+          goto maybe_apply;
         }
       }
 
@@ -6076,6 +6073,7 @@ token_parse_expression(
       }
     }
 
+    maybe_apply:
     if (is_value_expected) {
       const Operator *empty_space_operator = &context->compilation->apply_operator;
       if (!token_handle_operator(
