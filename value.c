@@ -1491,8 +1491,21 @@ value_i64_cast_to(
   u64 *out_bits,
   u64 *out_bit_size
 ) {
-  if (!descriptor_is_integer(target_descriptor)) {
-    return Literal_Cast_Result_Target_Not_An_Integer;
+  switch(target_descriptor->tag) {
+    case Descriptor_Tag_Raw:
+    case Descriptor_Tag_Integer: {
+      // All good
+    } break;
+    case Descriptor_Tag_Float: {
+      panic("TODO");
+    } break;
+    case Descriptor_Tag_Void:
+    case Descriptor_Tag_Struct:
+    case Descriptor_Tag_Pointer_To:
+    case Descriptor_Tag_Fixed_Array:
+    case Descriptor_Tag_Function_Instance: {
+      return Literal_Cast_Result_Target_Not_An_Integer;
+    } break;
   }
 
   u64 bit_size = target_descriptor->bit_size.as_u64;
