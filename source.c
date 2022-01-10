@@ -3036,8 +3036,6 @@ call_function_overload(
   }
   if (mass_has_error(context)) return 0;
 
-  if (mass_has_error(context)) return 0;
-
   const Storage *runtime_storage = &value_as_forced(runtime_value)->storage;
   mass_assert_storage_is_valid_in_context(runtime_storage, context);
 
