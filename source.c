@@ -3248,16 +3248,10 @@ call_function_overload(
     if (storage_is_stack(param_storage)) continue;
 
     Value *source_arg = *dyn_array_get(temp_arguments, i);
-    // :IndirectReturnArgument
     if (storage_is_indirect(param_storage)) {
       Register base_register = param_storage->Memory.location.Indirect.base_register;
       Storage target_storage = storage_register(base_register, (Bits){64});
-      Storage source_storage = storage_adjusted_for_lea(value_as_forced(source_arg)->storage);
-
-      push_eagerly_encoded_assembly(
-        &builder->code_block, *source_range,
-        &(Instruction_Assembly){lea, {target_storage, source_storage}}
-      );
+      mass_storage_load_address(builder, source_range, &target_storage, &value_as_forced(source_arg)->storage);
     } else {
       mass_assign_helper(context, builder, param, source_arg, source_range);
       if (mass_has_error(context)) return 0;
