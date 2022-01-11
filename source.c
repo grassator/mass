@@ -3089,7 +3089,11 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
     Function_Call_Parameter *call_param = dyn_array_get(call_setup->parameters, i);
     Value *target_param = dyn_array_push_uninitialized(target_params);
-    value_init(target_param, call_param->descriptor, call_param->storage, *source_range);
+    if (call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer) {
+      value_init(target_param, &descriptor_void_pointer, call_param->storage, *source_range);
+    } else {
+      value_init(target_param, call_param->descriptor, call_param->storage, *source_range);
+    }
     if (call_param->flags & Function_Call_Parameter_Flags_Uninitialized) {
       Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
       Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
@@ -3115,6 +3119,7 @@ call_function_overload(
     // Generally we can not optimize a copy to stack if the target is implicit pointer
     // or an indirect storage because they need a memory address.
     bool needs_memory_address = (
+      (call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer) ||
       descriptor_is_implicit_pointer(call_param->descriptor) ||
       storage_is_indirect(&call_param->storage)
     );
@@ -3244,12 +3249,16 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Value *param = dyn_array_get(target_params, i);
     Value *source_arg = *dyn_array_get(temp_arguments, i);
+    Function_Call_Parameter *call_param = dyn_array_get(call_setup->parameters, i);
 
     const Storage *param_storage = &value_as_forced(param)->storage;
     const Storage *source_storage = &value_as_forced(source_arg)->storage;
-    if (storage_equal(param_storage, source_storage)) continue;
+    bool is_implicit_pointer = !!(call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer);
+    if (storage_equal(param_storage, source_storage) && !is_implicit_pointer) continue;
 
-    if (storage_is_indirect(param_storage)) {
+    if (is_implicit_pointer) {
+      mass_storage_load_address(builder, source_range, param_storage, source_storage);
+    } else if (storage_is_indirect(param_storage)) {
       Register base_register = param_storage->Memory.location.Indirect.base_register;
       Storage target_storage = storage_register(base_register, (Bits){64});
       mass_storage_load_address(builder, source_range, &target_storage, source_storage);

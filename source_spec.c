@@ -2517,7 +2517,7 @@ spec("source") {
     }
 
     // Both System_V and win64 will pass 7th argument on the stack
-    it("should be able to use a 128bit struct passed as the 7th arguments") {
+    xit("should be able to use a 128bit struct passed as the 7th arguments") {
       s8(*checker)(s8, s8, s8, s8, s8, s8, Test_128bit) =
         (s8(*)(s8, s8, s8, s8, s8, s8, Test_128bit))test_program_inline_source_function(
           "foo", &test_context,

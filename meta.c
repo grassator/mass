@@ -1772,6 +1772,7 @@ main(void) {
   push_type(type_enum("Function_Call_Parameter_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Uninitialized", 1 << 0 },
+    { "Implicit_Pointer", 1 << 1 },
   }));
 
   push_type(type_struct("Function_Call_Parameter", (Struct_Item[]){

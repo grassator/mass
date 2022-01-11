@@ -700,7 +700,31 @@ mass_function_literal_instance_for_info(
       // mapped correctly, `Function_Call_Parameter` keeps track of the original index.
       const Resolved_Function_Parameter *def_param = dyn_array_get(fn_info->parameters, call_param->original_index);
       assert(def_param->tag == Resolved_Function_Parameter_Tag_Unknown);
-      Value *arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
+      Value *arg_value;
+      if (call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer) {
+        arg_value = 0;
+        switch(call_param->storage.tag) {
+          case Storage_Tag_Register: {
+            Register reg = call_param->storage.Register.index;
+            storage = storage_indirect(call_param->descriptor->bit_size, reg);
+          } break;
+          case Storage_Tag_Memory: {
+            if (!storage_is_stack(&call_param->storage)) {
+              panic("TODO");
+            } else {
+              panic("UNEXPECTED implicit pointer arg storage");
+            }
+          } break;
+          case Storage_Tag_Eflags:
+          case Storage_Tag_Xmm:
+          case Storage_Tag_Immediate:
+          case Storage_Tag_Disjoint:
+          case Storage_Tag_Static: {
+            panic("UNEXPECTED implicit pointer arg storage");
+          } break;
+        }
+      }
+      arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->symbol;
       if (param_symbol) {

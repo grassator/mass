@@ -661,24 +661,6 @@ x86_64_system_v_classify_field_recursively(
   }
 }
 
-static inline Descriptor *
-calling_convention_implicit_pointer_descriptor(
-  const Allocator *allocator,
-  const Descriptor *pointee
-) {
-  Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Pointer_To,
-    .bit_size = {64},
-    .bit_alignment = {64},
-    .Pointer_To = {
-      .descriptor = pointee,
-      .is_implicit = true,
-    },
-  };
-  return descriptor;
-}
-
 static Function_Call_Setup
 calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
@@ -919,28 +901,26 @@ calling_convention_x86_64_windows_call_setup_proc(
       .original_index = param_index, //:ParameterOriginalIndex
     };
 
-    bool should_pass_as_an_implicit_pointer;
-    {
-      switch(item.descriptor->bit_size.as_u64) {
-        case 64:
-        case 32:
-        case 16:
-        case 8: {
-          should_pass_as_an_implicit_pointer = false;
-        } break;
-        default: {
-          should_pass_as_an_implicit_pointer = true;
-        } break;
-      }
+    switch(item.descriptor->bit_size.as_u64) {
+      case 64:
+      case 32:
+      case 16:
+      case 8: {
+        // passed by value
+      } break;
+      default: {
+        item.flags |= Function_Call_Parameter_Flags_Implicit_Pointer;
+      } break;
     }
 
-    if (should_pass_as_an_implicit_pointer) {
-      item.descriptor = calling_convention_implicit_pointer_descriptor(allocator, item.descriptor);
-    }
-    if (argument_index < countof(general_registers)) {
+    if (item.flags & Function_Call_Parameter_Flags_Implicit_Pointer) {
+      Register reg = general_registers[argument_index];
+      item.storage = storage_register(reg, (Bits){64});
+    } else if (argument_index < countof(general_registers)) {
       Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[argument_index]
         : general_registers[argument_index];
+
       item.storage = storage_register(reg, item.descriptor->bit_size);
     } else {
       item.storage = storage_stack(

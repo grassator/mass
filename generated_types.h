@@ -568,11 +568,13 @@ typedef dyn_array_type(const Function_Call_Jump *) Array_Const_Function_Call_Jum
 typedef enum Function_Call_Parameter_Flags {
   Function_Call_Parameter_Flags_None = 0,
   Function_Call_Parameter_Flags_Uninitialized = 1,
+  Function_Call_Parameter_Flags_Implicit_Pointer = 2,
 } Function_Call_Parameter_Flags;
 
 const char *function_call_parameter_flags_name(Function_Call_Parameter_Flags value) {
   if (value == 0) return "Function_Call_Parameter_Flags_None";
   if (value == 1) return "Function_Call_Parameter_Flags_Uninitialized";
+  if (value == 2) return "Function_Call_Parameter_Flags_Implicit_Pointer";
   assert(!"Unexpected value for enum Function_Call_Parameter_Flags");
   return 0;
 };
@@ -5074,6 +5076,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(function_call_parameter_flags, Function_Call_Parameter
 static C_Enum_Item function_call_parameter_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Uninitialized"), .value = 1 },
+{ .name = slice_literal_fields("Implicit_Pointer"), .value = 2 },
 };
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter_Flags, function_call_parameter_flags);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter_Flags *, function_call_parameter_flags_pointer);
