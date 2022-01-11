@@ -3243,15 +3243,16 @@ call_function_overload(
 
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Value *param = dyn_array_get(target_params, i);
+    Value *source_arg = *dyn_array_get(temp_arguments, i);
 
     const Storage *param_storage = &value_as_forced(param)->storage;
-    if (storage_is_stack(param_storage)) continue;
+    const Storage *source_storage = &value_as_forced(source_arg)->storage;
+    if (storage_equal(param_storage, source_storage)) continue;
 
-    Value *source_arg = *dyn_array_get(temp_arguments, i);
     if (storage_is_indirect(param_storage)) {
       Register base_register = param_storage->Memory.location.Indirect.base_register;
       Storage target_storage = storage_register(base_register, (Bits){64});
-      mass_storage_load_address(builder, source_range, &target_storage, &value_as_forced(source_arg)->storage);
+      mass_storage_load_address(builder, source_range, &target_storage, source_storage);
     } else {
       mass_assign_helper(context, builder, param, source_arg, source_range);
       if (mass_has_error(context)) return 0;
