@@ -810,10 +810,6 @@ deduce_runtime_descriptor_for_value(
 
   const Descriptor *deduced_descriptor = value->descriptor;
 
-  if (descriptor_is_implicit_pointer(deduced_descriptor)) {
-    deduced_descriptor = descriptor_as_pointer_to(deduced_descriptor)->descriptor;
-  }
-
   if (mass_value_is_static(value)) {
     if (value->descriptor == &descriptor_i64) {
       if (maybe_desired_descriptor && maybe_desired_descriptor != &descriptor_i64) {
@@ -970,33 +966,6 @@ mass_assign_helper(
   const Storage *target_storage = &value_as_forced(target)->storage;
 
   if (mass_descriptor_is_void(target->descriptor)) {
-    return;
-  }
-
-  if (descriptor_is_implicit_pointer(source->descriptor)) {
-    Value *ref_source = value_indirect_from_pointer(context, builder, source, source_range);
-    mass_assign_helper(context, builder, target, ref_source, source_range);
-    storage_release_if_temporary(builder, &value_as_forced(ref_source)->storage);
-    return;
-  }
-
-  if (descriptor_is_implicit_pointer(target->descriptor)) {
-    if (
-      (
-        mass_value_is_static(source) &&
-        !assign_from_static(context, builder, target, source, source_range)
-      ) ||
-      source->descriptor == &descriptor_tuple
-    ) {
-      Value *referenced_target = value_indirect_from_pointer(context, builder, target, source_range);
-      mass_assign_helper(context, builder, referenced_target, source, source_range);
-      storage_release_if_temporary(builder, &value_as_forced(referenced_target)->storage);
-      return;
-    } else {
-      const Descriptor *original_descriptor = target->descriptor->Pointer_To.descriptor;
-      if (!same_type(original_descriptor, source->descriptor)) goto err;
-      mass_storage_load_address(builder, source_range, target_storage, source_storage);
-    }
     return;
   }
 
@@ -3107,9 +3076,6 @@ call_function_overload(
       maybe_source_storage = &value_as_forced(source_arg)->storage;
     }
     const Descriptor *stack_descriptor = call_param->descriptor;
-    if (descriptor_is_implicit_pointer(stack_descriptor)) {
-      stack_descriptor = stack_descriptor->Pointer_To.descriptor;
-    }
 
     u64 target_param_register_bitset = register_bitset_from_storage(&call_param->storage);
     if (target_param_register_bitset >> 16) {
@@ -3120,7 +3086,6 @@ call_function_overload(
     // or an indirect storage because they need a memory address.
     bool needs_memory_address = (
       (call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer) ||
-      descriptor_is_implicit_pointer(call_param->descriptor) ||
       storage_is_indirect(&call_param->storage)
     );
 
@@ -4027,9 +3992,6 @@ token_handle_function_call(
         .source_range = arg->source_range,
       });
     } else {
-      if (descriptor_is_implicit_pointer(descriptor)) {
-        descriptor = descriptor_as_pointer_to(descriptor)->descriptor;
-      }
       dyn_array_push(arg_parameters, (Resolved_Function_Parameter) {
         .tag = Resolved_Function_Parameter_Tag_Unknown,
         .descriptor = descriptor,
@@ -4757,11 +4719,7 @@ mass_type_only_token_parse_expression(
   parser->flags = saved_flags;
   if (mass_has_error(context)) return 0;
 
-  const Descriptor *user_presentable_descriptor = value_or_lazy_value_descriptor(value);
-  if (descriptor_is_implicit_pointer(user_presentable_descriptor)) {
-    user_presentable_descriptor = user_presentable_descriptor->Pointer_To.descriptor;
-  }
-  return user_presentable_descriptor;
+  return value->descriptor;
 }
 
 static Value *
@@ -4839,14 +4797,7 @@ mass_pointer_to_lazy_proc(
   Value *pointer_value = mass_value_from_expected_result(context, builder, expected_result, *source_range);
   const Storage *pointer_storage = &value_as_forced(pointer_value)->storage;
   const Storage *forced_storage = &value_as_forced(forced)->storage;
-  if (
-    forced->descriptor->tag == Descriptor_Tag_Pointer_To &&
-    forced->descriptor->Pointer_To.is_implicit
-  ) {
-    move_value(builder, source_range, pointer_storage, forced_storage);
-  } else {
-    mass_storage_load_address(builder, source_range, pointer_storage, forced_storage);
-  }
+  mass_storage_load_address(builder, source_range, pointer_storage, forced_storage);
   storage_release_if_temporary(builder, forced_storage);
   return mass_expected_result_ensure_value_or_temp(
     context, builder, expected_result, pointer_value
@@ -5154,10 +5105,6 @@ mass_handle_field_access_lazy_proc(
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
   if (mass_has_error(context)) return 0;
   bool source_is_contant = struct_->flags & Value_Flags_Constant;
-
-  if (descriptor_is_implicit_pointer(struct_->descriptor)) {
-    struct_ = value_indirect_from_pointer(context, builder, struct_, source_range);
-  }
 
   Storage struct_storage = value_as_forced(struct_)->storage;
 

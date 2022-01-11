@@ -369,13 +369,6 @@ descriptor_is_float(
   return true;
 }
 
-static bool
-descriptor_is_implicit_pointer(
-  const Descriptor *descriptor
-) {
-  return descriptor && descriptor->tag == Descriptor_Tag_Pointer_To && descriptor->Pointer_To.is_implicit;
-}
-
 static inline const Descriptor *
 maybe_unwrap_pointer_descriptor(
   const Descriptor *descriptor

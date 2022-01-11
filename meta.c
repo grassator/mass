@@ -1838,7 +1838,6 @@ main(void) {
       { "Array_Struct_Field", "fields" },
     }),
     struct_fields("Pointer_To", (Struct_Item[]){
-      { "u64", "is_implicit" },
       { "const Descriptor *", "descriptor" },
     }),
   }), (Struct_Item[]){

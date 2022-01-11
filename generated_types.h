@@ -1966,7 +1966,6 @@ typedef struct Descriptor_Struct {
   Array_Struct_Field fields;
 } Descriptor_Struct;
 typedef struct Descriptor_Pointer_To {
-  u64 is_implicit;
   const Descriptor * descriptor;
 } Descriptor_Pointer_To;
 typedef struct Descriptor {
@@ -5289,11 +5288,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct, Descriptor_Struct,
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_struct);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_pointer_to, Descriptor_Pointer_To,
-  {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("is_implicit"),
-    .offset = offsetof(Descriptor_Pointer_To, is_implicit),
-  },
   {
     .descriptor = &descriptor_descriptor_pointer,
     .name = slice_literal_fields("descriptor"),

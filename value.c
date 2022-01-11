@@ -145,7 +145,7 @@ mass_error_append_descriptor_impl(
       APPEND_LITERAL(">");
     } break;
     case Descriptor_Tag_Pointer_To: {
-      if (!descriptor->Pointer_To.is_implicit) APPEND_LITERAL("&");
+      APPEND_LITERAL("&");
       mass_error_append_descriptor_impl(result, descriptor->Pointer_To.descriptor, level + 1);
     } break;
     case Descriptor_Tag_Fixed_Array: {
@@ -369,12 +369,6 @@ types_equal(
   const Descriptor *b,
   Brand_Comparison_Mode brand_comparison_mode
 ) {
-  if (descriptor_is_implicit_pointer(a)) {
-    a = a->Pointer_To.descriptor;
-  }
-  if (descriptor_is_implicit_pointer(b)) {
-    b = b->Pointer_To.descriptor;
-  }
   if (a->brand != b->brand) {
     switch (brand_comparison_mode) {
       case Brand_Comparison_Mode_Strict: {
@@ -1121,7 +1115,6 @@ descriptor_pointer_to(
     .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Pointer_To = {
-      .is_implicit = false,
       .descriptor = descriptor,
     }
   };
