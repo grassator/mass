@@ -1936,9 +1936,11 @@ value_force(
     }
     Value *result = lazy->proc(context, builder, expected_result, &value->source_range, lazy->payload);
     if (mass_has_error(context)) return 0;
-    // TODO is there a better way to cache the result?
-    *value = *result;
-    return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, value);
+    if (!lazy->is_factory) {
+      *value = *result; // cache the result
+      result = value;
+    }
+    return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, result);
   }
 
   return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, value);

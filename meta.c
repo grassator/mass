@@ -1624,6 +1624,8 @@ main(void) {
 
   export_compiler(push_type(add_common_fields(type_union("Value", (Struct_Type[]){
     struct_fields("Lazy", (Struct_Item[]){
+      { "_Bool", "is_factory" },
+      { "u8", "_is_factory_padding", 7 },
       { "Epoch", "epoch" },
       { "const void *", "payload" },
       { "Lazy_Value_Proc", "proc" }

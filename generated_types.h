@@ -1676,6 +1676,8 @@ typedef enum {
 } Value_Tag;
 
 typedef struct Value_Lazy {
+  _Bool is_factory;
+  u8 _is_factory_padding[7];
   Epoch epoch;
   const void * payload;
   Lazy_Value_Proc proc;
@@ -3144,6 +3146,7 @@ static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3
 static Descriptor descriptor_i8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_i8);
 static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
 static Descriptor descriptor_i8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_i8);
+static Descriptor descriptor_i8_7 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 7, &descriptor_i8);
 static Descriptor descriptor_i8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_i8);
 static Descriptor descriptor_i8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_i8);
 static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
@@ -4537,6 +4540,11 @@ static C_Enum_Item value_tag_items[] = {
 { .name = slice_literal_fields("Forced"), .value = 1 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(value_lazy, Value_Lazy,
+  {
+    .descriptor = &descriptor__bool,
+    .name = slice_literal_fields("is_factory"),
+    .offset = offsetof(Value_Lazy, is_factory),
+  },
   {
     .descriptor = &descriptor_epoch,
     .name = slice_literal_fields("epoch"),
