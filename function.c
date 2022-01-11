@@ -687,6 +687,7 @@ mass_function_literal_instance_for_info(
       if (call_param->flags & Function_Call_Parameter_Flags_Uninitialized) {
         continue;
       }
+      // :ParamStackAreaAdjust
       if (
         storage_is_stack(&storage) &&
         storage.Memory.location.Stack.area == Stack_Area_Call_Target_Argument
@@ -707,10 +708,22 @@ mass_function_literal_instance_for_info(
           case Storage_Tag_Register: {
             Register reg = call_param->storage.Register.index;
             storage = storage_indirect(call_param->descriptor->bit_size, reg);
+            arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
           } break;
           case Storage_Tag_Memory: {
-            if (!storage_is_stack(&call_param->storage)) {
-              panic("TODO");
+            if (storage_is_stack(&call_param->storage)) {
+              arg_value = mass_allocate(context, Value);
+              *arg_value = (Value) {
+                .tag = Value_Tag_Lazy,
+                .descriptor = call_param->descriptor,
+                .source_range = def_param->source_range,
+                .Lazy = {
+                  .is_factory = true,
+                  .epoch = body_parser.epoch,
+                  .proc = mass_implicit_function_parameter_factory_proc,
+                  .payload = call_param,
+                },
+              };
             } else {
               panic("UNEXPECTED implicit pointer arg storage");
             }
@@ -723,8 +736,9 @@ mass_function_literal_instance_for_info(
             panic("UNEXPECTED implicit pointer arg storage");
           } break;
         }
+      } else {
+        arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       }
-      arg_value = value_make(context, call_param->descriptor, storage, def_param->source_range);
       arg_value->flags |= Value_Flags_Constant;
       const Symbol *param_symbol = def_param->symbol;
       if (param_symbol) {

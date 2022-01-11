@@ -901,7 +901,8 @@ calling_convention_x86_64_windows_call_setup_proc(
       .original_index = param_index, //:ParameterOriginalIndex
     };
 
-    switch(item.descriptor->bit_size.as_u64) {
+    Bits bit_size = item.descriptor->bit_size;
+    switch(bit_size.as_u64) {
       case 64:
       case 32:
       case 16:
@@ -910,22 +911,19 @@ calling_convention_x86_64_windows_call_setup_proc(
       } break;
       default: {
         item.flags |= Function_Call_Parameter_Flags_Implicit_Pointer;
+        bit_size = (Bits){64};
       } break;
     }
 
-    if (item.flags & Function_Call_Parameter_Flags_Implicit_Pointer) {
-      Register reg = general_registers[argument_index];
-      item.storage = storage_register(reg, (Bits){64});
-    } else if (argument_index < countof(general_registers)) {
+    if (argument_index < countof(general_registers)) {
       Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[argument_index]
         : general_registers[argument_index];
 
-      item.storage = storage_register(reg, item.descriptor->bit_size);
+      item.storage = storage_register(reg, bit_size);
     } else {
-      item.storage = storage_stack(
-        u64_to_s32(argument_index * 8), item.descriptor->bit_size, Stack_Area_Call_Target_Argument
-      );
+      s32 offset = u64_to_s32(argument_index * 8);
+      item.storage = storage_stack(offset, bit_size, Stack_Area_Call_Target_Argument);
     }
     dyn_array_push(result.parameters, item);
     argument_index += 1;

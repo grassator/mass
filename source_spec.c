@@ -2517,15 +2517,16 @@ spec("source") {
     }
 
     // Both System_V and win64 will pass 7th argument on the stack
-    xit("should be able to use a 128bit struct passed as the 7th arguments") {
-      s8(*checker)(s8, s8, s8, s8, s8, s8, Test_128bit) =
-        (s8(*)(s8, s8, s8, s8, s8, s8, Test_128bit))test_program_inline_source_function(
+    it("should be able to use a 128bit struct passed as the 7th arguments") {
+      u64(*checker)(u8, u8, u8, u8, u8, u8, Test_128bit) =
+        (u64(*)(u8, u8, u8, u8, u8, u8, Test_128bit))test_program_inline_source_function(
           "foo", &test_context,
-          "Test_128bit :: c_struct [ x : s64, y : s64 ]\n"
-          "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8, x6 : s8, x7 : Test_128bit ) -> (s64) { x7.x }"
+          "Test_128bit :: c_struct [ x : i64, y : i64 ]\n"
+          "foo :: fn(x1: i8, x2 : i8, x3 : i8, x4 : i8, x5 : i8, x6 : i8, x7 : Test_128bit ) -> (i64)"
+          "{ x7.y + x7.x }"
         );
       check(spec_check_mass_result(test_context.result));
-      Test_128bit test_128bit = { .x = 42, .y = 20 };
+      Test_128bit test_128bit = { .x = 32, .y = 10 };
       check(checker(1, 2, 3, 4, 5, 6, test_128bit) == 42);
     }
 

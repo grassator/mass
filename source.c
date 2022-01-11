@@ -1946,6 +1946,28 @@ value_force(
   return mass_expected_result_ensure_value_or_temp(context, builder, expected_result, value);
 }
 
+static Value *
+mass_implicit_function_parameter_factory_proc(
+  Mass_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  const Source_Range *source_range,
+  const Function_Call_Parameter *param
+) {
+  Register temp_register = register_acquire_temp(builder);
+  Storage register_storage = storage_register(temp_register, (Bits){64});
+  Storage param_storage = param->storage;
+  { // :ParamStackAreaAdjust
+    assert(storage_is_stack(&param_storage));
+    param_storage.Memory.location.Stack.area = Stack_Area_Received_Argument;
+  }
+  move_value(builder, source_range, &register_storage, &param_storage);
+  Storage indirect_storage = storage_indirect(param->descriptor->bit_size, temp_register);
+  indirect_storage.flags |= Storage_Flags_Temporary;
+  Value *result = value_make(context, param->descriptor, indirect_storage, *source_range);
+  return expected_result_validate(expected_result, result);
+}
+
 static inline void
 value_force_exact(
   Mass_Context *context,

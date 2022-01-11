@@ -186,6 +186,15 @@ mass_make_lazy_value(
   Lazy_Value_Proc proc
 );
 
+static Value *
+mass_implicit_function_parameter_factory_proc(
+  Mass_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  const Source_Range *source_range,
+  const Function_Call_Parameter *param
+);
+
 static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value
