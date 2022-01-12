@@ -3867,15 +3867,18 @@ token_handle_function_call(
     .length = u64_to_u32(normalized_arg_count),
     .source_range = args_view.source_range,
   };
+
+  bool normalization_failed_to_cast_a_static_value = false;
   if (normalized_arg_count) {
     assert(args_view.length <= normalized_arg_count);
-    normalized_args.values =
-      allocator_allocate_array(context->allocator, Value *, normalized_arg_count);
+    normalized_args.values = allocator_allocate_array(context->allocator, Value *, normalized_arg_count);
     for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
       const Resolved_Function_Parameter *param = dyn_array_get(info->parameters, i);
-      Value *source = i >= args_view.length
-        ? param->maybe_default_value
-        : value_view_get(&args_view, i);
+      if (i >= args_view.length) {
+        normalized_args.values[i] = param->maybe_default_value;
+        continue;
+      }
+      Value *source = value_view_get(&args_view, i);
       assert(source);
       // TODO @Speed might avoid this check if all args are exact match in Overload_Match_Found
       if (!same_type(param->descriptor, source->descriptor)) {
@@ -3890,10 +3893,6 @@ token_handle_function_call(
         }
         bool can_static_cast = mass_value_is_static(source);
         if (param->descriptor->tag == Descriptor_Tag_Function_Instance) {
-          // FIXME for runtime calls a function instance might be a relocation, so we can't hard-code
-          //       a static value.
-          // FIXME And for trampolines intrinsics this is completeley broken because we need to
-          //       force a jit function instance.
           can_static_cast = false;
         } else if (value_is_tuple(source)) {
           const Tuple *tuple = value_as_tuple(source);
@@ -3912,6 +3911,8 @@ token_handle_function_call(
           }
           if (mass_has_error(context)) return 0;
           source = adjusted_source;
+        } else {
+          normalization_failed_to_cast_a_static_value = true;
         }
       }
       normalized_args.values[i] = source;
@@ -3921,6 +3922,7 @@ token_handle_function_call(
   if (value_is_function_literal(overload)) {
     const Function_Literal *literal = value_as_function_literal(overload);
     if (value_is_intrinsic(literal->body)) {
+      assert(!normalization_failed_to_cast_a_static_value);
       return mass_intrinsic_call(context, parser, literal->body, info->return_descriptor, normalized_args);
     }
     if (literal->header.flags & Function_Header_Flags_Macro) {
@@ -3929,12 +3931,7 @@ token_handle_function_call(
   }
 
   if (info->flags & Function_Info_Flags_Compile_Time) {
-    for (u64 i = 0; i < normalized_args.length; ++i) {
-      Value *arg = value_view_get(&normalized_args, i);
-      const Resolved_Function_Parameter *param = dyn_array_get(info->parameters, i);
-      assert(mass_value_is_static(arg));
-      assert(same_type(param->descriptor, arg->descriptor));
-    }
+    assert(!normalization_failed_to_cast_a_static_value);
     Value *result = mass_trampoline_call(context, parser, overload, info, normalized_args);
     if (mass_has_error(context)) return 0;
     return result;
