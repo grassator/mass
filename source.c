@@ -6513,7 +6513,6 @@ mass_compilation_init_scopes(
   MASS_INTRINSIC_OPERATOR(".", Prefix, 30, "named_accessor");
 
   MASS_ALIAS_OPERATOR("==", Infix, 7, "equal");
-  MASS_ALIAS_OPERATOR("==", Infix, 7, "equal");
   MASS_ALIAS_OPERATOR("!=", Infix, 7, "not_equal");
   MASS_ALIAS_OPERATOR("<", Infix, 8, "less");
   MASS_ALIAS_OPERATOR(">", Infix, 8, "greater");
