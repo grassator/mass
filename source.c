@@ -6036,7 +6036,7 @@ token_parse_function_literal(
   return mass_make_function_literal(context, parser, &header, body_value, view.source_range);
 }
 
-static inline bool
+static inline void
 token_handle_operator(
   Mass_Context *context,
   Parser *parser,
@@ -6045,8 +6045,6 @@ token_handle_operator(
   const Operator *operator,
   Source_Range source_range
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
   while (dyn_array_length(*operator_stack)) {
     Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
 
@@ -6066,7 +6064,6 @@ token_handle_operator(
     .source_range = source_range,
     .operator = operator,
   });
-  return true;
 }
 
 static Value *
@@ -6147,9 +6144,8 @@ token_parse_expression(
 
       const Operator *maybe_operator = scope_lookup_operator(context, parser->scope, symbol, fixity_mask);
       if (maybe_operator) {
-        if (!token_handle_operator(
-          context, parser, &value_stack, &operator_stack, maybe_operator, value->source_range
-        )) goto defer;
+        token_handle_operator(context, parser, &value_stack, &operator_stack, maybe_operator, value->source_range);
+        if (mass_has_error(context)) goto defer;
         is_value_expected = (maybe_operator->fixity == Operator_Fixity_Postfix);
         continue;
       }
@@ -6158,9 +6154,8 @@ token_parse_expression(
     maybe_apply:
     if (is_value_expected) {
       const Operator *empty_space_operator = &context->compilation->apply_operator;
-      if (!token_handle_operator(
-        context, parser, &value_stack, &operator_stack, empty_space_operator, value->source_range
-      )) goto defer;
+      token_handle_operator(context, parser, &value_stack, &operator_stack, empty_space_operator, value->source_range);
+      if (mass_has_error(context)) goto defer;
     }
     dyn_array_push(value_stack, value);
     is_value_expected = true;
