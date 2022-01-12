@@ -6036,19 +6036,6 @@ token_parse_function_literal(
   return mass_make_function_literal(context, parser, &header, body_value, view.source_range);
 }
 
-typedef Value *(*Expression_Matcher_Proc)(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View view,
-  u32 *out_match_length,
-  const Symbol *end_symbol
-);
-
-typedef struct {
-  Expression_Matcher_Proc proc;
-  bool matches_end_of_expression;
-} Expression_Matcher;
-
 static inline bool
 token_handle_operator(
   Mass_Context *context,
