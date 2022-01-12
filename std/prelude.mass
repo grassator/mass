@@ -72,8 +72,8 @@ debugger :: fn() -> () intrinsic {
     {
       instruction : MASS.Instruction
       instruction.tag = MASS.Instruction_Tag.Bytes
-      instruction.Bytes.memory.0 = cast(i8, 0xcc)
-      instruction.Bytes.length = cast(i8, 1)
+      instruction.Bytes.memory.0 = 0xCC
+      instruction.Bytes.length = 1
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
@@ -222,8 +222,8 @@ x86_64 :: module {
     instruction.tag = MASS.Instruction_Tag.Bytes
     instruction.Bytes.memory.0 = cast(i8, rex)
     instruction.Bytes.memory.1 = op_code
-    instruction.Bytes.memory.2 = cast(i8, mod_reg_rm)
-    instruction.Bytes.length = cast(i8, 3)
+    instruction.Bytes.memory.2 = mod_reg_rm
+    instruction.Bytes.length = 3
     instruction
   }
 }

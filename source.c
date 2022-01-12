@@ -2433,7 +2433,7 @@ mass_handle_tuple_cast_lazy_proc(
 ) {
   const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
   assert(expected_descriptor == payload->target);
-  assert(payload->target->tag == Descriptor_Tag_Struct);
+  assert(payload->target->tag == Descriptor_Tag_Struct || payload->target->tag == Descriptor_Tag_Fixed_Array);
   Value *result = mass_value_from_expected_result(context, builder, expected_result, *source_range);
   mass_assign_helper(context, builder, result, payload->expression, source_range);
   return result;
@@ -2447,7 +2447,7 @@ mass_cast_helper(
   Value *expression,
   Source_Range source_range
 ) {
-   Mass_Cast_Lazy_Payload lazy_payload = {
+  Mass_Cast_Lazy_Payload lazy_payload = {
     .target = target_descriptor,
     .expression = expression,
   };
@@ -4793,18 +4793,46 @@ mass_handle_assignment_lazy_proc(
   Value *target = value_force(context, builder, &expected_target, payload->target);
   if (mass_has_error(context)) return 0;
 
-  const Descriptor *deduced_source_descriptor =
-    deduce_runtime_descriptor_for_value(context, payload->source, target_descriptor);
-  if (!deduced_source_descriptor) {
+  if (target->flags & Value_Flags_Constant) {
     mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
+      .tag = Mass_Error_Tag_Assignment_To_Constant,
       .source_range = *source_range,
-      .Type_Mismatch = { .expected = target_descriptor, .actual = payload->source->descriptor },
     });
     return 0;
   }
 
-  value_force_exact(context, builder, target, payload->source);
+  Value *source = payload->source;
+  const Descriptor *deduced_source_descriptor =
+    deduce_runtime_descriptor_for_value(context, source, target_descriptor);
+  if (!deduced_source_descriptor) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = *source_range,
+      .Type_Mismatch = { .expected = target_descriptor, .actual = source->descriptor },
+    });
+    return 0;
+  }
+  if (!types_equal(deduced_source_descriptor, source->descriptor, Brand_Comparison_Mode_One_Unbranded)) {
+    if (!mass_value_is_static(source)) {
+      panic("Give current deduction rules only static values should be able to implicitly cast");
+    }
+    if (same_type(source->descriptor, &descriptor_i64)) {
+      Mass_Cast_Lazy_Payload lazy_payload = { .target = target_descriptor, .expression = source };
+      Expected_Result cast_result =
+        mass_expected_result_exact(target_descriptor, value_as_forced(target)->storage);
+      mass_handle_cast_lazy_proc(context, builder, &cast_result, source_range, &lazy_payload);
+    } else if (
+      value_is_tuple(source) ||
+      deduced_source_descriptor->tag == Descriptor_Tag_Function_Instance
+    ) {
+      // Casting handled in `mass_assign_helper`
+      value_force_exact(context, builder, target, payload->source);
+    } else {
+      panic("TODO");
+    }
+  } else {
+    value_force_exact(context, builder, target, payload->source);
+  }
   storage_release_if_temporary(builder, &value_as_forced(target)->storage);
   if (mass_has_error(context)) return 0;
 

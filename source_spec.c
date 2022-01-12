@@ -1442,7 +1442,14 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-
+    it("should be able to assign an integer to an i8 value that would fit it") {
+      u8(*checker)(void) = (u8(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: fn() -> (i8) { x : i8 = 42; x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
     it("should be able to define, assign and lookup an i64 variable on the stack") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
