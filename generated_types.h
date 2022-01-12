@@ -334,6 +334,35 @@ typedef struct Epoch Epoch;
 typedef dyn_array_type(Epoch *) Array_Epoch_Ptr;
 typedef dyn_array_type(const Epoch *) Array_Const_Epoch_Ptr;
 
+typedef struct Function_Layout Function_Layout;
+typedef dyn_array_type(Function_Layout *) Array_Function_Layout_Ptr;
+typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
+
+typedef struct Mass_Context Mass_Context;
+typedef dyn_array_type(Mass_Context *) Array_Mass_Context_Ptr;
+typedef dyn_array_type(const Mass_Context *) Array_Const_Mass_Context_Ptr;
+
+typedef enum Parser_Flags {
+  Parser_Flags_None = 0,
+  Parser_Flags_Global = 1,
+  Parser_Flags_Type_Only = 2,
+} Parser_Flags;
+
+const char *parser_flags_name(Parser_Flags value) {
+  if (value == 0) return "Parser_Flags_None";
+  if (value == 1) return "Parser_Flags_Global";
+  if (value == 2) return "Parser_Flags_Type_Only";
+  assert(!"Unexpected value for enum Parser_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Parser_Flags *) Array_Parser_Flags_Ptr;
+typedef dyn_array_type(const Parser_Flags *) Array_Const_Parser_Flags_Ptr;
+
+typedef struct Parser Parser;
+typedef dyn_array_type(Parser *) Array_Parser_Ptr;
+typedef dyn_array_type(const Parser *) Array_Const_Parser_Ptr;
+
 typedef enum Operator_Fixity {
   Operator_Fixity_Infix = 1,
   Operator_Fixity_Prefix = 2,
@@ -365,35 +394,6 @@ const char *operator_associativity_name(Operator_Associativity value) {
 
 typedef dyn_array_type(Operator_Associativity *) Array_Operator_Associativity_Ptr;
 typedef dyn_array_type(const Operator_Associativity *) Array_Const_Operator_Associativity_Ptr;
-
-typedef struct Function_Layout Function_Layout;
-typedef dyn_array_type(Function_Layout *) Array_Function_Layout_Ptr;
-typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
-
-typedef struct Mass_Context Mass_Context;
-typedef dyn_array_type(Mass_Context *) Array_Mass_Context_Ptr;
-typedef dyn_array_type(const Mass_Context *) Array_Const_Mass_Context_Ptr;
-
-typedef enum Parser_Flags {
-  Parser_Flags_None = 0,
-  Parser_Flags_Global = 1,
-  Parser_Flags_Type_Only = 2,
-} Parser_Flags;
-
-const char *parser_flags_name(Parser_Flags value) {
-  if (value == 0) return "Parser_Flags_None";
-  if (value == 1) return "Parser_Flags_Global";
-  if (value == 2) return "Parser_Flags_Type_Only";
-  assert(!"Unexpected value for enum Parser_Flags");
-  return 0;
-};
-
-typedef dyn_array_type(Parser_Flags *) Array_Parser_Flags_Ptr;
-typedef dyn_array_type(const Parser_Flags *) Array_Const_Parser_Flags_Ptr;
-
-typedef struct Parser Parser;
-typedef dyn_array_type(Parser *) Array_Parser_Ptr;
-typedef dyn_array_type(const Parser *) Array_Const_Parser_Ptr;
 
 typedef struct Operator Operator;
 typedef struct Operator_Alias Operator_Alias;
@@ -2575,18 +2575,6 @@ static Descriptor descriptor_array_epoch;
 static Descriptor descriptor_array_epoch_ptr;
 static Descriptor descriptor_epoch_pointer;
 static Descriptor descriptor_epoch_pointer_pointer;
-static Descriptor descriptor_operator_fixity;
-static Descriptor descriptor_array_operator_fixity;
-static Descriptor descriptor_array_operator_fixity_ptr;
-static Descriptor descriptor_array_const_operator_fixity_ptr;
-static Descriptor descriptor_operator_fixity_pointer;
-static Descriptor descriptor_operator_fixity_pointer_pointer;
-static Descriptor descriptor_operator_associativity;
-static Descriptor descriptor_array_operator_associativity;
-static Descriptor descriptor_array_operator_associativity_ptr;
-static Descriptor descriptor_array_const_operator_associativity_ptr;
-static Descriptor descriptor_operator_associativity_pointer;
-static Descriptor descriptor_operator_associativity_pointer_pointer;
 static Descriptor descriptor_function_layout;
 static Descriptor descriptor_array_function_layout;
 static Descriptor descriptor_array_function_layout_ptr;
@@ -2608,6 +2596,18 @@ static Descriptor descriptor_array_parser;
 static Descriptor descriptor_array_parser_ptr;
 static Descriptor descriptor_parser_pointer;
 static Descriptor descriptor_parser_pointer_pointer;
+static Descriptor descriptor_operator_fixity;
+static Descriptor descriptor_array_operator_fixity;
+static Descriptor descriptor_array_operator_fixity_ptr;
+static Descriptor descriptor_array_const_operator_fixity_ptr;
+static Descriptor descriptor_operator_fixity_pointer;
+static Descriptor descriptor_operator_fixity_pointer_pointer;
+static Descriptor descriptor_operator_associativity;
+static Descriptor descriptor_array_operator_associativity;
+static Descriptor descriptor_array_operator_associativity_ptr;
+static Descriptor descriptor_array_const_operator_associativity_ptr;
+static Descriptor descriptor_operator_associativity_pointer;
+static Descriptor descriptor_operator_associativity_pointer_pointer;
 static Descriptor descriptor_operator;
 static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
@@ -4130,21 +4130,6 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_epoch_ptr, epoch_pointer, Array_Epoch_Ptr);
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_epoch, epoch, Array_Epoch);
 DEFINE_VALUE_IS_AS_HELPERS(Epoch, epoch);
 DEFINE_VALUE_IS_AS_HELPERS(Epoch *, epoch_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
-static C_Enum_Item operator_fixity_items[] = {
-{ .name = slice_literal_fields("Infix"), .value = 1 },
-{ .name = slice_literal_fields("Prefix"), .value = 2 },
-{ .name = slice_literal_fields("Postfix"), .value = 4 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Operator_Fixity, operator_fixity);
-DEFINE_VALUE_IS_AS_HELPERS(Operator_Fixity *, operator_fixity_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(operator_associativity, Operator_Associativity)
-static C_Enum_Item operator_associativity_items[] = {
-{ .name = slice_literal_fields("Left"), .value = 0 },
-{ .name = slice_literal_fields("Right"), .value = 1 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity, operator_associativity);
-DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity *, operator_associativity_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
   {
     .descriptor = &descriptor_i32,
@@ -4249,6 +4234,21 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_parser_ptr, parser_pointer, Array_Parser_Ptr)
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_parser, parser, Array_Parser);
 DEFINE_VALUE_IS_AS_HELPERS(Parser, parser);
 DEFINE_VALUE_IS_AS_HELPERS(Parser *, parser_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
+static C_Enum_Item operator_fixity_items[] = {
+{ .name = slice_literal_fields("Infix"), .value = 1 },
+{ .name = slice_literal_fields("Prefix"), .value = 2 },
+{ .name = slice_literal_fields("Postfix"), .value = 4 },
+};
+DEFINE_VALUE_IS_AS_HELPERS(Operator_Fixity, operator_fixity);
+DEFINE_VALUE_IS_AS_HELPERS(Operator_Fixity *, operator_fixity_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(operator_associativity, Operator_Associativity)
+static C_Enum_Item operator_associativity_items[] = {
+{ .name = slice_literal_fields("Left"), .value = 0 },
+{ .name = slice_literal_fields("Right"), .value = 1 },
+};
+DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity, operator_associativity);
+DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity *, operator_associativity_pointer);
 /*union struct start */
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operator_ptr, operator_pointer, Array_Operator_Ptr);
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operator, operator, Array_Operator);

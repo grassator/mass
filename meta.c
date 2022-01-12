@@ -1492,17 +1492,6 @@ main(void) {
     { "u64", "as_u64" },
   }));
 
-  push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
-    { "Infix", 1 << 0 },
-    { "Prefix", 1 << 1 },
-    { "Postfix", 1 << 2 },
-  }));
-
-  push_type(type_enum("Operator_Associativity", (Enum_Type_Item[]){
-    { "Left", 0 },
-    { "Right", 1 },
-  }));
-
   push_type(type_struct("Function_Layout", (Struct_Item[]){
     { "s32", "stack_reserve" },
     { "u8", "stack_allocation_offset_in_prolog" },
@@ -1534,6 +1523,17 @@ main(void) {
     { "Scope *", "scope" },
     { "Module *", "module" },
   })));
+
+  push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
+    { "Infix", 1 << 0 },
+    { "Prefix", 1 << 1 },
+    { "Postfix", 1 << 2 },
+  }));
+
+  push_type(type_enum("Operator_Associativity", (Enum_Type_Item[]){
+    { "Left", 0 },
+    { "Right", 1 },
+  }));
 
   push_type(add_common_fields(type_union("Operator", (Struct_Type[]){
     struct_fields("Alias", (Struct_Item[]){
@@ -2160,8 +2160,8 @@ main(void) {
     {"Instruction", "instruction"},
   })));
 
-  export_global_custom_name("__get", push_type(type_intrinsic("mass_get")));
-  export_global_custom_name("__import", push_type(type_intrinsic("mass_import")));
+  export_compiler_custom_name("get", push_type(type_intrinsic("mass_get")));
+  export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));
   export_compiler_custom_name("apply", push_type(type_intrinsic("mass_apply")));

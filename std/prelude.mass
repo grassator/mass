@@ -1,66 +1,4 @@
-// `__get` is a global because it itself needs to be used to access module exports
-operator(.) :: 20 __get
-
-// `__import` is global to avoid the need to define other compiler exports as global
-operator(import _) :: 20 __import
-
 MASS :: import("mass")
-
-// These keyword-like operators have extremely high precedence to make sure that
-// they really get the next token, unless the user has something really specific
-// in mind and creates an operator with an even higher precedence.
-operator(module _) :: 100 MASS.inline_module
-operator(intrinsic _) :: 100 MASS.intrinsic
-operator(c_struct _) :: 100 MASS.c_struct
-operator(exports _) :: 100 MASS.exports
-
-// `using` and `return` want an arbitrary expression so have the lowest precedence
-operator(using _) :: 0 MASS.using
-operator(return _) :: 0 MASS.return
-
-// `size_of` and `type_of` are essentially function calls with special parsing
-// rules and evaluation behavior, so they get the same precedence as `apply`
-operator(type_of _) :: 20 MASS.type_of
-operator(parse_type _) :: 20 MASS.parse_type
-operator(size_of _) :: 20 MASS.size_of
-
-operator(' _) :: 30 MASS.quote
-operator(_ ') :: 30 MASS.unquote
-
-operator(,) :: 0 MASS.comma
-
-// TODO allow non-intrinsic overloads
-operator(=) :: 1 MASS.operator_assignment
-operator(:=) :: 0 MASS.define_inferred
-operator(_ .*) :: 20 MASS.dereference
-
-operator(:) :: 2 MASS.typed_symbol
-
-operator(@ _) :: 20 MASS.eval
-operator(. _) :: 30 MASS.named_accessor
-
-operator(==) :: 7 'equal
-operator(!=) :: 7 'not_equal
-
-operator(<) :: 8 'less
-operator(>) :: 8 'greater
-operator(<=) :: 8 'less_equal
-operator(>=) :: 8 'greater_equal
-
-operator(+) :: 10 'add
-operator(-) :: 10 'subtract
-
-operator(*) :: 15 'multiply
-operator(/) :: 15 'divide
-operator(%) :: 15 'remainder
-
-operator(<<) :: 15 'logical_shift_left
-operator(>>) :: 15 'logical_shift_right
-operator(|) :: 15 'bitwise_or
-operator(&) :: 15 'bitwise_and
-
-operator(- _) :: 16 'negate
-operator(& _) :: 16 'pointer_to
 
 cast :: fn(type : Type, value) -> _ MASS.cast
 zero_extend :: fn(type : Type, value) -> _ MASS.zero_extend
@@ -101,7 +39,7 @@ get :: fn(x ~ is_pointer_type, rhs) -> _ intrinsic {
   sliced_args.length = cast(i32, 1)
   deref := MASS.dereference(context, parser, sliced_args)
   arguments.values.* = deref
-  __get(context, parser, arguments)
+  MASS.get(context, parser, arguments)
 }
 
 Void :: type_of(())

@@ -6586,6 +6586,7 @@ static void
 mass_compilation_init_scopes(
   Compilation *compilation
 ) {
+  Mass_Context context = mass_context_from_compilation(compilation);
   const Allocator *allocator = compilation->allocator;
   Scope *root_scope =  scope_make(compilation->allocator, 0);
   compilation->root_scope = root_scope;
@@ -6616,6 +6617,101 @@ mass_compilation_init_scopes(
     root_scope, VALUE_STATIC_EPOCH, type_source_range,
     mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
   );
+
+  #define MASS_INTRINSIC_OPERATOR(_SYMBOL_, _FIXITY_, _PRECEDENCE_, _INTRINSIC_)\
+    do {\
+      Operator *op = mass_allocate(&context, Operator);\
+      *op = (Operator){\
+        .tag = Operator_Tag_Intrinsic,\
+        .fixity = Operator_Fixity_##_FIXITY_,\
+        .precedence = (_PRECEDENCE_),\
+        .associativity = Operator_Associativity_Left,\
+        .Intrinsic = {\
+          .body = scope_lookup(\
+            module_scope,\
+            mass_ensure_symbol(compilation, slice_literal(_INTRINSIC_))\
+          )->value\
+        },\
+      };\
+      const Symbol *symbol = mass_ensure_symbol(compilation, slice_literal(_SYMBOL_));\
+      Source_Range source_range;\
+      INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));\
+      scope_define_operator(&context, root_scope, source_range, symbol, op);\
+    } while(false)
+
+  #define MASS_ALIAS_OPERATOR(_SYMBOL_, _FIXITY_, _PRECEDENCE_, _ALIAS_)\
+    do {\
+      Operator *op = mass_allocate(&context, Operator);\
+      *op = (Operator){\
+        .tag = Operator_Tag_Alias,\
+        .fixity = Operator_Fixity_##_FIXITY_,\
+        .precedence = (_PRECEDENCE_),\
+        .associativity = Operator_Associativity_Left,\
+        .Alias = { .symbol = mass_ensure_symbol(compilation, slice_literal(_ALIAS_)) },\
+      };\
+      const Symbol *symbol = mass_ensure_symbol(compilation, slice_literal(_SYMBOL_));\
+      Source_Range source_range;\
+      INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));\
+      scope_define_operator(&context, root_scope, source_range, symbol, op);\
+    } while(false)
+
+
+  MASS_INTRINSIC_OPERATOR(".", Infix, 20, "get");
+
+  // These keyword-like operators have extremely high precedence to make sure that
+  // they really get the next token, unless the user has something really specific
+  // in mind and creates an operator with an even higher precedence.
+  MASS_INTRINSIC_OPERATOR("module", Prefix, 100, "inline_module");
+  MASS_INTRINSIC_OPERATOR("intrinsic", Prefix, 100, "intrinsic");
+  MASS_INTRINSIC_OPERATOR("c_struct", Prefix, 100, "c_struct");
+  MASS_INTRINSIC_OPERATOR("exports", Prefix, 100, "exports");
+
+  // `using` and `return` want an arbitrary expression so have the lowest precedence
+  MASS_INTRINSIC_OPERATOR("using", Prefix, 0, "using");
+  MASS_INTRINSIC_OPERATOR("return", Prefix, 0, "return");
+
+  // `size_of` and `type_of` are essentially function calls with special parsing
+  // rules and evaluation behavior, so they get the same precedence as `apply`
+  MASS_INTRINSIC_OPERATOR("import", Prefix, 20, "import");
+  MASS_INTRINSIC_OPERATOR("type_of", Prefix, 20, "type_of");
+  MASS_INTRINSIC_OPERATOR("parse_type", Prefix, 20, "parse_type");
+  MASS_INTRINSIC_OPERATOR("size_of", Prefix, 20, "size_of");
+
+  MASS_INTRINSIC_OPERATOR("'", Prefix, 30, "quote");
+  MASS_INTRINSIC_OPERATOR("'", Postfix, 30, "unquote");
+
+  MASS_INTRINSIC_OPERATOR(",", Infix, 0, "comma");
+
+  MASS_INTRINSIC_OPERATOR("=", Infix, 1, "operator_assignment");
+  MASS_INTRINSIC_OPERATOR(":=", Infix, 0, "define_inferred");
+  MASS_INTRINSIC_OPERATOR(".*", Postfix, 20, "dereference");
+
+  MASS_INTRINSIC_OPERATOR(":", Infix, 2, "typed_symbol");
+
+  MASS_INTRINSIC_OPERATOR("@", Prefix, 20, "eval");
+  MASS_INTRINSIC_OPERATOR(".", Prefix, 30, "named_accessor");
+
+  MASS_ALIAS_OPERATOR("==", Infix, 7, "equal");
+  MASS_ALIAS_OPERATOR("==", Infix, 7, "equal");
+  MASS_ALIAS_OPERATOR("!=", Infix, 7, "not_equal");
+  MASS_ALIAS_OPERATOR("<", Infix, 8, "less");
+  MASS_ALIAS_OPERATOR(">", Infix, 8, "greater");
+  MASS_ALIAS_OPERATOR("<=", Infix, 8, "less_equal");
+  MASS_ALIAS_OPERATOR(">=", Infix, 8, "greater_equal");
+  MASS_ALIAS_OPERATOR("+", Infix, 10, "add");
+  MASS_ALIAS_OPERATOR("-", Infix, 10, "subtract");
+  MASS_ALIAS_OPERATOR("*", Infix, 15, "multiply");
+  MASS_ALIAS_OPERATOR("/", Infix, 15, "divide");
+  MASS_ALIAS_OPERATOR("%", Infix, 15, "remainder");
+  MASS_ALIAS_OPERATOR("<<", Infix, 15, "logical_shift_left");
+  MASS_ALIAS_OPERATOR(">>", Infix, 15, "logical_shift_right");
+  MASS_ALIAS_OPERATOR("|", Infix, 15, "bitwise_or");
+  MASS_ALIAS_OPERATOR("&", Infix, 15, "bitwise_and");
+  MASS_ALIAS_OPERATOR("-", Prefix, 16, "negate");
+  MASS_ALIAS_OPERATOR("&", Prefix, 16, "pointer_to");
+
+  #undef MASS_INTRINSIC_OPERATOR
+  #undef MASS_ALIAS_OPERATOR
 
   {
     static Token_Statement_Matcher default_statement_matchers[] = {

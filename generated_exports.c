@@ -570,6 +570,38 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
+    mass_get, "get", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
+    mass_import, "import", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_intrinsic, "intrinsic", &descriptor_value_pointer,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
@@ -1730,38 +1762,6 @@ global_scope_define_exports(
   const Calling_Convention *calling_convention =
     compilation->jit.program->default_calling_convention;
   (void)calling_convention;
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_get, "__get", &descriptor_value_pointer,
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
-      .descriptor = &descriptor_mass_context_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
-      .descriptor = &descriptor_parser_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
-      .descriptor = &descriptor_value_view
-    }
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
-    mass_import, "__import", &descriptor_value_pointer,
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
-      .descriptor = &descriptor_mass_context_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
-      .descriptor = &descriptor_parser_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
-      .descriptor = &descriptor_value_view
-    }
-  );
   Source_Range bool__source_range;
   INIT_LITERAL_SOURCE_RANGE(&bool__source_range, "bool");
   scope_define_value(
