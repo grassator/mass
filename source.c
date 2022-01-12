@@ -2739,47 +2739,6 @@ mass_cast(
   return mass_cast_helper(context, parser, target_descriptor, expression, args_view.source_range);
 }
 
-static void
-token_dispatch_operator(
-  Mass_Context *context,
-  Parser *parser,
-  Array_Value_Ptr *stack,
-  Operator_Stack_Entry *operator_entry
-);
-
-static inline bool
-token_handle_operator(
-  Mass_Context *context,
-  Parser *parser,
-  Array_Value_Ptr *stack,
-  Array_Operator_Stack_Entry *operator_stack,
-  const Operator *operator,
-  Source_Range source_range
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  while (dyn_array_length(*operator_stack)) {
-    Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
-
-    if (last_operator->operator->precedence < operator->precedence) break;
-    if (last_operator->operator->precedence == operator->precedence) {
-      if (last_operator->operator->associativity != Operator_Associativity_Left) {
-        break;
-      }
-    }
-
-    dyn_array_pop(*operator_stack);
-
-    // apply the operator on the stack
-    token_dispatch_operator(context, parser, stack, last_operator);
-  }
-  dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
-    .source_range = source_range,
-    .operator = operator,
-  });
-  return true;
-}
-
 static bool
 token_parse_constant_definitions(
   Mass_Context *context,
@@ -6089,6 +6048,39 @@ typedef struct {
   Expression_Matcher_Proc proc;
   bool matches_end_of_expression;
 } Expression_Matcher;
+
+static inline bool
+token_handle_operator(
+  Mass_Context *context,
+  Parser *parser,
+  Array_Value_Ptr *stack,
+  Array_Operator_Stack_Entry *operator_stack,
+  const Operator *operator,
+  Source_Range source_range
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  while (dyn_array_length(*operator_stack)) {
+    Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
+
+    if (last_operator->operator->precedence < operator->precedence) break;
+    if (last_operator->operator->precedence == operator->precedence) {
+      if (last_operator->operator->associativity != Operator_Associativity_Left) {
+        break;
+      }
+    }
+
+    dyn_array_pop(*operator_stack);
+
+    // apply the operator on the stack
+    token_dispatch_operator(context, parser, stack, last_operator);
+  }
+  dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
+    .source_range = source_range,
+    .operator = operator,
+  });
+  return true;
+}
 
 static Value *
 token_parse_expression(
