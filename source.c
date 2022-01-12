@@ -6151,8 +6151,8 @@ token_parse_block_statements(
       },
     };
 
-    bool matched = token_statement_matcher_in_scopes(
-      context, parser, statement->children, &temp_lazy_value.Lazy, parser->scope
+    bool matched = token_parse_constant_definitions(
+      context, parser, statement->children, &temp_lazy_value.Lazy
     );
     if (mass_has_error(context)) goto defer;
     if (matched) {
@@ -6583,14 +6583,6 @@ mass_compilation_init_scopes(
 
   #undef MASS_INTRINSIC_OPERATOR
   #undef MASS_ALIAS_OPERATOR
-
-  {
-    static Token_Statement_Matcher default_statement_matchers[] = {
-      {.proc = token_parse_constant_definitions},
-    };
-
-    root_scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
-  }
 }
 
 static void
