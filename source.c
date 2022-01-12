@@ -3869,7 +3869,13 @@ token_handle_function_call(
           void *memory = mass_allocate_bytes_from_descriptor(context, param->descriptor);
           Storage storage = storage_static_heap(memory, param->descriptor->bit_size);
           Value *adjusted_source = value_make(context, param->descriptor, storage, source->source_range);
-          mass_assign_helper(context, 0/*no builder */, adjusted_source, source, &args_view.source_range);
+          if (same_type(source->descriptor, &descriptor_i64)) {
+            Mass_Cast_Lazy_Payload lazy_payload = { .target = param->descriptor, .expression = source };
+            Expected_Result cast_result = mass_expected_result_exact(param->descriptor, storage);
+            mass_handle_cast_lazy_proc(context, 0/*no builder */, &cast_result, &source_range, &lazy_payload);
+          } else {
+            mass_assign_helper(context, 0/*no builder */, adjusted_source, source, &args_view.source_range);
+          }
           if (mass_has_error(context)) return 0;
           source = adjusted_source;
         }

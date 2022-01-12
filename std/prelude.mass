@@ -305,11 +305,11 @@ add_or_subtract :: fn(
 }
 
 add :: fn(x : i64, y : i64) -> (i64) intrinsic {
-  add_or_subtract(context, parser, arguments, cast(i8, 0x01))
+  add_or_subtract(context, parser, arguments, 0x01)
 }
 
 subtract :: fn(x : i64, y : i64) -> (i64) intrinsic {
-  add_or_subtract(context, parser, arguments, cast(i8, 0x29))
+  add_or_subtract(context, parser, arguments, 0x29)
 }
 
 compare :: fn(
@@ -360,7 +360,7 @@ compare :: fn(
     }
 
     {
-      instruction := x86_64.op1_reg64_reg64_mr(cast(i8, 0x39), temp_lhs_register, temp_rhs_register)
+      instruction := x86_64.op1_reg64_reg64_mr(0x39, temp_lhs_register, temp_rhs_register)
       MASS.push_instruction(&builder.code_block, instruction)
     }
 
