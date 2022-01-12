@@ -2094,135 +2094,6 @@ mass_exports(
   return result;
 }
 
-static bool
-token_parse_operator_definition(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View view,
-  Value_Lazy *out_lazy_value
-) {
-  u32 peek_index = 0;
-  Value *keyword_token = value_view_maybe_match_cached_symbol(
-    view, &peek_index, context->compilation->common_symbols.operator
-  );
-  if (!keyword_token) return 0;
-
-  Value *pattern_token = value_view_next(&view, &peek_index);
-  if (!value_is_group_paren(pattern_token)) { context_parse_error(context, parser, view, peek_index); goto err; }
-
-  Value *separator_token = value_view_maybe_match_cached_symbol(
-    view, &peek_index, mass_ensure_symbol(context->compilation, slice_literal("::"))
-  );
-  if (!separator_token) { context_parse_error(context, parser, view, peek_index); goto err; }
-
-  Value *precedence_or_tuple_token = value_view_next(&view, &peek_index);
-  if (!precedence_or_tuple_token) { context_parse_error(context, parser, view, peek_index); goto err; }
-
-  Value *precedence_or_tuple_value = token_parse_single(context, parser, precedence_or_tuple_token);
-  if (mass_has_error(context)) goto err;
-
-  Value *precedence_value;
-  Value *body;
-  if (value_is_tuple(precedence_or_tuple_value)) {
-    const Tuple *tuple = value_as_tuple(precedence_or_tuple_value);
-    if (dyn_array_length(tuple->items) != 2) {
-      panic("TODO better matching here");
-      return false;
-    }
-    precedence_value = *dyn_array_get(tuple->items, 0);
-    body = *dyn_array_get(tuple->items, 1);
-  } else {
-    precedence_value = precedence_or_tuple_value;
-    Value_View rest = value_view_rest(&view, peek_index);
-    u32 body_length;
-    body = token_parse_expression(context, parser, rest, &body_length, 0);
-    if (mass_has_error(context)) goto err;
-
-    if (!body_length) { context_parse_error(context, parser, view, peek_index); goto err; }
-    peek_index += body_length;
-  }
-
-  if (!mass_value_ensure_static_of(context, precedence_value, &descriptor_i64)) goto err;
-  u32 precendence = u64_to_u32(value_as_i64(precedence_value)->bits);
-
-  Value_View definition = value_as_group_paren(pattern_token)->children;
-
-  Value *operator_token;
-  Operator_Fixity fixity = Operator_Fixity_Prefix;
-  Operator_Associativity associativity = Operator_Associativity_Left;
-  u16 argument_count = 1;
-
-  // prefix and postfix
-  if (definition.length == 2) {
-    Value *first =  value_view_get(&definition, 0);
-    fixity = Operator_Fixity_Prefix;
-    if (value_match_symbol(first, slice_literal("_"))) {
-      fixity = Operator_Fixity_Postfix;
-    }
-    if (fixity == Operator_Fixity_Prefix) {
-      associativity = Operator_Associativity_Right;
-      if (!value_match_symbol(value_view_get(&definition, 1), slice_literal("_"))) {
-        context_parse_error(context, parser, view, peek_index);
-        goto err;
-      }
-      operator_token = value_view_get(&definition, 0);
-    } else {
-      operator_token = value_view_get(&definition, 1);
-    }
-  } else if (definition.length == 1) { // infix
-    argument_count = 2;
-    fixity = Operator_Fixity_Infix;
-    operator_token = value_view_get(&definition, 0);
-  } else {
-    operator_token = 0;
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = pattern_token->source_range,
-      .detailed_message ="Expected the pattern to have 2 tokens for prefix / postfix or 1 for infix operators"
-    });
-    goto err;
-  }
-
-  Operator *operator = mass_allocate(context, Operator);
-
-  if (value_is_symbol(body)) {
-    const Symbol *alias = value_as_symbol(body);
-    *operator = (Operator){
-      .tag = Operator_Tag_Alias,
-      .fixity = fixity,
-      .precedence = precendence,
-      .associativity = associativity,
-      .Alias = { .symbol = alias },
-    };
-  } else if (value_is_intrinsic(body)) {
-    *operator = (Operator){
-      .tag = Operator_Tag_Intrinsic,
-      .fixity = fixity,
-      .precedence = precendence,
-      .associativity = associativity,
-      .Intrinsic = { .body = body },
-    };
-  } else {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = body->source_range,
-      .detailed_message = slice_literal("Expected a valid operator body"),
-    });
-    goto err;
-  }
-
-  scope_define_operator(
-    context,
-    parser->scope,
-    keyword_token->source_range,
-    value_as_symbol(operator_token),
-    operator
-  );
-
-  err:
-  return true;
-}
-
 static Slice
 mass_slice_from_slice_like(
   Value *value
@@ -6716,11 +6587,7 @@ mass_compilation_init_scopes(
   {
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
-      {.proc = token_parse_operator_definition},
     };
-    for (u64 i = 0; i < countof(default_statement_matchers) - 1; ++i) {
-      default_statement_matchers[i + 1].previous = &default_statement_matchers[i];
-    }
 
     root_scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
   }

@@ -1604,34 +1604,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-
-    it("should report an error when defining an overloaded infix operator") {
-      test_program_inline_source_base(
-        "dummy", &test_context,
-        "operator (**) :: 15 'multiply;"
-        "operator (**) :: 15 'multiply;"
-        "dummy :: fn() -> (s64) { 21 ** 2 }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Operator_Fixity_Conflict);
-      check(error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Infix);
-      spec_check_slice(error->Operator_Fixity_Conflict.symbol, slice_literal("**"));
-    }
-
-    it("should report an error when defining an overloaded infix and postfix operator") {
-      test_program_inline_source_base(
-        "dummy", &test_context,
-        "operator (**) :: 15 'multiply;"
-        "operator (_ **) :: 15 'multiply;"
-        "dummy :: fn() -> (s64) { 21 ** 2 }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Operator_Fixity_Conflict);
-      check(error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Postfix);
-      spec_check_slice(error->Operator_Fixity_Conflict.symbol, slice_literal("**"));
-    }
   }
 
   describe("Quote / Unquote") {
