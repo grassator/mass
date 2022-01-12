@@ -2747,11 +2747,10 @@ token_dispatch_operator(
   Operator_Stack_Entry *operator_entry
 );
 
-static bool
+static inline bool
 token_handle_operator(
   Mass_Context *context,
   Parser *parser,
-  Value_View view,
   Array_Value_Ptr *stack,
   Array_Operator_Stack_Entry *operator_stack,
   const Operator *operator,
@@ -6170,7 +6169,7 @@ token_parse_expression(
       const Operator *maybe_operator = scope_lookup_operator(context, parser->scope, symbol, fixity_mask);
       if (maybe_operator) {
         if (!token_handle_operator(
-          context, parser, view, &value_stack, &operator_stack, maybe_operator, value->source_range
+          context, parser, &value_stack, &operator_stack, maybe_operator, value->source_range
         )) goto defer;
         is_value_expected = (maybe_operator->fixity == Operator_Fixity_Postfix);
         continue;
@@ -6181,7 +6180,7 @@ token_parse_expression(
     if (is_value_expected) {
       const Operator *empty_space_operator = &context->compilation->apply_operator;
       if (!token_handle_operator(
-        context, parser, view, &value_stack, &operator_stack, empty_space_operator, value->source_range
+        context, parser, &value_stack, &operator_stack, empty_space_operator, value->source_range
       )) goto defer;
     }
     dyn_array_push(value_stack, value);
