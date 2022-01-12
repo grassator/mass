@@ -752,6 +752,50 @@ mass_process_tuple_as_descriptor(
 }
 
 static inline bool
+mass_tuple_is_static(
+  Mass_Context *context,
+  const Tuple *tuple
+) {
+  // TODO consider creating a tuple iterator to avoid copy-pasting code like this
+  for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
+    Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
+    const Value *item_value;
+    if (value_is_named_accessor(tuple_item)) {
+      const Symbol *symbol = value_as_named_accessor(tuple_item)->symbol;
+      Scope_Entry *entry = scope_lookup(tuple->scope_where_it_was_created, symbol);
+      if (!entry) {
+        // This is a hard error instead of a callback because it is just a syntax sugar expansion
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Undefined_Variable,
+          .Undefined_Variable = { .name = symbol->name },
+          .source_range = tuple_item->source_range,
+        });
+        return false;
+      }
+      // This is a hard error instead of a callback because it is just a syntax sugar expansion
+      if (entry->epoch.as_u64 != tuple->epoch.as_u64) {
+        mass_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Epoch_Mismatch,
+          .source_range = tuple_item->source_range,
+        });
+        return false;
+      }
+      item_value = scope_entry_force_value(context, entry);
+    } else if (value_is_assignment(tuple_item)) {
+      const Assignment *assignment = value_as_assignment(tuple_item);
+      item_value = assignment->source;
+    } else {
+      item_value = tuple_item;
+    }
+    if (!mass_value_is_static(item_value)) return false;
+    if (value_is_tuple(item_value)) {
+      if (!mass_tuple_is_static(context, value_as_tuple(item_value))) return false;
+    }
+  }
+  return true;
+}
+
+static inline bool
 mass_deduce_tuple_item_proc(
   Mass_Context *context,
   const Descriptor *item_descriptor,
@@ -3853,17 +3897,7 @@ token_handle_function_call(
           can_static_cast = false;
         } else if (value_is_tuple(source)) {
           const Tuple *tuple = value_as_tuple(source);
-          for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
-            Value *tuple_item = *dyn_array_get(tuple->items, tuple_index);
-            // FIXME!!!!!!!!!!
-            // this is wrong since the tuple contains Assignment and Named_Accessor
-            // entries that are always static. Maybe those should be resolved eagerly for
-            // the easy of managing the tuple?
-            if (!mass_value_is_static(tuple_item)) {
-              can_static_cast = false;
-              break;
-            }
-          }
+          can_static_cast = mass_tuple_is_static(context, tuple);
         }
         if (can_static_cast) {
           void *memory = mass_allocate_bytes_from_descriptor(context, param->descriptor);
