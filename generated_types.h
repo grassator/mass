@@ -401,10 +401,6 @@ typedef struct Operator_Intrinsic Operator_Intrinsic;
 typedef dyn_array_type(Operator *) Array_Operator_Ptr;
 typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
 
-typedef struct Token_Statement_Matcher Token_Statement_Matcher;
-typedef dyn_array_type(Token_Statement_Matcher *) Array_Token_Statement_Matcher_Ptr;
-typedef dyn_array_type(const Token_Statement_Matcher *) Array_Const_Token_Statement_Matcher_Ptr;
-
 typedef struct Scope_Entry Scope_Entry;
 typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
 typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
@@ -717,9 +713,6 @@ typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
   (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, const void * payload);
-
-typedef _Bool (*Token_Statement_Matcher_Proc)
-  (Mass_Context * context, Parser * parser, Value_View view, Value_Lazy * out_lazy_value);
 
 typedef enum Instruction_Extension_Type {
   Instruction_Extension_Type_None = 0,
@@ -1585,12 +1578,6 @@ operator_as_intrinsic(const Operator *operator) {
   return &operator->Intrinsic;
 }
 typedef dyn_array_type(Operator) Array_Operator;
-typedef struct Token_Statement_Matcher {
-  const Token_Statement_Matcher * previous;
-  Token_Statement_Matcher_Proc proc;
-} Token_Statement_Matcher;
-typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
-
 typedef struct Scope_Entry {
   Value * value;
   Slice name;
@@ -1606,7 +1593,6 @@ typedef struct Scope {
   const Allocator * allocator;
   const Scope * parent;
   Scope_Map * map;
-  const Token_Statement_Matcher * statement_matcher;
 } Scope;
 typedef dyn_array_type(Scope) Array_Scope;
 
@@ -2614,11 +2600,6 @@ static Descriptor descriptor_array_operator_ptr;
 static Descriptor descriptor_array_const_operator_ptr;
 static Descriptor descriptor_operator_pointer;
 static Descriptor descriptor_operator_pointer_pointer;
-static Descriptor descriptor_token_statement_matcher;
-static Descriptor descriptor_array_token_statement_matcher;
-static Descriptor descriptor_array_token_statement_matcher_ptr;
-static Descriptor descriptor_token_statement_matcher_pointer;
-static Descriptor descriptor_token_statement_matcher_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_array_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
@@ -2857,7 +2838,6 @@ static Descriptor descriptor_array_compilation_ptr;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_compilation_pointer_pointer;
 static Descriptor descriptor_lazy_value_proc;
-static Descriptor descriptor_token_statement_matcher_proc;
 static Descriptor descriptor_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type_ptr;
@@ -4309,23 +4289,6 @@ MASS_DEFINE_TYPE_VALUE(operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator, operator);
 DEFINE_VALUE_IS_AS_HELPERS(Operator *, operator_pointer);
 /*union struct end*/
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
-  {
-    .descriptor = &descriptor_token_statement_matcher_pointer,
-    .name = slice_literal_fields("previous"),
-    .offset = offsetof(Token_Statement_Matcher, previous),
-  },
-  {
-    .descriptor = &descriptor_token_statement_matcher_proc,
-    .name = slice_literal_fields("proc"),
-    .offset = offsetof(Token_Statement_Matcher, proc),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(token_statement_matcher);
-MASS_DEFINE_C_DYN_ARRAY_TYPE(array_token_statement_matcher_ptr, token_statement_matcher_pointer, Array_Token_Statement_Matcher_Ptr);
-MASS_DEFINE_C_DYN_ARRAY_TYPE(array_token_statement_matcher, token_statement_matcher, Array_Token_Statement_Matcher);
-DEFINE_VALUE_IS_AS_HELPERS(Token_Statement_Matcher, token_statement_matcher);
-DEFINE_VALUE_IS_AS_HELPERS(Token_Statement_Matcher *, token_statement_matcher_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   {
     .descriptor = &descriptor_value_pointer,
@@ -4373,11 +4336,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
     .descriptor = &descriptor_scope_map_pointer,
     .name = slice_literal_fields("map"),
     .offset = offsetof(Scope, map),
-  },
-  {
-    .descriptor = &descriptor_token_statement_matcher_pointer,
-    .name = slice_literal_fields("statement_matcher"),
-    .offset = offsetof(Scope, statement_matcher),
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope);
@@ -6134,26 +6092,6 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_void_pointer,
-  }
-)
-MASS_DEFINE_FUNCTION_DESCRIPTOR(
-  token_statement_matcher_proc,
-  &descriptor__bool,
-  {
-    .tag = Resolved_Function_Parameter_Tag_Unknown,
-    .descriptor = &descriptor_mass_context_pointer,
-  },
-  {
-    .tag = Resolved_Function_Parameter_Tag_Unknown,
-    .descriptor = &descriptor_parser_pointer,
-  },
-  {
-    .tag = Resolved_Function_Parameter_Tag_Unknown,
-    .descriptor = &descriptor_value_view,
-  },
-  {
-    .tag = Resolved_Function_Parameter_Tag_Unknown,
-    .descriptor = &descriptor_value_lazy_pointer,
   }
 )
 MASS_DEFINE_OPAQUE_C_TYPE(instruction_extension_type, Instruction_Extension_Type)

@@ -141,40 +141,6 @@ scope_make(
   return scope;
 }
 
-static inline bool
-scope_statement_matcher_shallow(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View view,
-  Value_Lazy *out_lazy_value,
-  const Scope *scope
-) {
-  const Token_Statement_Matcher *matcher = scope->statement_matcher;
-  // Do a reverse iteration because we want statements that are defined later
-  // to have higher precedence when parsing
-  for (; matcher; matcher = matcher->previous) {
-    if (matcher->proc(context, parser, view, out_lazy_value)) return true;
-    if (mass_has_error(context)) return true;
-  }
-  return false;
-}
-
-static inline bool
-token_statement_matcher_in_scopes(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View view,
-  Value_Lazy *out_lazy_value,
-  const Scope *scope
-) {
-  for (; scope; scope = scope->parent) {
-    if (scope_statement_matcher_shallow(context, parser, view, out_lazy_value, scope)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static void
 mass_copy_scope_exports(
   Scope *to,
@@ -2149,22 +2115,6 @@ mass_import(
     .detailed_message ="import() expects a single string argument"
   });
   return 0;
-}
-
-static void
-mass_push_token_matcher(
-  Mass_Context *context,
-  Parser *parser,
-  Token_Statement_Matcher_Proc proc,
-  void *payload
-) {
-  Token_Statement_Matcher *matcher =
-    mass_allocate(context, Token_Statement_Matcher);
-  *matcher = (Token_Statement_Matcher){
-    .previous = parser->scope->statement_matcher,
-    .proc = proc,
-  };
-  parser->scope->statement_matcher = matcher;
 }
 
 // TODO move this to user land (again)

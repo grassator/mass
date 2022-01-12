@@ -1548,11 +1548,6 @@ main(void) {
     { "u64", "precedence" },
   }));
 
-  push_type(type_struct("Token_Statement_Matcher", (Struct_Item[]){
-    { "const Token_Statement_Matcher *", "previous" },
-    { "Token_Statement_Matcher_Proc", "proc" },
-  }));
-
   push_type(type_struct("Scope_Entry", (Struct_Item[]){
     { "Value *", "value" },
     { "Slice", "name" },
@@ -1579,7 +1574,6 @@ main(void) {
     { "const Allocator *", "allocator" },
     { "const Scope *", "parent" },
     { "Scope_Map *", "map" },
-    { "const Token_Statement_Matcher *", "statement_matcher" },
   })));
 
   push_type(type_struct("Overload", (Struct_Item[]){
@@ -2110,13 +2104,6 @@ main(void) {
     { "const Expected_Result *", "expected_result" },
     { "const Source_Range *", "source_range" },
     { "const void *", "payload" },
-  }));
-
-  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "_Bool", (Argument_Type[]){
-    { "Mass_Context *", "context" },
-    { "Parser *", "parser" },
-    { "Value_View", "view" },
-    { "Value_Lazy *", "out_lazy_value" },
   }));
 
   push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){
