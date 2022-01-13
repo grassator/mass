@@ -266,10 +266,14 @@ mass_error_to_string(
     } break;
     case Mass_Error_Tag_Type_Mismatch: {
       Mass_Error_Type_Mismatch const *mismatch = &error->Type_Mismatch;
-      APPEND_LITERAL("Type mismatch: expected ");
-      mass_error_append_descriptor(result, mismatch->expected);
-      APPEND_LITERAL(", got ");
-      mass_error_append_descriptor(result, mismatch->actual);
+      if (error->detailed_message.length) {
+        APPEND_SLICE(error->detailed_message);
+      } else {
+        APPEND_LITERAL("Type mismatch: expected ");
+        mass_error_append_descriptor(result, mismatch->expected);
+        APPEND_LITERAL(", got ");
+        mass_error_append_descriptor(result, mismatch->actual);
+      }
     } break;
     case Mass_Error_Tag_Integer_Range: {
       APPEND_LITERAL("Value does not fit into integer of type ");

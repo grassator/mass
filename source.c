@@ -654,7 +654,6 @@ mass_process_tuple_as_descriptor(
         field_source = tuple_item;
         if (field_index >= dyn_array_length(fields)) {
           Slice message = slice_literal("Tuple has too many items for the struct it is assigned to");
-          // FIXME :TupleAssignError need a better error here?
           report_error_proc(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Type_Mismatch,
             .source_range = tuple_item->source_range,
@@ -702,7 +701,6 @@ mass_process_tuple_as_descriptor(
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
-          // FIXME :TupleAssignError need a better error here?
         .Type_Mismatch = { .expected = descriptor, .actual = &descriptor_tuple },
         .detailed_message = message,
       });
@@ -717,7 +715,6 @@ mass_process_tuple_as_descriptor(
       report_error_proc(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
-          // FIXME :TupleAssignError need a better error here?
         .Type_Mismatch = { .expected = descriptor, .actual = &descriptor_tuple },
         .detailed_message = message,
       });
