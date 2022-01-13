@@ -46,9 +46,9 @@ Void :: type_of(())
 make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
   value : &MASS.Value = allocate(allocator, MASS.Value)
   value.source_range = source_range.*
-  value.tag = MASS.Value_Tag.Forced
+  value.tag = .Forced
   value.descriptor = Void
-  value.Forced.storage.tag = MASS.Storage_Tag.Immediate
+  value.Forced.storage.tag = .Immediate
   value.Forced.storage.bit_size = [0]
   value
 }
@@ -63,7 +63,7 @@ debugger :: fn() -> () intrinsic {
   ) -> (&MASS.Value) {
     {
       MASS.push_instruction(&builder.code_block, MASS.Instruction [
-        .tag = MASS.Instruction_Tag.Location,
+        .tag = .Location,
         .scope = 0,
         .Location = [source_range.*]
       ]);
@@ -71,7 +71,7 @@ debugger :: fn() -> () intrinsic {
 
     {
       instruction : MASS.Instruction
-      instruction.tag = MASS.Instruction_Tag.Bytes
+      instruction.tag = .Bytes
       instruction.Bytes.memory.0 = 0xCC
       instruction.Bytes.length = 1
       MASS.push_instruction(&builder.code_block, instruction);
@@ -81,7 +81,7 @@ debugger :: fn() -> () intrinsic {
   }
 
   lazy_value := allocate(context.allocator, MASS.Value)
-  lazy_value.tag = MASS.Value_Tag.Lazy
+  lazy_value.tag = .Lazy
   lazy_value.descriptor = Void
   lazy_value.source_range = arguments.source_range
   lazy_value.Lazy = [
@@ -219,7 +219,7 @@ x86_64 :: module {
     mod_reg_rm := cast(i8, (0b11 << 6) | ((rhs_reg_index & 0b111) << 3) | (lhs_reg_index & 0b111))
 
     instruction : Instruction
-    instruction.tag = MASS.Instruction_Tag.Bytes
+    instruction.tag = .Bytes
     instruction.Bytes.memory.0 = cast(i8, rex)
     instruction.Bytes.memory.1 = op_code
     instruction.Bytes.memory.2 = mod_reg_rm
@@ -252,7 +252,7 @@ add_or_subtract :: fn(
 
     temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
 
-    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+    if context.compilation.result.tag != .Success then {
       return 0
     }
 
@@ -262,13 +262,13 @@ add_or_subtract :: fn(
 
     temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
 
-    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+    if context.compilation.result.tag != .Success then {
       return 0
     }
 
     {
       MASS.push_instruction(&builder.code_block, MASS.Instruction [
-        .tag = MASS.Instruction_Tag.Location,
+        .tag = .Location,
         .scope = 0,
         .Location = [source_range.*]
       ]);
@@ -289,8 +289,8 @@ add_or_subtract :: fn(
 
   lazy_value := allocate(context.allocator, MASS.Value)
   lazy_value.* = [
-    .tag = MASS.Value_Tag.Lazy,
-    .flags = MASS.Value_Flags.None,
+    .tag = .Lazy,
+    .flags = .None,
     .descriptor = i64,
     .source_range = arguments.source_range,
     .Lazy = [
@@ -336,7 +336,7 @@ compare :: fn(
     expected_lhs := MASS.expected_result_exact(i64, temp_lhs_storage)
     temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
 
-    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+    if context.compilation.result.tag != .Success then {
       return 0
     }
 
@@ -345,13 +345,13 @@ compare :: fn(
     expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
     temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
 
-    if context.compilation.result.tag != MASS.Result_Tag.Success then {
+    if context.compilation.result.tag != .Success then {
       return 0
     }
 
     {
       instruction := MASS.Instruction [
-        .tag = MASS.Instruction_Tag.Location,
+        .tag = .Location,
         .scope = 0,
         .Location = [source_range.*]
       ]
@@ -369,13 +369,13 @@ compare :: fn(
 
     value := allocate(context.allocator, MASS.Value)
     value.* = [
-      .tag = MASS.Value_Tag.Forced,
-      .flags = MASS.Value_Flags.None,
+      .tag = .Forced,
+      .flags = .None,
       .descriptor = bool,
       .source_range = source_range.* ,
       .Forced = [.storage = [
-        .tag = MASS.Storage_Tag.Eflags,
-        .flags = MASS.Storage_Flags.None,
+        .tag = .Eflags,
+        .flags = .None,
         .bit_size = (value.descriptor.*).bit_size,
         .Eflags = [payload.compare_type]
       ]]
@@ -388,8 +388,8 @@ compare :: fn(
 
   lazy_value := allocate(context.allocator, MASS.Value)
   lazy_value.* = [
-    .tag = MASS.Value_Tag.Lazy,
-    .flags = MASS.Value_Flags.None,
+    .tag = .Lazy,
+    .flags = .None,
     .descriptor = bool,
     .source_range = arguments.source_range,
     .Lazy = [
@@ -434,17 +434,6 @@ signed :: module {
   less_equal :: signed_less_equal
   greater :: signed_greater
   greater_equal :: signed_greater_equal
-}
-
-equal :: fn(x, accessor : MASS.Named_Accessor) -> _ intrinsic {
-  meta :: import("std/meta")
-  accessor := meta.reify(arguments.1, MASS.Named_Accessor)
-  x_descriptor := arguments.0.descriptor
-  named_value := MASS.module_get(context, (x_descriptor.*).own_module, accessor.symbol, &arguments.source_range)
-  values : (&MASS.Value) * 2 = [arguments.0, named_value]
-  new_args : MASS.Value_View = arguments
-  new_args.values = &values.0
-  MASS.forward_call_to_alias(context, parser, new_args, & 'equal)
 }
 
 equal :: fn(x, y : x) -> (bool) MASS.generic_equal
@@ -498,14 +487,14 @@ Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
   raw_bit_size : i64 = unsigned_multiply((item_type.*).bit_size.as_u64, length)
   if raw_bit_size & 0xffff_ffff_8000_0000 != 0 then {
     error : MASS.Error
-    error.tag = MASS.Error_Tag.Integer_Range
+    error.tag = .Integer_Range
     error.source_range = arguments.source_range
     meta.context_error(context, error)
     return 0
   }
 
   t.* = [
-    .tag = MASS.Descriptor_Tag.Fixed_Array,
+    .tag = .Fixed_Array,
     .brand = 0,
     .own_module = 0,
     .bit_size = [raw_bit_size],

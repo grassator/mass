@@ -868,6 +868,13 @@ deduce_runtime_descriptor_for_value(
       } else {
         deduced_descriptor = anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
       }
+    } else if (same_type(value->descriptor, &descriptor_named_accessor)) {
+      const Named_Accessor *accessor = value_as_named_accessor(value);
+      Module *module = maybe_desired_descriptor->own_module;
+      if (!module) return 0;
+      Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, accessor->symbol);
+      if (!entry) return 0;
+      return maybe_desired_descriptor;
     } else if (
       same_type(value->descriptor, &descriptor_overload) ||
       same_type(value->descriptor, &descriptor_function_literal)
@@ -1092,6 +1099,20 @@ mass_assign_helper(
     return;
   }
 
+  if (mass_value_is_static(source)) {
+    if (value_is_named_accessor(source)) {
+      const Named_Accessor *accessor = value_as_named_accessor(source);
+      Module *module = target->descriptor->own_module;
+      Value *adjusted_source = mass_module_get_impl(context, module, accessor->symbol, source_range);
+      if (mass_has_error(context)) return;
+      mass_assign_helper(context, builder, target, adjusted_source, source_range);
+      return;
+    }
+    if (assign_from_static(context, builder, target, source, source_range)) {
+      return;
+    }
+  }
+
   if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!types_equal(target->descriptor, source->descriptor, Brand_Comparison_Mode_One_Unbranded)) goto err;
 
@@ -1116,12 +1137,6 @@ mass_assign_helper(
       if (mass_has_error(context)) return;
     }
     return;
-  }
-
-  if (mass_value_is_static(source)) {
-    if (assign_from_static(context, builder, target, source, source_range)) {
-      return;
-    }
   }
 
   if (mass_has_error(context)) return;
@@ -4860,6 +4875,7 @@ mass_handle_assignment_lazy_proc(
       mass_handle_cast_lazy_proc(context, builder, &cast_result, source_range, &lazy_payload);
     } else if (
       value_is_tuple(source) ||
+      value_is_named_accessor(source) ||
       deduced_source_descriptor->tag == Descriptor_Tag_Function_Instance
     ) {
       // Casting handled in `mass_assign_helper`

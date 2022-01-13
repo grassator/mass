@@ -5,23 +5,23 @@ Source_Range :: MASS.Source_Range
 same_type :: MASS.same_type
 
 context_error :: fn(context : &MASS.Context, error : MASS.Error) {
-  assert(context.compilation.result.tag == MASS.Result_Tag.Success)
-  context.compilation.result.tag = MASS.Result_Tag.Error
+  assert(context.compilation.result.tag == .Success)
+  context.compilation.result.tag = .Error
   context.compilation.result.Error.error = error
 }
 
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   assert(same_type(value.descriptor, type))
-  assert(value.tag == MASS.Value_Tag.Forced)
+  assert(value.tag == .Forced)
   storage := &value.Forced.storage
   assert((value.descriptor.*).bit_size.as_u64 == storage.bit_size.as_u64)
 
-  if storage.tag == MASS.Storage_Tag.Static then {
+  if storage.tag == .Static then {
     storage.Static.pointer
-  } else if storage.tag == MASS.Storage_Tag.Immediate then {
+  } else if storage.tag == .Immediate then {
     &storage.Immediate.bits
   } else {
-    assert(storage.tag == MASS.Storage_Tag.Static)
+    assert(storage.tag == .Static)
     0
   }
 }
@@ -32,17 +32,17 @@ static_value :: fn(
   source_range : Source_Range
 ) -> (&Value) {
   type :: type_of(pointer)
-  static_assert(type.tag == MASS.Descriptor_Tag.Pointer_To)
+  static_assert(type.tag == .Pointer_To)
   pointee_type :: (type.Pointer_To.*).descriptor
   pointee_bit_size :: (pointee_type.*).bit_size
   static_assert(pointee_bit_size > 64)
 
   static_value := allocate(compilation.allocator, Value)
-  static_value.tag = MASS.Value_Tag.Forced
+  static_value.tag = .Forced
   static_value.source_range = source_range
   static_value.descriptor = pointee_type
 
-  static_value.Forced.storage.tag = MASS.Storage_Tag.Static
+  static_value.Forced.storage.tag = .Static
   static_value.Forced.storage.bit_size = pointee_bit_size
 
   static_value.Forced.storage.Static.pointer = pointer
@@ -60,11 +60,11 @@ immediate :: fn(
   static_assert(type_bit_size <= 64, "Type is too large to fit into an immediate")
 
   static_value := allocate(compilation.allocator, Value)
-  static_value.tag = MASS.Value_Tag.Forced
+  static_value.tag = .Forced
   static_value.source_range = source_range
   static_value.descriptor = type
 
-  static_value.Forced.storage.tag = MASS.Storage_Tag.Immediate
+  static_value.Forced.storage.tag = .Immediate
   static_value.Forced.storage.bit_size = type_bit_size
   cast(type, static_value.Forced.storage.Immediate.bits) = source
 

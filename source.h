@@ -195,6 +195,14 @@ mass_implicit_function_parameter_factory_proc(
   const Function_Call_Parameter *param
 );
 
+static Value *
+mass_module_get_impl(
+  Mass_Context *context,
+  const Module *module,
+  const Symbol *symbol,
+  const Source_Range *source_range
+);
+
 static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value
