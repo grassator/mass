@@ -5429,8 +5429,12 @@ mass_comma(
   Parser *parser,
   Value_View args_view
 ) {
-  assert(args_view.length == 2);
   Value *lhs = value_view_get(&args_view, 0);
+  if (args_view.length == 1) {
+    return lhs;
+  }
+  assert(args_view.length == 2);
+
   Value *rhs = value_view_get(&args_view, 1);
   const List_Node *previous;
   if (value_is_list_node(lhs)) {
@@ -6583,7 +6587,7 @@ mass_compilation_init_scopes(
   MASS_INTRINSIC_OPERATOR("'", Operator_Flags_None, Prefix, 30, "quote");
   MASS_INTRINSIC_OPERATOR("'", Operator_Flags_None, Postfix, 30, "unquote");
 
-  MASS_INTRINSIC_OPERATOR(",", Operator_Flags_None, Infix, 0, "comma");
+  MASS_INTRINSIC_OPERATOR(",", Operator_Flags_Optional_Rhs, Infix, 0, "comma");
 
   MASS_INTRINSIC_OPERATOR("=", Operator_Flags_None, Infix, 1, "operator_assignment");
   MASS_INTRINSIC_OPERATOR(":=", Operator_Flags_None, Infix, 0, "define_inferred");

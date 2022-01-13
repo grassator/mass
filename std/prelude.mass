@@ -297,8 +297,8 @@ add_or_subtract :: fn(
       .is_factory = false,
       .epoch = parser.epoch,
       .proc = lazy_value_proc,
-      .payload = cast(&Void, payload)
-    ]
+      .payload = cast(&Void, payload),
+    ],
   ]
 
   lazy_value
