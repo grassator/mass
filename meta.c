@@ -1535,6 +1535,11 @@ main(void) {
     { "Right", 1 },
   }));
 
+  push_type(type_enum("Operator_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Optional_Rhs", 1 << 0 },
+  }));
+
   push_type(add_common_fields(type_union("Operator", (Struct_Type[]){
     struct_fields("Alias", (Struct_Item[]){
       { "const Symbol *", "symbol" },
@@ -1543,9 +1548,10 @@ main(void) {
       { "Value *", "body" },
     }),
   }), (Struct_Item[]){
+    { "Operator_Flags", "flags" },
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
-    { "u64", "precedence" },
+    { "u32", "precedence" },
   }));
 
   push_type(type_struct("Scope_Entry", (Struct_Item[]){

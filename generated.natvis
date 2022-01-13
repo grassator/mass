@@ -1104,6 +1104,7 @@
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
+    <Item Name="flags">flags</Item>
     <Item Name="fixity">fixity</Item>
     <Item Name="associativity">associativity</Item>
     <Item Name="precedence">precedence</Item>

@@ -592,9 +592,6 @@ spec("source") {
         "main :: fn() -> () { if; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Undefined_Variable);
-      spec_check_slice(error->Undefined_Variable.name, slice_literal("if"));
     }
   }
 
@@ -904,6 +901,17 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       s32 actual = checker(42);
       check(actual == 42);
+    }
+
+    it("should be able to have an explicit return without any expression following") {
+      void(*checker)(u64 *) = (void(*)(u64 *))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x : &i64) -> () { if x.* == 0 then { return }; x.* = 42 }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      u64 number = 21;
+      checker(&number);
+      check(number == 42);
     }
 
     it("should be able to run fibonnacii") {

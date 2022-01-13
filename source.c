@@ -5466,29 +5466,41 @@ token_dispatch_operator(
   u32 argument_count = operator->fixity == Operator_Fixity_Infix ? 2 : 1;
 
   if (dyn_array_length(*stack) < argument_count) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = stack_entry->source_range,
-      .detailed_message = slice_literal("Not enough arguments for operator"),
-    });
-    return;
+    if (operator->flags & Operator_Flags_Optional_Rhs) {
+      argument_count -= 1;
+    }
+    if (dyn_array_length(*stack) < argument_count) {
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = stack_entry->source_range,
+        .detailed_message = slice_literal("Not enough arguments for operator"),
+      });
+      return;
+    }
   }
-  u64 start_index = dyn_array_length(*stack) - argument_count;
+  Value_View args_view;
   Source_Range source_range = stack_entry->source_range;
-  Value_View args_view = {
-    .values = dyn_array_get(*stack, start_index),
-    .length = argument_count,
-    .source_range = source_range,
-  };
+  u64 start_index = dyn_array_length(*stack) - argument_count;
+  if (argument_count) {
+    args_view = (Value_View) {
+      .values = dyn_array_get(*stack, start_index),
+      .length = argument_count,
+      .source_range = source_range,
+    };
+  } else {
+    args_view = (Value_View){.source_range = source_range};
+  }
   Value *result_value = 0;
   switch(operator->tag) {
     case Operator_Tag_Alias: {
-      Value **first_arg_pointer = dyn_array_get(*stack, start_index);
-      *first_arg_pointer = token_parse_single(context, parser, *first_arg_pointer);
+      if (argument_count) {
+        Value **first_arg_pointer = dyn_array_get(*stack, start_index);
+        *first_arg_pointer = token_parse_single(context, parser, *first_arg_pointer);
 
-      if (argument_count == 2) {
-        Value **second_arg_pointer = dyn_array_get(*stack, start_index + 1);
-        *second_arg_pointer = token_parse_single(context, parser, *second_arg_pointer);
+        if (argument_count == 2) {
+          Value **second_arg_pointer = dyn_array_get(*stack, start_index + 1);
+          *second_arg_pointer = token_parse_single(context, parser, *second_arg_pointer);
+        }
       }
 
       result_value = mass_forward_call_to_alias(context, parser, args_view, operator->Alias.symbol);
@@ -5573,7 +5585,7 @@ token_parse_if_expression(
   Value *value_condition;
   {
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
-    u32 condition_length;
+    u32 condition_length = 0;
     value_condition = token_parse_expression(
       context, parser, condition_view, &condition_length, context->compilation->common_symbols.then
     );
@@ -5584,7 +5596,7 @@ token_parse_if_expression(
   Value *value_then;
   {
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
-    u32 then_length;
+    u32 then_length = 0;
     value_then = token_parse_expression(
       context, parser, then_view, &then_length, context->compilation->common_symbols._else
     );
@@ -5965,10 +5977,6 @@ token_parse_expression(
     //      and not allow generally empty expressions
     return mass_make_void(context, view.source_range);
   }
-  if(view.length == 1) {
-    *out_match_length = 1;
-    return token_parse_single(context, parser, value_view_get(&view, 0));
-  }
 
   Value *result = 0;
 
@@ -6321,8 +6329,15 @@ mass_return(
   Parser *parser,
   Value_View args
 ) {
-  assert(args.length == 1);
-  Value *return_value = token_parse_single(context, parser, value_view_get(&args, 0));
+  Value *return_value;
+  if (args.length == 0) {
+    return_value = mass_make_void(context, args.source_range);
+  } else if (args.length == 1) {
+    return_value = token_parse_single(context, parser, value_view_get(&args, 0));
+  } else {
+    panic("UNREACHABLE");
+    return 0;
+  }
 
   Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
   *payload = (Mass_Value_Lazy_Payload) {.value = return_value};
@@ -6504,11 +6519,12 @@ mass_compilation_init_scopes(
     mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
   );
 
-  #define MASS_INTRINSIC_OPERATOR(_SYMBOL_, _FIXITY_, _PRECEDENCE_, _INTRINSIC_)\
+  #define MASS_INTRINSIC_OPERATOR(_SYMBOL_, _FLAGS_, _FIXITY_, _PRECEDENCE_, _INTRINSIC_)\
     do {\
       Operator *op = mass_allocate(&context, Operator);\
       *op = (Operator){\
         .tag = Operator_Tag_Intrinsic,\
+        .flags = (_FLAGS_),\
         .fixity = Operator_Fixity_##_FIXITY_,\
         .precedence = (_PRECEDENCE_),\
         .associativity = Operator_Associativity_Left,\
@@ -6525,11 +6541,12 @@ mass_compilation_init_scopes(
       scope_define_operator(&context, root_scope, source_range, symbol, op);\
     } while(false)
 
-  #define MASS_ALIAS_OPERATOR(_SYMBOL_, _FIXITY_, _PRECEDENCE_, _ALIAS_)\
+  #define MASS_ALIAS_OPERATOR(_SYMBOL_, _FLAGS_, _FIXITY_, _PRECEDENCE_, _ALIAS_)\
     do {\
       Operator *op = mass_allocate(&context, Operator);\
       *op = (Operator){\
         .tag = Operator_Tag_Alias,\
+        .flags = (_FLAGS_),\
         .fixity = Operator_Fixity_##_FIXITY_,\
         .precedence = (_PRECEDENCE_),\
         .associativity = Operator_Associativity_Left,\
@@ -6542,58 +6559,58 @@ mass_compilation_init_scopes(
     } while(false)
 
 
-  MASS_INTRINSIC_OPERATOR(".", Infix, 20, "get");
+  MASS_INTRINSIC_OPERATOR(".", Operator_Flags_None, Infix, 20, "get");
 
   // These keyword-like operators have extremely high precedence to make sure that
   // they really get the next token, unless the user has something really specific
   // in mind and creates an operator with an even higher precedence.
-  MASS_INTRINSIC_OPERATOR("module", Prefix, 100, "inline_module");
-  MASS_INTRINSIC_OPERATOR("intrinsic", Prefix, 100, "intrinsic");
-  MASS_INTRINSIC_OPERATOR("c_struct", Prefix, 100, "c_struct");
-  MASS_INTRINSIC_OPERATOR("exports", Prefix, 100, "exports");
+  MASS_INTRINSIC_OPERATOR("module", Operator_Flags_None, Prefix, 100, "inline_module");
+  MASS_INTRINSIC_OPERATOR("intrinsic", Operator_Flags_None, Prefix, 100, "intrinsic");
+  MASS_INTRINSIC_OPERATOR("c_struct", Operator_Flags_None, Prefix, 100, "c_struct");
+  MASS_INTRINSIC_OPERATOR("exports", Operator_Flags_None, Prefix, 100, "exports");
 
   // `using` and `return` want an arbitrary expression so have the lowest precedence
-  MASS_INTRINSIC_OPERATOR("using", Prefix, 0, "using");
-  MASS_INTRINSIC_OPERATOR("return", Prefix, 0, "return");
+  MASS_INTRINSIC_OPERATOR("using", Operator_Flags_None, Prefix, 0, "using");
+  MASS_INTRINSIC_OPERATOR("return", Operator_Flags_Optional_Rhs, Prefix, 0, "return");
 
   // `size_of` and `type_of` are essentially function calls with special parsing
   // rules and evaluation behavior, so they get the same precedence as `apply`
-  MASS_INTRINSIC_OPERATOR("import", Prefix, 20, "import");
-  MASS_INTRINSIC_OPERATOR("type_of", Prefix, 20, "type_of");
-  MASS_INTRINSIC_OPERATOR("parse_type", Prefix, 20, "parse_type");
-  MASS_INTRINSIC_OPERATOR("size_of", Prefix, 20, "size_of");
+  MASS_INTRINSIC_OPERATOR("import", Operator_Flags_None, Prefix, 20, "import");
+  MASS_INTRINSIC_OPERATOR("type_of", Operator_Flags_None, Prefix, 20, "type_of");
+  MASS_INTRINSIC_OPERATOR("parse_type", Operator_Flags_None, Prefix, 20, "parse_type");
+  MASS_INTRINSIC_OPERATOR("size_of", Operator_Flags_None, Prefix, 20, "size_of");
 
-  MASS_INTRINSIC_OPERATOR("'", Prefix, 30, "quote");
-  MASS_INTRINSIC_OPERATOR("'", Postfix, 30, "unquote");
+  MASS_INTRINSIC_OPERATOR("'", Operator_Flags_None, Prefix, 30, "quote");
+  MASS_INTRINSIC_OPERATOR("'", Operator_Flags_None, Postfix, 30, "unquote");
 
-  MASS_INTRINSIC_OPERATOR(",", Infix, 0, "comma");
+  MASS_INTRINSIC_OPERATOR(",", Operator_Flags_None, Infix, 0, "comma");
 
-  MASS_INTRINSIC_OPERATOR("=", Infix, 1, "operator_assignment");
-  MASS_INTRINSIC_OPERATOR(":=", Infix, 0, "define_inferred");
-  MASS_INTRINSIC_OPERATOR(".*", Postfix, 20, "dereference");
+  MASS_INTRINSIC_OPERATOR("=", Operator_Flags_None, Infix, 1, "operator_assignment");
+  MASS_INTRINSIC_OPERATOR(":=", Operator_Flags_None, Infix, 0, "define_inferred");
+  MASS_INTRINSIC_OPERATOR(".*", Operator_Flags_None, Postfix, 20, "dereference");
 
-  MASS_INTRINSIC_OPERATOR(":", Infix, 2, "typed_symbol");
+  MASS_INTRINSIC_OPERATOR(":", Operator_Flags_None, Infix, 2, "typed_symbol");
 
-  MASS_INTRINSIC_OPERATOR("@", Prefix, 20, "eval");
-  MASS_INTRINSIC_OPERATOR(".", Prefix, 30, "named_accessor");
+  MASS_INTRINSIC_OPERATOR("@", Operator_Flags_None, Prefix, 20, "eval");
+  MASS_INTRINSIC_OPERATOR(".", Operator_Flags_None, Prefix, 30, "named_accessor");
 
-  MASS_ALIAS_OPERATOR("==", Infix, 7, "equal");
-  MASS_ALIAS_OPERATOR("!=", Infix, 7, "not_equal");
-  MASS_ALIAS_OPERATOR("<", Infix, 8, "less");
-  MASS_ALIAS_OPERATOR(">", Infix, 8, "greater");
-  MASS_ALIAS_OPERATOR("<=", Infix, 8, "less_equal");
-  MASS_ALIAS_OPERATOR(">=", Infix, 8, "greater_equal");
-  MASS_ALIAS_OPERATOR("+", Infix, 10, "add");
-  MASS_ALIAS_OPERATOR("-", Infix, 10, "subtract");
-  MASS_ALIAS_OPERATOR("*", Infix, 15, "multiply");
-  MASS_ALIAS_OPERATOR("/", Infix, 15, "divide");
-  MASS_ALIAS_OPERATOR("%", Infix, 15, "remainder");
-  MASS_ALIAS_OPERATOR("<<", Infix, 15, "logical_shift_left");
-  MASS_ALIAS_OPERATOR(">>", Infix, 15, "logical_shift_right");
-  MASS_ALIAS_OPERATOR("|", Infix, 15, "bitwise_or");
-  MASS_ALIAS_OPERATOR("&", Infix, 15, "bitwise_and");
-  MASS_ALIAS_OPERATOR("-", Prefix, 16, "negate");
-  MASS_ALIAS_OPERATOR("&", Prefix, 16, "pointer_to");
+  MASS_ALIAS_OPERATOR("==", Operator_Flags_None, Infix, 7, "equal");
+  MASS_ALIAS_OPERATOR("!=", Operator_Flags_None, Infix, 7, "not_equal");
+  MASS_ALIAS_OPERATOR("<", Operator_Flags_None, Infix, 8, "less");
+  MASS_ALIAS_OPERATOR(">", Operator_Flags_None, Infix, 8, "greater");
+  MASS_ALIAS_OPERATOR("<=", Operator_Flags_None, Infix, 8, "less_equal");
+  MASS_ALIAS_OPERATOR(">=", Operator_Flags_None, Infix, 8, "greater_equal");
+  MASS_ALIAS_OPERATOR("+", Operator_Flags_None, Infix, 10, "add");
+  MASS_ALIAS_OPERATOR("-", Operator_Flags_None, Infix, 10, "subtract");
+  MASS_ALIAS_OPERATOR("*", Operator_Flags_None, Infix, 15, "multiply");
+  MASS_ALIAS_OPERATOR("/", Operator_Flags_None, Infix, 15, "divide");
+  MASS_ALIAS_OPERATOR("%", Operator_Flags_None, Infix, 15, "remainder");
+  MASS_ALIAS_OPERATOR("<<", Operator_Flags_None, Infix, 15, "logical_shift_left");
+  MASS_ALIAS_OPERATOR(">>", Operator_Flags_None, Infix, 15, "logical_shift_right");
+  MASS_ALIAS_OPERATOR("|", Operator_Flags_None, Infix, 15, "bitwise_or");
+  MASS_ALIAS_OPERATOR("&", Operator_Flags_None, Infix, 15, "bitwise_and");
+  MASS_ALIAS_OPERATOR("-", Operator_Flags_None, Prefix, 16, "negate");
+  MASS_ALIAS_OPERATOR("&", Operator_Flags_None, Prefix, 16, "pointer_to");
 
   #undef MASS_INTRINSIC_OPERATOR
   #undef MASS_ALIAS_OPERATOR

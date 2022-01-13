@@ -395,6 +395,21 @@ const char *operator_associativity_name(Operator_Associativity value) {
 typedef dyn_array_type(Operator_Associativity *) Array_Operator_Associativity_Ptr;
 typedef dyn_array_type(const Operator_Associativity *) Array_Const_Operator_Associativity_Ptr;
 
+typedef enum Operator_Flags {
+  Operator_Flags_None = 0,
+  Operator_Flags_Optional_Rhs = 1,
+} Operator_Flags;
+
+const char *operator_flags_name(Operator_Flags value) {
+  if (value == 0) return "Operator_Flags_None";
+  if (value == 1) return "Operator_Flags_Optional_Rhs";
+  assert(!"Unexpected value for enum Operator_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Operator_Flags *) Array_Operator_Flags_Ptr;
+typedef dyn_array_type(const Operator_Flags *) Array_Const_Operator_Flags_Ptr;
+
 typedef struct Operator Operator;
 typedef struct Operator_Alias Operator_Alias;
 typedef struct Operator_Intrinsic Operator_Intrinsic;
@@ -1559,9 +1574,10 @@ typedef struct Operator_Intrinsic {
 typedef struct Operator {
   Operator_Tag tag;
   char _tag_padding[4];
+  Operator_Flags flags;
   Operator_Fixity fixity;
   Operator_Associativity associativity;
-  u64 precedence;
+  u32 precedence;
   union {
     Operator_Alias Alias;
     Operator_Intrinsic Intrinsic;
@@ -2594,6 +2610,12 @@ static Descriptor descriptor_array_operator_associativity_ptr;
 static Descriptor descriptor_array_const_operator_associativity_ptr;
 static Descriptor descriptor_operator_associativity_pointer;
 static Descriptor descriptor_operator_associativity_pointer_pointer;
+static Descriptor descriptor_operator_flags;
+static Descriptor descriptor_array_operator_flags;
+static Descriptor descriptor_array_operator_flags_ptr;
+static Descriptor descriptor_array_const_operator_flags_ptr;
+static Descriptor descriptor_operator_flags_pointer;
+static Descriptor descriptor_operator_flags_pointer_pointer;
 static Descriptor descriptor_operator;
 static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
@@ -4229,6 +4251,13 @@ static C_Enum_Item operator_associativity_items[] = {
 };
 DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity, operator_associativity);
 DEFINE_VALUE_IS_AS_HELPERS(Operator_Associativity *, operator_associativity_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(operator_flags, Operator_Flags)
+static C_Enum_Item operator_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Optional_Rhs"), .value = 1 },
+};
+DEFINE_VALUE_IS_AS_HELPERS(Operator_Flags, operator_flags);
+DEFINE_VALUE_IS_AS_HELPERS(Operator_Flags *, operator_flags_pointer);
 /*union struct start */
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operator_ptr, operator_pointer, Array_Operator_Ptr);
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_operator, operator, Array_Operator);
@@ -4260,6 +4289,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
     .offset = offsetof(Operator, tag),
   },
   {
+    .descriptor = &descriptor_operator_flags,
+    .name = slice_literal_fields("flags"),
+    .offset = offsetof(Operator, flags),
+  },
+  {
     .descriptor = &descriptor_operator_fixity,
     .name = slice_literal_fields("fixity"),
     .offset = offsetof(Operator, fixity),
@@ -4270,7 +4304,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operator, Operator,
     .offset = offsetof(Operator, associativity),
   },
   {
-    .descriptor = &descriptor_i64,
+    .descriptor = &descriptor_i32,
     .name = slice_literal_fields("precedence"),
     .offset = offsetof(Operator, precedence),
   },
