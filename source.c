@@ -821,8 +821,8 @@ deduce_runtime_descriptor_for_value(
   const Descriptor *deduced_descriptor = value->descriptor;
 
   if (mass_value_is_static(value)) {
-    if (value->descriptor == &descriptor_i64) {
-      if (maybe_desired_descriptor && maybe_desired_descriptor != &descriptor_i64) {
+    if (same_type(value->descriptor, &descriptor_i64)) {
+      if (maybe_desired_descriptor && !same_type(maybe_desired_descriptor, &descriptor_i64)) {
         if (maybe_desired_descriptor->tag == Descriptor_Tag_Pointer_To) {
           u64 bits = value_as_i64(value)->bits;
           if (bits != 0) {
@@ -837,7 +837,7 @@ deduce_runtime_descriptor_for_value(
         }
         deduced_descriptor = maybe_desired_descriptor;
       }
-    } else if (value->descriptor == &descriptor_tuple) {
+    } else if (same_type(value->descriptor, &descriptor_tuple)) {
       const Tuple *tuple = value_as_tuple(value);
       if (maybe_desired_descriptor) {
         switch(maybe_desired_descriptor->tag) {
@@ -869,8 +869,8 @@ deduce_runtime_descriptor_for_value(
         deduced_descriptor = anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
       }
     } else if (
-      value->descriptor == &descriptor_overload ||
-      value->descriptor == &descriptor_function_literal
+      same_type(value->descriptor, &descriptor_overload) ||
+      same_type(value->descriptor, &descriptor_function_literal)
     ) {
       Array_Resolved_Function_Parameter parameters;
       if (maybe_desired_descriptor) {
