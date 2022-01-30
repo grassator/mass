@@ -6160,6 +6160,48 @@ mass_handle_block_lazy_proc(
 }
 
 static Value *
+mass_handle_explicit_return_lazy_proc(
+  Mass_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  const Source_Range *source_range,
+  const Ast_Return *ast_return
+) {
+  Value *parse_result = ast_return->value;
+  mass_assign_helper(context, builder, &builder->return_value, parse_result, source_range);
+  if (mass_has_error(context)) return 0;
+  Storage return_label = code_label32(builder->code_block.end_label);
+
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range,
+    &(Instruction_Assembly) {jmp, {return_label}}
+  );
+
+  Value *void_value = mass_make_void(context, *source_range);
+  return expected_result_validate(expected_result, void_value);
+}
+
+static Value *
+mass_return(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args
+) {
+  Ast_Return *ast_return = mass_allocate(context, Ast_Return);
+  if (args.length == 0) {
+    *ast_return = (Ast_Return) {.value = mass_make_void(context, args.source_range)};
+  } else if (args.length == 1) {
+    *ast_return = (Ast_Return) {.value = token_parse_single(context, parser, value_view_get(&args, 0))};
+  } else {
+    panic("UNREACHABLE");
+    return 0;
+  }
+  if (mass_has_error(context)) return 0;
+
+  return value_make(context, &descriptor_ast_return, storage_static(ast_return), args.source_range);
+}
+
+static Value *
 token_parse_block_statements(
   Mass_Context *context,
   Parser *parser,
@@ -6224,6 +6266,12 @@ token_parse_block_statements(
           const Module *module = value_as_ast_using(parse_result)->module;
           mass_copy_scope_exports(parser->scope, module->exports.scope);
           continue;
+        } else if (parse_result->descriptor == &descriptor_ast_return) {
+          const Ast_Return *ast_return = value_as_ast_return(parse_result);
+          parse_result = mass_make_lazy_value(
+            context, parser, parse_result->source_range, ast_return,
+            &descriptor_void, mass_handle_explicit_return_lazy_proc
+          );
         } else if (parse_result->descriptor == &descriptor_assignment) {
           parse_result = mass_make_lazy_value(
             context, parser, parse_result->source_range, value_as_assignment(parse_result),
@@ -6316,52 +6364,6 @@ mass_using(
   Ast_Using *using = mass_allocate(context, Ast_Using);
   *using = (Ast_Using) { .module = module };
   return value_make(context, &descriptor_ast_using, storage_immediate(using), args.source_range);
-}
-
-static Value *
-mass_handle_explicit_return_lazy_proc(
-  Mass_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range,
-  const Mass_Value_Lazy_Payload *payload
-) {
-  Value *parse_result = payload->value;
-  mass_assign_helper(context, builder, &builder->return_value, parse_result, source_range);
-  if (mass_has_error(context)) return 0;
-  Storage return_label = code_label32(builder->code_block.end_label);
-
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range,
-    &(Instruction_Assembly) {jmp, {return_label}}
-  );
-
-  Value *void_value = mass_make_void(context, *source_range);
-  return expected_result_validate(expected_result, void_value);
-}
-
-static Value *
-mass_return(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args
-) {
-  Value *return_value;
-  if (args.length == 0) {
-    return_value = mass_make_void(context, args.source_range);
-  } else if (args.length == 1) {
-    return_value = token_parse_single(context, parser, value_view_get(&args, 0));
-  } else {
-    panic("UNREACHABLE");
-    return 0;
-  }
-
-  Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
-  *payload = (Mass_Value_Lazy_Payload) {.value = return_value};
-  return mass_make_lazy_value(
-    context, parser, args.source_range, payload, &descriptor_void,
-    mass_handle_explicit_return_lazy_proc
-  );
 }
 
 static Value *

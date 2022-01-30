@@ -1245,6 +1245,10 @@ main(void) {
     { "Value_View", "children" },
   })));
 
+  export_compiler(push_type(type_struct("Ast_Return", (Struct_Item[]){
+    { "Value *", "value" },
+  })));
+
   export_compiler(push_type(type_struct("Ast_Statement", (Struct_Item[]){
     { "Value_View", "children" },
     { "Ast_Statement *", "next" },

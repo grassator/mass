@@ -63,6 +63,10 @@ typedef struct Group_Paren Group_Paren;
 typedef dyn_array_type(Group_Paren *) Array_Group_Paren_Ptr;
 typedef dyn_array_type(const Group_Paren *) Array_Const_Group_Paren_Ptr;
 
+typedef struct Ast_Return Ast_Return;
+typedef dyn_array_type(Ast_Return *) Array_Ast_Return_Ptr;
+typedef dyn_array_type(const Ast_Return *) Array_Const_Ast_Return_Ptr;
+
 typedef struct Ast_Statement Ast_Statement;
 typedef dyn_array_type(Ast_Statement *) Array_Ast_Statement_Ptr;
 typedef dyn_array_type(const Ast_Statement *) Array_Const_Ast_Statement_Ptr;
@@ -1219,6 +1223,11 @@ typedef struct Group_Paren {
   Value_View children;
 } Group_Paren;
 typedef dyn_array_type(Group_Paren) Array_Group_Paren;
+
+typedef struct Ast_Return {
+  Value * value;
+} Ast_Return;
+typedef dyn_array_type(Ast_Return) Array_Ast_Return;
 
 typedef struct Ast_Statement {
   Value_View children;
@@ -2433,6 +2442,11 @@ static Descriptor descriptor_array_group_paren;
 static Descriptor descriptor_array_group_paren_ptr;
 static Descriptor descriptor_group_paren_pointer;
 static Descriptor descriptor_group_paren_pointer_pointer;
+static Descriptor descriptor_ast_return;
+static Descriptor descriptor_array_ast_return;
+static Descriptor descriptor_array_ast_return_ptr;
+static Descriptor descriptor_ast_return_pointer;
+static Descriptor descriptor_ast_return_pointer_pointer;
 static Descriptor descriptor_ast_statement;
 static Descriptor descriptor_array_ast_statement;
 static Descriptor descriptor_array_ast_statement_ptr;
@@ -3377,6 +3391,18 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_group_paren_ptr, group_paren_pointer, Array_G
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_group_paren, group_paren, Array_Group_Paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren);
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren *, group_paren_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(ast_return, Ast_Return,
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("value"),
+    .offset = offsetof(Ast_Return, value),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(ast_return);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_return_ptr, ast_return_pointer, Array_Ast_Return_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_ast_return, ast_return, Array_Ast_Return);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Return, ast_return);
+DEFINE_VALUE_IS_AS_HELPERS(Ast_Return *, ast_return_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(ast_statement, Ast_Statement,
   {
     .descriptor = &descriptor_value_view,
