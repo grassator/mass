@@ -1526,6 +1526,7 @@ main(void) {
     { "Epoch", "epoch" },
     { "Scope *", "scope" },
     { "Module *", "module" },
+    { "const Descriptor * *", "return_descriptor_pointer" },
   })));
 
   push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){

@@ -1566,6 +1566,7 @@ typedef struct Parser {
   Epoch epoch;
   Scope * scope;
   Module * module;
+  const Descriptor * * return_descriptor_pointer;
 } Parser;
 typedef dyn_array_type(Parser) Array_Parser;
 
@@ -4258,6 +4259,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parser, Parser,
     .descriptor = &descriptor_module_pointer,
     .name = slice_literal_fields("module"),
     .offset = offsetof(Parser, module),
+  },
+  {
+    .descriptor = &descriptor_descriptor_pointer_pointer,
+    .name = slice_literal_fields("return_descriptor_pointer"),
+    .offset = offsetof(Parser, return_descriptor_pointer),
   },
 );
 MASS_DEFINE_TYPE_VALUE(parser);

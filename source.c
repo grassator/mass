@@ -6181,6 +6181,9 @@ mass_return(
     return 0;
   }
   if (mass_has_error(context)) return 0;
+  if (!*parser->return_descriptor_pointer) {
+    *parser->return_descriptor_pointer = ast_return->value->descriptor;
+  }
 
   return value_make(context, &descriptor_ast_return, storage_static(ast_return), args.source_range);
 }

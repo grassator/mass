@@ -946,8 +946,7 @@ spec("source") {
       check(checker(42) == 42);
     }
 
-    // FIXME there seem to be multiple problems with an explicit return at the end of the function
-    xit("should support inferred return types for a non-recursive fn with an explicit return at the end") {
+    it("should support inferred return types for a non-recursive fn with an explicit return at the end") {
       u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn(x: i64) -> _ { return x }"

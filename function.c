@@ -556,14 +556,15 @@ mass_infer_function_return_type(
   Value *body
 ) {
   Scope *body_scope = scope_make(context->allocator, scope);
+  const Descriptor *return_descriptor = 0; // Inferred
   Parser body_parser = {
+    .return_descriptor_pointer = &return_descriptor,
     .flags = Parser_Flags_None,
     .scope = body_scope,
     .epoch = get_new_epoch(),
     .module = 0, // FIXME provide module here
   };
 
-  // FIXME :FakeArgs
   for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
     const Resolved_Function_Parameter *def_param = dyn_array_get(info->parameters, i);
     assert(def_param->descriptor);
@@ -592,7 +593,12 @@ mass_infer_function_return_type(
   const Ast_Block *block = value_as_ast_block(body);
   Value *lazy_value = token_parse_block(context, &body_parser, block, &body->source_range);
   if (mass_has_error(context)) return 0;
-  return value_or_lazy_value_descriptor(lazy_value);
+  if (lazy_value->descriptor->tag == Descriptor_Tag_Never) {
+    if (return_descriptor) {
+      return return_descriptor;
+    }
+  }
+  return lazy_value->descriptor;
 }
 
 static Value *
@@ -653,8 +659,10 @@ mass_function_literal_instance_for_info(
   );
   dyn_array_push(mutable_literal->instances, cached_instance);
 
+  const Descriptor *return_descriptor = fn_info->return_descriptor;
   Scope *body_scope = scope_make(context->allocator, literal->own_scope);
   Parser body_parser = {
+    .return_descriptor_pointer = &return_descriptor,
     .flags = Parser_Flags_None,
     .scope = body_scope,
     .epoch = get_new_epoch(),
@@ -663,7 +671,6 @@ mass_function_literal_instance_for_info(
 
   Slice end_label_name = slice_literal(":end");
 
-  const Descriptor *return_descriptor = fn_info->return_descriptor;
   Storage return_storage = instance_descriptor->Function_Instance.call_setup.callee_return;
   Source_Range return_range = literal->header.returns.source_range;
 
