@@ -912,6 +912,16 @@ spec("source") {
       check(actual == 42);
     }
 
+    it("should report an error when unreacheable statements are found after a return") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x : i64) -> (i64) { return x; x + 2 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Unreachable_Statement);
+    }
+
     it("should be able to have an explicit return without any expression following") {
       void(*checker)(u64 *) = (void(*)(u64 *))test_program_inline_source_function(
         "checker", &test_context,

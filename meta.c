@@ -1861,6 +1861,7 @@ main(void) {
 
   export_compiler_custom_name("Error", push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),
+    struct_empty("Unreachable_Statement"),
     struct_empty("Parse"),
     struct_empty("Assignment_To_Constant"),
     struct_fields("User_Defined", (Struct_Item[]){

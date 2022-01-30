@@ -6207,6 +6207,7 @@ token_parse_block_statements(
     .capacity = 128,
   );
 
+  bool last_statement_was_return = false;
   for (; statement; statement = statement->next) {
     if (mass_has_error(context)) goto defer;
     Source_Range statement_range = statement->children.source_range;
@@ -6219,6 +6220,14 @@ token_parse_block_statements(
         .epoch = parser->epoch,
       },
     };
+
+    if (last_statement_was_return) {
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Unreachable_Statement,
+        .source_range = statement_range,
+      });
+      return 0;
+    }
 
     bool matched = token_parse_constant_definitions(
       context, parser, statement->children, &temp_lazy_value.Lazy
@@ -6254,6 +6263,7 @@ token_parse_block_statements(
           mass_copy_scope_exports(parser->scope, module->exports.scope);
           continue;
         } else if (parse_result->descriptor == &descriptor_ast_return) {
+          last_statement_was_return = true;
           const Ast_Return *ast_return = value_as_ast_return(parse_result);
           parse_result = mass_make_lazy_value(
             context, parser, parse_result->source_range, ast_return,

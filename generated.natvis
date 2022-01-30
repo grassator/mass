@@ -2014,6 +2014,9 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Unimplemented">
     Unimplemented
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Unreachable_Statement">
+    Unreachable_Statement
+  </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Parse">
     Parse
   </DisplayString>
