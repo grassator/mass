@@ -777,8 +777,13 @@ deduce_runtime_descriptor_for_value(
   Value *value,
   const Descriptor *maybe_desired_descriptor
 ) {
-  if (maybe_desired_descriptor && maybe_desired_descriptor->tag == Descriptor_Tag_Void) {
-    return maybe_desired_descriptor;
+  if (maybe_desired_descriptor) {
+    if (maybe_desired_descriptor->tag == Descriptor_Tag_Void) return maybe_desired_descriptor;
+    if (same_type(value->descriptor, maybe_desired_descriptor)) return value->descriptor;
+  }
+  if (value->descriptor->tag == Descriptor_Tag_Never) {
+    if (!same_type(value->descriptor, maybe_desired_descriptor)) return 0;
+    return value->descriptor;
   }
 
   const Descriptor *deduced_descriptor = value->descriptor;
@@ -5532,19 +5537,27 @@ mass_handle_if_expression_lazy_proc(
   Value *result_value = value_force(context, builder, expected_result, payload->then);
   if (mass_has_error(context)) return 0;
 
-  Source_Range after_then_body_source_range = payload->then->source_range;
-  after_then_body_source_range.offsets.from = after_then_body_source_range.offsets.to;
-  push_eagerly_encoded_assembly(
-    &builder->code_block, after_then_body_source_range,
-    &(Instruction_Assembly){jmp, {code_label32(after_label)}}
-  );
+  bool empty_else_branch =
+    payload->else_->descriptor == &descriptor_void && mass_value_is_static(payload->else_);
+  if (empty_else_branch) {
+    push_instruction(&builder->code_block, (Instruction) {
+      .tag = Instruction_Tag_Label,
+      .Label.pointer = else_label,
+    });
+  } else {
+    Source_Range after_then_body_source_range = payload->then->source_range;
+    after_then_body_source_range.offsets.from = after_then_body_source_range.offsets.to;
+    push_eagerly_encoded_assembly(
+      &builder->code_block, after_then_body_source_range,
+      &(Instruction_Assembly){jmp, {code_label32(after_label)}}
+    );
+    push_instruction(&builder->code_block, (Instruction) {
+      .tag = Instruction_Tag_Label,
+      .Label.pointer = else_label,
+    });
+    value_force_exact(context, builder, result_value, payload->else_);
+  }
 
-  push_instruction(&builder->code_block, (Instruction) {
-    .tag = Instruction_Tag_Label,
-    .Label.pointer = else_label,
-  });
-
-  value_force_exact(context, builder, result_value, payload->else_);
   if (mass_has_error(context)) return 0;
 
   push_instruction(&builder->code_block, (Instruction) {
@@ -5612,12 +5625,9 @@ token_parse_if_expression(
     return condition ? value_then : value_else;
   }
 
-  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(value_then);
-  if (context_is_compile_time_eval(context)) {
-    result_descriptor = deduce_runtime_descriptor_for_value(
-      context, value_else, result_descriptor
-    );
-  }
+  const Descriptor *result_descriptor = value_then->descriptor->tag == Descriptor_Tag_Never
+    ? value_else->descriptor
+    : value_then->descriptor;
 
   Mass_If_Expression_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_If_Expression_Lazy_Payload);
@@ -6145,8 +6155,14 @@ mass_handle_explicit_return_lazy_proc(
     &(Instruction_Assembly) {jmp, {return_label}}
   );
 
-  Value *void_value = mass_make_void(context, *source_range);
-  return expected_result_validate(expected_result, void_value);
+  const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
+  Value *result_value;
+  if (same_type(expected_descriptor, &descriptor_void)) {
+    result_value = mass_make_void(context, *source_range);
+  } else {
+    result_value = mass_make_never(context, *source_range);
+  }
+  return expected_result_validate(expected_result, result_value);
 }
 
 static Value *
@@ -6238,7 +6254,7 @@ token_parse_block_statements(
           const Ast_Return *ast_return = value_as_ast_return(parse_result);
           parse_result = mass_make_lazy_value(
             context, parser, parse_result->source_range, ast_return,
-            &descriptor_void, mass_handle_explicit_return_lazy_proc
+            &descriptor_never, mass_handle_explicit_return_lazy_proc
           );
         } else if (parse_result->descriptor == &descriptor_assignment) {
           parse_result = mass_make_lazy_value(

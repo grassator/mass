@@ -564,8 +564,7 @@ spec("source") {
       s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
         "is_positive", &test_context,
         "is_positive :: fn(x : s32) -> (s8) {\n"
-          "if x < 10 then { return 0 } else { return 1 }\n"
-          "0"
+          "if x < 10 then { return 0 } else { return 1 }"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
@@ -900,6 +899,16 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       u64 actual = checker(0);
+      check(actual == 42);
+    }
+
+    it("should be able to have an explicit return at the end of function") {
+      u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x : i64) -> (i64) { return x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      u64 actual = checker(42);
       check(actual == 42);
     }
 

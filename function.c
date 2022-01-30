@@ -770,7 +770,16 @@ mass_function_literal_instance_for_info(
   }
   if (mass_has_error(context)) return 0;
 
-  value_force_exact(context, builder, &builder->return_value, parse_result);
+  if (same_type(parse_result->descriptor, &descriptor_never)) {
+    // TODO probably should verify that there are explicit returns
+    //      in the function, otherwise the return type of the function
+    //      itself should be `never`
+    Expected_Result expected_result = expected_result_any(&descriptor_never);
+    (void)value_force(context, builder, &expected_result, parse_result);
+  } else {
+    value_force_exact(context, builder, &builder->return_value, parse_result);
+  }
+  if (mass_has_error(context)) return 0;
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
