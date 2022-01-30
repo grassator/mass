@@ -324,6 +324,40 @@ value_make(
   );
 }
 
+
+static inline const Descriptor *
+mass_expected_result_descriptor(
+  const Expected_Result *expected_result
+) {
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: return expected_result->Exact.descriptor;
+    case Expected_Result_Tag_Flexible: return expected_result->Flexible.descriptor;
+  }
+  panic("Unknown Expected_Result tag");
+  return 0;
+}
+
+static inline Expected_Result
+mass_expected_result_exact(
+  const Descriptor *descriptor,
+  Storage storage
+) {
+  return (Expected_Result) {
+    .tag = Expected_Result_Tag_Exact,
+    .Exact = { .descriptor = descriptor, .storage = storage },
+  };
+}
+
+static inline Expected_Result
+expected_result_any(
+  const Descriptor *descriptor
+) {
+  return (Expected_Result){
+    .tag = Expected_Result_Tag_Flexible,
+    .Flexible = { .descriptor = descriptor },
+  };
+}
+
 static inline Value *
 mass_make_void(
   Mass_Context *context,
