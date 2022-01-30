@@ -876,7 +876,7 @@ spec("source") {
     it("should disallow default arguments coming after non-default ones") {
       test_program_inline_source_function(
         "test", &test_context,
-        "test :: fn(x : s64, y : s64 = 20, z : s32) -> () {}\n"
+        "test :: fn(x : i64, y : i64 = 20, z : i64) -> () {}\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -884,22 +884,22 @@ spec("source") {
     }
 
     it("should support capturing static arguments") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: { ANSWER :: 42; fn() -> (s64) { ANSWER } }\n"
+        "checker :: { ANSWER :: 42; fn() -> (i64) { ANSWER } }\n"
       );
       check(spec_check_mass_result(test_context.result));
-      s64 actual = checker();
+      u64 actual = checker();
       check(actual == 42);
     }
 
     it("should be able to have an explicit return") {
-      s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
+      u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(x : s32) -> (s32) { if x > 0 then { return x }; 0 }"
+        "checker :: fn(x : i64) -> (i64) { if x == 0 then { return 42 }; 0 }"
       );
       check(spec_check_mass_result(test_context.result));
-      s32 actual = checker(42);
+      u64 actual = checker(0);
       check(actual == 42);
     }
 
