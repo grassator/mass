@@ -1954,13 +1954,14 @@ typedef dyn_array_type(Struct_Field) Array_Struct_Field;
 
 typedef enum {
   Descriptor_Tag_Void = 0,
-  Descriptor_Tag_Raw = 1,
-  Descriptor_Tag_Float = 2,
-  Descriptor_Tag_Integer = 3,
-  Descriptor_Tag_Function_Instance = 4,
-  Descriptor_Tag_Fixed_Array = 5,
-  Descriptor_Tag_Struct = 6,
-  Descriptor_Tag_Pointer_To = 7,
+  Descriptor_Tag_Never = 1,
+  Descriptor_Tag_Raw = 2,
+  Descriptor_Tag_Float = 3,
+  Descriptor_Tag_Integer = 4,
+  Descriptor_Tag_Function_Instance = 5,
+  Descriptor_Tag_Fixed_Array = 6,
+  Descriptor_Tag_Struct = 7,
+  Descriptor_Tag_Pointer_To = 8,
 } Descriptor_Tag;
 
 typedef struct Descriptor_Integer {
@@ -2379,6 +2380,8 @@ _Pragma("warning (pop)")
 
 static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
+static Descriptor descriptor_never;
+static Descriptor descriptor_never_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_descriptor_pointer;
 static Descriptor descriptor_bits;
@@ -5258,13 +5261,14 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_descriptor, descriptor, Array_Descriptor);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Void"), .value = 0 },
-{ .name = slice_literal_fields("Raw"), .value = 1 },
-{ .name = slice_literal_fields("Float"), .value = 2 },
-{ .name = slice_literal_fields("Integer"), .value = 3 },
-{ .name = slice_literal_fields("Function_Instance"), .value = 4 },
-{ .name = slice_literal_fields("Fixed_Array"), .value = 5 },
-{ .name = slice_literal_fields("Struct"), .value = 6 },
-{ .name = slice_literal_fields("Pointer_To"), .value = 7 },
+{ .name = slice_literal_fields("Never"), .value = 1 },
+{ .name = slice_literal_fields("Raw"), .value = 2 },
+{ .name = slice_literal_fields("Float"), .value = 3 },
+{ .name = slice_literal_fields("Integer"), .value = 4 },
+{ .name = slice_literal_fields("Function_Instance"), .value = 5 },
+{ .name = slice_literal_fields("Fixed_Array"), .value = 6 },
+{ .name = slice_literal_fields("Struct"), .value = 7 },
+{ .name = slice_literal_fields("Pointer_To"), .value = 8 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_integer, Descriptor_Integer,
   {

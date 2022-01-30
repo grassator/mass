@@ -244,6 +244,12 @@ static Descriptor descriptor_void = {
 MASS_DEFINE_TYPE_VALUE(void);
 MASS_DEFINE_POINTER_DESCRIPTOR(void);
 
+static Descriptor descriptor_never = {
+  .tag = Descriptor_Tag_Never,
+};
+MASS_DEFINE_TYPE_VALUE(never);
+MASS_DEFINE_POINTER_DESCRIPTOR(never);
+
 typedef struct {
   void *bytes;
   u64 length;

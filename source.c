@@ -804,6 +804,7 @@ deduce_runtime_descriptor_for_value(
       const Tuple *tuple = value_as_tuple(value);
       if (maybe_desired_descriptor) {
         switch(maybe_desired_descriptor->tag) {
+          case Descriptor_Tag_Never:
           case Descriptor_Tag_Raw:
           case Descriptor_Tag_Integer:
           case Descriptor_Tag_Float:
@@ -4395,8 +4396,9 @@ mass_handle_generic_comparison_lazy_proc(
 
   Value *result = 0;
   switch(lhs_descriptor->tag) {
-    // Two void values are always equal to each other
-    case Descriptor_Tag_Void: {
+    // Two void or never values are always equal to each other
+    case Descriptor_Tag_Void:
+    case Descriptor_Tag_Never: {
       bool equal = true;
       result = value_make(context, &descriptor__bool, storage_immediate(&equal), *source_range);
     } break;

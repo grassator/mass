@@ -1946,6 +1946,9 @@
   <DisplayString Condition="tag == Descriptor_Tag_Void">
     Void
   </DisplayString>
+  <DisplayString Condition="tag == Descriptor_Tag_Never">
+    Never
+  </DisplayString>
   <DisplayString Condition="tag == Descriptor_Tag_Raw">
     Raw
   </DisplayString>

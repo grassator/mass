@@ -367,6 +367,15 @@ mass_make_void(
   return value_make(context, &descriptor_void, storage, source_range);
 }
 
+static inline Value *
+mass_make_never(
+  Mass_Context *context,
+  const Source_Range source_range
+) {
+  Storage storage = { .tag = Storage_Tag_Immediate, .bit_size = {0} };
+  return value_make(context, &descriptor_never, storage, source_range);
+}
+
 static inline bool
 descriptor_is_integer(
   const Descriptor *descriptor

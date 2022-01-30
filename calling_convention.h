@@ -423,6 +423,7 @@ x86_64_system_v_classify(
 
   System_V_Aggregate_Iterator it;
   switch(descriptor->tag) {
+    case Descriptor_Tag_Never:
     case Descriptor_Tag_Void: {
       return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
     } break;
@@ -563,6 +564,7 @@ x86_64_system_v_classify_field_recursively(
 
     switch(it->item->tag) {
       case Descriptor_Tag_Void:
+      case Descriptor_Tag_Never:
       case Descriptor_Tag_Function_Instance:
       case Descriptor_Tag_Pointer_To:
       case Descriptor_Tag_Raw:

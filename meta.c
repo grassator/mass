@@ -1826,6 +1826,7 @@ main(void) {
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Void"),
+    struct_empty("Never"),
     struct_empty("Raw"),
     struct_empty("Float"),
     struct_fields("Integer", (Struct_Item[]){
@@ -2489,6 +2490,9 @@ main(void) {
 
       fprintf(file, "static Descriptor descriptor_void;\n");
       fprintf(file, "static Descriptor descriptor_void_pointer;\n");
+
+      fprintf(file, "static Descriptor descriptor_never;\n");
+      fprintf(file, "static Descriptor descriptor_never_pointer;\n");
 
       // The descriptor of descriptors needs to be forward declared
       fprintf(file, "static Descriptor descriptor_descriptor;\n");

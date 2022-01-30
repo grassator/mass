@@ -122,6 +122,9 @@ mass_error_append_descriptor_impl(
     case Descriptor_Tag_Void: {
       APPEND_LITERAL("()");
     } break;
+    case Descriptor_Tag_Never: {
+      APPEND_LITERAL("never");
+    } break;
     case Descriptor_Tag_Integer:
     case Descriptor_Tag_Float: {
       APPEND_LITERAL("<");
@@ -393,6 +396,7 @@ types_equal(
 
   switch(a->tag) {
     case Descriptor_Tag_Void:
+    case Descriptor_Tag_Never:
     case Descriptor_Tag_Float: {
       return true;
     }
@@ -694,6 +698,7 @@ storage_static_equal_internal(
   //       for padding bytes in Mass, so safer to recurse.
   //return memcmp(a_memory, b_memory, byte_size) == 0;
   switch(a_descriptor->tag) {
+    case Descriptor_Tag_Never:
     case Descriptor_Tag_Void: {
       return true;
     } break;
@@ -1497,6 +1502,7 @@ value_i64_cast_to(
       panic("TODO");
     } break;
     case Descriptor_Tag_Void:
+    case Descriptor_Tag_Never:
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Fixed_Array:
