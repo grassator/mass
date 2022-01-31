@@ -6208,8 +6208,20 @@ token_parse_block_statements(
   );
 
   bool last_statement_was_return = false;
+  Value *last_parse_result = 0;
   for (; statement; statement = statement->next) {
     if (mass_has_error(context)) goto defer;
+    // :IgnoreStaticValueStatements
+    if (last_parse_result) {
+      if (mass_value_is_static(last_parse_result)) {
+        // Static values that are result of the statements are useless and ignored.
+        // It might make sense to warn here, but might be tough to distinguish
+        // cases where this was generated as part of optimization (constant folding,
+        // if branch pruning) vs when it is a user error.
+      } else {
+        dyn_array_push(temp_lazy_statements, last_parse_result);
+      }
+    }
     Source_Range statement_range = statement->children.source_range;
 
     // FIXME token_statement_matcher_in_scopes should instead return a Value *
@@ -6306,8 +6318,15 @@ token_parse_block_statements(
           continue;
         }
       }
-      dyn_array_push(temp_lazy_statements, parse_result);
+
+      // :IgnoreStaticValueStatements
+      last_parse_result = parse_result;
     }
+  }
+
+  // :IgnoreStaticValueStatements
+  if (last_parse_result) {
+    dyn_array_push(temp_lazy_statements, last_parse_result);
   }
 
   if (mass_has_error(context)) goto defer;

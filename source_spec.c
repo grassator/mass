@@ -1759,6 +1759,16 @@ spec("source") {
       check(value_as_i64(result)->bits == 42);
     }
 
+    it("should consider a value compile-time known if all the statements are") {
+      Value *result = test_program_inline_source_base(
+        "RESULT", &test_context,
+        "RESULT :: {1;2;3;42}\n"
+      );
+
+      check(spec_check_mass_result(test_context.result));
+      check(value_as_i64(result)->bits == 42);
+    }
+
     it("should support compile time blocks") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
