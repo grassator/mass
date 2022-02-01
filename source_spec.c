@@ -2262,6 +2262,19 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support defining a compile-time struct") {
+      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "Point :: c_struct [x : s32, y : s32]\n"
+        "test :: fn() -> (s32) {"
+          "p :: Point [31, 11]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to dereference struct pointers") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,

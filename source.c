@@ -980,7 +980,7 @@ mass_assign_helper(
         .expression = source,
       };
       Expected_Result expected_result = expected_result_any(target->descriptor);
-      source = mass_handle_cast_lazy_proc(context, builder, &expected_result, source_range, &lazy_payload);
+      source = mass_cast_lazy_proc(context, builder, &expected_result, source_range, &lazy_payload);
       if (mass_has_error(context)) return;
       source_storage = &value_as_forced(source)->storage;
     }
@@ -2402,7 +2402,7 @@ static bool mass_i64_signed_greater_equal(i64 a, i64 b) { return (s64)a.bits >= 
 static bool mass_i64_unsigned_greater_equal(i64 a, i64 b) { return a.bits >= b.bits; }
 
 static Value *
-mass_handle_cast_lazy_proc(
+mass_cast_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
@@ -2453,7 +2453,7 @@ mass_handle_cast_lazy_proc(
 }
 
 static Value *
-mass_handle_tuple_cast_lazy_proc(
+mass_tuple_cast_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
@@ -2481,28 +2481,33 @@ mass_cast_helper(
     .expression = expression,
   };
 
-  if (
-    expression->descriptor == &descriptor_tuple &&
-    mass_value_is_static(expression)
-  ) {
-    Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
-    *heap_payload = lazy_payload;
-
-    return mass_make_lazy_value(
-      context, parser, source_range, heap_payload, target_descriptor, mass_handle_tuple_cast_lazy_proc
-    );
-  }
-
   if (mass_value_is_static(expression)) {
-    Expected_Result expected_result = expected_result_any(target_descriptor);
-    return mass_handle_cast_lazy_proc(context, 0, &expected_result, &source_range, &lazy_payload);
+    if (value_is_tuple(expression)) {
+      const Tuple *tuple = value_as_tuple(expression);
+      if (mass_tuple_is_static(context, tuple)) {
+        void *memory = mass_allocate_bytes_from_descriptor(context, target_descriptor);
+        Storage storage = storage_static_heap(memory, target_descriptor->bit_size);
+        Expected_Result expected_result = mass_expected_result_exact(target_descriptor, storage);
+        return mass_tuple_cast_lazy_proc(context, 0, &expected_result, &source_range, &lazy_payload);
+      } else {
+        Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
+        *heap_payload = lazy_payload;
+
+        return mass_make_lazy_value(
+          context, parser, source_range, heap_payload, target_descriptor, mass_tuple_cast_lazy_proc
+        );
+      }
+    } else {
+      Expected_Result expected_result = expected_result_any(target_descriptor);
+      return mass_cast_lazy_proc(context, 0, &expected_result, &source_range, &lazy_payload);
+    }
   }
 
   Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
   *heap_payload = lazy_payload;
 
   return mass_make_lazy_value(
-    context, parser, source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+    context, parser, source_range, heap_payload, target_descriptor, mass_cast_lazy_proc
   );
 }
 
@@ -3890,7 +3895,7 @@ token_handle_function_call(
           if (same_type(source->descriptor, &descriptor_i64)) {
             Mass_Cast_Lazy_Payload lazy_payload = { .target = param->descriptor, .expression = source };
             Expected_Result cast_result = mass_expected_result_exact(param->descriptor, storage);
-            mass_handle_cast_lazy_proc(context, 0/*no builder */, &cast_result, &source_range, &lazy_payload);
+            mass_cast_lazy_proc(context, 0/*no builder */, &cast_result, &source_range, &lazy_payload);
           } else {
             mass_assign_helper(context, 0/*no builder */, adjusted_source, source, &args_view.source_range);
           }
@@ -4843,7 +4848,7 @@ mass_handle_assignment_lazy_proc(
       Mass_Cast_Lazy_Payload lazy_payload = { .target = target_descriptor, .expression = source };
       Expected_Result cast_result =
         mass_expected_result_exact(target_descriptor, value_as_forced(target)->storage);
-      mass_handle_cast_lazy_proc(context, builder, &cast_result, source_range, &lazy_payload);
+      mass_cast_lazy_proc(context, builder, &cast_result, source_range, &lazy_payload);
     } else if (
       value_is_tuple(source) ||
       value_is_named_accessor(source) ||

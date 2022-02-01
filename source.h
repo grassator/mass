@@ -9,7 +9,7 @@ typedef struct {
 } Mass_Cast_Lazy_Payload;
 
 static Value *
-mass_handle_cast_lazy_proc(
+mass_cast_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
