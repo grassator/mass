@@ -2006,6 +2006,7 @@ mass_forward_call_to_alias(
   }
 
   Value *target = scope_entry_force_value(context, entry);
+  if (mass_has_error(context)) return 0;
   return token_handle_function_call(context, parser, target, args, source_range);
 }
 
