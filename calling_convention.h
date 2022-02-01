@@ -783,9 +783,9 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     result.caller_return = imm0;
   } else {
     // TODO provide user error? or should it be handled earlier?
-    assert(return_descriptor->bit_size.as_u64 == 32);
+    assert(return_descriptor->bit_size.as_u64 <= 64);
 
-    Storage common_storage = storage_register(Register_A, (Bits){32});
+    Storage common_storage = storage_register(Register_A, return_descriptor->bit_size);
     result.callee_return = common_storage;
     result.caller_return = common_storage;
   }
