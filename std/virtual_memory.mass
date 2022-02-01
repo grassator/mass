@@ -10,8 +10,7 @@ READ_WRITE_EXECUTE :: Permissions[3]
 //equal :: fn(x : Permissions, y : Permissions) -> (bool) { x.bits == y.bits }
 
 // TODO figure out what is the strategy for errors in Mass
-// TODO figure out why default argument `address : &Void = 0` does not work
-allocate :: fn(size : u64, permissions : Permissions) -> (&Void) {
+allocate :: fn(size : u64, permissions : Permissions, address : &Void = 0) -> (&Void) {
   if get_target_os() == .Windows then {
     using import("std/win32")
     allocation_type :: MEM_COMMIT | MEM_RESERVE
@@ -27,7 +26,7 @@ allocate :: fn(size : u64, permissions : Permissions) -> (&Void) {
       assert(false, "UNREACHABLE")
       PAGE_NOACCESS // TODO use an assert that is changed to have `never` type
     }
-    VirtualAlloc(0, size, allocation_type, win32_permissions)
+    VirtualAlloc(address, size, allocation_type, win32_permissions)
   } else {
     using import("std/linux")
     // FIXME figure out how to avoid these weird casts
@@ -43,6 +42,6 @@ allocate :: fn(size : u64, permissions : Permissions) -> (&Void) {
       assert(false, "UNREACHABLE")
       i32(PROT_NONE) // TODO use an assert that is changed to have `never` type
     }
-    sys_mmap(0, size, linux_permissions, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+    sys_mmap(address, size, linux_permissions, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
   }
 }

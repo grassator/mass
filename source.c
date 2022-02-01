@@ -3163,18 +3163,19 @@ mass_function_info_init_for_header_and_maybe_body(
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, header->parameters) {
     Source_Range source_range = param->source_range;
-    if (param->descriptor || param->maybe_default_value) {
+    if (param->maybe_type_expression.length) {
+      scope_define_lazy_compile_time_expression(
+        &temp_context, &args_parser, args_parser.scope, param->symbol, param->maybe_type_expression
+      );
+    } else {
       const Descriptor *descriptor = param->descriptor;
       if (!descriptor) {
+        assert(param->maybe_default_value);
         descriptor = deduce_runtime_descriptor_for_value(context, param->maybe_default_value, 0);
       }
       Storage storage = storage_immediate(&descriptor);
       Value *param_value = value_make(&temp_context, &descriptor_descriptor_pointer, storage, source_range);
       scope_define_value(args_parser.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value);
-    } else {
-      scope_define_lazy_compile_time_expression(
-        &temp_context, &args_parser, args_parser.scope, param->symbol, param->maybe_type_expression
-      );
     }
   }
 
@@ -3192,19 +3193,40 @@ mass_function_info_init_for_header_and_maybe_body(
           descriptor = value_ensure_type(&temp_context, args_parser.scope, type_value, source_range);
           if (mass_has_error(&temp_context)) goto err;
         }
+
         bool was_generic = false;
         if (param->tag == Function_Parameter_Tag_Generic) {
           if (!param->Generic.maybe_type_constraint) {
             was_generic = true;
           }
         }
+
+        // Default value might need to be cast to the actual type of the parameter
+        Value *maybe_default_value = param->maybe_default_value;
+        if (maybe_default_value && !same_type(descriptor, maybe_default_value->descriptor)) {
+          const Descriptor *runtime_descriptor =
+            deduce_runtime_descriptor_for_value(context, maybe_default_value, descriptor);
+          if (!runtime_descriptor) {
+            mass_error(context, (Mass_Error) {
+              .tag = Mass_Error_Tag_Type_Mismatch,
+              .source_range = maybe_default_value->source_range,
+              .Type_Mismatch = { .expected = descriptor, .actual = maybe_default_value->descriptor },
+            });
+            goto err;
+          }
+          maybe_default_value = mass_cast_helper(
+            context, 0, descriptor, maybe_default_value, param->source_range
+          );
+          if (mass_has_error(context)) goto err;
+        }
+
         dyn_array_push(out_info->parameters, (Resolved_Function_Parameter) {
           .tag = Resolved_Function_Parameter_Tag_Unknown,
           .descriptor = descriptor,
           .symbol = param->symbol,
           .source_range = param->source_range,
           .was_generic = was_generic,
-          .maybe_default_value = param->maybe_default_value,
+          .maybe_default_value = maybe_default_value,
         });
       } break;
       case Function_Parameter_Tag_Exact_Static: {
