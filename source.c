@@ -960,8 +960,9 @@ mass_assign_helper(
       if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
         const i64 *literal = value_as_i64(source);
         if (literal->bits == 0) {
-          Storage zero = imm64(0);
-          move_value(builder, source_range, target_storage, &zero);
+          Value null_pointer;
+          value_init(&null_pointer, target->descriptor, imm64(0), source->source_range);
+          mass_assign_helper(context, builder, target, &null_pointer, source_range);
           return;
         } else {
           mass_error(context, (Mass_Error) {
