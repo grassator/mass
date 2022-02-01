@@ -1,17 +1,10 @@
 exports [.allocate, .Permissions, .NONE, .READ, .READ_WRITE, .READ_WRITE_EXECUTE]
 
-// FIXME this should work
-//Permissions :: c_struct [ bits : i64 ]
-//NONE    :: [0]
-//READ    :: [1]
-//READ_WRITE   :: [2]
-//READ_WRITE_EXECUTE :: [3]
-
-Permissions :: i64
-NONE    :: 0
-READ    :: 1
-READ_WRITE   :: 2
-READ_WRITE_EXECUTE :: 3
+Permissions :: c_struct [ bits : i64 ]
+NONE    :: Permissions[0]
+READ    :: Permissions[1]
+READ_WRITE   :: Permissions[2]
+READ_WRITE_EXECUTE :: Permissions[3]
 
 // TODO should be possible to define this equality
 //equal :: fn(x : Permissions, y : Permissions) -> (bool) { x.bits == y.bits }
@@ -22,13 +15,13 @@ allocate :: fn(size : u64, permissions : Permissions) -> (&Void) {
   if get_target_os() == .Windows then {
     using import("std/win32")
     allocation_type :: MEM_COMMIT | MEM_RESERVE
-    win32_permissions := if permissions == NONE then {
+    win32_permissions := if permissions.bits == NONE.bits then {
       PAGE_NOACCESS
-    } else if permissions == READ then {
+    } else if permissions.bits == READ.bits then {
       PAGE_READONLY
-    } else if permissions == READ_WRITE then {
+    } else if permissions.bits == READ_WRITE.bits then {
       PAGE_READWRITE
-    } else if permissions == READ_WRITE_EXECUTE then {
+    } else if permissions.bits == READ_WRITE_EXECUTE.bits then {
       PAGE_EXECUTE_READWRITE
     } else {
       assert(false, "UNREACHABLE")
@@ -38,13 +31,13 @@ allocate :: fn(size : u64, permissions : Permissions) -> (&Void) {
   } else {
     using import("std/linux")
     // FIXME figure out how to avoid these weird casts
-    linux_permissions : i32 = if permissions == NONE then {
+    linux_permissions : i32 = if permissions.bits == NONE.bits then {
       i32(PROT_NONE)
-    } else if permissions == READ then {
+    } else if permissions.bits == READ.bits then {
       i32(PROT_READ)
-    } else if permissions == READ_WRITE then {
+    } else if permissions.bits == READ_WRITE.bits then {
       i32(PROT_READ | PROT_WRITE)
-    } else if permissions == READ_WRITE_EXECUTE then {
+    } else if permissions.bits == READ_WRITE_EXECUTE.bits then {
       i32(PROT_READ | PROT_WRITE | PROT_EXEC)
     } else {
       assert(false, "UNREACHABLE")
