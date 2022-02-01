@@ -28,18 +28,17 @@ allocate :: fn(size : u64, permissions : Permissions, address : &Void = 0) -> (&
     VirtualAlloc(address, size, allocation_type, win32_permissions)
   } else {
     using import("std/linux")
-    // FIXME figure out how to avoid these weird casts
-    linux_permissions : i32 = if permissions.bits == NONE.bits then {
-      i32(PROT_NONE)
+    linux_permissions := if permissions.bits == NONE.bits then {
+      PROT_NONE
     } else if permissions.bits == READ.bits then {
-      i32(PROT_READ)
+      PROT_READ
     } else if permissions.bits == READ_WRITE.bits then {
-      i32(PROT_READ | PROT_WRITE)
+      PROT_READ | PROT_WRITE
     } else if permissions.bits == READ_WRITE_EXECUTE.bits then {
-      i32(PROT_READ | PROT_WRITE | PROT_EXEC)
+      PROT_READ | PROT_WRITE | PROT_EXEC
     } else {
       unreachable()
     }
-    sys_mmap(address, size, linux_permissions, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+    sys_mmap(address, size, cast(i32, linux_permissions), MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
   }
 }
