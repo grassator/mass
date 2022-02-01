@@ -23,8 +23,7 @@ allocate :: fn(size : u64, permissions : Permissions, address : &Void = 0) -> (&
     } else if permissions.bits == READ_WRITE_EXECUTE.bits then {
       PAGE_EXECUTE_READWRITE
     } else {
-      assert(false, "UNREACHABLE")
-      PAGE_NOACCESS // TODO use an assert that is changed to have `never` type
+      unreachable()
     }
     VirtualAlloc(address, size, allocation_type, win32_permissions)
   } else {
@@ -39,8 +38,7 @@ allocate :: fn(size : u64, permissions : Permissions, address : &Void = 0) -> (&
     } else if permissions.bits == READ_WRITE_EXECUTE.bits then {
       i32(PROT_READ | PROT_WRITE | PROT_EXEC)
     } else {
-      assert(false, "UNREACHABLE")
-      i32(PROT_NONE) // TODO use an assert that is changed to have `never` type
+      unreachable()
     }
     sys_mmap(address, size, linux_permissions, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
   }

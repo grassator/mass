@@ -42,9 +42,28 @@ get :: fn(x ~ is_pointer_type, rhs) -> _ intrinsic {
   MASS.get(context, parser, arguments)
 }
 
+Never :: &MASS.Descriptor[
+  .tag = .Never,
+  .brand = 0,
+  .own_module = 0,
+  .bit_size = [0],
+  .bit_alignment = [0],
+  .Pointer_To = [0], // @Hack for C unions
+]
+make_never :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
+  value := allocate(allocator, MASS.Value)
+  value.source_range = source_range.*
+  value.tag = .Forced
+  value.descriptor = Never
+  value.Forced.storage.tag = .Immediate
+  value.Forced.storage.bit_size = [0]
+  value
+}
+
+
 Void :: type_of(())
 make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
-  value : &MASS.Value = allocate(allocator, MASS.Value)
+  value := allocate(allocator, MASS.Value)
   value.source_range = source_range.*
   value.tag = .Forced
   value.descriptor = Void
@@ -53,7 +72,7 @@ make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&
   value
 }
 
-debugger :: fn() -> () intrinsic {
+unreachable :: fn() -> (Never) intrinsic {
   lazy_value_proc :: fn(
     context : &MASS.Context,
     builder : &MASS.Function_Builder,
@@ -77,12 +96,12 @@ debugger :: fn() -> () intrinsic {
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
-    make_void(context.allocator, source_range)
+    make_never(context.allocator, source_range)
   }
 
   lazy_value := allocate(context.allocator, MASS.Value)
   lazy_value.tag = .Lazy
-  lazy_value.descriptor = Void
+  lazy_value.descriptor = Never
   lazy_value.source_range = arguments.source_range
   lazy_value.Lazy = [
     .is_factory = false,
@@ -104,9 +123,10 @@ assert :: fn(condition : bool, message := "Assertion failed\n") -> () {
   //io :: import("std/io")
   if condition then {} else {
     //io.print(message)
-    debugger()
+    unreachable()
   }
 }
+
 get :: fn(view : MASS.Value_View, index : i64) -> (&MASS.Value) {
   assert(MASS.i64_unsigned_less_equal(index, 0xFFFF_FFFF))
   unchecked_get_at_index(view.values, index)

@@ -5587,7 +5587,12 @@ mass_handle_if_expression_lazy_proc(
       .tag = Instruction_Tag_Label,
       .Label.pointer = else_label,
     });
-    value_force_exact(context, builder, result_value, payload->else_);
+    if (payload->else_->descriptor->tag == Descriptor_Tag_Never) {
+      Expected_Result never_result = expected_result_any(&descriptor_never);
+      (void)value_force(context, builder, &never_result, payload->else_);
+    } else {
+      value_force_exact(context, builder, result_value, payload->else_);
+    }
   }
 
   if (mass_has_error(context)) return 0;
