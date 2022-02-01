@@ -76,6 +76,19 @@
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(...)\
   MASS_DEFINE_DESCRIPTOR(Descriptor_Tag_Raw, __VA_ARGS__)
 
+#define MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _BRAND_)\
+  static Descriptor descriptor_##_NAME_ = {\
+    .tag = Descriptor_Tag_Struct,\
+    .brand = (_BRAND_),\
+    .bit_size = {0},\
+    .bit_alignment = 0,\
+    .Struct = {\
+      .fields = {.internal = &dyn_array_static_empty_internal},\
+    },\
+  };\
+  MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
+  MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
+
 #define MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _C_TYPE_, _BRAND_, ...)\
   dyn_array_struct(Struct_Field) descriptor_##_NAME_##_fields = {\
     .length = countof((const Struct_Field[]){__VA_ARGS__}),\

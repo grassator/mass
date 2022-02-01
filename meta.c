@@ -924,11 +924,16 @@ print_mass_descriptor_and_type(
       {
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct_Type *struct_ = &type->union_.items[i];
-          if (struct_->item_count) {
-            char buffer[1024];
-            s32 result = snprintf(buffer, countof(buffer), "%s_%s", type->name, struct_->name);
+          char name_buffer[1024];
+          {
+            s32 result = snprintf(name_buffer, countof(name_buffer), "%s_%s", type->name, struct_->name);
             assert(result > 0);
-            print_mass_struct(file, buffer, struct_);
+          }
+          if (struct_->item_count) {
+            print_mass_struct(file, name_buffer, struct_);
+          } else {
+            const char *lowercase_name = strtolower(name_buffer);
+            fprintf(file, "MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(%s, 0);\n", lowercase_name);
           }
         }
       }
@@ -948,17 +953,43 @@ print_mass_descriptor_and_type(
           print_mass_struct_item(file, type->name, item);
         }
 
+        const char *field_name_for_offset = 0;
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct_Type *struct_ = &type->union_.items[i];
-          if (struct_->item_count) {
-            const char *struct_lowercase_name = strtolower(struct_->name);
+          if (!struct_->item_count) continue;
 
-            fprintf(file, "  {\n");
-            fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", struct_->name);
-            fprintf(file, "    .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
-            fprintf(file, "    .offset = offsetof(%s, %s),\n", type->name, struct_->name);
-            fprintf(file, "  },\n");
+          const char *struct_lowercase_name = strtolower(struct_->name);
+          field_name_for_offset = struct_->name; //:EmptyVariantOffset
+          fprintf(file, "  {\n");
+          fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", struct_->name);
+          fprintf(file, "    .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
+          fprintf(file, "    .offset = offsetof(%s, %s),\n", type->name, struct_->name);
+          fprintf(file, "  },\n");
+        }
+        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+          Struct_Type *struct_ = &type->union_.items[i];
+          if (struct_->item_count) continue;
+
+          const char *struct_lowercase_name = strtolower(struct_->name);
+          fprintf(file, "  {\n");
+          fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", struct_->name);
+          fprintf(file, "    .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
+          // :EmptyVariantOffset
+          // Empty variants are not present in C because you can not put a void into a union
+          // but in Mass we want to still generate them so that you could do this:
+          //   foo := MyTaggedUnion [.tag = MyTag, .MyTag = []]
+          // Omitting .MyTag even if it is an empty struct is a problem because
+          // Mass checks initialization by checking field overlaps instead of explicit unions.
+          if (field_name_for_offset) {
+            // The name for `offsetof` does not match the name of the variant
+            // but that is OK because all the variants start at the same byte
+            fprintf(file, "    .offset = offsetof(%s, %s)/*:EmptyVariantOffset*/,\n",
+              type->name, field_name_for_offset);
+          } else {
+            // If we get here, all variants are zero-sized and the offset is the end of the struct
+            fprintf(file, "    .offset = sizeof(%s),\n", type->name);
           }
+          fprintf(file, "  },\n");
         }
         fprintf(file, ");\n");
         fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);

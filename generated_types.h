@@ -3277,6 +3277,8 @@ static C_Enum_Item module_exports_tag_items[] = {
 { .name = slice_literal_fields("All"), .value = 1 },
 { .name = slice_literal_fields("Selective"), .value = 2 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(module_exports_not_specified, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(module_exports_all, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(module_exports_selective, Module_Exports_Selective,
   {
     .descriptor = &descriptor_tuple_pointer,
@@ -3305,6 +3307,16 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module_exports, Module_Exports,
     .name = slice_literal_fields("Selective"),
     .descriptor = &descriptor_module_exports_selective,
     .offset = offsetof(Module_Exports, Selective),
+  },
+  {
+    .name = slice_literal_fields("Not_Specified"),
+    .descriptor = &descriptor_module_exports_not_specified,
+    .offset = offsetof(Module_Exports, Selective)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("All"),
+    .descriptor = &descriptor_module_exports_all,
+    .offset = offsetof(Module_Exports, Selective)/*:EmptyVariantOffset*/,
   },
 );
 MASS_DEFINE_TYPE_VALUE(module_exports);
@@ -4456,6 +4468,7 @@ static C_Enum_Item overload_match_tag_items[] = {
 { .name = slice_literal_fields("Undecidable"), .value = 1 },
 { .name = slice_literal_fields("Found"), .value = 2 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(overload_match_no_match, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_undecidable, Overload_Match_Undecidable,
   {
     .descriptor = &descriptor_array_undecidable_match,
@@ -4492,6 +4505,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match, Overload_Match,
     .name = slice_literal_fields("Found"),
     .descriptor = &descriptor_overload_match_found,
     .offset = offsetof(Overload_Match, Found),
+  },
+  {
+    .name = slice_literal_fields("No_Match"),
+    .descriptor = &descriptor_overload_match_no_match,
+    .offset = offsetof(Overload_Match, Found)/*:EmptyVariantOffset*/,
   },
 );
 MASS_DEFINE_TYPE_VALUE(overload_match);
@@ -4805,6 +4823,7 @@ static C_Enum_Item function_parameter_tag_items[] = {
 { .name = slice_literal_fields("Generic"), .value = 1 },
 { .name = slice_literal_fields("Exact_Static"), .value = 2 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(function_parameter_runtime, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter_generic, Function_Parameter_Generic,
   {
     .descriptor = &descriptor_i64,
@@ -4867,6 +4886,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
     .descriptor = &descriptor_function_parameter_exact_static,
     .offset = offsetof(Function_Parameter, Exact_Static),
   },
+  {
+    .name = slice_literal_fields("Runtime"),
+    .descriptor = &descriptor_function_parameter_runtime,
+    .offset = offsetof(Function_Parameter, Exact_Static)/*:EmptyVariantOffset*/,
+  },
 );
 MASS_DEFINE_TYPE_VALUE(function_parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Parameter, function_parameter);
@@ -4880,6 +4904,7 @@ static C_Enum_Item resolved_function_parameter_tag_items[] = {
 { .name = slice_literal_fields("Unknown"), .value = 0 },
 { .name = slice_literal_fields("Known"), .value = 1 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(resolved_function_parameter_unknown, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(resolved_function_parameter_known, Resolved_Function_Parameter_Known,
   {
     .descriptor = &descriptor_storage,
@@ -4924,6 +4949,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(resolved_function_parameter, Resolved_Function_Par
     .descriptor = &descriptor_resolved_function_parameter_known,
     .offset = offsetof(Resolved_Function_Parameter, Known),
   },
+  {
+    .name = slice_literal_fields("Unknown"),
+    .descriptor = &descriptor_resolved_function_parameter_unknown,
+    .offset = offsetof(Resolved_Function_Parameter, Known)/*:EmptyVariantOffset*/,
+  },
 );
 MASS_DEFINE_TYPE_VALUE(resolved_function_parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Resolved_Function_Parameter, resolved_function_parameter);
@@ -4946,6 +4976,7 @@ static C_Enum_Item function_return_tag_items[] = {
 { .name = slice_literal_fields("Generic"), .value = 1 },
 { .name = slice_literal_fields("Exact"), .value = 2 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(function_return_inferred, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return_generic, Function_Return_Generic,
   {
     .descriptor = &descriptor_value_view,
@@ -4982,6 +5013,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
     .name = slice_literal_fields("Exact"),
     .descriptor = &descriptor_function_return_exact,
     .offset = offsetof(Function_Return, Exact),
+  },
+  {
+    .name = slice_literal_fields("Inferred"),
+    .descriptor = &descriptor_function_return_inferred,
+    .offset = offsetof(Function_Return, Exact)/*:EmptyVariantOffset*/,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
@@ -5277,6 +5313,10 @@ static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Struct"), .value = 7 },
 { .name = slice_literal_fields("Pointer_To"), .value = 8 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(descriptor_void, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(descriptor_never, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(descriptor_raw, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(descriptor_float, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_integer, Descriptor_Integer,
   {
     .descriptor = &descriptor_i64,
@@ -5383,6 +5423,26 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .descriptor = &descriptor_descriptor_pointer_to,
     .offset = offsetof(Descriptor, Pointer_To),
   },
+  {
+    .name = slice_literal_fields("Void"),
+    .descriptor = &descriptor_descriptor_void,
+    .offset = offsetof(Descriptor, Pointer_To)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Never"),
+    .descriptor = &descriptor_descriptor_never,
+    .offset = offsetof(Descriptor, Pointer_To)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Raw"),
+    .descriptor = &descriptor_descriptor_raw,
+    .offset = offsetof(Descriptor, Pointer_To)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Float"),
+    .descriptor = &descriptor_descriptor_float,
+    .offset = offsetof(Descriptor, Pointer_To)/*:EmptyVariantOffset*/,
+  },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor);
 DEFINE_VALUE_IS_AS_HELPERS(Descriptor, descriptor);
@@ -5428,6 +5488,10 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("No_Runtime_Use"), .value = 24 },
 { .name = slice_literal_fields("Recursive_Intrinsic_Use"), .value = 25 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_unimplemented, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_unreachable_statement, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_parse, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_assignment_to_constant, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {
     .descriptor = &descriptor_slice,
@@ -5444,6 +5508,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_circular_dependency, Mass_Error_Circula
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_circular_dependency);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_non_trailing_default_argument, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_expected_static, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_tokenizer, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_integer_range, Mass_Error_Integer_Range,
   {
     .descriptor = &descriptor_descriptor_pointer,
@@ -5557,6 +5624,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_type_mismatch, Mass_Error_Type_Mismatch
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_type_mismatch);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_epoch_mismatch, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_no_matching_overload, Mass_Error_No_Matching_Overload,
   {
     .descriptor = &descriptor_value_pointer,
@@ -5573,6 +5641,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undecidable_overload, Mass_Error_Undeci
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undecidable_overload);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_non_function_overload, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_no_runtime_use, 0);
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_error_recursive_intrinsic_use, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
   {
     .name = slice_literal_fields("tag"),
@@ -5669,6 +5740,61 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .descriptor = &descriptor_mass_error_undecidable_overload,
     .offset = offsetof(Mass_Error, Undecidable_Overload),
   },
+  {
+    .name = slice_literal_fields("Unimplemented"),
+    .descriptor = &descriptor_mass_error_unimplemented,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Unreachable_Statement"),
+    .descriptor = &descriptor_mass_error_unreachable_statement,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Parse"),
+    .descriptor = &descriptor_mass_error_parse,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Assignment_To_Constant"),
+    .descriptor = &descriptor_mass_error_assignment_to_constant,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Non_Trailing_Default_Argument"),
+    .descriptor = &descriptor_mass_error_non_trailing_default_argument,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Expected_Static"),
+    .descriptor = &descriptor_mass_error_expected_static,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Tokenizer"),
+    .descriptor = &descriptor_mass_error_tokenizer,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Epoch_Mismatch"),
+    .descriptor = &descriptor_mass_error_epoch_mismatch,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Non_Function_Overload"),
+    .descriptor = &descriptor_mass_error_non_function_overload,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("No_Runtime_Use"),
+    .descriptor = &descriptor_mass_error_no_runtime_use,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
+  {
+    .name = slice_literal_fields("Recursive_Intrinsic_Use"),
+    .descriptor = &descriptor_mass_error_recursive_intrinsic_use,
+    .offset = offsetof(Mass_Error, Undecidable_Overload)/*:EmptyVariantOffset*/,
+  },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error);
 DEFINE_VALUE_IS_AS_HELPERS(Mass_Error, mass_error);
@@ -5682,6 +5808,7 @@ static C_Enum_Item mass_result_tag_items[] = {
 { .name = slice_literal_fields("Success"), .value = 0 },
 { .name = slice_literal_fields("Error"), .value = 1 },
 };
+MASS_DEFINE_EMPTY_STRUCT_DESCRIPTOR_WITH_BRAND(mass_result_success, 0);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_result_error, Mass_Result_Error,
   {
     .descriptor = &descriptor_mass_error,
@@ -5700,6 +5827,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_result, Mass_Result,
     .name = slice_literal_fields("Error"),
     .descriptor = &descriptor_mass_result_error,
     .offset = offsetof(Mass_Result, Error),
+  },
+  {
+    .name = slice_literal_fields("Success"),
+    .descriptor = &descriptor_mass_result_success,
+    .offset = offsetof(Mass_Result, Error)/*:EmptyVariantOffset*/,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_result);
