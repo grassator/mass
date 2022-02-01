@@ -2789,7 +2789,24 @@ spec("source") {
     }
   }
 
-
+  #if defined(_WIN32) || defined(__linux__)
+  describe("Standard Library") {
+    it("should support virtual memory allocation") {
+      void *(*checker)(void) = (void *(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> _ {"
+          "vm :: import(\"std/virtual_memory\")\n"
+          "vm.allocate(4096, vm.READ_WRITE)"
+        "}\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      void *memory = checker();
+      check(memory);
+      *(u8 *)memory = 42;
+      check(((u8 *)memory)[0] == 42);
+    }
+  }
+  #endif
 
   #if defined(_WIN32)
   describe("Windows") {

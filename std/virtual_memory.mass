@@ -1,0 +1,55 @@
+exports [.allocate, .Permissions, .NONE, .READ, .READ_WRITE, .READ_WRITE_EXECUTE]
+
+// FIXME this should work
+//Permissions :: c_struct [ bits : i64 ]
+//NONE    :: [0]
+//READ    :: [1]
+//READ_WRITE   :: [2]
+//READ_WRITE_EXECUTE :: [3]
+
+Permissions :: i64
+NONE    :: 0
+READ    :: 1
+READ_WRITE   :: 2
+READ_WRITE_EXECUTE :: 3
+
+// TODO should be possible to define this equality
+//equal :: fn(x : Permissions, y : Permissions) -> (bool) { x.bits == y.bits }
+
+// TODO figure out what is the strategy for errors in Mass
+// TODO figure out why default argument `address : &Void = 0` does not work
+allocate :: fn(size : u64, permissions : Permissions) -> (&Void) {
+  if get_target_os() == .Windows then {
+    using import("std/win32")
+    allocation_type :: MEM_COMMIT | MEM_RESERVE
+    win32_permissions := if permissions == NONE then {
+      PAGE_NOACCESS
+    } else if permissions == READ then {
+      PAGE_READONLY
+    } else if permissions == READ_WRITE then {
+      PAGE_READWRITE
+    } else if permissions == READ_WRITE_EXECUTE then {
+      PAGE_EXECUTE_READWRITE
+    } else {
+      assert(false, "UNREACHABLE")
+      PAGE_NOACCESS // TODO use an assert that is changed to have `never` type
+    }
+    VirtualAlloc(0, size, allocation_type, win32_permissions)
+  } else {
+    using import("std/linux")
+    // FIXME figure out how to avoid these weird casts
+    linux_permissions : i32 = if permissions == NONE then {
+      i32(PROT_NONE)
+    } else if permissions == READ then {
+      i32(PROT_READ)
+    } else if permissions == READ_WRITE then {
+      i32(PROT_READ | PROT_WRITE)
+    } else if permissions == READ_WRITE_EXECUTE then {
+      i32(PROT_READ | PROT_WRITE | PROT_EXEC)
+    } else {
+      assert(false, "UNREACHABLE")
+      i32(PROT_NONE) // TODO use an assert that is changed to have `never` type
+    }
+    sys_mmap(0, size, linux_permissions, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)
+  }
+}

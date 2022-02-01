@@ -1,5 +1,19 @@
-exports [.ExitProcess, .GetStdHandle, .WriteFile]
+MEM_COMMIT  :: 0x00001000
+MEM_RESERVE :: 0x00002000
 
+PAGE_NOACCESS :: u32 0x01
+PAGE_READONLY :: u32 0x02
+PAGE_READWRITE :: u32 0x04
+PAGE_EXECUTE :: u32 0x10
+PAGE_EXECUTE_READ :: u32 0x20
+PAGE_EXECUTE_READWRITE :: u32 0x80
+
+VirtualAlloc :: fn(
+  address : &Void,
+  size : u64,
+  allocation_type : u32,
+  protect : u32
+) -> (&Void) external("kernel32.dll", "VirtualAlloc")
 ExitProcess :: fn(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
 GetStdHandle :: fn(handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
 WriteFile :: fn(

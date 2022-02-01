@@ -1,5 +1,3 @@
-exports [.sys_write, .sys_exit, .STDOUT_FILENO]
-
 STDOUT_FILENO :: 1
 
 make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Function_Literal) {
@@ -11,6 +9,23 @@ make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Fu
     MASS.syscall(context, parser, arguments, &signature, number)
   })
 }
+
+PROT_NONE :: 0x00
+PROT_READ :: 0x01
+PROT_WRITE :: 0x02
+PROT_EXEC :: 0x04
+
+MAP_PRIVATE :: 0x02
+MAP_ANONYMOUS :: 0x20
+
+sys_mmap :: make_syscall((fn(
+  address : &Void,
+  length : u64,
+  protection : i32,
+  flags : i32,
+  file_descriptor : s32,
+  offsets : u64
+) -> (&Void)), 9)
 
 sys_write :: make_syscall((fn(descriptor : s32, buffer : &i8, size : i64) -> (s32)), 1)
 sys_exit :: make_syscall((fn(status : s32) -> (s32)), 60)
