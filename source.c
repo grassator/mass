@@ -1488,14 +1488,17 @@ token_parse_tuple(
   Parser *parser,
   Value_View view
 ) {
-  Value_View remaining = view;
-
   Value *result_value = 0;
 
-  Value *list = token_parse_expression(context, parser, remaining, &(u32){0}, 0);
-  if (mass_has_error(context)) return 0;
-  Array_Value_Ptr items = mass_parse_maybe_list_into_value_array(context, parser, list);
-  if (mass_has_error(context)) return 0;
+  Array_Value_Ptr items;
+  if (view.length) {
+    Value *list = token_parse_expression(context, parser, view, &(u32){0}, 0);
+    if (mass_has_error(context)) return 0;
+    items = mass_parse_maybe_list_into_value_array(context, parser, list);
+    if (mass_has_error(context)) return 0;
+  } else {
+    items = dyn_array_static_empty(Array_Value_Ptr);
+  }
 
   allocator_allocate_bulk(context->allocator, combined, {
     Tuple tuple;
