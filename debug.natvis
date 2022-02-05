@@ -13,6 +13,20 @@
             </ArrayItems>
         </Expand>
     </Type>
+	<Type Name="Scope_Map">
+		<Expand>
+			<CustomListItems>
+				<Variable Name="i" InitialValue="0" />
+				<Size>occupied</Size>
+				<Loop>
+					<If Condition="entries[i].occupied">
+						<Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+					</If>
+					<Exec>i++</Exec>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
 	<Type Name="Register_Bitset">
 		<Expand>
 			<CustomListItems MaxItemsPerView="64">
