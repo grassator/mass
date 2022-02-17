@@ -100,14 +100,17 @@ unreachable :: fn() -> (Never) intrinsic {
   }
 
   lazy_value := allocate(context.allocator, MASS.Value)
-  lazy_value.tag = .Lazy
-  lazy_value.descriptor = Never
-  lazy_value.source_range = arguments.source_range
-  lazy_value.Lazy = [
-    .is_factory = false,
-    .epoch = parser.epoch,
-    .proc = lazy_value_proc,
-    .payload = 0
+  lazy_value.* = [
+    .tag = .Lazy,
+    .flags = .None,
+    .descriptor = Never,
+    .source_range = arguments.source_range,
+    .Lazy = [
+      .is_factory = false,
+      .epoch = parser.epoch,
+      .proc = lazy_value_proc,
+      .payload = 0,
+    ],
   ]
 
   lazy_value
