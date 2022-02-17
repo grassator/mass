@@ -1523,7 +1523,40 @@ token_parse_single(
   Value *value
 ) {
   if (value->descriptor == &descriptor_group_paren) {
-    return token_parse_expression(context, parser, value_as_group_paren(value)->children, &(u32){0}, 0);
+    Value_View children = value_as_group_paren(value)->children;
+    // Support resolving parenthesized operator (+) as a static value
+    if (children.length == 1) {
+      Value *only_child = value_view_get(&children, 0);
+      if (value_is_symbol(only_child)) {
+        const Symbol *symbol = value_as_symbol(only_child);
+        const Operator *maybe_operator = scope_lookup_operator(
+          context, parser->scope, symbol, Operator_Fixity_Prefix
+        );
+        if (!maybe_operator) {
+          maybe_operator = scope_lookup_operator(
+            context, parser->scope, symbol, Operator_Fixity_Infix | Operator_Fixity_Postfix
+          );
+        }
+        if (maybe_operator) {
+          switch(maybe_operator->tag) {
+            case Operator_Tag_Alias: {
+              return mass_context_force_lookup(
+                context, parser, parser->scope, maybe_operator->Alias.symbol, &children.source_range
+              );
+            } break;
+            case Operator_Tag_Intrinsic: {
+              mass_error(context, (Mass_Error) {
+                .tag = Mass_Error_Tag_Parse,
+                .source_range = children.source_range,
+                .detailed_message = slice_literal("Intrinsic operators can not be used as values"),
+              });
+              return 0;
+            } break;
+          }
+        }
+      }
+    }
+    return token_parse_expression(context, parser, children, &(u32){0}, 0);
   } else if (value->descriptor == &descriptor_ast_block) {
     return token_parse_block(context, parser, value_as_ast_block(value), &value->source_range);
   } else if (value->descriptor == &descriptor_group_square) {

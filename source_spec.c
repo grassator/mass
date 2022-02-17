@@ -1637,6 +1637,14 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+    it("should be able to use an operator in parens as an immediate function target") {
+      u64(*checker)(u64, u64) = (u64(*)(u64, u64))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x : i64, y : i64) -> (i64) { (+)(x, y) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(30, 12) == 42);
+    }
   }
 
   describe("Quote / Unquote") {
