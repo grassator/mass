@@ -408,7 +408,6 @@ win32_program_test_exception_handler(
       exception_data->compilation,
       exception_data->jit
     );
-    win32_print_register_state(ContextRecord);
   }
 
   return ExceptionContinueSearch;

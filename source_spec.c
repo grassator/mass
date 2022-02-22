@@ -2831,7 +2831,7 @@ spec("source") {
 
   #if defined(_WIN32)
   describe("Windows") {
-    it("should be unwind stack on hardware exception on Windows") {
+    it("should print a stack trace on hardware exception") {
       fn_type_opaque checker = test_program_external_source_function(
         "main", &test_context, "fixtures\\error_runtime_divide_by_zero"
       );
