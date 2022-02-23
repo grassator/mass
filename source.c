@@ -4282,11 +4282,7 @@ mass_handle_arithmetic_operation(
   if (mass_has_error(context)) return 0;
 
   const Descriptor *result_descriptor = value_or_lazy_value_descriptor(lhs);
-  // FIXME this is required for default params with a type specified
-  //       i.e. fn(x : s64 = 20) and should be fixed there
-  if (!descriptor_is_integer(value_or_lazy_value_descriptor(rhs))) {
-    rhs = mass_cast_helper(context, parser, result_descriptor, rhs, rhs->source_range);
-  } else if (!descriptor_is_integer(value_or_lazy_value_descriptor(lhs))) {
+  if (!descriptor_is_integer(value_or_lazy_value_descriptor(lhs))) {
     result_descriptor = value_or_lazy_value_descriptor(rhs);
     lhs = mass_cast_helper(context, parser, result_descriptor, lhs, lhs->source_range);
   }
