@@ -2635,8 +2635,7 @@ static bool
 token_parse_constant_definitions(
   Mass_Context *context,
   Parser *parser,
-  Value_View view,
-  Value_Lazy *out_lazy_value
+  Value_View view
 ) {
   if (view.length < 2) return false;
   u32 peek_index = 0;
@@ -6290,15 +6289,6 @@ token_parse_block_statements(
     }
     Source_Range statement_range = statement->children.source_range;
 
-    // FIXME token_statement_matcher_in_scopes should instead return a Value *
-    Value temp_lazy_value = {
-      .tag = Value_Tag_Lazy,
-      .descriptor = &descriptor_void,
-      .Lazy = {
-        .epoch = parser->epoch,
-      },
-    };
-
     if (last_statement_was_return) {
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Unreachable_Statement,
@@ -6307,87 +6297,74 @@ token_parse_block_statements(
       return 0;
     }
 
-    bool matched = token_parse_constant_definitions(
-      context, parser, statement->children, &temp_lazy_value.Lazy
-    );
+    if (token_parse_constant_definitions(context, parser, statement->children)) continue;
     if (mass_has_error(context)) goto defer;
-    if (matched) {
-      // If the statement did not assign a proc that means that it does not need
-      // to output any instructions and there is nothing to force.
-      if (temp_lazy_value.Lazy.proc) {
-        assert(temp_lazy_value.descriptor);
-        Value *lazy_value = mass_allocate(context, Value);
-        *lazy_value = temp_lazy_value;
-        lazy_value->source_range = statement_range;
-        dyn_array_push(temp_lazy_statements, lazy_value);
-      }
-    } else {
-      u32 match_length = 0;
-      Value *parse_result = token_parse_expression(context, parser, statement->children, &match_length, 0);
-      if (mass_has_error(context)) goto defer;
 
-      if (match_length != statement->children.length) {
-        Value_View remainder = value_view_rest(&statement->children, match_length);
-        mass_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = remainder.source_range,
-        });
-        goto defer;
-      }
+    u32 match_length = 0;
+    Value *parse_result = token_parse_expression(context, parser, statement->children, &match_length, 0);
+    if (mass_has_error(context)) goto defer;
 
-      if (mass_value_is_static(parse_result)) {
-        if (parse_result->descriptor == &descriptor_ast_using) {
-          const Module *module = value_as_ast_using(parse_result)->module;
-          mass_copy_scope_exports(parser->scope, module->exports.scope);
-          continue;
-        } else if (parse_result->descriptor == &descriptor_ast_return) {
-          last_statement_was_return = true;
-          const Ast_Return *ast_return = value_as_ast_return(parse_result);
-          parse_result = mass_make_lazy_value(
-            context, parser, parse_result->source_range, ast_return,
-            &descriptor_never, mass_handle_explicit_return_lazy_proc
-          );
-        } else if (parse_result->descriptor == &descriptor_assignment) {
-          parse_result = mass_make_lazy_value(
-            context, parser, parse_result->source_range, value_as_assignment(parse_result),
-            &descriptor_void, mass_handle_assignment_lazy_proc
-          );
-        } else if (parse_result->descriptor == &descriptor_typed_symbol) {
-          parse_result = mass_define_stack_value_from_typed_symbol(
-            context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
-          );
-        } else if (parse_result->descriptor == &descriptor_mass_while) {
-          parse_result = mass_make_lazy_value(
-            context, parser, parse_result->source_range, value_as_mass_while(parse_result),
-            &descriptor_void, mass_handle_while_lazy_proc
-          );
-        } else if (parse_result->descriptor == &descriptor_module_exports) {
-          if (!(parser->flags & Parser_Flags_Global)) {
-            mass_error(context, (Mass_Error) {
-              .tag = Mass_Error_Tag_Parse,
-              .source_range = statement_range,
-              .detailed_message = slice_literal("Export declarations are only supported at top level"),
-            });
-            goto defer;
-          }
-          if (parser->module->exports.tag != Module_Exports_Tag_Not_Specified) {
-            mass_error(context, (Mass_Error) {
-              .tag = Mass_Error_Tag_Parse,
-              .source_range = statement_range,
-              .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
-              .other_source_range = parser->module->exports.source_range,
-            });
-            goto defer;
-          }
-          const Module_Exports *exports = value_as_module_exports(parse_result);
-          parser->module->exports = *exports;
-          continue;
-        }
-      }
-
-      // :IgnoreStaticValueStatements
-      last_parse_result = parse_result;
+    if (match_length != statement->children.length) {
+      Value_View remainder = value_view_rest(&statement->children, match_length);
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = remainder.source_range,
+      });
+      goto defer;
     }
+
+    if (mass_value_is_static(parse_result)) {
+      if (parse_result->descriptor == &descriptor_ast_using) {
+        const Module *module = value_as_ast_using(parse_result)->module;
+        mass_copy_scope_exports(parser->scope, module->exports.scope);
+        continue;
+      } else if (parse_result->descriptor == &descriptor_ast_return) {
+        last_statement_was_return = true;
+        const Ast_Return *ast_return = value_as_ast_return(parse_result);
+        parse_result = mass_make_lazy_value(
+          context, parser, parse_result->source_range, ast_return,
+          &descriptor_never, mass_handle_explicit_return_lazy_proc
+        );
+      } else if (parse_result->descriptor == &descriptor_assignment) {
+        parse_result = mass_make_lazy_value(
+          context, parser, parse_result->source_range, value_as_assignment(parse_result),
+          &descriptor_void, mass_handle_assignment_lazy_proc
+        );
+      } else if (parse_result->descriptor == &descriptor_typed_symbol) {
+        parse_result = mass_define_stack_value_from_typed_symbol(
+          context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
+        );
+      } else if (parse_result->descriptor == &descriptor_mass_while) {
+        parse_result = mass_make_lazy_value(
+          context, parser, parse_result->source_range, value_as_mass_while(parse_result),
+          &descriptor_void, mass_handle_while_lazy_proc
+        );
+      } else if (parse_result->descriptor == &descriptor_module_exports) {
+        if (!(parser->flags & Parser_Flags_Global)) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Parse,
+            .source_range = statement_range,
+            .detailed_message = slice_literal("Export declarations are only supported at top level"),
+          });
+          goto defer;
+        }
+        if (parser->module->exports.tag != Module_Exports_Tag_Not_Specified) {
+          mass_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Parse,
+            .source_range = statement_range,
+            .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
+            .other_source_range = parser->module->exports.source_range,
+          });
+          goto defer;
+        }
+        const Module_Exports *exports = value_as_module_exports(parse_result);
+        parser->module->exports = *exports;
+        continue;
+      }
+    }
+
+    // :IgnoreStaticValueStatements
+    last_parse_result = parse_result;
   }
 
   // :IgnoreStaticValueStatements
