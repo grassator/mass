@@ -5890,32 +5890,32 @@ token_parse_function_literal(
   }
 
   Function_Return returns;
-  if (arrow) {
-    Value *token = value_view_next(&view, &peek_index);
-    if (!token) {
-      context_parse_error(context, parser, view, peek_index);
-      return 0;
-    }
-    Source_Range return_range = token->source_range;
-    if (value_is_group_paren(token)) {
-      Value_View return_types_view = value_as_group_paren(token)->children;
-      if (return_types_view.length == 0) {
-        returns = function_return_exact(&descriptor_void, return_range);
-      } else {
-        returns = function_return_generic(return_types_view, return_range);
-      }
-    } else if (
-      value_is_symbol(token) && value_as_symbol(token) == context->compilation->common_symbols._
-    ) {
-      Source_Range return_range = value_view_slice(&view, peek_index, peek_index).source_range;
-      returns = function_return_inferred(return_range);
+  if (!arrow) {
+    context_parse_error(context, parser, view, peek_index);
+    return 0;
+  }
+
+  Value *token = value_view_next(&view, &peek_index);
+  if (!token) {
+    context_parse_error(context, parser, view, peek_index);
+    return 0;
+  }
+  Source_Range return_range = token->source_range;
+  if (value_is_group_paren(token)) {
+    Value_View return_types_view = value_as_group_paren(token)->children;
+    if (return_types_view.length == 0) {
+      returns = function_return_exact(&descriptor_void, return_range);
     } else {
-      context_parse_error(context, parser, view, peek_index);
-      return 0;
+      returns = function_return_generic(return_types_view, return_range);
     }
-  } else {
+  } else if (
+    value_is_symbol(token) && value_as_symbol(token) == context->compilation->common_symbols._
+  ) {
     Source_Range return_range = value_view_slice(&view, peek_index, peek_index).source_range;
-    returns = function_return_exact(&descriptor_void, return_range);
+    returns = function_return_inferred(return_range);
+  } else {
+    context_parse_error(context, parser, view, peek_index);
+    return 0;
   }
 
   Value_View args_view = value_as_group_paren(args)->children;

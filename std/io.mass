@@ -16,7 +16,7 @@ print :: fn(string : String) -> () {
   native_stdout(string.bytes, string.length)
 }
 
-print :: fn(x : s64) {
+print :: fn(x : s64) -> () {
   // TODO replace with shadowing an arg with a local when supported
   integer := x
   count := {

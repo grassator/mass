@@ -1,4 +1,4 @@
-main :: fn() {
+main :: fn() -> () {
   io :: import("std/io")
   process :: import("std/process")
 

@@ -4,7 +4,7 @@ Value :: MASS.Value
 Source_Range :: MASS.Source_Range
 same_type :: MASS.same_type
 
-context_error :: fn(context : &MASS.Context, error : MASS.Error) {
+context_error :: fn(context : &MASS.Context, error : MASS.Error) -> () {
   assert(context.compilation.result.tag == .Success)
   context.compilation.result.tag = .Error
   context.compilation.result.Error.error = error

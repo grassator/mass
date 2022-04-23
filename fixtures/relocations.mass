@@ -3,7 +3,7 @@ global_static_string :: "b"
 
 test :: fn() -> (String) { [global_char_pointer, 1] }
 
-main :: fn() {
+main :: fn() -> () {
   process :: import("std/process")
   char_string := test()
   io :: import("std/io")

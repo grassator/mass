@@ -1,4 +1,4 @@
-fizz_buzz :: fn() {
+fizz_buzz :: fn() -> () {
   io :: import("std/io")
 
   i : s64 = 1
@@ -20,7 +20,7 @@ fizz_buzz :: fn() {
   }
 }
 
-main :: fn() {
+main :: fn() -> () {
   process :: import("std/process")
   fizz_buzz()
   process.exit(0)

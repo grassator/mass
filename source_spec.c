@@ -2491,7 +2491,7 @@ spec("source") {
     it("should support static_assert") {
       test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() { static_assert(false, \"Oops\") }\n"
+        "checker :: fn() -> () { static_assert(false, \"Oops\") }\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -2502,7 +2502,7 @@ spec("source") {
     xit("should support runtime asserts") {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() { assert(false, \"Oops\") }\n"
+        "checker :: fn() -> () { assert(false, \"Oops\") }\n"
       );
       check(spec_check_mass_result(test_context.result));
       checker();
@@ -2719,7 +2719,7 @@ spec("source") {
       test_program_inline_source_function(
         "checker", &test_context,
         "broken_import :: fn() -> () external(\"very broken dll name\", \"and a broken symbol\") \n"
-        "checker :: fn() { broken_import() }\n"
+        "checker :: fn() -> () { broken_import() }\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
