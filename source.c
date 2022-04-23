@@ -855,9 +855,6 @@ deduce_runtime_descriptor_for_value(
       } else {
         if (value->descriptor == &descriptor_function_literal) {
           const Function_Literal *literal = value_as_function_literal(value);
-          if (literal->header.flags & Function_Header_Flags_Macro) {
-            return 0;
-          }
           if (literal->header.generic_parameter_count > 0) {
             return 0;
           }
@@ -2730,7 +2727,6 @@ mass_handle_macro_call(
   Source_Range source_range
 ) {
   const Function_Literal *literal = value_as_function_literal(overload);
-  assert(literal->header.flags & Function_Header_Flags_Macro);
 
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
@@ -3972,9 +3968,6 @@ token_handle_function_call(
     if (value_is_intrinsic(literal->body)) {
       assert(!normalization_failed_to_cast_a_static_value);
       return mass_intrinsic_call(context, parser, literal->body, info->return_descriptor, normalized_args);
-    }
-    if (literal->header.flags & Function_Header_Flags_Macro) {
-      return mass_handle_macro_call(context, parser, overload, normalized_args, source_range);
     }
   }
 
@@ -5877,13 +5870,7 @@ token_parse_function_literal(
 
   Value *keyword = value_view_next(&view, &peek_index);
   const Symbol *keyword_symbol = value_as_symbol(keyword);
-
-  bool is_macro = false;
-  if (keyword_symbol == context->compilation->common_symbols.macro) {
-    is_macro = true;
-  } else {
-    assert(keyword_symbol == context->compilation->common_symbols.fn);
-  }
+  assert(keyword_symbol == context->compilation->common_symbols.fn);
 
   Value *args = value_view_next(&view, &peek_index);
   if (!value_is_group_paren(args)) {
@@ -5900,15 +5887,6 @@ token_parse_function_literal(
       view, &peek_index, context->compilation->common_symbols.operator_fat_arrow
     );
     if (arrow) is_compile_time = true;
-  }
-
-  if (is_macro && is_compile_time) {
-    mass_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = keyword->source_range,
-      .detailed_message = slice_literal("Function-like macro can not be marked compile time"),
-    });
-    return 0;
   }
 
   Function_Return returns;
@@ -5954,14 +5932,6 @@ token_parse_function_literal(
   }
   if (!body_value) {
     Value_View rest = value_view_match_till_symbol(view, &peek_index, end_symbol);
-    if (is_macro) {
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = rest.source_range,
-        .detailed_message = slice_literal("Function-like macro must have a literal body in {}"),
-      });
-      return 0;
-    }
     if (rest.length) body_value = token_parse_expression(context, parser, rest, &(u32){0}, 0);
   }
   if (mass_has_error(context)) return 0;
@@ -5978,7 +5948,6 @@ token_parse_function_literal(
     }
   }
 
-  if (is_macro) header.flags |= Function_Header_Flags_Macro;
   if (is_compile_time) header.flags |= Function_Header_Flags_Compile_Time;
 
   *matched_length = peek_index;
@@ -6076,7 +6045,6 @@ token_parse_expression(
 
       if (
         symbol == context->compilation->common_symbols.fn ||
-        symbol == context->compilation->common_symbols.macro ||
         symbol == context->compilation->common_symbols._while ||
         symbol == context->compilation->common_symbols._if
       ) {

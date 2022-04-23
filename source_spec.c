@@ -759,19 +759,6 @@ spec("source") {
       check(answer == 42);
     }
 
-    it("should report an error when trying to use a macro as fn pointer") {
-      test_program_inline_source_base(
-        "checker", &test_context,
-        "checker :: fn() -> (s64) {"
-          "local := macro() { 42 };"
-          "local()"
-        "}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_No_Runtime_Use);
-    }
-
     it("should be able to parse and run functions with overloads") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
@@ -1818,17 +1805,6 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_Epoch_Mismatch);
     }
 
-    it("should not be able to use runtime values in a static context inside a macro") {
-      test_program_inline_source_base(
-        "test", &test_context,
-        "comptime :: macro(x : i64) -> (i64) { @( x ) }\n"
-        "test :: fn() -> (i64) { foo := 42; comptime(foo) }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Epoch_Mismatch);
-    }
-
     it("should support compile-time arithmetic operations") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -1847,154 +1823,6 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(checker());
-    }
-  }
-
-  describe("Macro") {
-    it("should be able to parse and run macro id function") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "id :: macro(x : s64) -> (s64) { x }\n"
-        "test :: fn() -> (s64) { id(42) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
-      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "id :: macro(x : i64) -> (i64) { if x == 3 then { return 42 }; x }\n"
-        "checker :: fn() -> (i64) { id(3) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should type check macro return value if it is defined") {
-      test_program_inline_source_base(
-        "checker", &test_context,
-        "oops :: macro() -> (i64) { 42000000000 }\n"
-        "checker :: fn() -> (i16) { oops() }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_i16);
-      check(error->Type_Mismatch.actual == &descriptor_i64);
-    }
-
-    it("should support macro parameters without type assertions") {
-      s64 (*checker)() =
-        (s64 (*)())test_program_inline_source_function(
-          "checker", &test_context,
-          "identity :: macro(x) { x }\n"
-          "checker :: fn() -> (s64) { identity(42) }"
-        );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to use a while loop") {
-      s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
-        "sum_up_to", &test_context,
-        "sum_up_to :: fn(to : s32) -> (s32) {"
-          "x := to;"
-          "sum : s32;"
-          "sum = 0;"
-          "while (x >= 0) {"
-            "sum = sum + x;"
-            "x = x - 1;"
-          "};"
-          "sum"
-        "}"
-      );
-      check(sum_up_to);
-      check(sum_up_to(0) == 0);
-      check(sum_up_to(1) == 1);
-      check(sum_up_to(2) == 3);
-      check(sum_up_to(3) == 6);
-    }
-
-    xit("should be able to use `break` statement inside of the while loop") {
-      s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn(to : s32) -> (s32) {"
-          "x := to;"
-          "sum : s32;"
-          "sum = 0;"
-          "while (x >= 0) {"
-            "break;"
-            "sum = sum + x;"
-            "x = x - 1;"
-          "};"
-          "sum"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(0) == 0);
-      check(checker(1) == 0);
-    }
-
-    xit("should be able to use `continue` statement inside of the while loop") {
-      s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn(to : s32) -> (s32) {"
-          "x := to;"
-          "sum : s32;"
-          "sum = 0;"
-          "while (x >= 0) {"
-            "sum = sum + x;"
-            "x = x - 1;"
-            "continue;"
-          "};"
-          "sum"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(0) == 0);
-      check(checker(1) == 1);
-      check(checker(2) == 3);
-    }
-
-    it("should be able to run a long compile-time loop") {
-      u64(*checker)() = (u64(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (i64) {\n"
-          "using unsigned\n"
-          "i : i64 = 0\n"
-          "while i < 1000000 { i = i + 1 }\n"
-          "i\n"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 1000000);
-    }
-
-    it("should report an error for macro external functions") {
-      test_program_inline_source_base(
-        "test", &test_context,
-        "ExitProcess :: macro(x : i64) -> (i64) external(\"kernel32.dll\", \"ExitProcess\")\n"
-        "test :: fn() -> (i64) { ExitProcess(42) }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Parse);
-      Slice actual_error_slice = source_from_source_range(test_context.compilation, &error->source_range);
-      Slice expected_error_slice = slice_literal("external(\"kernel32.dll\", \"ExitProcess\")");
-      check(slice_equal(slice_trim_whitespace(actual_error_slice), expected_error_slice));
-    }
-
-    it("should be able to parse and run macro id function at compile time") {
-      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "FOO :: 42\n"
-        "id :: macro(x : i64) -> (i64) { x }\n"
-        "BAR :: id(FOO)\n"
-        "test :: fn() -> (i64) { BAR }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
     }
   }
 

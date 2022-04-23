@@ -608,7 +608,6 @@ mass_function_literal_instance_for_info(
   const Function_Info *fn_info
 ) {
   Program *program = context->program;
-  assert(!(literal->header.flags & Function_Header_Flags_Macro));
 
   // TODO figure out how to avoid the const cast here
   Function_Literal *mutable_literal = (Function_Literal *)literal;

@@ -1418,7 +1418,6 @@ compilation_init(
     .get = mass_ensure_symbol(compilation, slice_literal("get")),
     .intrinsic = mass_ensure_symbol(compilation, slice_literal("intrinsic")),
     .label = mass_ensure_symbol(compilation, slice_literal("label")),
-    .macro = mass_ensure_symbol(compilation, slice_literal("macro")),
     .operator = mass_ensure_symbol(compilation, slice_literal("operator")),
     .placeholder = mass_ensure_symbol(compilation, slice_literal("placeholder")),
     .postfix_block = mass_ensure_symbol(compilation, slice_literal("postfix_block")),

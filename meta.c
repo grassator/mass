@@ -1776,7 +1776,6 @@ main(void) {
 
   push_type(type_enum("Function_Header_Flags", (Enum_Type_Item[]){
     { "None", 0 },
-    { "Macro", 1 << 0 },
     { "Intrinsic", 1 << 1 },
     { "Compile_Time", 1 << 2 },
   }));
@@ -2093,7 +2092,6 @@ main(void) {
     { "const Symbol *", "get" },
     { "const Symbol *", "intrinsic" },
     { "const Symbol *", "label" },
-    { "const Symbol *", "macro" },
     { "const Symbol *", "operator" },
     { "const Symbol *", "placeholder" },
     { "const Symbol *", "postfix_block" },
