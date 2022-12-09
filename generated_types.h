@@ -817,12 +817,6 @@ static Value * mass_operator_assignment
 static Value * mass_define_inferred
   (Mass_Context * context, Parser * parser, Value_View args);
 
-static Value * mass_quote
-  (Mass_Context * context, Parser * parser, Value_View args);
-
-static Value * mass_unquote
-  (Mass_Context * context, Parser * parser, Value_View args);
-
 static Value * mass_comma
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2306,7 +2300,6 @@ typedef struct Common_Symbols {
   const Symbol * operator_fat_arrow;
   const Symbol * operator_space;
   const Symbol * operator_tilde;
-  const Symbol * operator_quote;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -2913,8 +2906,6 @@ static Descriptor descriptor_mass_using;
 static Descriptor descriptor_mass_return;
 static Descriptor descriptor_mass_operator_assignment;
 static Descriptor descriptor_mass_define_inferred;
-static Descriptor descriptor_mass_quote;
-static Descriptor descriptor_mass_unquote;
 static Descriptor descriptor_mass_comma;
 static Descriptor descriptor_mass_function_literal;
 static Descriptor descriptor_mass_dereference;
@@ -6151,11 +6142,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_tilde"),
     .offset = offsetof(Common_Symbols, operator_tilde),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("operator_quote"),
-    .offset = offsetof(Common_Symbols, operator_quote),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);

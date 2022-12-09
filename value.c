@@ -1441,7 +1441,6 @@ compilation_init(
     .operator_fat_arrow = mass_ensure_symbol(compilation, slice_literal("=>")),
     .operator_space = mass_ensure_symbol(compilation, slice_literal(" ")),
     .operator_tilde = mass_ensure_symbol(compilation, slice_literal("~")),
-    .operator_quote = mass_ensure_symbol(compilation, slice_literal("'")),
   };
 
   mass_compilation_init_scopes(compilation);

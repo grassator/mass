@@ -1589,32 +1589,6 @@ mass_named_accessor(
 }
 
 static Value *
-mass_quote(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args
-) {
-  assert(args.length == 1);
-  Value *value = value_view_get(&args, 0);
-  Quoted quoted = {.value = value};
-  Value *result = value_init(
-    mass_allocate(context, Value),
-    &descriptor_quoted, storage_immediate(&quoted), args.source_range
-  );
-  return result;
-}
-
-static Value *
-mass_unquote(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args
-) {
-  assert(args.length == 1);
-  return token_parse_single(context, parser, value_view_get(&args, 0));
-}
-
-static Value *
 mass_handle_statement_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
@@ -6625,9 +6599,6 @@ mass_compilation_init_scopes(
   MASS_INTRINSIC_OPERATOR("type_of", Operator_Flags_None, Prefix, 20, "type_of");
   MASS_INTRINSIC_OPERATOR("parse_type", Operator_Flags_None, Prefix, 20, "parse_type");
   MASS_INTRINSIC_OPERATOR("size_of", Operator_Flags_None, Prefix, 20, "size_of");
-
-  MASS_INTRINSIC_OPERATOR("'", Operator_Flags_None, Prefix, 30, "quote");
-  MASS_INTRINSIC_OPERATOR("'", Operator_Flags_None, Postfix, 30, "unquote");
 
   MASS_INTRINSIC_OPERATOR(",", Operator_Flags_Optional_Rhs, Infix, 0, "comma");
 

@@ -1634,49 +1634,6 @@ spec("source") {
     }
   }
 
-  describe("Quote / Unquote") {
-    it("should be possible to use for non-lexical symbol lookup") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "my_symbol :: 'foo\n"
-        "foo :: 42\n"
-        "checker :: fn() -> (s64) { my_symbol' }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-    it("should be possible to quote operator symbols") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "my_symbol :: ' *\n"
-        "my_assert_is_symbol :: fn(symbol : MASS.Symbol) => (s64) { 42 }\n"
-        "checker :: fn() -> (s64) { my_assert_is_symbol(my_symbol) }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-    it("should be possible to use for splicing in a block") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "my_block :: '{ foo }\n"
-        "foo :: 42\n"
-        "checker :: fn() -> (s64) { my_block' }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-    it("should be possible to use non-lexical symbol definition") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "foo_symbol :: 'foo\n"
-        "(foo_symbol) :: 42\n"
-        "checker :: fn() -> (s64) { foo }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-  }
-
   describe("Accessors") {
     it("should support parsing named accessors") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(

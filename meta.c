@@ -2115,7 +2115,6 @@ main(void) {
     { "const Symbol *", "operator_fat_arrow" },
     { "const Symbol *", "operator_space" },
     { "const Symbol *", "operator_tilde" },
-    { "const Symbol *", "operator_quote" },
   }));
 
   export_compiler(push_type(type_struct("Compilation", (Struct_Item[]){
@@ -2199,8 +2198,6 @@ main(void) {
   export_compiler_custom_name("return", push_type(type_intrinsic("mass_return")));
   export_compiler_custom_name("operator_assignment", push_type(type_intrinsic("mass_operator_assignment")));
   export_compiler_custom_name("define_inferred", push_type(type_intrinsic("mass_define_inferred")));
-  export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
-  export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
   export_compiler_custom_name("comma", push_type(type_intrinsic("mass_comma")));
   export_compiler_custom_name("function_literal", push_type(type_intrinsic("mass_function_literal")));
   export_compiler_custom_name("dereference", push_type(type_intrinsic("mass_dereference")));
