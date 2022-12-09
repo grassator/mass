@@ -3159,6 +3159,7 @@ static Descriptor descriptor_i8_7 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 7, &descrip
 static Descriptor descriptor_i8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_i8);
 static Descriptor descriptor_i8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_i8);
 static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
+static Descriptor descriptor_i8_0 = MASS_DESCRIPTOR_STATIC_ARRAY(s8, 0, &descriptor_i8);
 MASS_DEFINE_STRUCT_DESCRIPTOR(bits, Bits,
   {
     .descriptor = &descriptor_i64,
@@ -6638,6 +6639,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(dyn_array_internal, Dyn_Array_Internal,
     .descriptor = &descriptor_i64,
     .name = slice_literal_fields("capacity"),
     .offset = offsetof(Dyn_Array_Internal, capacity),
+  },
+  {
+    .descriptor = &descriptor_i8_0,
+    .name = slice_literal_fields("items"),
+    .offset = offsetof(Dyn_Array_Internal, items),
   },
 );
 MASS_DEFINE_TYPE_VALUE(dyn_array_internal);

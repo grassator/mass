@@ -26,6 +26,8 @@ typedef struct {
   u32 array_length;
 } Struct_Item;
 
+static const u32 FLEXIBLE_ARRAY_ITEM = UINT32_MAX;
+
 typedef struct {
   const char *name;
   Struct_Item *items;
@@ -244,6 +246,7 @@ print_c_struct(
   for (uint64_t i = 0; i < struct_->item_count; ++i) {
     Struct_Item *item = &struct_->items[i];
     fprintf(file, "  %s %s", item->type, item->name);
+    if (item->array_length == FLEXIBLE_ARRAY_ITEM) fprintf(file, "[]");
     if (item->array_length > 1) fprintf(file, "[%u]", item->array_length);
     fprintf(file, ";\n");
   }
@@ -707,8 +710,8 @@ print_mass_array_descriptors_for_struct(
     hash_map_set(already_defined_set, type_slice, true);
     fprintf(file, "static Descriptor ");
     print_mass_struct_descriptor_type(file, item->type);
-    fprintf(file, "_%u = MASS_DESCRIPTOR_STATIC_ARRAY(%s, %u, &",
-      item->array_length, item->type, item->array_length);
+    u32 length = item->array_length == FLEXIBLE_ARRAY_ITEM ? 0 : item->array_length;
+    fprintf(file, "_%u = MASS_DESCRIPTOR_STATIC_ARRAY(%s, %u, &", length, item->type, length);
     print_mass_struct_descriptor_type(file, item->type);
     fprintf(file, ");\n");
   }
@@ -817,7 +820,8 @@ print_mass_struct_item(
   fprintf(file, "  {\n");
   fprintf(file, "    .descriptor = &");
   print_mass_struct_descriptor_type(file, item->type);
-  if (item->array_length > 1) fprintf(file, "_%u", item->array_length);
+  if (item->array_length == FLEXIBLE_ARRAY_ITEM) fprintf(file, "_0");
+  else if (item->array_length > 1) fprintf(file, "_%u", item->array_length);
   fprintf(file, ",\n");
   fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
   fprintf(file, "    .offset = offsetof(%s, %s),\n", struct_name, item->name);
@@ -2466,7 +2470,7 @@ main(void) {
     { "const Allocator *", "allocator" },
     { "i64", "length" },
     { "i64", "capacity" },
-    //{ "s8 *", "items" }, // TODO support flexible array members or even better - sized by a field
+    { "s8", "items", FLEXIBLE_ARRAY_ITEM },
   })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
 
   const char *this_filename = __FILE__;
