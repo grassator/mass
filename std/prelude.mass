@@ -372,15 +372,11 @@ compare :: fn(
       return 0
     }
 
-    {
-      instruction := MASS.Instruction [
-        .tag = .Location,
-        .scope = 0,
-        .Location = [source_range.*]
-      ]
-      // TODO support inline tuple in the call
-      MASS.push_instruction(&builder.code_block, instruction);
-    }
+    MASS.push_instruction(&builder.code_block, [
+      .tag = .Location,
+      .scope = 0,
+      .Location = [source_range.*],
+    ])
 
     {
       instruction := x86_64.op1_reg64_reg64_mr(0x39, temp_lhs_register, temp_rhs_register)
