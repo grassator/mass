@@ -112,7 +112,6 @@ mass_copy_scope_exports(
   Scope *to,
   const Scope *from
 ) {
-  // TODO also deal with statement matchers here
   for (u64 i = 0; i < from->map->capacity; ++i) {
     Scope_Map__Entry *map_entry = &from->map->entries[i];
     if (!map_entry->occupied) continue;
