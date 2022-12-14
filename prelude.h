@@ -4128,22 +4128,6 @@ hash_map_destroy_internal(
 #define PRELUDE_VA_MACRO_GET(MACRO, ...) PRELUDE_MACRO_CONCAT(MACRO, PRELUDE_NUM_ARGS(__VA_ARGS__))
 #define PRELUDE_VA_MACRO(MACRO, ...) PRELUDE_VA_MACRO_GET(MACRO, ##__VA_ARGS__)(__VA_ARGS__)
 
-#define PRI(x) _Generic((x),\
-  u8: PRIu8, u16: PRIu16, u32: PRIu32, u64: PRIu64,\
-  s8: PRIs8, s16: PRIs16, s32: PRIs32, s64: PRIs64,\
-  slong_t: PRIslong_t, ulong_t: PRIulong_t,\
-  f32: PRIf32, f64: PRIf64,\
-  char *: "s", const char *: "s",\
-  Slice: PRIslice,\
-  void *: "p")
-
-#define PRELUDE_PROCESS_TYPE(_type_)\
-  static inline void _type_##_print(_type_ x) {\
-    printf("%" PRELUDE_MACRO_CONCAT(PRI, _type_), x);\
-  }
-PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
-#undef PRELUDE_PROCESS_TYPE
-
 static inline void
 c_string_print(
   const char *string
