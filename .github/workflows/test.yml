@@ -13,7 +13,7 @@ jobs:
     steps:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Configure MSVC Dev Cmd
         uses: ilammy/msvc-dev-cmd@v1
       - name: List working directory
@@ -30,7 +30,7 @@ jobs:
     steps:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Configure MSVC Dev Cmd
         uses: ilammy/msvc-dev-cmd@v1
       - name: List working directory
@@ -47,7 +47,7 @@ jobs:
     steps:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: GCC Version
         run: gcc -v
       - name: Test
@@ -62,7 +62,7 @@ jobs:
     steps:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Clang Version
         run: clang -v
       - name: Test
@@ -77,7 +77,7 @@ jobs:
     steps:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Compiler Version
         run: cc -v
       - name: Test
