@@ -2019,7 +2019,7 @@ slice_split_by_callback_internal(
     s8 ch = slice.bytes[index];
     bool is_separator = indexed
       ? callback(ch, index)
-      : ((slice_split_callback)(callback))(ch);
+      : ((slice_split_callback)(void *)(callback))(ch);
     if (is_separator && !previous_is_separator) {
       previous_is_separator = true;
       dyn_array_push(result, slice_sub(slice, prev_index, index));
