@@ -122,6 +122,15 @@
 #define PRIs64 PRIi64
 #define PRIxs64 PRIxi64
 
+#define PRIs32 PRIi32
+#define PRIxs32 PRIxi32
+
+#define PRIs16 PRIi16
+#define PRIxs16 PRIxi16
+
+#define PRIs8 PRIi8
+#define PRIxs8 PRIxi8
+
 typedef int8_t  s8;
 typedef int16_t s16;
 typedef int32_t s32;
@@ -135,30 +144,24 @@ typedef uint64_t u64;
 #define u64_max_value UINT64_MAX
 #define u64_min_value 0
 
-#define PRIu32 "u"
 #define u32_max_value UINT32_MAX
 #define u32_min_value 0
 
-#define PRIu16 "hu"
 #define u16_max_value UINT16_MAX
 #define u16_min_value 0
 
-#define PRIu8 "hhu"
 #define u8_max_value UINT8_MAX
 #define u8_min_value 0
 
 #define s64_max_value INT64_MAX
 #define s64_min_value INT64_MIN
 
-#define PRIs32 "i"
 #define s32_max_value INT32_MAX
 #define s32_min_value INT32_MIN
 
-#define PRIs16 "hi"
 #define s16_max_value INT16_MAX
 #define s16_min_value INT16_MIN
 
-#define PRIs8 "hhi"
 #define s8_max_value INT8_MAX
 #define s8_min_value INT8_MIN
 
