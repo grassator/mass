@@ -2303,7 +2303,7 @@ c_string_split_by_callback_internal(
   while (*ch) {
     bool is_separator = indexed
       ? callback(*ch, index)
-      : ((c_string_split_callback)(callback))(*ch);
+      : ((c_string_split_callback)(void *)(callback))(*ch);
     if (is_separator && !previous_is_separator) {
       previous_is_separator = true;
       dyn_array_push(result, (Slice){string, ch - string});
