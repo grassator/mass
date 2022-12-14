@@ -5,6 +5,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#define __STDC_FORMAT_MACROS 1
+#include <inttypes.h> // PRI macros
 #include <stdint.h> // int8_t, etc
 #include <stdbool.h>
 
@@ -105,9 +107,6 @@
 
   #define PRIslong_t "li"
   #define PRIulong_t "lu"
-
-  #define PRIs64 "lli"
-  #define PRIu64 "llu"
 #else
   typedef signed long long slong_t;
   typedef unsigned long long ulong_t;
@@ -118,10 +117,10 @@
 
   #define PRIslong_t "lli"
   #define PRIulong_t "llu"
-
-  #define PRIs64 "li"
-  #define PRIu64 "lu"
 #endif
+
+#define PRIs64 PRIi64
+#define PRIxs64 PRIxi64
 
 typedef int8_t  s8;
 typedef int16_t s16;
