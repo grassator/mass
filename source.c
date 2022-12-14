@@ -1588,18 +1588,6 @@ mass_named_accessor(
   return result;
 }
 
-static Value *
-mass_handle_statement_lazy_proc(
-  Mass_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  const Source_Range *source_range,
-  Value *lazy_value
-) {
-  assert(mass_descriptor_is_void(mass_expected_result_descriptor(expected_result)));
-  return value_force(context, builder, expected_result, lazy_value);
-}
-
 static inline const Descriptor *
 token_match_type(
   Mass_Context *context,
