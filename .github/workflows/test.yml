@@ -1,6 +1,6 @@
 name: Build & Test
-
-# Run this workflow every time a new commit pushed to your repository
+#
+## Run this workflow every time a new commit pushed to your repository
 on: push
 
 jobs:
@@ -68,17 +68,17 @@ jobs:
       - name: Test
         run: CC=clang ./test.sh
 
-  mac:
-    # Name the Job
-    name: Mac Build & Test
-    # Set the type of machine to run on
-    runs-on: macos-latest
-
-    steps:
-      # Checks out a copy of your repository on the ubuntu-latest machine
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Compiler Version
-        run: cc -v
-      - name: Test
-        run: ./test.sh
+#  mac:
+#    # Name the Job
+#    name: Mac Build & Test
+#    # Set the type of machine to run on
+#    runs-on: macos-latest
+#
+#    steps:
+#      # Checks out a copy of your repository on the ubuntu-latest machine
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#      - name: Compiler Version
+#        run: cc -v
+#      - name: Test
+#        run: ./test.sh
