@@ -314,8 +314,14 @@ mass_error_to_string(
       APPEND_SLICE(source);
     } break;
     case Mass_Error_Tag_No_Matching_Overload: {
-      // TODO provide better error message with argument types
-      APPEND_LITERAL("Could not find matching overload for call ");
+      Mass_Error_No_Matching_Overload const *no_match = &error->No_Matching_Overload;
+      APPEND_LITERAL("Could not find matching overload for call.\n  Arguments: ");
+      for (u64 i = 0; i < dyn_array_length(no_match->arguments); ++i) {
+        if (i != 0) APPEND_LITERAL(", ");
+        const Resolved_Function_Parameter *arg = dyn_array_get(no_match->arguments, i);
+        mass_error_append_descriptor(result, arg->descriptor);
+      }
+      APPEND_LITERAL("\n  Source code: ");
       Slice source = source_from_source_range(compilation, &error->source_range);
       APPEND_SLICE(source);
     } break;

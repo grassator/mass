@@ -2092,6 +2092,7 @@ typedef struct Mass_Error_Type_Mismatch {
 } Mass_Error_Type_Mismatch;
 typedef struct Mass_Error_No_Matching_Overload {
   Value * target;
+  Array_Resolved_Function_Parameter arguments;
 } Mass_Error_No_Matching_Overload;
 typedef struct Mass_Error_Undecidable_Overload {
   Array_Undecidable_Match matches;
@@ -5618,6 +5619,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_no_matching_overload, Mass_Error_No_Mat
     .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("target"),
     .offset = offsetof(Mass_Error_No_Matching_Overload, target),
+  },
+  {
+    .descriptor = &descriptor_array_resolved_function_parameter,
+    .name = slice_literal_fields("arguments"),
+    .offset = offsetof(Mass_Error_No_Matching_Overload, arguments),
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_no_matching_overload);

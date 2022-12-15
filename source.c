@@ -3354,10 +3354,15 @@ mass_match_overload_or_error(
   if (mass_has_error(context)) return 0;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
+      Array_Resolved_Function_Parameter arguments;
+      dyn_array_copy_from_temp(Array_Resolved_Function_Parameter, context, &arguments, arg_parameters);
       mass_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = *source_range,
-        .No_Matching_Overload = { .target = target },
+        .No_Matching_Overload = {
+          .target = target,
+          .arguments = arguments
+        },
       });
       return false;
     }
