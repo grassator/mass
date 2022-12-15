@@ -497,14 +497,13 @@ allocate :: fn(allocator : &MASS.Allocator, @type : Type) -> _ {
 }
 
 Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
-  using MASS_I64_MATH
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
   length := meta.reify(arguments.1, i64).*
   t := allocate(context.allocator, MASS.Descriptor)
 
-  raw_bit_size : i64 = unsigned_multiply((item_type.*).bit_size.as_u64, length)
-  if raw_bit_size & 0xffff_ffff_8000_0000 != 0 then {
+  raw_bit_size := MASS.i64_unsigned_multiply((item_type.*).bit_size.as_u64, length)
+  if MASS.i64_bitwise_and(raw_bit_size, 0xffff_ffff_8000_0000) != 0 then {
     error : MASS.Error
     error.tag = .Integer_Range
     error.source_range = arguments.source_range
