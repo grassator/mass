@@ -525,6 +525,17 @@ Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
 
 multiply :: Array
 
+Opaque :: fn(item_type : Type, name : String) => (Type) intrinsic {
+  meta :: import("std/meta")
+  item_type := meta.reify(arguments.0, Type).*
+  name := meta.reify(arguments.1, String).*
+  symbol := allocate(context.allocator, MASS.Symbol)
+  symbol.* = [ .name = name ]
+  t := allocate(context.allocator, MASS.Descriptor)
+  t.* = (item_type.*)
+  meta.immediate(context.compilation, t, arguments.source_range)
+}
+
 external :: fn(
   library_name : String,
   symbol_name : String
