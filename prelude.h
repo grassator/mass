@@ -1536,7 +1536,7 @@ slice_parse_s64(
   for (s64 index = slice.length - 1; index >= 0; --index) {
     s8 digit = slice.bytes[index];
     if (digit >= '0' && digit <= '9') {
-      integer += (digit - '0') * multiplier;
+      integer += multiplier * (s64)(digit - '0');
       multiplier *= 10;
     } else if (digit == '-') {
       if (index != 0) {

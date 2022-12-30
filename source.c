@@ -3645,26 +3645,29 @@ mass_trampoline_call(
   if (mass_has_error(context)) return 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
-  u8 *args_struct_memory = trampoline->args_descriptor->bit_size.as_u64
-    ? allocator_allocate_bytes(
+  u64 bit_size = trampoline->args_descriptor->bit_size.as_u64;
+  u8* args_struct_memory = 0;
+  
+  if (bit_size) {
+    args_struct_memory = allocator_allocate_bytes(
       context->temp_allocator,
       descriptor_byte_size(trampoline->args_descriptor),
       descriptor_byte_alignment(trampoline->args_descriptor)
-    )
-    : 0;
-
-  Array_Struct_Field fields = trampoline->args_descriptor->Struct.fields;
-  assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
-  for (u64 i = 0; i < args_view.length; ++i) {
-    Value *item = value_view_get(&args_view, i);
-    assert(mass_value_is_static(item));
-    const Struct_Field *field = dyn_array_get(fields, i);
-    u64 offset = field->offset;
-    void *arg_memory = args_struct_memory + offset;
-    const void *source_memory = storage_static_memory_with_bit_size(
-      &value_as_forced(item)->storage, item->descriptor->bit_size
     );
-    memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
+
+    Array_Struct_Field fields = trampoline->args_descriptor->Struct.fields;
+    assert(trampoline->args_descriptor->tag == Descriptor_Tag_Struct);
+    for (u64 i = 0; i < args_view.length; ++i) {
+      Value* item = value_view_get(&args_view, i);
+      assert(mass_value_is_static(item));
+      const Struct_Field* field = dyn_array_get(fields, i);
+      u64 offset = field->offset;
+      void* arg_memory = args_struct_memory + offset;
+      const void* source_memory = storage_static_memory_with_bit_size(
+        &value_as_forced(item)->storage, item->descriptor->bit_size
+      );
+      memcpy(arg_memory, source_memory, descriptor_byte_size(item->descriptor));
+    }
   }
 
   const Descriptor *return_descriptor = trampoline->original_info->return_descriptor;
