@@ -1523,6 +1523,11 @@ spec("source") {
         check(spec_check_mass_result(test_context.result));
         check(checker((i64){10}, (i64){3}).bits == 10 + 3);
       }
+      it("should correctly handle s64") {
+        MATH_CHECKER_FN(s64, s64, +);
+        check(spec_check_mass_result(test_context.result));
+        check(checker(10, 3) == 10 + 3);
+      }
     }
 
     describe("division") {
