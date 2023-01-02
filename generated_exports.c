@@ -24,6 +24,27 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Source_Range")),
     type_source_range_value
   );
+  Source_Range Module_Exports__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Module_Exports__source_range, "Module_Exports");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Module_Exports__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Module_Exports")),
+    type_module_exports_value
+  );
+  Source_Range Module_Exports_Tag__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Module_Exports_Tag__source_range, "Module_Exports_Tag");
+  scope_define_enum(
+    compilation, scope, Module_Exports_Tag__source_range,
+    slice_literal("Module_Exports_Tag"), type_module_exports_tag_value,
+    module_exports_tag_items, countof(module_exports_tag_items)
+  );
+  Source_Range Module_Exports_Selective__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Module_Exports_Selective__source_range, "Module_Exports_Selective");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Module_Exports_Selective__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Module_Exports_Selective")),
+    type_module_exports_selective_value
+  );
   Source_Range Module__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Module__source_range, "Module");
   scope_define_value(

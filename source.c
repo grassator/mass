@@ -1567,6 +1567,29 @@ token_parse_single(
   }
 }
 
+static bool
+mass_is_slice_like(
+  Value *value
+) {
+  return same_type(value->descriptor, &descriptor_slice)
+    || same_type(value->descriptor, &descriptor_byte_slice);
+}
+
+static Slice
+mass_slice_from_slice_like(
+  Value *value
+) {
+  if (same_type(value->descriptor, &descriptor_slice)) {
+    return *value_as_slice(value);
+  } else if (same_type(value->descriptor, &descriptor_byte_slice)) {
+    const Mass_Byte_Slice *byte_slice = value_as_byte_slice(value);
+    return (Slice){.bytes = byte_slice->bytes, .length = byte_slice->length};
+  } else {
+    panic("TODO accept any right-shaped struct, not just generic view");
+    return (Slice){0};
+  }
+}
+
 static Value *
 mass_named_accessor(
   Mass_Context *context,
@@ -1575,11 +1598,18 @@ mass_named_accessor(
 ) {
   assert(args.length == 1);
   Value *symbol_value = value_view_get(&args, 0);
-  if (!mass_value_ensure_static_of(context, symbol_value, &descriptor_symbol)) {
-    return 0;
+  const Symbol *symbol = 0;
+  if (same_type(value_or_lazy_value_descriptor(symbol_value), &descriptor_symbol)) {
+    if (!mass_value_ensure_static_of(context, symbol_value, &descriptor_symbol)) {
+      return 0;
+    }
+    symbol = value_as_symbol(symbol_value);
+  } else if (mass_is_slice_like(symbol_value)) {
+    Slice name = mass_slice_from_slice_like(symbol_value);
+    symbol = mass_ensure_symbol(context->compilation, name);
   }
 
-  Named_Accessor named_accessor = {.symbol = value_as_symbol(symbol_value)};
+  Named_Accessor named_accessor = {.symbol = symbol };
   Value *result = value_init(
     mass_allocate(context, Value),
     &descriptor_named_accessor, storage_immediate(&named_accessor), args.source_range
@@ -2082,21 +2112,6 @@ mass_exports(
     context, &descriptor_module_exports, storage_static(export), args.source_range
   );
   return result;
-}
-
-static Slice
-mass_slice_from_slice_like(
-  Value *value
-) {
-  if (same_type(value->descriptor, &descriptor_slice)) {
-    return *value_as_slice(value);
-  } else if (same_type(value->descriptor, &descriptor_byte_slice)) {
-    const Mass_Byte_Slice *byte_slice = value_as_byte_slice(value);
-    return (Slice){.bytes = byte_slice->bytes, .length = byte_slice->length};
-  } else {
-    panic("TODO accept any right-shaped struct, not just generic view");
-    return (Slice){0};
-  }
 }
 
 static Value *

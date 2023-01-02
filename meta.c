@@ -1243,7 +1243,7 @@ main(void) {
     { "Value *", "source" },
   }));
 
-  push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
+  export_compiler(push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
     struct_empty("Not_Specified"),
     struct_empty("All"),
     struct_fields("Selective", (Struct_Item[]){
@@ -1252,7 +1252,7 @@ main(void) {
   }), (Struct_Item[]){
     { "Scope *", "scope" },
     { "Source_Range", "source_range" },
-  }));
+  })));
 
   export_compiler(push_type(type_struct("Module", (Struct_Item[]){
     { "Source_Range", "source_range" },
