@@ -238,7 +238,7 @@ storage_static_memory(const Storage *);
     if (value->tag != Value_Tag_Forced) return false;\
     const Storage *storage = &value->Forced.storage;\
     if (storage->tag != Storage_Tag_Static && storage->tag != Storage_Tag_Immediate) return false;\
-    return value->descriptor == &descriptor_##_SUFFIX_;\
+    return same_type(value->descriptor, &descriptor_##_SUFFIX_);\
   }\
   static inline  _C_TYPE_ const *\
   value_as_##_SUFFIX_(\
