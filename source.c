@@ -5264,6 +5264,29 @@ mass_array_like_get(
 }
 
 static Value *
+mass_get_from_descriptor_module(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args_view
+) {
+  Value *lhs = value_view_get(&args_view, 0);
+  Value *rhs = value_view_get(&args_view, 1);
+  const Descriptor *descriptor = *value_as_descriptor_pointer(lhs);
+  if (!descriptor->own_module) {
+    Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Unknown_Field,
+      .source_range = rhs->source_range,
+      .Unknown_Field = { .name = field_name, .type = descriptor },
+    });
+    return 0;
+  }
+  if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
+  const Symbol *symbol = value_as_symbol(rhs);
+  return mass_module_get_impl(context, descriptor->own_module, symbol, &args_view.source_range);
+}
+
+static Value *
 mass_get(
   Mass_Context *context,
   Parser *parser,
@@ -5286,19 +5309,7 @@ mass_get(
     return mass_module_get(context, parser, parsed_args);
   }
   if (value_is_descriptor_pointer(lhs)) {
-    const Descriptor *descriptor = *value_as_descriptor_pointer(lhs);
-    if (!descriptor->own_module) {
-      Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
-      mass_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Unknown_Field,
-        .source_range = rhs->source_range,
-        .Unknown_Field = { .name = field_name, .type = descriptor },
-      });
-      return 0;
-    }
-    if (!mass_value_ensure_static_of(context, rhs, &descriptor_symbol)) return 0;
-    const Symbol *symbol = value_as_symbol(rhs);
-    return mass_module_get_impl(context, descriptor->own_module, symbol, &args_view.source_range);
+    return mass_get_from_descriptor_module(context, parser, parsed_args);
   }
 
   const Symbol *symbol = context->compilation->common_symbols.get;

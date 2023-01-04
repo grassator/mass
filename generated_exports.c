@@ -621,6 +621,22 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
+    mass_get_from_descriptor_module, "get_from_descriptor_module", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_import, "import", &descriptor_value_pointer,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("context")),

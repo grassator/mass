@@ -31,6 +31,7 @@ unchecked_get_at_index :: fn(
 
 get :: fn(x ~ is_struct_type, rhs) -> _ MASS.struct_get
 get :: fn(x ~ is_fixed_array_type, rhs) -> _ MASS.unchecked_get_at_index
+get :: fn(x : Type, name : MASS.Symbol) -> _ MASS.get_from_descriptor_module
 
 // Auto-dereferencing pointers. This is a very generic fn, meaning that a user can easily
 // create a more specic overload even for pointer types.
@@ -533,7 +534,9 @@ Opaque :: fn(item_type : Type, name : String) => (Type) intrinsic {
   symbol.* = [ .name = name ]
   t := allocate(context.allocator, MASS.Descriptor)
   t.* = (item_type.*)
-  t.brand = symbol
+  (t.*).brand = symbol
+  meta.immediate(context.compilation, t, arguments.source_range)
+}
   meta.immediate(context.compilation, t, arguments.source_range)
 }
 

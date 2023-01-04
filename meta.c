@@ -2194,6 +2194,7 @@ main(void) {
   })));
 
   export_compiler_custom_name("get", push_type(type_intrinsic("mass_get")));
+  export_compiler_custom_name("get_from_descriptor_module", push_type(type_intrinsic("mass_get_from_descriptor_module")));
   export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
 
   export_compiler_custom_name("intrinsic", push_type(type_intrinsic("mass_intrinsic")));

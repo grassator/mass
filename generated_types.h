@@ -793,6 +793,9 @@ static void push_instruction
 static Value * mass_get
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_get_from_descriptor_module
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_import
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -2911,6 +2914,7 @@ static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_get;
+static Descriptor descriptor_mass_get_from_descriptor_module;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_intrinsic;
 static Descriptor descriptor_mass_apply;
