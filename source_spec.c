@@ -1786,6 +1786,17 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker());
     }
+
+    it("should support defining new types at compile time") {
+      u64 (*checker)() = (u64 (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "i64x2 :: type_id_test(i64 * 2)\n"
+        "type_id_test :: fn(type : Type) => _ intrinsic { arguments.0 }\n"
+        "checker :: fn() -> (i64) { x : i64x2 = [1, 2]; x.1 }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 2);
+    }
   }
 
   describe("Strings") {
