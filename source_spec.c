@@ -1797,6 +1797,17 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 2);
     }
+
+    it("should getting a value from a type-based module defined in an intrinsic") {
+      u64 (*checker)() = (u64 (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "SomeEnum :: c_enum(i64, [ .Foo = 42 ])\n"
+        "accepts_some_enum :: fn(x : SomeEnum) -> (i64) { cast(i64, x) }\n"
+        "checker :: fn() -> (i64) { accepts_some_enum(SomeEnum.Foo) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Strings") {

@@ -2287,6 +2287,13 @@ main(void) {
     })
   ));
 
+  export_compiler_custom_name("ensure_symbol", push_type(
+    type_function(Default, "mass_ensure_symbol", "const Symbol *", (Argument_Type[]){
+      { "Compilation *", "compilation" },
+      { "Slice", "name" },
+    })
+  ));
+
   export_compiler(push_type(
     type_function(Default, "scope_define_value", "void", (Argument_Type[]){
       { "Scope *", "scope" },

@@ -537,6 +537,36 @@ Opaque :: fn(item_type : Type, name : String) => (Type) intrinsic {
   (t.*).brand = symbol
   meta.immediate(context.compilation, t, arguments.source_range)
 }
+
+c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
+  meta :: import("std/meta")
+  item_type := meta.reify(arguments.0, Type).*
+  tuple := meta.reify(arguments.1, MASS.Tuple).*
+  // FIXME actually extract values from the tuple
+  symbol := MASS.ensure_symbol(context.compilation, "Foo")
+
+  enum_scope := MASS.scope_make(context.allocator, 0)
+  enum_module := allocate(context.allocator, MASS.Module)
+  enum_module.* = [
+    .source_range = arguments.source_range,
+    .own_scope = enum_scope,
+    ."exports" = [
+      .tag = .All,
+      .scope = enum_scope,
+      .source_range = arguments.source_range,
+      .Selective = [0], // FIXME should not be necessary
+    ]
+  ]
+  t := allocate(context.allocator, MASS.Descriptor)
+  t.* = (item_type.*)
+  //t.brand = FIXME make up a brand or not ?
+  // TODO We have special overload for accessing own modules of descriptors so here we have
+  //      to use this weird syntax
+  (t.*).own_module = enum_module
+
+  value := meta.immediate(context.compilation, 42, arguments.source_range)
+  MASS.scope_define_value(enum_scope, [0], arguments.source_range, symbol, value)
+
   meta.immediate(context.compilation, t, arguments.source_range)
 }
 

@@ -910,6 +910,9 @@ static const Descriptor * descriptor_pointer_to
 static Scope * scope_make
   (const Allocator * allocator, const Scope * parent);
 
+static const Symbol * mass_ensure_symbol
+  (Compilation * compilation, Slice name);
+
 static void scope_define_value
   (Scope * scope, Epoch epoch, Source_Range source_range, const Symbol * symbol, Value * value);
 
@@ -2953,6 +2956,7 @@ static Descriptor descriptor_mass_tuple_length;
 static Descriptor descriptor_mass_tuple_get;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_scope_make;
+static Descriptor descriptor_mass_ensure_symbol;
 static Descriptor descriptor_scope_define_value;
 static Descriptor descriptor_same_type;
 static Descriptor descriptor_register_acquire_temp;

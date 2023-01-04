@@ -1177,6 +1177,18 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
+    mass_ensure_symbol, "ensure_symbol", &descriptor_symbol_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("compilation")),
+      .descriptor = &descriptor_compilation_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("name")),
+      .descriptor = &descriptor_slice
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
     scope_define_value, "scope_define_value", &descriptor_void,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("scope")),
