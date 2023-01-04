@@ -533,6 +533,7 @@ Opaque :: fn(item_type : Type, name : String) => (Type) intrinsic {
   symbol.* = [ .name = name ]
   t := allocate(context.allocator, MASS.Descriptor)
   t.* = (item_type.*)
+  t.brand = symbol
   meta.immediate(context.compilation, t, arguments.source_range)
 }
 
