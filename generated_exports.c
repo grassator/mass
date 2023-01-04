@@ -24,6 +24,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Source_Range")),
     type_source_range_value
   );
+  Source_Range Assignment__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Assignment__source_range, "Assignment");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Assignment__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Assignment")),
+    type_assignment_value
+  );
   Source_Range Module_Exports__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Module_Exports__source_range, "Module_Exports");
   scope_define_value(
@@ -1110,6 +1117,26 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
+    mass_tuple_length, "tuple_length", &descriptor_i64,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("tuple")),
+      .descriptor = &descriptor_tuple_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_tuple_get, "tuple_get", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("tuple")),
+      .descriptor = &descriptor_tuple_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("index")),
+      .descriptor = &descriptor_i64
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
     descriptor_pointer_to, "descriptor_pointer_to", &descriptor_descriptor_pointer,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("compilation")),
@@ -1118,6 +1145,42 @@ compiler_scope_define_exports(
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
       .descriptor = &descriptor_descriptor_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    scope_make, "scope_make", &descriptor_scope_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parent")),
+      .descriptor = &descriptor_scope_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    scope_define_value, "scope_define_value", &descriptor_void,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("scope")),
+      .descriptor = &descriptor_scope_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("epoch")),
+      .descriptor = &descriptor_epoch
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("source_range")),
+      .descriptor = &descriptor_source_range
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("symbol")),
+      .descriptor = &descriptor_symbol_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("value")),
+      .descriptor = &descriptor_value_pointer
     }
   );
   MASS_DEFINE_FUNCTION(

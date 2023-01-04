@@ -1238,10 +1238,10 @@ main(void) {
     { "Value *", "body" },
   }));
 
-  push_type(type_struct("Assignment", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Assignment", (Struct_Item[]){
     { "Value *", "target" },
     { "Value *", "source" },
-  }));
+  })));
 
   export_compiler(push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
     struct_empty("Not_Specified"),
@@ -2265,6 +2265,23 @@ main(void) {
     type_function(Default, "descriptor_pointer_to", "const Descriptor *", (Argument_Type[]){
       { "Compilation *", "compilation" },
       { "const Descriptor *", "descriptor" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "scope_make", "Scope *", (Argument_Type[]){
+      { "const Allocator *", "allocator" },
+      { "const Scope *", "parent" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "scope_define_value", "void", (Argument_Type[]){
+      { "Scope *", "scope" },
+      { "Epoch", "epoch" },
+      { "Source_Range", "source_range" },
+      { "const Symbol *", "symbol" },
+      { "Value *", "value" },
     })
   ));
 

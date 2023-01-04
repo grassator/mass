@@ -895,8 +895,20 @@ static const Descriptor * mass_constraint_fixed_array_type
 static const Descriptor * mass_constraint_function_instance_type
   (const Descriptor * descriptor);
 
+static u64 mass_tuple_length
+  (const Tuple * tuple);
+
+static Value * mass_tuple_get
+  (const Tuple * tuple, u64 index);
+
 static const Descriptor * descriptor_pointer_to
   (Compilation * compilation, const Descriptor * descriptor);
+
+static Scope * scope_make
+  (const Allocator * allocator, const Scope * parent);
+
+static void scope_define_value
+  (Scope * scope, Epoch epoch, Source_Range source_range, const Symbol * symbol, Value * value);
 
 static _Bool same_type
   (const Descriptor * a, const Descriptor * b);
@@ -2933,7 +2945,11 @@ static Descriptor descriptor_mass_constraint_pointer_type;
 static Descriptor descriptor_mass_constraint_struct_type;
 static Descriptor descriptor_mass_constraint_fixed_array_type;
 static Descriptor descriptor_mass_constraint_function_instance_type;
+static Descriptor descriptor_mass_tuple_length;
+static Descriptor descriptor_mass_tuple_get;
 static Descriptor descriptor_descriptor_pointer_to;
+static Descriptor descriptor_scope_make;
+static Descriptor descriptor_scope_define_value;
 static Descriptor descriptor_same_type;
 static Descriptor descriptor_register_acquire_temp;
 static Descriptor descriptor_register_release;
