@@ -433,6 +433,21 @@ struct_find_field_by_name(
   return false;
 }
 
+static inline u64
+mass_tuple_length(
+  const Tuple *tuple
+) {
+  return dyn_array_length(tuple->items);
+}
+
+static inline Value *
+mass_tuple_get(
+  const Tuple *tuple,
+  u64 index
+) {
+  return *dyn_array_get(tuple->items, index);
+}
+
 typedef enum {
   Tuple_Eval_Mode_Value,
   Tuple_Eval_Mode_Type,
@@ -456,12 +471,12 @@ anonymous_struct_descriptor_from_tuple(
 
   Slice_Set *field_name_set = hash_map_make(
     Slice_Set,
-    .initial_capacity = dyn_array_length(tuple->items) * 2,
+    .initial_capacity = mass_tuple_length(tuple) * 2,
     .allocator = context->temp_allocator,
   );
 
-  for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
-    Value *item = *dyn_array_get(tuple->items, i);
+  for (u64 i = 0; i < mass_tuple_length(tuple); ++i) {
+    Value *item = mass_tuple_get(tuple, i);
     Slice name = {0};
 
     const Descriptor *field_descriptor;
@@ -3662,7 +3677,7 @@ mass_trampoline_call(
   Temp_Mark temp_mark = context_temp_mark(context);
   u64 bit_size = trampoline->args_descriptor->bit_size.as_u64;
   u8* args_struct_memory = 0;
-  
+
   if (bit_size) {
     args_struct_memory = allocator_allocate_bytes(
       context->temp_allocator,

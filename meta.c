@@ -2260,6 +2260,17 @@ main(void) {
       { "const Descriptor *", "descriptor" },
     })
   ));
+  export_compiler_custom_name("tuple_length", push_type(
+    type_function(Default, "mass_tuple_length", "u64", (Argument_Type[]){
+      { "const Tuple *", "tuple" },
+    })
+  ));
+  export_compiler_custom_name("tuple_get", push_type(
+    type_function(Default, "mass_tuple_get", "Value *", (Argument_Type[]){
+      { "const Tuple *", "tuple" },
+      { "u64", "index" },
+    })
+  ));
 
   export_compiler(push_type(
     type_function(Default, "descriptor_pointer_to", "const Descriptor *", (Argument_Type[]){
