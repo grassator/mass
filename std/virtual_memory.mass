@@ -1,23 +1,24 @@
-exports [.allocate, .Permissions, .NONE, .READ, .READ_WRITE, .READ_WRITE_EXECUTE]
+exports [.allocate, .Permissions]
 
-Permissions        :: Opaque(i64, "Permissions")
-NONE               :: cast(Permissions, 0)
-READ               :: cast(Permissions, 1)
-READ_WRITE         :: cast(Permissions, 2)
-READ_WRITE_EXECUTE :: cast(Permissions, 3)
+Permissions :: c_enum(i64, [
+  .NONE = 0,
+  .READ = 1,
+  .READ_WRITE = 2,
+  .READ_WRITE_EXECUTE = 3,
+])
 
 // TODO figure out what is the strategy for errors in Mass
 allocate :: fn(size : u64, permissions : Permissions, address : &Void = 0) -> (&Void) {
   if get_target_os() == .Windows then {
     using import("std/win32")
     allocation_type :: MEM_COMMIT | MEM_RESERVE
-    win32_permissions := if permissions == NONE then {
+    win32_permissions := if permissions == .NONE then {
       PAGE_NOACCESS
-    } else if permissions == READ then {
+    } else if permissions == .READ then {
       PAGE_READONLY
-    } else if permissions == READ_WRITE then {
+    } else if permissions == .READ_WRITE then {
       PAGE_READWRITE
-    } else if permissions == READ_WRITE_EXECUTE then {
+    } else if permissions == .READ_WRITE_EXECUTE then {
       PAGE_EXECUTE_READWRITE
     } else {
       unreachable()
@@ -25,13 +26,13 @@ allocate :: fn(size : u64, permissions : Permissions, address : &Void = 0) -> (&
     VirtualAlloc(address, size, allocation_type, win32_permissions)
   } else {
     using import("std/linux")
-    linux_permissions := if permissions == NONE then {
+    linux_permissions := if permissions == .NONE then {
       PROT_NONE
-    } else if permissions == READ then {
+    } else if permissions == .READ then {
       PROT_READ
-    } else if permissions == READ_WRITE then {
+    } else if permissions == .READ_WRITE then {
       PROT_READ | PROT_WRITE
-    } else if permissions == READ_WRITE_EXECUTE then {
+    } else if permissions == .READ_WRITE_EXECUTE then {
       PROT_READ | PROT_WRITE | PROT_EXEC
     } else {
       unreachable()

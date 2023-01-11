@@ -2640,7 +2640,7 @@ spec("source") {
         "checker", &test_context,
         "checker :: fn() -> _ {"
           "vm :: import(\"std/virtual_memory\")\n"
-          "vm.allocate(4096, vm.READ_WRITE)"
+          "vm.allocate(4096, .READ_WRITE)"
         "}\n"
       );
       check(spec_check_mass_result(test_context.result));
