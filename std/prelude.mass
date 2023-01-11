@@ -541,9 +541,7 @@ Opaque :: fn(item_type : Type, name : String) => (Type) intrinsic {
 c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
-  tuple := meta.reify(arguments.1, MASS.Tuple).*
-  // FIXME actually extract values from the tuple
-  symbol := MASS.ensure_symbol(context.compilation, "Foo")
+  tuple := meta.reify(arguments.1, MASS.Tuple)
 
   enum_scope := MASS.scope_make(context.allocator, 0)
   enum_module := allocate(context.allocator, MASS.Module)
@@ -571,9 +569,23 @@ c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
     .Integer = [0], // FIXME should not be necessary
   ]
 
-  value := meta.immediate(context.compilation, 42, arguments.source_range)
-  value.descriptor = t
-  MASS.scope_define_value(enum_scope, [0], arguments.source_range, symbol, value)
+  {
+    length := MASS.tuple_length(tuple)
+    i := 0
+    while i != length {
+      item := MASS.tuple_get(tuple, i)
+      assignment := meta.reify(item, MASS.Assignment)
+      accessor := meta.reify(assignment.target, MASS.Named_Accessor)
+      // FIXME check source descriptor
+      // FIXME properly coerce the value instead of just replacing the descriptor
+      // FIXME check that it is a compile-time value
+      value := assignment.source
+      value.descriptor = t
+      MASS.scope_define_value(enum_scope, [0], arguments.source_range, accessor.symbol, value)
+
+      i = i + 1
+    }
+  }
 
   meta.immediate(context.compilation, t, arguments.source_range)
 }
