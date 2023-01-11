@@ -557,14 +557,22 @@ c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
       .Selective = [0], // FIXME should not be necessary
     ]
   ]
+  brand_symbol := allocate(context.allocator, MASS.Symbol)
+  brand_symbol.* = [ .name = "FIXME" ] // Provide a better naming here
   t := allocate(context.allocator, MASS.Descriptor)
-  t.* = (item_type.*)
-  //t.brand = FIXME make up a brand or not ?
-  // TODO We have special overload for accessing own modules of descriptors so here we have
-  //      to use this weird syntax
-  (t.*).own_module = enum_module
+  t.* = [
+    .tag = .Raw,
+    .brand = brand_symbol,
+    .own_module = enum_module,
+    // TODO We have special overload for accessing own modules of descriptors so here we have
+    //      to use this weird syntax
+    .bit_size = (item_type.*).bit_size,
+    .bit_alignment = (item_type.*).bit_alignment,
+    .Integer = [0], // FIXME should not be necessary
+  ]
 
   value := meta.immediate(context.compilation, 42, arguments.source_range)
+  value.descriptor = t
   MASS.scope_define_value(enum_scope, [0], arguments.source_range, symbol, value)
 
   meta.immediate(context.compilation, t, arguments.source_range)

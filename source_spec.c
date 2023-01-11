@@ -1797,8 +1797,10 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 2);
     }
+  }
 
-    it("should getting a value from a type-based module defined in an intrinsic") {
+  describe("C Enums") {
+    it("should get a value from a type-based module defined in an intrinsic") {
       u64 (*checker)() = (u64 (*)())test_program_inline_source_function(
         "checker", &test_context,
         "SomeEnum :: c_enum(i64, [ .Foo = 42 ])\n"
@@ -1807,6 +1809,15 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
+    }
+    it("should support equality") {
+      bool (*checker)() = (bool (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "SomeEnum :: c_enum(i64, [ .Foo = 42 ])\n"
+        "checker :: fn() -> (bool) { x := SomeEnum.Foo; x == .Foo }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker());
     }
   }
 
