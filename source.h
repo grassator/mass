@@ -170,12 +170,6 @@ scope_entry_force_value(
   Scope_Entry *entry
 );
 
-static inline Expected_Result
-mass_expected_result_exact(
-  const Descriptor *descriptor,
-  Storage storage
-);
-
 static inline Value *
 mass_make_lazy_value(
   Mass_Context *context,

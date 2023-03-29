@@ -1201,8 +1201,7 @@ function_literal_info_for_parameters(
       }
     }
     if (param->Generic.maybe_type_constraint) {
-      actual_descriptor = param->Generic.maybe_type_constraint(actual_descriptor);
-      if (!actual_descriptor) return 0;
+      if (!param->Generic.maybe_type_constraint((Type){actual_descriptor})) return 0;
     }
     specialized_param->descriptor = actual_descriptor;
   }

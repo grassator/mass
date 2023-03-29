@@ -3,12 +3,13 @@
 #include <stddef.h>
 #include <limits.h>
 
+// :TypeStruct
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\
   (Value) {\
     .tag = Value_Tag_Forced,\
-    .descriptor = &descriptor_descriptor_pointer,\
+    .descriptor = &descriptor_type,\
     .Forced = {\
-      .storage = {\
+      .storage = { \
         .tag = Storage_Tag_Immediate,\
         .bit_size = {sizeof(Descriptor *) * CHAR_BIT},\
         .Immediate.bits = (u64)(_DESCRIPTOR_),\

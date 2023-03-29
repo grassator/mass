@@ -349,6 +349,14 @@ mass_expected_result_exact(
 }
 
 static inline Expected_Result
+mass_expected_result_exact_type(
+  Type type,
+  Storage storage
+) {
+  return mass_expected_result_exact(type.descriptor, storage);
+}
+
+static inline Expected_Result
 expected_result_any(
   const Descriptor *descriptor
 ) {

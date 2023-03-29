@@ -628,8 +628,12 @@ typedef struct Descriptor_Pointer_To Descriptor_Pointer_To;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
-typedef const Descriptor * (*Mass_Type_Constraint_Proc)
-  (const Descriptor * descriptor);
+typedef struct Type Type;
+typedef dyn_array_type(Type *) Array_Type_Ptr;
+typedef dyn_array_type(const Type *) Array_Const_Type_Ptr;
+
+typedef _Bool (*Mass_Type_Constraint_Proc)
+  (Type type);
 
 typedef struct Mass_Error Mass_Error;
 typedef struct Mass_Error_User_Defined Mass_Error_User_Defined;
@@ -880,23 +884,23 @@ static Value * mass_static_assert
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
-static const Descriptor * mass_constraint_integer_type
-  (const Descriptor * descriptor);
+static _Bool mass_constraint_integer_type
+  (Type type);
 
-static const Descriptor * mass_constraint_float_type
-  (const Descriptor * descriptor);
+static _Bool mass_constraint_float_type
+  (Type type);
 
-static const Descriptor * mass_constraint_pointer_type
-  (const Descriptor * descriptor);
+static _Bool mass_constraint_pointer_type
+  (Type type);
 
-static const Descriptor * mass_constraint_struct_type
-  (const Descriptor * descriptor);
+static _Bool mass_constraint_struct_type
+  (Type type);
 
-static const Descriptor * mass_constraint_fixed_array_type
-  (const Descriptor * descriptor);
+static _Bool mass_constraint_fixed_array_type
+  (Type type);
 
-static const Descriptor * mass_constraint_function_instance_type
-  (const Descriptor * descriptor);
+static _Bool mass_constraint_function_instance_type
+  (Type type);
 
 static u64 mass_tuple_length
   (const Tuple * tuple);
@@ -936,6 +940,9 @@ static void storage_release_if_temporary
 
 static Expected_Result mass_expected_result_exact
   (const Descriptor * descriptor, Storage storage);
+
+static Expected_Result mass_expected_result_exact_type
+  (Type type, Storage storage);
 
 static Value * mass_syscall
   (Mass_Context * context, Parser * parser, Value_View args, const Function_Header * header, u64 number);
@@ -1048,6 +1055,9 @@ static Value * mass_generic_equal
 static Value * mass_generic_not_equal
   (Mass_Context * context, Parser * parser, Value_View args);
 
+typedef dyn_array_type(_Bool *) Array__Bool_Ptr;
+typedef dyn_array_type(const _Bool *) Array_Const__Bool_Ptr;
+
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
 
@@ -1059,9 +1069,6 @@ typedef dyn_array_type(const Allocator *) Array_Const_Allocator_Ptr;
 
 typedef dyn_array_type(Virtual_Memory_Buffer *) Array_Virtual_Memory_Buffer_Ptr;
 typedef dyn_array_type(const Virtual_Memory_Buffer *) Array_Const_Virtual_Memory_Buffer_Ptr;
-
-typedef dyn_array_type(_Bool *) Array__Bool_Ptr;
-typedef dyn_array_type(const _Bool *) Array_Const__Bool_Ptr;
 
 typedef dyn_array_type(i8 *) Array_i8_Ptr;
 typedef dyn_array_type(const i8 *) Array_Const_i8_Ptr;
@@ -2034,6 +2041,11 @@ descriptor_as_pointer_to(const Descriptor *descriptor) {
   return &descriptor->Pointer_To;
 }
 typedef dyn_array_type(Descriptor) Array_Descriptor;
+typedef struct Type {
+  const Descriptor * descriptor;
+} Type;
+typedef dyn_array_type(Type) Array_Type;
+
 typedef enum {
   Mass_Error_Tag_Unimplemented = 0,
   Mass_Error_Tag_Unreachable_Statement = 1,
@@ -2367,6 +2379,8 @@ typedef struct X64_Mnemonic {
 } X64_Mnemonic;
 typedef dyn_array_type(X64_Mnemonic) Array_X64_Mnemonic;
 
+typedef dyn_array_type(_Bool) Array__Bool;
+
 typedef dyn_array_type(char) Array_char;
 
 typedef dyn_array_type(int) Array_int;
@@ -2374,8 +2388,6 @@ typedef dyn_array_type(int) Array_int;
 typedef dyn_array_type(Allocator) Array_Allocator;
 
 typedef dyn_array_type(Virtual_Memory_Buffer) Array_Virtual_Memory_Buffer;
-
-typedef dyn_array_type(_Bool) Array__Bool;
 
 typedef dyn_array_type(i8) Array_i8;
 
@@ -2395,6 +2407,8 @@ static Descriptor descriptor_never;
 static Descriptor descriptor_never_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_descriptor_pointer;
+static Descriptor descriptor_type;
+static Descriptor descriptor_type_pointer;
 static Descriptor descriptor_bits;
 static Descriptor descriptor_array_bits;
 static Descriptor descriptor_array_bits_ptr;
@@ -2820,6 +2834,11 @@ static Descriptor descriptor_array_descriptor_ptr;
 static Descriptor descriptor_array_const_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
 static Descriptor descriptor_descriptor_pointer_pointer;
+static Descriptor descriptor_type;
+static Descriptor descriptor_array_type;
+static Descriptor descriptor_array_type_ptr;
+static Descriptor descriptor_type_pointer;
+static Descriptor descriptor_type_pointer_pointer;
 static Descriptor descriptor_mass_type_constraint_proc;
 static Descriptor descriptor_mass_error;
 static Descriptor descriptor_array_mass_error;
@@ -2965,6 +2984,7 @@ static Descriptor descriptor_storage_register;
 static Descriptor descriptor_storage_register_temp;
 static Descriptor descriptor_storage_release_if_temporary;
 static Descriptor descriptor_mass_expected_result_exact;
+static Descriptor descriptor_mass_expected_result_exact_type;
 static Descriptor descriptor_mass_syscall;
 static Descriptor descriptor_value_force;
 static Descriptor descriptor_mass_module_get_impl;
@@ -3002,6 +3022,12 @@ static Descriptor descriptor_mass_integer_equal;
 static Descriptor descriptor_mass_integer_not_equal;
 static Descriptor descriptor_mass_generic_equal;
 static Descriptor descriptor_mass_generic_not_equal;
+static Descriptor descriptor__bool;
+static Descriptor descriptor_array__bool;
+static Descriptor descriptor_array__bool_ptr;
+static Descriptor descriptor_array_const__bool_ptr;
+static Descriptor descriptor__bool_pointer;
+static Descriptor descriptor__bool_pointer_pointer;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
 static Descriptor descriptor_array_char_ptr;
@@ -3026,12 +3052,6 @@ static Descriptor descriptor_array_virtual_memory_buffer_ptr;
 static Descriptor descriptor_array_const_virtual_memory_buffer_ptr;
 static Descriptor descriptor_virtual_memory_buffer_pointer;
 static Descriptor descriptor_virtual_memory_buffer_pointer_pointer;
-static Descriptor descriptor__bool;
-static Descriptor descriptor_array__bool;
-static Descriptor descriptor_array__bool_ptr;
-static Descriptor descriptor_array_const__bool_ptr;
-static Descriptor descriptor__bool_pointer;
-static Descriptor descriptor__bool_pointer_pointer;
 static Descriptor descriptor_i8;
 static Descriptor descriptor_array_i8;
 static Descriptor descriptor_array_i8_ptr;
@@ -5461,12 +5481,24 @@ MASS_DEFINE_TYPE_VALUE(descriptor);
 DEFINE_VALUE_IS_AS_HELPERS(Descriptor, descriptor);
 DEFINE_VALUE_IS_AS_HELPERS(Descriptor *, descriptor_pointer);
 /*union struct end*/
+MASS_DEFINE_STRUCT_DESCRIPTOR(type, Type,
+  {
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .offset = offsetof(Type, descriptor),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(type);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_type_ptr, type_pointer, Array_Type_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_type, type, Array_Type);
+DEFINE_VALUE_IS_AS_HELPERS(Type, type);
+DEFINE_VALUE_IS_AS_HELPERS(Type *, type_pointer);
 MASS_DEFINE_FUNCTION_DESCRIPTOR(
   mass_type_constraint_proc,
-  &descriptor_descriptor_pointer,
+  &descriptor__bool,
   {
     .tag = Resolved_Function_Parameter_Tag_Unknown,
-    .descriptor = &descriptor_descriptor_pointer,
+    .descriptor = &descriptor_type,
   }
 )
 /*union struct start */
@@ -6393,6 +6425,11 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_x64_mnemonic_ptr, x64_mnemonic_pointer, Array
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_x64_mnemonic, x64_mnemonic, Array_X64_Mnemonic);
 DEFINE_VALUE_IS_AS_HELPERS(X64_Mnemonic, x64_mnemonic);
 DEFINE_VALUE_IS_AS_HELPERS(X64_Mnemonic *, x64_mnemonic_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool)
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array__bool_ptr, _bool_pointer, Array__Bool_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array__bool, _bool, Array__Bool);
+DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool);
+DEFINE_VALUE_IS_AS_HELPERS(_Bool *, _bool_pointer);
 MASS_DEFINE_INTEGER_C_TYPE(char, char, 1)
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_char_ptr, char_pointer, Array_char_Ptr);
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_char, char, Array_char);
@@ -6413,11 +6450,6 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_virtual_memory_buffer_ptr, virtual_memory_buf
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_virtual_memory_buffer, virtual_memory_buffer, Array_Virtual_Memory_Buffer);
 DEFINE_VALUE_IS_AS_HELPERS(Virtual_Memory_Buffer, virtual_memory_buffer);
 DEFINE_VALUE_IS_AS_HELPERS(Virtual_Memory_Buffer *, virtual_memory_buffer_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(_bool, _Bool)
-MASS_DEFINE_C_DYN_ARRAY_TYPE(array__bool_ptr, _bool_pointer, Array__Bool_Ptr);
-MASS_DEFINE_C_DYN_ARRAY_TYPE(array__bool, _bool, Array__Bool);
-DEFINE_VALUE_IS_AS_HELPERS(_Bool, _bool);
-DEFINE_VALUE_IS_AS_HELPERS(_Bool *, _bool_pointer);
 MASS_DEFINE_RAW_C_TYPE(i8, i8)
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i8_ptr, i8_pointer, Array_i8_Ptr);
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_i8, i8, Array_i8);

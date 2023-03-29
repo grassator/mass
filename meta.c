@@ -1889,8 +1889,14 @@ main(void) {
     { "Bits", "bit_alignment" },
   })));
 
-  push_type(type_function(Typedef, "Mass_Type_Constraint_Proc", "const Descriptor *", (Argument_Type[]){
-    { "const Descriptor *", "descriptor" },
+  // :TypeStruct This struct must be just a strongly typed wrapper around a pointer
+  // and can not contain any extra fields, or a bunch of assumtions in the compiler fail
+  export_global(push_type(type_struct("Type", (Struct_Item[]){
+    { "const Descriptor *", "descriptor"},
+  })));
+
+  push_type(type_function(Typedef, "Mass_Type_Constraint_Proc", "_Bool", (Argument_Type[]){
+    { "Type", "type" },
   }));
 
   export_compiler_custom_name("Error", push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
@@ -2232,33 +2238,33 @@ main(void) {
     })
   ));
   export_compiler_custom_name("constraint_integer_type", push_type(
-    type_function(Default, "mass_constraint_integer_type", "const Descriptor *", (Argument_Type[]){
-      { "const Descriptor *", "descriptor" },
+    type_function(Default, "mass_constraint_integer_type", "_Bool", (Argument_Type[]){
+      { "Type", "type" },
     })
   ));
   export_compiler_custom_name("constraint_float_type", push_type(
-    type_function(Default, "mass_constraint_float_type", "const Descriptor *", (Argument_Type[]){
-      { "const Descriptor *", "descriptor" },
+    type_function(Default, "mass_constraint_float_type", "_Bool", (Argument_Type[]){
+      { "Type", "type" },
     })
   ));
   export_compiler_custom_name("constraint_pointer_type", push_type(
-    type_function(Default, "mass_constraint_pointer_type", "const Descriptor *", (Argument_Type[]){
-      { "const Descriptor *", "descriptor" },
+    type_function(Default, "mass_constraint_pointer_type", "_Bool", (Argument_Type[]){
+      { "Type", "type" },
     })
   ));
   export_compiler_custom_name("constraint_struct_type", push_type(
-    type_function(Default, "mass_constraint_struct_type", "const Descriptor *", (Argument_Type[]){
-      { "const Descriptor *", "descriptor" },
+    type_function(Default, "mass_constraint_struct_type", "_Bool", (Argument_Type[]){
+      { "Type", "type" },
     })
   ));
   export_compiler_custom_name("constraint_fixed_array_type", push_type(
-    type_function(Default, "mass_constraint_fixed_array_type", "const Descriptor *", (Argument_Type[]){
-      { "const Descriptor *", "descriptor" },
+    type_function(Default, "mass_constraint_fixed_array_type", "_Bool", (Argument_Type[]){
+      { "Type", "type" },
     })
   ));
   export_compiler_custom_name("constraint_function_instance_type", push_type(
-    type_function(Default, "mass_constraint_function_instance_type", "const Descriptor *", (Argument_Type[]){
-      { "const Descriptor *", "descriptor" },
+    type_function(Default, "mass_constraint_function_instance_type", "_Bool", (Argument_Type[]){
+      { "Type", "type" },
     })
   ));
   export_compiler_custom_name("tuple_length", push_type(
@@ -2348,6 +2354,13 @@ main(void) {
   export_compiler_custom_name("expected_result_exact", push_type(
     type_function(Default, "mass_expected_result_exact", "Expected_Result", (Argument_Type[]){
       { "const Descriptor *", "descriptor" },
+      { "Storage", "storage" },
+    })
+  ));
+
+  export_compiler_custom_name("expected_result_exact_type", push_type(
+    type_function(Default, "mass_expected_result_exact_type", "Expected_Result", (Argument_Type[]){
+      { "Type", "type" },
       { "Storage", "storage" },
     })
   ));
@@ -2447,6 +2460,11 @@ main(void) {
   // Standard C types //
   //////////////////////
 
+  set_flags(
+    export_global_custom_name("bool", push_type(type_c_opaque("_Bool"))),
+    Meta_Type_Flags_No_C_Type
+  );
+
   // The signedness of `char` is implementation defined. To keep things same
   // we assume that the meta program and the main one are both compiled
   // on the same machine with the same compiler and flags, allowing to detect
@@ -2459,11 +2477,6 @@ main(void) {
   // Prelude Types
   export_compiler(set_flags(push_type(type_c_opaque("Allocator")), Meta_Type_Flags_No_C_Type));
   set_flags(push_type(type_c_opaque("Virtual_Memory_Buffer")), Meta_Type_Flags_No_C_Type);
-
-  set_flags(
-    export_global_custom_name("bool", push_type(type_c_opaque("_Bool"))),
-    Meta_Type_Flags_No_C_Type
-   );
 
   export_global(set_flags(push_type(type_raw("i8")), Meta_Type_Flags_No_C_Type));
   export_global(set_flags(push_type(type_raw("i16")), Meta_Type_Flags_No_C_Type));
@@ -2566,6 +2579,8 @@ main(void) {
       // The descriptor of descriptors needs to be forward declared
       fprintf(file, "static Descriptor descriptor_descriptor;\n");
       fprintf(file, "static Descriptor descriptor_descriptor_pointer;\n");
+      fprintf(file, "static Descriptor descriptor_type;\n");
+      fprintf(file, "static Descriptor descriptor_type_pointer;\n");
 
       for (uint32_t i = 0; i < type_count; ++i) {
         print_mass_descriptor_and_type_forward_declaration(file, &types[i]);

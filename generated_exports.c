@@ -1085,50 +1085,50 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_constraint_integer_type, "constraint_integer_type", &descriptor_descriptor_pointer,
+    mass_constraint_integer_type, "constraint_integer_type", &descriptor__bool,
     (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
-      .descriptor = &descriptor_descriptor_pointer
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_constraint_float_type, "constraint_float_type", &descriptor_descriptor_pointer,
+    mass_constraint_float_type, "constraint_float_type", &descriptor__bool,
     (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
-      .descriptor = &descriptor_descriptor_pointer
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_constraint_pointer_type, "constraint_pointer_type", &descriptor_descriptor_pointer,
+    mass_constraint_pointer_type, "constraint_pointer_type", &descriptor__bool,
     (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
-      .descriptor = &descriptor_descriptor_pointer
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_constraint_struct_type, "constraint_struct_type", &descriptor_descriptor_pointer,
+    mass_constraint_struct_type, "constraint_struct_type", &descriptor__bool,
     (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
-      .descriptor = &descriptor_descriptor_pointer
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_constraint_fixed_array_type, "constraint_fixed_array_type", &descriptor_descriptor_pointer,
+    mass_constraint_fixed_array_type, "constraint_fixed_array_type", &descriptor__bool,
     (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
-      .descriptor = &descriptor_descriptor_pointer
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_constraint_function_instance_type, "constraint_function_instance_type", &descriptor_descriptor_pointer,
+    mass_constraint_function_instance_type, "constraint_function_instance_type", &descriptor__bool,
     (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
-      .descriptor = &descriptor_descriptor_pointer
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     }
   );
   MASS_DEFINE_FUNCTION(
@@ -1285,6 +1285,18 @@ compiler_scope_define_exports(
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
       .descriptor = &descriptor_descriptor_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("storage")),
+      .descriptor = &descriptor_storage
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_expected_result_exact_type, "expected_result_exact_type", &descriptor_expected_result,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("type")),
+      .descriptor = &descriptor_type
     },
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("storage")),
@@ -1849,6 +1861,13 @@ global_scope_define_exports(
   const Calling_Convention *calling_convention =
     compilation->jit.program->default_calling_convention;
   (void)calling_convention;
+  Source_Range Type__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Type__source_range, "Type");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Type__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Type")),
+    type_type_value
+  );
   Source_Range bool__source_range;
   INIT_LITERAL_SOURCE_RANGE(&bool__source_range, "bool");
   scope_define_value(

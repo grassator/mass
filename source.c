@@ -1391,10 +1391,23 @@ value_ensure_type(
     Function_Call_Setup call_setup = calling_convention->call_setup_proc(context->allocator, info);
     return descriptor_function_instance(context->allocator, info, call_setup, context->program);
   }
-  if (!mass_value_ensure_static_of(context, value, &descriptor_descriptor_pointer)) {
+  if (!mass_value_ensure_static(context, value)) {
     return 0;
   }
-  return *value_as_descriptor_pointer(value);
+  if (value_is_type(value)) {
+    return value_as_type(value)->descriptor;
+  }
+  // TODO this should not be necessary but is helpful during transition to strong Type alias
+  if (value_is_descriptor_pointer(value)) {
+    return *value_as_descriptor_pointer(value);
+  }
+
+  mass_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Type_Mismatch,
+    .source_range = source_range,
+    .Type_Mismatch = { .expected = &descriptor_type, .actual = value->descriptor },
+  });
+  return 0;
 }
 
 static inline Value_View
@@ -4431,7 +4444,8 @@ mass_parse_type(
   value = token_parse_single(context, parser, value);
   if (mass_has_error(context)) return 0;
   const Descriptor *descriptor = value_ensure_type(context, parser->scope, value, args.source_range);
-  return value_make(context, &descriptor_descriptor_pointer, storage_immediate(&descriptor), args.source_range);
+  Type type = { descriptor };
+  return value_make(context, &descriptor_type, storage_immediate(&type), args.source_range);
 }
 
 static const Descriptor *
@@ -4458,8 +4472,9 @@ mass_type_of(
   assert(args.length == 1);
   Value *value = value_view_get(&args, 0);
   const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, value);
+  Type type = { descriptor };
   if (mass_has_error(context)) return 0;
-  return value_make(context, &descriptor_descriptor_pointer, storage_immediate(&descriptor), args.source_range);
+  return value_make(context, &descriptor_type, storage_immediate(&type), args.source_range);
 }
 
 static Value *
@@ -4576,7 +4591,7 @@ mass_pointer_to(
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee_descriptor);
   if (mass_value_is_static(pointee)) {
-    const void *source_memory = get_static_storage_with_bit_size(
+    const void *source_memory = storage_static_memory_with_bit_size(
       &value_as_forced(pointee)->storage, pointee_descriptor->bit_size
     );
     Value *result = value_make(
@@ -4603,11 +4618,9 @@ mass_pointer_to_type(
   const Descriptor *descriptor =
     value_ensure_type(context, parser->scope, type_value, args_view.source_range);
   if (mass_has_error(context)) return 0;
-  const Descriptor *pointer_descriptor = descriptor_pointer_to(context->compilation, descriptor);
-  Storage storage = storage_immediate(&pointer_descriptor);
-  return value_make(
-    context, &descriptor_descriptor_pointer, storage, args_view.source_range
-  );
+  Type pointer_type = { descriptor_pointer_to(context->compilation, descriptor) };
+  Storage storage = storage_immediate(&pointer_type);
+  return value_make(context, &descriptor_type, storage, args_view.source_range);
 }
 
 static Value *
@@ -4635,8 +4648,8 @@ mass_apply(
   Value *rhs_token = value_view_get(&operands, 1);
   Value *lhs_value = operands.values[0] = token_parse_single(context, parser, lhs_token);
   if (mass_has_error(context)) return 0;
-  if (value_is_descriptor_pointer(lhs_value)) {
-    const Descriptor *descriptor = *value_as_descriptor_pointer(lhs_value);
+  if (value_is_type(lhs_value)) {
+    const Descriptor *descriptor = value_as_type(lhs_value)->descriptor;
     Value *rhs_value = token_parse_single(context, parser, rhs_token);
     return mass_cast_helper(context, parser, descriptor, rhs_value, operands.source_range);
   } else if (value_is_function_header(lhs_value)) {
@@ -5074,46 +5087,46 @@ mass_dereference(
   );
 }
 
-static const Descriptor *
+static bool
 mass_constraint_pointer_type(
-  const Descriptor *descriptor
+  Type type
 ) {
-  return descriptor->tag == Descriptor_Tag_Pointer_To ? descriptor : 0;
+  return type.descriptor->tag == Descriptor_Tag_Pointer_To;
 }
 
-static const Descriptor *
+static bool
 mass_constraint_integer_type(
-  const Descriptor *descriptor
+  Type type
 ) {
-  return descriptor->tag == Descriptor_Tag_Integer ? descriptor : 0;
+  return type.descriptor->tag == Descriptor_Tag_Integer;
 }
 
-static const Descriptor *
+static bool
 mass_constraint_float_type(
-  const Descriptor *descriptor
+  Type type
 ) {
-  return descriptor->tag == Descriptor_Tag_Float ? descriptor : 0;
+  return type.descriptor->tag == Descriptor_Tag_Float;
 }
 
-static const Descriptor *
+static bool
 mass_constraint_fixed_array_type(
-  const Descriptor *descriptor
+  Type type
 ) {
-  return descriptor->tag == Descriptor_Tag_Fixed_Array ? descriptor : 0;
+  return type.descriptor->tag == Descriptor_Tag_Fixed_Array;
 }
 
-static const Descriptor *
+static bool
 mass_constraint_struct_type(
-  const Descriptor *descriptor
+  Type type
 ) {
-  return descriptor->tag == Descriptor_Tag_Struct ? descriptor : 0;
+  return type.descriptor->tag == Descriptor_Tag_Struct;
 }
 
-static const Descriptor *
+static bool
 mass_constraint_function_instance_type(
-  const Descriptor *descriptor
+  Type type
 ) {
-  return descriptor->tag == Descriptor_Tag_Function_Instance ? descriptor : 0;
+  return type.descriptor->tag == Descriptor_Tag_Function_Instance;
 }
 
 static Value *
@@ -5267,7 +5280,7 @@ mass_get_from_descriptor_module(
 ) {
   Value *lhs = value_view_get(&args_view, 0);
   Value *rhs = value_view_get(&args_view, 1);
-  const Descriptor *descriptor = *value_as_descriptor_pointer(lhs);
+  const Descriptor *descriptor = value_as_type(lhs)->descriptor;
   if (!descriptor->own_module) {
     Slice field_name = source_from_source_range(context->compilation, &rhs->source_range);
     mass_error(context, (Mass_Error) {
@@ -5304,7 +5317,7 @@ mass_get(
   if (lhs_descriptor == &descriptor_module) {
     return mass_module_get(context, parser, parsed_args);
   }
-  if (value_is_descriptor_pointer(lhs)) {
+  if (value_is_type(lhs)) {
     return mass_get_from_descriptor_module(context, parser, parsed_args);
   }
 
@@ -6363,7 +6376,7 @@ scope_define_enum(
 ) {
   const Allocator *allocator = compilation->allocator;
   Scope *enum_scope = scope_make(allocator, 0);
-  const Descriptor *enum_descriptor = *value_as_descriptor_pointer(enum_type_value);
+  const Descriptor *enum_descriptor = value_as_type(enum_type_value)->descriptor;
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
     Value *item_value = value_init(
@@ -6418,13 +6431,6 @@ mass_compilation_init_scopes(
   };
 
   global_scope_define_exports(compilation, root_scope);
-  Source_Range type_source_range;
-  INIT_LITERAL_SOURCE_RANGE(&type_source_range, "Type");
-  scope_define_value(
-    root_scope, VALUE_STATIC_EPOCH, type_source_range,
-    mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
-  );
-
   #define MASS_INTRINSIC_OPERATOR(_SYMBOL_, _FLAGS_, _FIXITY_, _PRECEDENCE_, _INTRINSIC_)\
     do {\
       Operator *op = mass_allocate(&context, Operator);\

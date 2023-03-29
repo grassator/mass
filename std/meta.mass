@@ -11,7 +11,7 @@ context_error :: fn(context : &MASS.Context, error : MASS.Error) -> () {
 }
 
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
-  assert(same_type(value.descriptor, type))
+  assert(same_type(value.descriptor, type_descriptor(type)))
   assert(value.tag == .Forced)
   storage := &value.Forced.storage
   assert((value.descriptor.*).bit_size.as_u64 == storage.bit_size.as_u64)
@@ -56,13 +56,14 @@ immediate :: fn(
   source_range : Source_Range
 ) -> (&Value) {
   type :: type_of(source)
-  type_bit_size :: (type.*).bit_size
+  descriptor :: type_descriptor(type)
+  type_bit_size :: descriptor.bit_size
   static_assert(type_bit_size <= 64, "Type is too large to fit into an immediate")
 
   static_value := allocate(compilation.allocator, Value)
   static_value.tag = .Forced
   static_value.source_range = source_range
-  static_value.descriptor = type
+  static_value.descriptor = descriptor
 
   static_value.Forced.storage.tag = .Immediate
   static_value.Forced.storage.bit_size = type_bit_size

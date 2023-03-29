@@ -970,7 +970,7 @@ spec("source") {
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_descriptor_pointer);
+      check(error->Type_Mismatch.expected == &descriptor_type);
       check(error->Type_Mismatch.actual == &descriptor_function_literal);
     }
 
@@ -1233,7 +1233,7 @@ spec("source") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_bit_size :: fn(x) -> (u64) { type :: type_of(x); (type.*).bit_size.as_u64 }\n"
+          "my_bit_size :: fn(x) -> (u64) { type :: type_of(x); type_descriptor(type).bit_size.as_u64 }\n"
           "checker :: fn() -> (u64) {\n"
             "x : u32 = 0\n"
             "my_bit_size(x)\n"
@@ -1297,8 +1297,8 @@ spec("source") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "type_constraint_any :: fn(t : Type) -> (Type) { t }\n"
-          "type_constraint_none :: fn(t : Type) -> (Type) { 0 }\n"
+          "type_constraint_any :: fn(t : Type) -> (bool) { true }\n"
+          "type_constraint_none :: fn(t : Type) -> (bool) { false }\n"
           "foo :: fn(x ~ type_constraint_any) -> (i64) { 42 }\n"
           "foo :: fn(x ~ type_constraint_none) -> (i64) { 21 }\n"
           "checker :: fn() -> (i64) {\n"
@@ -1313,7 +1313,7 @@ spec("source") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "type_constraint_any :: fn(t : Type) -> (Type) { t }\n"
+          "type_constraint_any :: fn(t : Type) -> (bool) { true }\n"
           "foo :: fn(x ~ type_constraint_any) -> (i64) { 42 }\n"
           "foo :: fn(x) -> (i64) { 21 }\n"
           "checker :: fn() -> (i64) {\n"
@@ -2423,8 +2423,9 @@ spec("source") {
       Expected_Result(*checker)() = (Expected_Result(*)())test_program_inline_source_function(
         "checker", &test_context,
         "proxy :: fn() => (MASS.Expected_Result) {\n"
-          "temp_storage := MASS.storage_register(MASS.Register.A, (i64.*).bit_size)\n"
-          "expected := MASS.expected_result_exact(i64, temp_storage)\n"
+          "i64_descriptor :: type_descriptor(i64) \n"
+          "temp_storage := MASS.storage_register(MASS.Register.A, i64_descriptor.bit_size)\n"
+          "expected := MASS.expected_result_exact(i64_descriptor, temp_storage)\n"
           "expected"
         "}\n"
         "checker :: fn() -> (MASS.Expected_Result) { proxy() }"

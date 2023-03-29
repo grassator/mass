@@ -139,7 +139,7 @@ get :: fn(view : MASS.Value_View, index : i64) -> (&MASS.Value) {
 static_assert :: fn(condition : bool, message : String = "") => () MASS.static_assert
 
 pointer_to :: fn(type : Type) => (Type) MASS.pointer_to_type
-pointer_to :: fn(x) -> (pointer_to(x)) MASS.pointer_to
+pointer_to :: fn(x) -> _ MASS.pointer_to
 
 MASS_I64_MATH :: module {
   add :: MASS.i64_add
@@ -272,7 +272,7 @@ add_or_subtract :: fn(
     payload := cast(&Payload, raw_payload)
     temp_lhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_lhs_register := temp_lhs_storage.Register.index
-    expected_lhs := MASS.expected_result_exact(i64, temp_lhs_storage)
+    expected_lhs := MASS.expected_result_exact_type(i64, temp_lhs_storage)
 
     temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
 
@@ -282,7 +282,7 @@ add_or_subtract :: fn(
 
     temp_rhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_rhs_register := temp_rhs_storage.Register.index
-    expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
+    expected_rhs := MASS.expected_result_exact_type(i64, temp_rhs_storage)
 
     temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
 
@@ -315,7 +315,7 @@ add_or_subtract :: fn(
   lazy_value.* = [
     .tag = .Lazy,
     .flags = .None,
-    .descriptor = i64,
+    .descriptor = type_descriptor(i64),
     .source_range = arguments.source_range,
     .Lazy = [
       .is_factory = false,
@@ -357,7 +357,7 @@ compare :: fn(
 
     temp_lhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_lhs_register := temp_lhs_storage.Register.index
-    expected_lhs := MASS.expected_result_exact(i64, temp_lhs_storage)
+    expected_lhs := MASS.expected_result_exact_type(i64, temp_lhs_storage)
     temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
 
     if context.compilation.result.tag != .Success then {
@@ -366,7 +366,7 @@ compare :: fn(
 
     temp_rhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_rhs_register := temp_rhs_storage.Register.index
-    expected_rhs := MASS.expected_result_exact(i64, temp_rhs_storage)
+    expected_rhs := MASS.expected_result_exact_type(i64, temp_rhs_storage)
     temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
 
     if context.compilation.result.tag != .Success then {
@@ -391,12 +391,12 @@ compare :: fn(
     value.* = [
       .tag = .Forced,
       .flags = .None,
-      .descriptor = bool,
+      .descriptor = type_descriptor(bool),
       .source_range = source_range.* ,
       .Forced = [.storage = [
         .tag = .Eflags,
         .flags = .None,
-        .bit_size = (value.descriptor.*).bit_size,
+        .bit_size = value.descriptor.bit_size,
         .Eflags = [payload.compare_type]
       ]]
     ]
@@ -410,7 +410,7 @@ compare :: fn(
   lazy_value.* = [
     .tag = .Lazy,
     .flags = .None,
-    .descriptor = bool,
+    .descriptor = type_descriptor(bool),
     .source_range = arguments.source_range,
     .Lazy = [
       .is_factory = false,
@@ -489,21 +489,32 @@ using {
 
 Allocator :: MASS.Allocator
 
+type_descriptor :: fn(type : Type) => (&MASS.Descriptor) {
+  // :TypeStruct
+  cast(&MASS.Descriptor, type)
+}
+
+type_descriptor :: fn(type : Type) -> (&MASS.Descriptor) {
+  // :TypeStruct
+  cast(&MASS.Descriptor, type)
+}
+
 allocate :: fn(allocator : &MASS.Allocator, @type : Type) -> _ {
   cast(&type, MASS.allocator_allocate_bytes(
     allocator,
-    MASS.i64_unsigned_divide((type.*).bit_size.as_u64, 8),
-    MASS.i64_unsigned_divide((type.*).bit_alignment.as_u64, 8)
+    MASS.i64_unsigned_divide(type_descriptor(type).bit_size.as_u64, 8),
+    MASS.i64_unsigned_divide(type_descriptor(type).bit_alignment.as_u64, 8)
   ))
 }
 
 Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
+  item_descriptor := type_descriptor(item_type)
   length := meta.reify(arguments.1, i64).*
-  t := allocate(context.allocator, MASS.Descriptor)
+  array_descriptor := allocate(context.allocator, MASS.Descriptor)
 
-  raw_bit_size := MASS.i64_unsigned_multiply((item_type.*).bit_size.as_u64, length)
+  raw_bit_size := MASS.i64_unsigned_multiply(item_descriptor.bit_size.as_u64, length)
   if MASS.i64_bitwise_and(raw_bit_size, 0xffff_ffff_8000_0000) != 0 then {
     error : MASS.Error
     error.tag = .Integer_Range
@@ -512,16 +523,18 @@ Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
     return 0
   }
 
-  t.* = [
+  array_descriptor.* = [
     .tag = .Fixed_Array,
     .brand = 0,
     .own_module = 0,
     .bit_size = [raw_bit_size],
-    .bit_alignment = (item_type.*).bit_alignment,
-    .Fixed_Array = [item_type, length]
+    .bit_alignment = item_descriptor.bit_alignment,
+    .Fixed_Array = [item_descriptor, length]
   ]
 
-  meta.immediate(context.compilation, t, arguments.source_range)
+  type := Type[array_descriptor]
+
+  meta.immediate(context.compilation, type, arguments.source_range)
 }
 
 multiply :: Array
@@ -532,15 +545,18 @@ Opaque :: fn(item_type : Type, name : String) => (Type) intrinsic {
   name := meta.reify(arguments.1, String).*
   symbol := allocate(context.allocator, MASS.Symbol)
   symbol.* = [ .name = name ]
-  t := allocate(context.allocator, MASS.Descriptor)
-  t.* = (item_type.*)
-  (t.*).brand = symbol
-  meta.immediate(context.compilation, t, arguments.source_range)
+  descriptor := allocate(context.allocator, MASS.Descriptor)
+  descriptor.* = type_descriptor(item_type)
+  descriptor.brand = symbol
+
+  type := Type[descriptor]
+  meta.immediate(context.compilation, type, arguments.source_range)
 }
 
 c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
+  item_descriptor := type_descriptor(item_type)
   tuple := meta.reify(arguments.1, MASS.Tuple)
 
   enum_scope := MASS.scope_make(context.allocator, 0)
@@ -557,15 +573,13 @@ c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
   ]
   brand_symbol := allocate(context.allocator, MASS.Symbol)
   brand_symbol.* = [ .name = "FIXME" ] // Provide a better naming here
-  t := allocate(context.allocator, MASS.Descriptor)
-  t.* = [
+  descriptor := allocate(context.allocator, MASS.Descriptor)
+  descriptor.* = [
     .tag = .Raw,
     .brand = brand_symbol,
     .own_module = enum_module,
-    // TODO We have special overload for accessing own modules of descriptors so here we have
-    //      to use this weird syntax
-    .bit_size = (item_type.*).bit_size,
-    .bit_alignment = (item_type.*).bit_alignment,
+    .bit_size = item_descriptor.bit_size,
+    .bit_alignment = item_descriptor.bit_alignment,
     .Integer = [0], // FIXME should not be necessary
   ]
 
@@ -580,14 +594,15 @@ c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
       // FIXME properly coerce the value instead of just replacing the descriptor
       // FIXME check that it is a compile-time value
       value := assignment.source
-      value.descriptor = t
+      value.descriptor = descriptor
       MASS.scope_define_value(enum_scope, [0], arguments.source_range, accessor.symbol, value)
 
       i = i + 1
     }
   }
 
-  meta.immediate(context.compilation, t, arguments.source_range)
+  type := Type[descriptor]
+  meta.immediate(context.compilation, type, arguments.source_range)
 }
 
 external :: fn(
