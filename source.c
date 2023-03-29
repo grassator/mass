@@ -1394,11 +1394,7 @@ value_ensure_type(
   if (!mass_value_ensure_static_of(context, value, &descriptor_descriptor_pointer)) {
     return 0;
   }
-  // Can't use `value_as_descriptor_pointer` because it might a user-generated version
-  // of the type that does not pointer compare unless we memoize
-  return *(Descriptor const **)storage_static_memory_with_bit_size(
-    &value_as_forced(value)->storage, value->descriptor->bit_size
-  );
+  return *value_as_descriptor_pointer(value);
 }
 
 static inline Value_View
