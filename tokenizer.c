@@ -287,7 +287,7 @@ tokenizer_handle_error(
   };
 }
 
-PRELUDE_NO_DISCARD Mass_Result
+static PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Mass_Context *context,
   Source_Range source_range,
