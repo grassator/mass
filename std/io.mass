@@ -4,7 +4,7 @@ native_stdout :: fn(buffer : &i8, size : i64) -> () {
   if get_target_os() == .Windows then {
     win32 :: import("std/win32")
     // TODO figure out if caching this handle is necessary and how to do that if it is necessary.
-    handle := win32.GetStdHandle(cast(s32, -11))
+    handle := win32.GetStdHandle(-11)
     win32.WriteFile(handle, buffer, cast(s32, size), 0, 0)
   } else {
     linux :: import("std/linux")
