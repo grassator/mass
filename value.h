@@ -55,29 +55,6 @@ mass_allocate_bytes_from_descriptor(
   );
 }
 
-static inline Function_Parameter
-function_parameter_with_default(
-  const Symbol *symbol,
-  Value *default_value,
-  const Descriptor *descriptor
-) {
-   return (Function_Parameter){
-    .tag = Function_Parameter_Tag_Runtime,
-    .symbol = symbol,
-    .descriptor = descriptor,
-    .source_range = {0}, // FIXME provide this
-    .maybe_default_value = default_value,
-  };
-}
-
-static  inline Function_Parameter
-function_parameter(
-  const Symbol *symbol,
-  const Descriptor *descriptor
-) {
-  return function_parameter_with_default(symbol, 0, descriptor);
-}
-
 typedef struct {
   u64 occupied;
 } Temp_Mark;
