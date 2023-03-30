@@ -1166,6 +1166,34 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Operator_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Operator_Symbol_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
 <Type Name="Array_Scope">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -2258,6 +2286,118 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Struct_Field_Set">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Slice_Set">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Symbol_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Trampoline_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Scope_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Macro_Replacement_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Jit_Import_Library_Handle_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Imported_Module_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
 <Type Name="Array_Jit_Counters">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -2310,6 +2450,48 @@
       <Size>data->length</Size>
       <ValuePointer>data->items</ValuePointer>
     </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Static_Pointer_Length_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Descriptor_Pointer_To_Cache_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
+  </Expand>
+</Type>
+<Type Name="Intrinsic_Proc_Cache_Map">
+  <Expand>
+    <CustomListItems>
+      <Variable Name="i" InitialValue="0" />
+      <Size>occupied</Size>
+      <Loop>
+        <If Condition="entries[i].occupied">
+          <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
+        </If>
+        <Exec>i++</Exec>
+      </Loop>
+    </CustomListItems>
   </Expand>
 </Type>
 <Type Name="Array_Common_Symbols">

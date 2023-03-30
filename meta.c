@@ -670,7 +670,20 @@ print_natvis(
       break;
     }
     case Meta_Type_Tag_Hash_Map: {
-      // TODO
+      fprintf(file, "<Type Name=\"%s\">\n", type->name);
+      fprintf(file, "  <Expand>\n");
+      fprintf(file, "    <CustomListItems>\n");
+      fprintf(file, "      <Variable Name=\"i\" InitialValue=\"0\" />\n");
+      fprintf(file, "      <Size>occupied</Size>\n");
+      fprintf(file, "      <Loop>\n");
+      fprintf(file, "        <If Condition=\"entries[i].occupied\">\n");
+      fprintf(file, "          <Item Name=\"{entries[i].key->name.bytes,[entries[i].key->name.length]s}\">entries[i].value</Item>\n");
+      fprintf(file, "        </If>\n");
+      fprintf(file, "        <Exec>i++</Exec>\n");
+      fprintf(file, "      </Loop>\n");
+      fprintf(file, "    </CustomListItems>\n");
+      fprintf(file, "  </Expand>\n");
+      fprintf(file, "</Type>\n");
       break;
     }
     case Meta_Type_Tag_Integer:
