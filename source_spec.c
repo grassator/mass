@@ -690,6 +690,16 @@ spec("source") {
       check(answer == 42);
     }
 
+    it("should be able to make argument writable by reassigning it to a local variable") {
+      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x: s64) -> (s64) { x := x; x = x * 2; x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 answer = checker(INT32_MAX);
+      check(answer == (s64)INT32_MAX * 2);
+    }
+
     it("should be able to put a non-generic function literal into a typed local variable") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
