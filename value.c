@@ -740,17 +740,15 @@ storage_static_equal_internal(
     } break;
     case Descriptor_Tag_Struct: {
       // compare field by field
-      u64 a_field_count = dyn_array_length(a_descriptor->Struct.fields);
-      u64 b_field_count = dyn_array_length(b_descriptor->Struct.fields);
-      if (a_field_count != b_field_count) {
-        return false;
-      }
-      for (u64 i = 0; i < a_field_count; ++i) {
-        const Struct_Field *a_field = dyn_array_get(a_descriptor->Struct.fields, i);
-        const Struct_Field *b_field = dyn_array_get(b_descriptor->Struct.fields, i);
+      u64 field_count = dyn_array_length(a_descriptor->Struct.fields);
+      assert(field_count == dyn_array_length(b_descriptor->Struct.fields));
+
+      for (u64 i = 0; i < field_count; ++i) {
+        const Struct_Field *field = dyn_array_get(a_descriptor->Struct.fields, i);
+        assert(same_type(field->descriptor, dyn_array_get(b_descriptor->Struct.fields, i)->descriptor));
         if (!storage_static_equal_internal(
-          a_field->descriptor, (s8 *)a_memory + a_field->offset,
-          b_field->descriptor, (s8 *)b_memory + b_field->offset
+          field->descriptor, (s8 *)a_memory + field->offset,
+          field->descriptor, (s8 *)b_memory + field->offset
         )) {
           return false;
         }
