@@ -981,7 +981,6 @@ storage_release_if_temporary(
             panic("Unexpected temporary indirect memory location based on the stack pointer");
           }
           register_release(builder, reg);
-          // TODO what about index register
           break;
         }
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
