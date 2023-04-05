@@ -2516,16 +2516,15 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-    // TODO somehow test that modules are only imported once
-    it("should support importing the same module multiple times") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+    it("should only import module once") {
+      bool(*checker)(void) = (bool(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "A :: import(\"fixtures/foo/../sample_module\")\n"
         "B :: import(\"fixtures\\\\sample_module\")\n"
-        "checker :: fn() -> (s64) { A.the_answer + B.the_answer }"
+        "checker :: fn() -> (bool) { &A == &B }"
       );
       check(spec_check_mass_result(test_context.result));
-      check(checker() == 84);
+      check(checker());
     }
 
     it("should support inline modules") {
