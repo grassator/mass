@@ -337,15 +337,14 @@ value_indirect_from_pointer(
   const Source_Range *source_range
 ) {
   const Descriptor *referenced_descriptor;
-  const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source);
-  if (source_descriptor->tag == Descriptor_Tag_Pointer_To) {
-    referenced_descriptor = source_descriptor->Pointer_To.descriptor;
+  if (source->descriptor->tag == Descriptor_Tag_Pointer_To) {
+    referenced_descriptor = source->descriptor->Pointer_To.descriptor;
   } else {
     panic("Unexpected descriptor tag for an indirect value");
     return 0;
   }
   if (source->tag == Value_Tag_Lazy) {
-    Expected_Result expected_result = expected_result_any(source_descriptor);
+    Expected_Result expected_result = expected_result_any(source->descriptor);
     source = value_force(context, builder, &expected_result, source);
     if (mass_has_error(context)) return 0;
   }
@@ -361,7 +360,7 @@ value_indirect_from_pointer(
     }
     case Storage_Tag_Memory: {
       Register reg = register_acquire_temp(builder);
-      Storage reg_storage = storage_register(reg, source_descriptor->bit_size);
+      Storage reg_storage = storage_register(reg, source->descriptor->bit_size);
       move_value(builder, source_range, &reg_storage, source_storage);
       storage_release_if_temporary(builder, source_storage);
       Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
@@ -1623,7 +1622,7 @@ mass_named_accessor(
   assert(args.length == 1);
   Value *symbol_value = value_view_get(&args, 0);
   const Symbol *symbol = 0;
-  if (same_type(value_or_lazy_value_descriptor(symbol_value), &descriptor_symbol)) {
+  if (same_type(symbol_value->descriptor, &descriptor_symbol)) {
     if (!mass_value_ensure_static_of(context, symbol_value, &descriptor_symbol)) {
       return 0;
     }
@@ -2301,14 +2300,6 @@ mass_c_struct(
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
-// TODO just inline this
-static inline const Descriptor *
-value_or_lazy_value_descriptor(
-  const Value *value
-) {
-  return value->descriptor;
-}
-
 // TODO this can probably now be implemented in terms of a mass_trampoline_call
 //      with a fake fn that has an inferred return type. But it might be too slow.
 static Value *
@@ -2336,7 +2327,7 @@ compile_time_eval(
     context->result = eval_context.result;
     return 0;
   }
-  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
+  const Descriptor *result_descriptor = expression_result_value->descriptor;
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
@@ -2445,7 +2436,7 @@ mass_cast_lazy_proc(
 ) {
   const Descriptor *target_descriptor = payload->target;
   Value *expression = payload->expression;
-  const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
+  const Descriptor *source_descriptor = expression->descriptor;
 
   Expected_Result expected_source = expected_result_any(source_descriptor);
   Value *value = value_force(context, builder, &expected_source, expression);
@@ -2555,7 +2546,7 @@ mass_zero_extend_lazy_proc(
 ) {
   const Descriptor *target_descriptor = payload->target;
   Value *expression = payload->expression;
-  const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
+  const Descriptor *source_descriptor = expression->descriptor;
 
   Bits cast_to_bit_size = target_descriptor->bit_size;
   Bits original_bit_size = source_descriptor->bit_size;
@@ -2731,7 +2722,7 @@ call_function_overload(
   const Storage *runtime_storage = &value_as_forced(runtime_value)->storage;
   mass_assert_storage_is_valid_in_context(runtime_storage, context);
 
-  const Descriptor *runtime_descriptor = value_or_lazy_value_descriptor(runtime_value);
+  const Descriptor *runtime_descriptor = runtime_value->descriptor;
   assert(runtime_descriptor->tag == Descriptor_Tag_Function_Instance);
 
   const Descriptor_Function_Instance *instance_descriptor = &runtime_descriptor->Function_Instance;
@@ -3285,7 +3276,7 @@ mass_match_overload_candidate(
       overload_info = specialized_info;
       if (!overload_info) return;
     } else {
-      const Descriptor *descriptor = value_or_lazy_value_descriptor(candidate);
+      const Descriptor *descriptor = candidate->descriptor;
       const Descriptor_Function_Instance *instance = descriptor_as_function_instance(descriptor);
       overload_info = instance->info;
       if (overload_info->flags & Function_Info_Flags_Compile_Time) {
@@ -3736,7 +3727,7 @@ token_handle_function_call(
   );
   for (u64 i = 0; i < args_view.length; ++i) {
     Value *arg = value_view_get(&args_view, i);
-    const Descriptor *descriptor = value_or_lazy_value_descriptor(arg);
+    const Descriptor *descriptor = arg->descriptor;
     if (mass_value_is_static(arg)) {
       dyn_array_push(arg_parameters, (Resolved_Function_Parameter) {
         .tag = Resolved_Function_Parameter_Tag_Known,
@@ -4135,13 +4126,13 @@ mass_handle_arithmetic_operation(
 
   if (mass_has_error(context)) return 0;
 
-  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(lhs);
-  if (!descriptor_is_integer(value_or_lazy_value_descriptor(lhs))) {
-    result_descriptor = value_or_lazy_value_descriptor(rhs);
+  const Descriptor *result_descriptor = lhs->descriptor;
+  if (!descriptor_is_integer(lhs->descriptor)) {
+    result_descriptor = rhs->descriptor;
     lhs = mass_cast_helper(context, parser, result_descriptor, lhs, lhs->source_range);
   }
   assert(descriptor_is_integer(result_descriptor));
-  assert(same_type(value_or_lazy_value_descriptor(lhs), value_or_lazy_value_descriptor(rhs)));
+  assert(same_type(lhs->descriptor, rhs->descriptor));
 
   Mass_Arithmetic_Operator_Lazy_Payload stack_lazy_payload =
     { .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range };
@@ -4184,8 +4175,8 @@ mass_handle_integer_comparison_lazy_proc(
   const Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
   Compare_Type compare_type = payload->compare_type;
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(payload->lhs);
-  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(payload->rhs);
+  const Descriptor *lhs_descriptor = payload->lhs->descriptor;
+  const Descriptor *rhs_descriptor = payload->rhs->descriptor;
   assert(same_type(lhs_descriptor, rhs_descriptor));
 
   const Descriptor *descriptor = lhs_descriptor;
@@ -4271,14 +4262,12 @@ mass_handle_generic_comparison_lazy_proc(
 
   Value *lhs = payload->lhs;
   Value *rhs = payload->rhs;
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
-  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
 
-  if (!same_type(lhs_descriptor, rhs_descriptor)) {
+  if (!same_type(lhs->descriptor, rhs->descriptor)) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = *source_range,
-      .Type_Mismatch = { .expected = lhs_descriptor, .actual = rhs_descriptor },
+      .Type_Mismatch = { .expected = lhs->descriptor, .actual = rhs->descriptor },
     });
     return 0;
   }
@@ -4315,7 +4304,7 @@ mass_handle_generic_comparison_lazy_proc(
   }
 
   Value *result = 0;
-  switch(lhs_descriptor->tag) {
+  switch(lhs->descriptor->tag) {
     // Two void or never values are always equal to each other
     case Descriptor_Tag_Void:
     case Descriptor_Tag_Never: {
@@ -4327,7 +4316,7 @@ mass_handle_generic_comparison_lazy_proc(
     case Descriptor_Tag_Float:
     case Descriptor_Tag_Integer:
     case Descriptor_Tag_Function_Instance: {
-      if (lhs_descriptor->bit_size.as_u64 > 64) {
+      if (lhs->descriptor->bit_size.as_u64 > 64) {
         panic("TODO support larger than register compares");
       }
 
@@ -4335,13 +4324,13 @@ mass_handle_generic_comparison_lazy_proc(
 
       // Try to reuse result_value if we can
       // TODO should also be able to reuse memory operands
-      Storage temp_a_storage = storage_register_temp(builder, lhs_descriptor->bit_size);
-      Expected_Result expected_a = mass_expected_result_exact(lhs_descriptor, temp_a_storage);
+      Storage temp_a_storage = storage_register_temp(builder, lhs->descriptor->bit_size);
+      Expected_Result expected_a = mass_expected_result_exact(lhs->descriptor, temp_a_storage);
       (void)value_force(context, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
-      Storage temp_b_storage = storage_register_temp(builder, rhs_descriptor->bit_size);
-      Expected_Result expected_b = mass_expected_result_exact(rhs_descriptor, temp_b_storage);
+      Storage temp_b_storage = storage_register_temp(builder, rhs->descriptor->bit_size);
+      Expected_Result expected_b = mass_expected_result_exact(rhs->descriptor, temp_b_storage);
       (void)value_force(context, builder, &expected_b, payload->rhs);
 
       if (mass_has_error(context)) return 0;
@@ -4532,7 +4521,7 @@ mass_pointer_to_lazy_proc(
   const Mass_Value_Lazy_Payload *payload
 ) {
   Value *pointee = payload->value;
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(pointee);
+  const Descriptor *descriptor = pointee->descriptor;
   Expected_Result expected_pointee = expected_result_any(descriptor);
   Value *forced = value_force(context, builder, &expected_pointee, pointee);
   if (mass_has_error(context)) return 0;
@@ -4588,11 +4577,10 @@ mass_pointer_to(
 ) {
   assert(args.length == 1);
   Value *pointee = value_view_get(&args, 0);
-  const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
-  const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee_descriptor);
+  const Descriptor *descriptor = descriptor_pointer_to(context->compilation, pointee->descriptor);
   if (mass_value_is_static(pointee)) {
     const void *source_memory = storage_static_memory_with_bit_size(
-      &value_as_forced(pointee)->storage, pointee_descriptor->bit_size
+      &value_as_forced(pointee)->storage, pointee->descriptor->bit_size
     );
     Value *result = value_make(
       context, descriptor, storage_immediate(&source_memory), args.source_range
@@ -4725,7 +4713,7 @@ mass_handle_assignment_lazy_proc(
   const Source_Range *source_range,
   const Assignment *payload
 ) {
-  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(payload->target);
+  const Descriptor *target_descriptor = payload->target->descriptor;
   Expected_Result expected_target = expected_result_any(target_descriptor);
   Value *target = value_force(context, builder, &expected_target, payload->target);
   if (mass_has_error(context)) return 0;
@@ -4869,8 +4857,7 @@ mass_handle_field_access_lazy_proc(
 ) {
   const Struct_Field *field = payload->field;
 
-  Expected_Result expected_struct =
-    expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
+  Expected_Result expected_struct = expected_result_any(payload->struct_->descriptor);
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
   if (mass_has_error(context)) return 0;
   bool source_is_contant = struct_->flags & Value_Flags_Constant;
@@ -4910,27 +4897,23 @@ mass_handle_array_access_lazy_proc(
   const Source_Range *source_range,
   const Mass_Array_Access_Lazy_Payload *payload
 ) {
-  Expected_Result expected_array =
-    expected_result_any(value_or_lazy_value_descriptor(payload->array));
+  Expected_Result expected_array = expected_result_any(payload->array->descriptor);
   Value *array = value_force(context, builder, &expected_array, payload->array);
-  Expected_Result expected_index =
-    expected_result_any(value_or_lazy_value_descriptor(payload->index));
+  Expected_Result expected_index = expected_result_any(payload->index->descriptor);
   Value *index = value_force(context, builder, &expected_index, payload->index);
 
   if (mass_has_error(context)) return 0;
 
   Value *array_element_value;
 
-  const Descriptor *array_descriptor = value_or_lazy_value_descriptor(array);
-
   const Descriptor *item_descriptor;
   Storage array_storage;
-  if(array_descriptor->tag == Descriptor_Tag_Fixed_Array) {
-    item_descriptor = array_descriptor->Fixed_Array.item;
+  if(array->descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    item_descriptor = array->descriptor->Fixed_Array.item;
     array_storage = value_as_forced(array)->storage;
   } else {
-    assert(array_descriptor->tag == Descriptor_Tag_Pointer_To);
-    item_descriptor = array_descriptor->Pointer_To.descriptor;
+    assert(array->descriptor->tag == Descriptor_Tag_Pointer_To);
+    item_descriptor = array->descriptor->Pointer_To.descriptor;
     Value *dereferenced = value_indirect_from_pointer(context, builder, array, source_range);
     array_storage = value_as_forced(dereferenced)->storage;
   }
@@ -5056,7 +5039,7 @@ mass_dereference(
 ) {
   Value *pointer = token_parse_single(context, parser, value_view_get(&args_view, 0));
   if (mass_has_error(context)) return 0;
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(pointer);
+  const Descriptor *descriptor = pointer->descriptor;
   if (descriptor->tag != Descriptor_Tag_Pointer_To) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
@@ -5178,8 +5161,7 @@ mass_struct_get(
   Value *lhs = value_view_get(&args_view, 0);
   Value *rhs = value_view_get(&args_view, 1);
 
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
-  const Descriptor *unwrapped_lhs_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
+  const Descriptor *unwrapped_lhs_descriptor = maybe_unwrap_pointer_descriptor(lhs->descriptor);
   assert(unwrapped_lhs_descriptor->tag == Descriptor_Tag_Struct);
   Array_Struct_Field fields = unwrapped_lhs_descriptor->Struct.fields;
 
@@ -5234,24 +5216,22 @@ mass_array_like_get(
   Value *rhs = token_parse_single(context, parser, value_view_get(&args_view, 1));
   if (mass_has_error(context)) return 0;
 
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
   const Descriptor *item_descriptor;
-  if (lhs_descriptor->tag == Descriptor_Tag_Fixed_Array) {
-    item_descriptor = lhs_descriptor->Fixed_Array.item;
-  } else if (lhs_descriptor->tag == Descriptor_Tag_Pointer_To) {
-    item_descriptor = lhs_descriptor->Pointer_To.descriptor;
+  if (lhs->descriptor->tag == Descriptor_Tag_Fixed_Array) {
+    item_descriptor = lhs->descriptor->Fixed_Array.item;
+  } else if (lhs->descriptor->tag == Descriptor_Tag_Pointer_To) {
+    item_descriptor = lhs->descriptor->Pointer_To.descriptor;
   } else {
     panic("UNREACHABLE");
     return 0;
   }
 
-  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
   // TODO this should this only accept i64?
-  if (rhs_descriptor != &descriptor_i64 && !descriptor_is_integer(rhs_descriptor)) {
+  if (rhs->descriptor != &descriptor_i64 && !descriptor_is_integer(rhs->descriptor)) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
-      .Type_Mismatch = { .expected = &descriptor_i64, .actual = rhs_descriptor },
+      .Type_Mismatch = { .expected = &descriptor_i64, .actual = rhs->descriptor },
     });
     return 0;
   }
@@ -5312,9 +5292,8 @@ mass_get(
 
   if (mass_has_error(context)) return 0;
 
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
 
-  if (lhs_descriptor == &descriptor_module) {
+  if (lhs->descriptor == &descriptor_module) {
     return mass_module_get(context, parser, parsed_args);
   }
   if (value_is_type(lhs)) {
@@ -6218,7 +6197,7 @@ token_parse_block_statements(
   u64 statement_count = dyn_array_length(temp_lazy_statements);
   if (statement_count) {
     Value *last_result = *dyn_array_last(temp_lazy_statements);
-    const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
+    const Descriptor *last_descriptor = last_result->descriptor;
     if (statement_count == 1) {
       block_result = last_result;
     } else {

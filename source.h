@@ -197,11 +197,6 @@ mass_module_get_impl(
   const Source_Range *source_range
 );
 
-static inline const Descriptor *
-value_or_lazy_value_descriptor(
-  const Value *value
-);
-
 static Value *
 token_parse_block_statements(
   Mass_Context *program,
