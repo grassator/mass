@@ -94,7 +94,6 @@ move_value(
     panic("Internal Error: Trying to move into Eflags");
   }
 
-  // FIXME this should probably not happen
   if (source->tag == Storage_Tag_Static) {
     assert(source->bit_size.as_u64 <= 64);
     Storage immediate = imm64(0);
