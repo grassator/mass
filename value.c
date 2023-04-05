@@ -1309,7 +1309,7 @@ host_os() {
   #elif (defined(__linux__) && defined(__x86_64__))
   return Os_Linux;
   #else
-  static_assert(false, "TODO add Os enum variant for this host system");
+  static_assert(false, "Host OS not supported");
   #endif
 }
 
