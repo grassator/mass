@@ -5235,8 +5235,7 @@ mass_array_like_get(
     return 0;
   }
 
-  // TODO this should this only accept i64?
-  if (rhs->descriptor != &descriptor_i64 && !descriptor_is_integer(rhs->descriptor)) {
+  if (rhs->descriptor != &descriptor_i64) {
     mass_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = args_view.source_range,
