@@ -511,15 +511,18 @@ anonymous_struct_descriptor_from_tuple(
     }
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
     if (name.length) {
-      if (hash_map_has(field_name_set, name)) {
+      u64 *previous_index = hash_map_get(field_name_set, name);
+      if (previous_index) {
+        const Source_Range* previous_range = &mass_tuple_get(tuple, *previous_index)->source_range;
         mass_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
           .source_range = item->source_range,
+          .other_source_range = *previous_range,
           .Redefinition = { .name = name },
         });
         goto err;
       } else {
-        hash_map_set(field_name_set, name, 1);
+        hash_map_set(field_name_set, name, i);
       }
     }
 
@@ -644,10 +647,13 @@ mass_process_tuple_as_descriptor(
         field = dyn_array_get(fields, field_index);
       }
       field_index += 1;
-      if (hash_map_has(assigned_set, field)) {
+      const u64* previous_index = hash_map_get(assigned_set, field);
+      if (previous_index) {
+        const Source_Range* previous_range = mass_tuple_get(tuple, *previous_index);
         report_error_proc(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
           .source_range = tuple_item->source_range,
+          .other_source_range = *previous_range,
           .Redefinition = { .name = field->name },
         });
         goto err;
@@ -667,7 +673,7 @@ mass_process_tuple_as_descriptor(
       for (u64 i = 0; i < dyn_array_length(fields); ++i) {
         const Struct_Field *a_field = dyn_array_get(fields, i);
         if (range_contains(field_overlap_range, a_field->offset)) {
-          hash_map_set(assigned_set, a_field, 1);
+          hash_map_set(assigned_set, a_field, i);
         }
       }
       if (mass_has_error(context)) goto err;
@@ -2283,12 +2289,14 @@ mass_c_struct(
   assert(args.length == 1);
 
   Value *tuple_value = token_parse_single(context, parser, value_view_get(&args, 0));
+  if (mass_has_error(context)) return 0;
   if (!mass_value_ensure_static_of(context, tuple_value, &descriptor_tuple)) return 0;
   const Tuple *tuple = value_as_tuple(tuple_value);
 
   Descriptor *descriptor = anonymous_struct_descriptor_from_tuple(
     context, tuple, Tuple_Eval_Mode_Type
   );
+  if (mass_has_error(context)) return 0;
   assert(descriptor->tag == Descriptor_Tag_Struct);
   descriptor->brand = mass_allocate(context, Symbol);
 

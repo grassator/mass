@@ -223,9 +223,11 @@ mass_error_to_string(
       APPEND_LITERAL("'");
     } break;
     case Mass_Error_Tag_Redefinition: {
-      // TODO report original location somehow
       APPEND_LITERAL("Redefinition of binding ");
       APPEND_SLICE(error->Redefinition.name);
+      APPEND_LITERAL("\n  previously defined here:\n  ");
+      Slice other_source = source_from_source_range(compilation, &error->other_source_range);
+      APPEND_SLICE(other_source);
     } break;
     case Mass_Error_Tag_Circular_Dependency: {
       APPEND_LITERAL("Circular dependency when resolving ");
