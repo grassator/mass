@@ -1579,6 +1579,8 @@ token_parse_single(
           }
         }
       }
+    } else if (children.length == 0) {
+      return mass_make_void(context, value->source_range);
     }
     return token_parse_expression(context, parser, children, &(u32){0}, 0);
   } else if (value->descriptor == &descriptor_ast_block) {
@@ -5860,12 +5862,6 @@ token_parse_expression(
   u32 *out_match_length,
   const Symbol *end_symbol
 ) {
-  if(view.length == 0) {
-    // TODO this probably should be special cased in the `()` handling
-    //      and not allow generally empty expressions
-    return mass_make_void(context, view.source_range);
-  }
-
   Value *result = 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
