@@ -649,7 +649,7 @@ mass_process_tuple_as_descriptor(
       field_index += 1;
       const u64* previous_index = hash_map_get(assigned_set, field);
       if (previous_index) {
-        const Source_Range* previous_range = mass_tuple_get(tuple, *previous_index);
+        const Source_Range* previous_range = &mass_tuple_get(tuple, *previous_index)->source_range;
         report_error_proc(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Redefinition,
           .source_range = tuple_item->source_range,
