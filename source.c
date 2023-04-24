@@ -771,7 +771,7 @@ mass_tuple_is_static(
     }
     if (!mass_value_is_static(item_value)) return false;
     if (value_is_tuple(item_value)) {
-      if (!mass_tuple_is_static(context, value_as_tuple(item_value))) return false;
+      if (!mass_tuple_is_static(context, const_value_as_tuple(item_value))) return false;
     }
   }
   return true;
@@ -1159,8 +1159,7 @@ value_force_lazy_static(
   Value *value,
   Slice name
 ) {
-  // TODO figure out how to get rid of this cast
-  Lazy_Static_Value *lazy = (Lazy_Static_Value *)value_as_lazy_static_value(value);
+  Lazy_Static_Value *lazy = value_as_lazy_static_value(value);
   Mass_Context *context = &lazy->context;
   if (lazy->resolving) {
     mass_error(context, (Mass_Error) {
@@ -1372,7 +1371,7 @@ value_match_symbol(
 ) {
   if (!value_is_symbol(token)) return false;
   if (!name.length) return true;
-  return slice_equal(value_as_symbol(token)->name, name);
+  return slice_equal(const_value_as_symbol(token)->name, name);
 }
 
 static inline const Descriptor *

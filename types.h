@@ -241,8 +241,16 @@ storage_static_memory(const Storage *);
     if (storage->tag != Storage_Tag_Static && storage->tag != Storage_Tag_Immediate) return false;\
     return same_type(value->descriptor, &descriptor_##_SUFFIX_);\
   }\
-  static inline  _C_TYPE_ const *\
+  static inline _C_TYPE_ *\
   value_as_##_SUFFIX_(\
+    Value *value\
+  ) {\
+    assert(value_is_##_SUFFIX_(value));\
+    assert(value->Forced.storage.bit_size.as_u64 == value->descriptor->bit_size.as_u64);\
+    return (_C_TYPE_ *)storage_static_memory(&value->Forced.storage);\
+  }\
+  static inline _C_TYPE_ const *\
+  const_value_as_##_SUFFIX_(\
     const Value *value\
   ) {\
     assert(value_is_##_SUFFIX_(value));\

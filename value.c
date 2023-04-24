@@ -1525,7 +1525,7 @@ value_i64_cast_to(
     return Literal_Cast_Result_Target_Too_Big;
   }
 
-  u64 bits = value_as_i64(value)->bits;
+  u64 bits = const_value_as_i64(value)->bits;
 
   if (bit_size != 64) {
     if (descriptor_is_signed_integer(target_descriptor)) {
