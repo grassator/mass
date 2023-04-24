@@ -603,17 +603,14 @@ mass_infer_function_return_type(
 static Value *
 mass_function_literal_instance_for_info(
   Mass_Context *context,
-  const Function_Literal *literal,
+  Function_Literal *literal,
   const Function_Info *fn_info
 ) {
   Program *program = context->program;
-
-  // TODO figure out how to avoid the const cast here
-  Function_Literal *mutable_literal = (Function_Literal *)literal;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
-  if (!dyn_array_is_initialized(mutable_literal->instances)) {
-    mutable_literal->instances = dyn_array_make(
+  if (!dyn_array_is_initialized(literal->instances)) {
+    literal->instances = dyn_array_make(
       Array_Value_Ptr,
       .allocator = context->allocator,
       .capacity = 4
@@ -646,7 +643,7 @@ mass_function_literal_instance_for_info(
       allocator_allocate(context->allocator, Value),
       instance_descriptor, storage, literal->body->source_range
     );
-    dyn_array_push(mutable_literal->instances, cached_instance);
+    dyn_array_push(literal->instances, cached_instance);
     return cached_instance;
   }
 
@@ -655,7 +652,7 @@ mass_function_literal_instance_for_info(
   Value *cached_instance = value_make(
     context, instance_descriptor, code_label32(call_label), literal->body->source_range
   );
-  dyn_array_push(mutable_literal->instances, cached_instance);
+  dyn_array_push(literal->instances, cached_instance);
 
   const Descriptor *return_descriptor = fn_info->return_descriptor;
   Scope *body_scope = scope_make(context->allocator, literal->own_scope);
@@ -819,7 +816,7 @@ ensure_function_instance(
   if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
     return fn_value;
   }
-  const Function_Literal *literal = value_as_function_literal(fn_value);
+  Function_Literal *literal = value_as_function_literal(fn_value);
   const Function_Info *fn_info =
     function_literal_info_for_parameters(context, literal, source_parameters);
   return mass_function_literal_instance_for_info(context, literal, fn_info);

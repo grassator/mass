@@ -1033,7 +1033,7 @@ mass_assign_helper(
 
       source = match_found.value;
       if (source->descriptor->tag != Descriptor_Tag_Function_Instance) {
-        const Function_Literal *literal = value_as_function_literal(match_found.value);
+        Function_Literal *literal = value_as_function_literal(match_found.value);
         source = mass_function_literal_instance_for_info(context, literal, match_found.info);
       }
       if (mass_has_error(context)) return;
@@ -1680,7 +1680,7 @@ mass_ensure_jit_function_for_value(
     assert(same_type(&fake_descriptor, instance->descriptor));
     #endif
   } else {
-    const Function_Literal *literal = value_as_function_literal(value);
+    Function_Literal *literal = value_as_function_literal(value);
     instance = mass_function_literal_instance_for_info(&jit_context, literal, fn_info);
   }
   if (mass_has_error(context)) return 0;
@@ -2719,7 +2719,7 @@ call_function_overload(
   Expected_Result instance_expected_result = expected_result_any(0);
   Value *runtime_value = payload->overload;
   if (value_is_function_literal(runtime_value)) {
-    const Function_Literal *literal = value_as_function_literal(runtime_value);
+    Function_Literal *literal = value_as_function_literal(runtime_value);
     runtime_value = mass_function_literal_instance_for_info(context, literal, payload->info);
   } else {
     runtime_value = value_force(context, builder, &instance_expected_result, payload->overload);
@@ -3519,7 +3519,7 @@ mass_ensure_trampoline(
     proxy_descriptor->Function_Instance.info = proxy_info;
     Value *runtime_instance = original;
     if (value_is_function_literal(runtime_instance)) {
-      const Function_Literal *literal = value_as_function_literal(runtime_instance);
+      Function_Literal *literal = value_as_function_literal(runtime_instance);
       runtime_instance = mass_function_literal_instance_for_info(context, literal, proxy_info);
     }
     if (mass_has_error(context)) return 0;
