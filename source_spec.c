@@ -2588,7 +2588,7 @@ spec("source") {
     xit("should parse and write an executable with a lot of constant folding") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
-        "main", &test_context, "../compile-time-benchmark/folding"
+        "main", &test_context, "../compile-time-execution-benchmark/folding"
       );
       check(test_program->entry_point);
       Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
@@ -2600,7 +2600,7 @@ spec("source") {
     xit("should parse and write an executable with a 1 million function calls") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
-        "main", &test_context, "../compile-time-benchmark/print"
+        "main", &test_context, "../compile-time-execution-benchmark/print"
       );
       check(test_program->entry_point);
       Array_Resolved_Function_Parameter params = dyn_array_static_empty(Array_Resolved_Function_Parameter);
