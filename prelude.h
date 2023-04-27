@@ -648,8 +648,11 @@ allocator_default_allocate(
   u64 size_in_bytes,
   u64 alignment
 ) {
-  // TODO use aligned malloc if available
+  #ifdef _WIN32
+  return _aligned_malloc(size_in_bytes, alignment);
+  #else
   return malloc(size_in_bytes);
+  #endif
 }
 static inline void
 allocator_default_deallocate(
@@ -657,7 +660,11 @@ allocator_default_deallocate(
   void *address,
   u64 size_in_bytes
 ) {
+  #ifdef _WIN32
+  _aligned_free(address);
+  #else
   free(address);
+  #endif
 }
 
 static inline void *
@@ -668,8 +675,11 @@ allocator_default_reallocate(
   u64 new_size_in_bytes,
   u64 alignment
 ) {
-  // TODO use aligned realloc if available
+  #ifdef _WIN32
+  return _aligned_realloc(address, new_size_in_bytes, alignment);
+  #else
   return realloc(address, new_size_in_bytes);
+  #endif
 }
 
 const Allocator *allocator_default = &(Allocator){
