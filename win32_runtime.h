@@ -237,6 +237,90 @@ win32_print_stack(
   win32_print_stack(stack_pointer, return_address, compilation, jit);
 }
 
+static Scope*
+win32_debugger_maybe_scope_for_address(
+  u64 rip,
+  Jit *jit
+) {
+  const Instruction *instruction = win32_instruction_for_address(rip, jit, 0);
+  if (instruction) {
+    if (instruction->scope) {
+      return instruction->scope;
+    } else {
+      printf("Found an instruction but it has no scope information\n");
+    }
+  } else {
+    printf("Could not find the instruction for the given IP\n");
+  }
+  return 0;
+}
+
+static void
+win32_debugger_loop(
+  CONTEXT *ContextRecord,
+  Win32_Exception_Data *exception_data
+) {
+  char line_buffer[256] = {0};
+  for (;;) {
+    fputs("mdb> ", stdout);
+    const char *command_c_string = fgets(line_buffer, countof(line_buffer), stdin);
+    if (!command_c_string) break;
+
+    Slice command = slice_from_c_string(command_c_string);
+    command = slice_trim_whitespace(command);
+    if (
+      slice_equal(command, slice_literal("continue")) ||
+      slice_equal(command, slice_literal("cont"))
+    ) {
+      break;
+    } else if (
+      slice_equal(command, slice_literal("backtrace")) ||
+      slice_equal(command, slice_literal("bt"))
+    ) {
+      win32_print_stack(
+        ContextRecord->Rsp,
+        ContextRecord->Rip,
+        exception_data->compilation,
+        exception_data->jit
+      );
+    } else if (
+      slice_equal(command, slice_literal("registers"))
+    ) {
+      // TODO support this for each stack frame
+      win32_print_register_state(ContextRecord);
+    } else if (
+      slice_equal(command, slice_literal("locals"))
+    ) {
+      Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
+        ContextRecord->Rip, exception_data->jit
+      );
+      if (maybe_scope) scope_print_names(maybe_scope);
+    } else if (slice_starts_with(command, slice_literal("print "))) {
+      Slice variable_name = slice_sub(command, strlen("print "), command.length);
+      variable_name = slice_trim_whitespace(variable_name);
+      Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
+        ContextRecord->Rip, exception_data->jit
+      );
+      if (maybe_scope) {
+        const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
+        Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
+        Value *value = scope_entry->value;
+        if (value) {
+          printf("TODO support printing of values\n");
+        } else {
+          printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
+        }
+      }
+    } else if (
+      slice_equal(command, slice_literal(""))
+    ) {
+      // Nothing to do
+    } else {
+      printf("Unknown command: %s", command_c_string);
+    }
+  }
+}
+
 static EXCEPTION_DISPOSITION
 win32_program_test_exception_handler(
   EXCEPTION_RECORD *ExceptionRecord,
@@ -259,65 +343,7 @@ win32_program_test_exception_handler(
       }
       case EXCEPTION_BREAKPOINT: {
         printf("Unhandled Exception: User Breakpoint hit\n");
-        char line_buffer[256] = {0};
-        for (;;) {
-          fputs("mdb> ", stdout);
-          const char *command_c_string = fgets(line_buffer, countof(line_buffer), stdin);
-          if (!command_c_string) break;
-
-          Slice command = slice_from_c_string(command_c_string);
-          command = slice_trim_whitespace(command);
-          if (
-            slice_equal(command, slice_literal("continue")) ||
-            slice_equal(command, slice_literal("cont"))
-          ) {
-            break;
-          } else if (
-            slice_equal(command, slice_literal("backtrace")) ||
-            slice_equal(command, slice_literal("bt"))
-          ) {
-            win32_print_stack(
-              ContextRecord->Rsp,
-              ContextRecord->Rip,
-              exception_data->compilation,
-              exception_data->jit
-            );
-          } else if (
-            slice_equal(command, slice_literal("registers"))
-          ) {
-            // TODO support this for each stack frame
-            win32_print_register_state(ContextRecord);
-          } else if (
-            slice_equal(command, slice_literal("locals"))
-          ) {
-            const Instruction *instruction =
-              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit, 0);
-            if (instruction && instruction->scope) {
-              scope_print_names(instruction->scope);
-            } else {
-              printf("No debug information for current IP is available\n");
-            }
-          } else if (slice_starts_with(command, slice_literal("print "))) {
-            Slice variable_name = slice_sub(command, strlen("print "), command.length);
-            variable_name = slice_trim_whitespace(variable_name);
-            const Instruction *instruction =
-              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit, 0);
-            if (instruction && instruction->scope) {
-              const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
-              Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_symbol);
-              Value *value = scope_entry->value;
-              if (value) {
-                printf("TODO support printing of values\n");
-              } else {
-                printf("No debug information for current IP is available\n");
-              }
-            } else {
-              printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
-            }
-          } else {
-            printf("Unknown command: %s", command_c_string);
-          }
-        }
+        win32_debugger_loop(ContextRecord, exception_data);
         // Move instruction pointer over the int3 (0xCC) instruction
         ContextRecord->Rip += 1;
         return ExceptionContinueExecution;
