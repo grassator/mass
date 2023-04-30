@@ -844,7 +844,7 @@ deduce_runtime_descriptor_for_value(
           case Descriptor_Tag_Struct: {
             bool success = mass_process_tuple_as_descriptor(
               context, tuple, maybe_desired_descriptor, &value->source_range,
-              mass_error, mass_deduce_tuple_item_proc, 0
+              (Mass_Report_Tuple_Error_Proc)mass_error, mass_deduce_tuple_item_proc, 0
             );
             if (success) {
               deduced_descriptor = maybe_desired_descriptor;
@@ -1013,7 +1013,8 @@ mass_assign_helper(
     };
     mass_process_tuple_as_descriptor(
       context, tuple, target->descriptor, source_range,
-      mass_error, mass_assign_tuple_item_proc, &payload
+      (Mass_Report_Tuple_Error_Proc)mass_error,
+      (Mass_Process_Tuple_Item_Proc)mass_assign_tuple_item_proc, &payload
     );
     return;
   }
@@ -2534,7 +2535,7 @@ mass_cast_helper(
         *heap_payload = lazy_payload;
 
         return mass_make_lazy_value(
-          context, parser, source_range, heap_payload, target_descriptor, mass_tuple_cast_lazy_proc
+          context, parser, source_range, heap_payload, target_descriptor, (Lazy_Value_Proc)mass_tuple_cast_lazy_proc
         );
       }
     } else {
@@ -2547,7 +2548,7 @@ mass_cast_helper(
   *heap_payload = lazy_payload;
 
   return mass_make_lazy_value(
-    context, parser, source_range, heap_payload, target_descriptor, mass_cast_lazy_proc
+    context, parser, source_range, heap_payload, target_descriptor, (Lazy_Value_Proc)mass_cast_lazy_proc
   );
 }
 
@@ -2616,7 +2617,7 @@ mass_zero_extend(
   *heap_payload = lazy_payload;
 
   return mass_make_lazy_value(
-    context, parser, args_view.source_range, heap_payload, target_descriptor, mass_zero_extend_lazy_proc
+    context, parser, args_view.source_range, heap_payload, target_descriptor, (Lazy_Value_Proc)mass_zero_extend_lazy_proc
   );
 }
 
@@ -3858,7 +3859,7 @@ token_handle_function_call(
 
   const Descriptor *lazy_descriptor = info->return_descriptor;
   Value *result = mass_make_lazy_value(
-    context, parser, source_range, call_payload, lazy_descriptor, call_function_overload
+    context, parser, source_range, call_payload, lazy_descriptor, (Lazy_Value_Proc)call_function_overload
   );
   return result;
 }
@@ -4156,7 +4157,7 @@ mass_handle_arithmetic_operation(
     allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
   *lazy_payload = stack_lazy_payload;
   return mass_make_lazy_value(
-    context, parser, arguments.source_range, lazy_payload, result_descriptor, mass_handle_arithmetic_operation_lazy_proc
+    context, parser, arguments.source_range, lazy_payload, result_descriptor, (Lazy_Value_Proc)mass_handle_arithmetic_operation_lazy_proc
   );
 }
 
@@ -4400,43 +4401,43 @@ mass_handle_comparison(
 
 static inline Value *mass_integer_less(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less
   );
 }
 static inline Value *mass_integer_greater(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater
   );
 }
 static inline Value *mass_integer_less_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less_Equal
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Less_Equal
   );
 }
 static inline Value *mass_integer_greater_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater_Equal
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_integer_comparison_lazy_proc, Compare_Type_Signed_Greater_Equal
   );
 }
 static inline Value *mass_integer_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Equal
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_integer_comparison_lazy_proc, Compare_Type_Equal
   );
 }
 static inline Value *mass_integer_not_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_integer_comparison_lazy_proc, Compare_Type_Not_Equal
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_integer_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
 static inline Value *mass_generic_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Equal
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_generic_comparison_lazy_proc, Compare_Type_Equal
   );
 }
 static inline Value *mass_generic_not_equal(Mass_Context *context, Parser *parser, Value_View arguments) {
   return mass_handle_comparison(
-    context, parser, arguments, mass_handle_generic_comparison_lazy_proc, Compare_Type_Not_Equal
+    context, parser, arguments, (Lazy_Value_Proc)mass_handle_generic_comparison_lazy_proc, Compare_Type_Not_Equal
   );
 }
 
@@ -4525,7 +4526,7 @@ mass_syscall(
 
   const Descriptor *lazy_descriptor = fn_info->return_descriptor;
   Value *result = mass_make_lazy_value(
-    context, parser, args.source_range, call_payload, lazy_descriptor, call_function_overload
+    context, parser, args.source_range, call_payload, lazy_descriptor, (Lazy_Value_Proc)call_function_overload
   );
   return result;
 }
@@ -4610,7 +4611,7 @@ mass_pointer_to(
   Mass_Value_Lazy_Payload *payload = mass_allocate(context, Mass_Value_Lazy_Payload);
   *payload = (Mass_Value_Lazy_Payload) {.value = pointee};
   return mass_make_lazy_value(
-    context, parser, args.source_range, payload, descriptor, mass_pointer_to_lazy_proc
+    context, parser, args.source_range, payload, descriptor, (Lazy_Value_Proc)mass_pointer_to_lazy_proc
   );
 }
 
@@ -4822,7 +4823,7 @@ mass_define_stack_value_from_typed_symbol(
   };
   Value *defined = mass_make_lazy_value(
     context, parser, source_range, payload,
-    typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
+    typed_symbol->descriptor, (Lazy_Value_Proc)mass_handle_variable_definition_lazy_proc
   );
 
   // :ScopeForEachDeclaration
@@ -5065,7 +5066,7 @@ mass_struct_field_access(
       *source_range,
       lazy_payload,
       field->descriptor,
-      mass_handle_field_access_lazy_proc
+      (Lazy_Value_Proc)mass_handle_field_access_lazy_proc
     );
   }
 }
@@ -5119,7 +5120,7 @@ mass_dereference(
     args_view.source_range,
     payload,
     descriptor->Pointer_To.descriptor,
-    mass_handle_dereference_operator_lazy_proc
+    (Lazy_Value_Proc)mass_handle_dereference_operator_lazy_proc
   );
 }
 
@@ -5300,7 +5301,7 @@ mass_array_like_get(
   *heap_payload = lazy_payload;
   return mass_make_lazy_value(
     context, parser, args_view.source_range, heap_payload,
-    item_descriptor, mass_handle_array_access_lazy_proc
+    item_descriptor, (Lazy_Value_Proc)mass_handle_array_access_lazy_proc
   );
 }
 
@@ -5601,7 +5602,7 @@ token_parse_if_expression(
   };
 
   return mass_make_lazy_value(
-    context, parser, keyword->source_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
+    context, parser, keyword->source_range, payload, result_descriptor, (Lazy_Value_Proc)mass_handle_if_expression_lazy_proc
   );
 }
 
@@ -6192,12 +6193,12 @@ token_parse_block_statements(
         const Ast_Return *ast_return = value_as_ast_return(parse_result);
         parse_result = mass_make_lazy_value(
           context, parser, parse_result->source_range, ast_return,
-          &descriptor_never, mass_handle_explicit_return_lazy_proc
+          &descriptor_never, (Lazy_Value_Proc)mass_handle_explicit_return_lazy_proc
         );
       } else if (parse_result->descriptor == &descriptor_assignment) {
         parse_result = mass_make_lazy_value(
           context, parser, parse_result->source_range, value_as_assignment(parse_result),
-          &descriptor_void, mass_handle_assignment_lazy_proc
+          &descriptor_void, (Lazy_Value_Proc)mass_handle_assignment_lazy_proc
         );
       } else if (parse_result->descriptor == &descriptor_typed_symbol) {
         parse_result = mass_define_stack_value_from_typed_symbol(
@@ -6206,7 +6207,7 @@ token_parse_block_statements(
       } else if (parse_result->descriptor == &descriptor_mass_while) {
         parse_result = mass_make_lazy_value(
           context, parser, parse_result->source_range, value_as_mass_while(parse_result),
-          &descriptor_void, mass_handle_while_lazy_proc
+          &descriptor_void, (Lazy_Value_Proc)mass_handle_while_lazy_proc
         );
       } else if (parse_result->descriptor == &descriptor_module_exports) {
         if (!(parser->flags & Parser_Flags_Global)) {
@@ -6254,7 +6255,7 @@ token_parse_block_statements(
       dyn_array_copy_from_temp(Array_Value_Ptr, context, &payload->statements, temp_lazy_statements);
 
       block_result = mass_make_lazy_value(
-        context, parser, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
+        context, parser, last_result->source_range, payload, last_descriptor, (Lazy_Value_Proc)mass_handle_block_lazy_proc
       );
     }
   } else {
@@ -6359,7 +6360,7 @@ token_define_local_variable(
 
   Value *variable_value = mass_make_lazy_value(
     context, parser, symbol->source_range, variable_payload, variable_descriptor,
-    mass_handle_variable_definition_lazy_proc
+    (Lazy_Value_Proc)mass_handle_variable_definition_lazy_proc
   );
 
   const Source_Range *source_range = &symbol->source_range;
