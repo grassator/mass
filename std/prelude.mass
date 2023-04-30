@@ -78,6 +78,7 @@ unreachable :: fn() -> (Never) intrinsic {
     context : &MASS.Context,
     builder : &MASS.Function_Builder,
     expected_result : &MASS.Expected_Result,
+    scope : &MASS.Scope,
     source_range : &MASS.Source_Range,
     payload : &Void
   ) -> (&MASS.Value) {
@@ -106,6 +107,7 @@ unreachable :: fn() -> (Never) intrinsic {
     .source_range = arguments.source_range,
     .Lazy = [
       .is_factory = false,
+      .scope = 0, // FIXME provide scope
       .epoch = parser.epoch,
       .proc = lazy_value_proc,
       .payload = 0,
@@ -264,6 +266,7 @@ add_or_subtract :: fn(
     context : &MASS.Context,
     builder : &MASS.Function_Builder,
     expected_result : &MASS.Expected_Result,
+    scope : &MASS.Scope,
     source_range : &MASS.Source_Range,
     raw_payload : &Void
   ) -> (&MASS.Value) {
@@ -317,6 +320,7 @@ add_or_subtract :: fn(
     .source_range = arguments.source_range,
     .Lazy = [
       .is_factory = false,
+      .scope = 0, // FIXME provide scope
       .epoch = parser.epoch,
       .proc = lazy_value_proc,
       .payload = cast(&Void, payload),
@@ -348,6 +352,7 @@ compare :: fn(
     context : &MASS.Context,
     builder : &MASS.Function_Builder,
     expected_result : &MASS.Expected_Result,
+    scope : &MASS.Scope,
     source_range : &MASS.Source_Range,
     raw_payload : &Void
   ) -> (&MASS.Value) {
@@ -413,6 +418,7 @@ compare :: fn(
     .Lazy = [
       .is_factory = false,
       .epoch = parser.epoch,
+      .scope = 0, // FIXME provide scope
       .proc = lazy_value_proc,
       .payload = cast(&Void, payload)
     ]

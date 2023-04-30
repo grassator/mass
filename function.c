@@ -721,6 +721,7 @@ mass_function_literal_instance_for_info(
                 .source_range = def_param->source_range,
                 .Lazy = {
                   .is_factory = true,
+                  .scope = literal->own_scope,
                   .epoch = body_parser.epoch,
                   .proc = mass_implicit_function_parameter_factory_proc,
                   .payload = call_param,

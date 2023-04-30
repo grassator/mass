@@ -1681,6 +1681,7 @@ main(void) {
       { "u8", "_is_factory_padding", 7 },
       { "Epoch", "epoch" },
       { "const void *", "payload" },
+      { "const Scope *", "scope" },
       { "Lazy_Value_Proc", "proc" }
     }),
     struct_fields("Forced", (Struct_Item[]){
@@ -2167,6 +2168,7 @@ main(void) {
     { "Mass_Context *", "context" },
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
+    { "const Scope *", "scope" },
     { "const Source_Range *", "source_range" },
     { "const void *", "payload" },
   }));

@@ -13,6 +13,7 @@ mass_cast_lazy_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Scope *scope,
   const Source_Range *source_range,
   const Mass_Cast_Lazy_Payload *payload
 );
@@ -185,6 +186,7 @@ mass_implicit_function_parameter_factory_proc(
   Mass_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
+  const Scope *scope,
   const Source_Range *source_range,
   const Function_Call_Parameter *param
 );

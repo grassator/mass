@@ -733,7 +733,7 @@ typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
-  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Source_Range * source_range, const void * payload);
+  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Scope * scope, const Source_Range * source_range, const void * payload);
 
 typedef enum Instruction_Extension_Type {
   Instruction_Extension_Type_None = 0,
@@ -1709,6 +1709,7 @@ typedef struct Value_Lazy {
   u8 _is_factory_padding[7];
   Epoch epoch;
   const void * payload;
+  const Scope * scope;
   Lazy_Value_Proc proc;
 } Value_Lazy;
 typedef struct Value_Forced {
@@ -4636,6 +4637,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_lazy, Value_Lazy,
     .offset = offsetof(Value_Lazy, payload),
   },
   {
+    .descriptor = &descriptor_scope_pointer,
+    .name = slice_literal_fields("scope"),
+    .offset = offsetof(Value_Lazy, scope),
+  },
+  {
     .descriptor = &descriptor_lazy_value_proc,
     .name = slice_literal_fields("proc"),
     .offset = offsetof(Value_Lazy, proc),
@@ -6328,6 +6334,10 @@ MASS_DEFINE_FUNCTION_DESCRIPTOR(
   {
     .tag = Resolved_Function_Parameter_Tag_Unknown,
     .descriptor = &descriptor_expected_result_pointer,
+  },
+  {
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
+    .descriptor = &descriptor_scope_pointer,
   },
   {
     .tag = Resolved_Function_Parameter_Tag_Unknown,
