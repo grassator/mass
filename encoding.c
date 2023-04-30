@@ -438,7 +438,6 @@ push_instruction(
 static inline void
 push_eagerly_encoded_assembly_no_source_range(
   Code_Block *code_block,
-  Source_Range source_range,
   const Instruction_Assembly *assembly
 ) {
   const Instruction_Encoding *encoding = encoding_match(assembly);
@@ -477,7 +476,7 @@ push_eagerly_encoded_assembly(
     .Location = { .source_range = source_range },
   });
 
-  push_eagerly_encoded_assembly_no_source_range(code_block, source_range, assembly);
+  push_eagerly_encoded_assembly_no_source_range(code_block, assembly);
 }
 
 static void

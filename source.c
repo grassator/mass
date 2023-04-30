@@ -4076,27 +4076,25 @@ mass_handle_arithmetic_operation_lazy_proc(
         }
         assert(widen);
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, result_range, &(Instruction_Assembly){widen}
+          &builder->code_block, &(Instruction_Assembly){widen}
         );
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, result_range,
-          &(Instruction_Assembly){idiv, {temp_divisor_storage}}
+          &builder->code_block, &(Instruction_Assembly){idiv, {temp_divisor_storage}}
         );
       } else {
         if (bit_size == 8) {
           Storage reg_ax = storage_register(Register_A, (Bits){16});
           push_eagerly_encoded_assembly_no_source_range(
-            &builder->code_block, result_range,
-            &(Instruction_Assembly){movzx, {reg_ax, temp_dividend_storage}}
+            &builder->code_block, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend_storage}}
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
           push_eagerly_encoded_assembly_no_source_range(
-            &builder->code_block, result_range, &(Instruction_Assembly){xor, {reg_d, reg_d}}
+            &builder->code_block, &(Instruction_Assembly){xor, {reg_d, reg_d}}
           );
         }
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, result_range, &(Instruction_Assembly){asm_div, {temp_divisor_storage}}
+          &builder->code_block, &(Instruction_Assembly){asm_div, {temp_divisor_storage}}
         );
       }
 
