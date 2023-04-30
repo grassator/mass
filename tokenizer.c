@@ -385,30 +385,30 @@ tokenize(
 
     CHAR_CATEGORY_MAP['_'] = Underscore;
 
-    for (s32 ch = '0'; ch <= '9'; ++ch) {
+    for (char ch = '0'; ch <= (char)'9'; ++ch) {
       DIGIT_DECODER[ch] = ch - '0';
     }
     CHAR_CATEGORY_MAP['0'] = Digit_0;
     CHAR_CATEGORY_MAP['1'] = Digit_1;
-    for (s32 ch = '2'; ch <= '7'; ++ch) {
+    for (char ch = '2'; ch <= (char)'7'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Digits_2_to_7;
     }
     CHAR_CATEGORY_MAP['8'] = Digits_8_to_9;
     CHAR_CATEGORY_MAP['9'] = Digits_8_to_9;
 
-    for (s32 ch = 'a'; ch <= 'f'; ++ch) {
+    for (char ch = 'a'; ch <= (char)'f'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Hex_Letter;
       DIGIT_DECODER[ch] = ch - 'a' + 10;
     }
-    for (s32 ch = 'A'; ch <= 'F'; ++ch) {
+    for (char ch = 'A'; ch <= (char)'F'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Hex_Letter;
       DIGIT_DECODER[ch] = ch - 'A' + 10;
     }
 
-    for (s32 ch = 'f' + 1; ch <= 'z'; ++ch) {
+    for (char ch = 'f' + 1; ch <= (char)'z'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Non_Hex_Letter;
     }
-    for (s32 ch = 'F' + 1; ch <= 'Z'; ++ch) {
+    for (char ch = 'F' + 1; ch <= (char)'Z'; ++ch) {
       CHAR_CATEGORY_MAP[ch] = Non_Hex_Letter;
     }
   }
