@@ -4801,7 +4801,20 @@ mass_define_stack_value_from_typed_symbol(
     context, parser, source_range, payload,
     typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
   );
-  scope_define_value(parser->scope, parser->epoch, source_range, typed_symbol->symbol, defined);
+
+  // :ScopeForEachDeclaration
+  // Every time a new value is defined we create a new scope.
+  // This should help with a few of things:
+  //   1. This should be slightly safer as it makes sure that statements above can not be using
+  //      variables from anywhere below.
+  //   2. Since we do not change the storage of a variable currently after it is created
+  //      we can probably use this info for debugging.
+  //   3. Allows for redeclaration of variables similar to Rust. It is unclear if that is good
+  //      longterm but it is good for experimentation at the moment.
+  Scope *block_scope_from_now_on = scope_make(context->allocator, parser->scope);
+  scope_define_value(block_scope_from_now_on, parser->epoch, source_range, typed_symbol->symbol, defined);
+  parser->scope = block_scope_from_now_on;
+
   return defined;
 }
 
@@ -4813,13 +4826,16 @@ mass_operator_assignment(
 ) {
   Value *target = token_parse_single(context, parser, value_view_get(&operands, 0));
   if (mass_has_error(context)) return 0;
-  Value *source = token_parse_single(context, parser, value_view_get(&operands, 1));
-  if (mass_has_error(context)) return 0;
 
+  // It is important to check this before parsing the expression because we want to allow
+  // redeclaration with the same name to happen while referring to the old variable
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
     target = mass_define_stack_value_from_typed_symbol(context, parser, typed_symbol, target->source_range);
   }
+
+  Value *source = token_parse_single(context, parser, value_view_get(&operands, 1));
+  if (mass_has_error(context)) return 0;
 
   Assignment *assignment = allocator_allocate(context->allocator, Assignment);
   *assignment = (Assignment) {
@@ -6316,7 +6332,10 @@ token_define_local_variable(
 
   const Source_Range *source_range = &symbol->source_range;
 
-  scope_define_value(parser->scope, parser->epoch, *source_range, value_as_symbol(symbol), variable_value);
+  // :ScopeForEachDeclaration
+  Scope *block_scope_from_now_on = scope_make(context->allocator, parser->scope);
+  scope_define_value(block_scope_from_now_on, parser->epoch, *source_range, value_as_symbol(symbol), variable_value);
+  parser->scope = block_scope_from_now_on;
 
   Assignment *assignment = mass_allocate(context, Assignment);
   *assignment = (Assignment) {
@@ -6335,6 +6354,7 @@ mass_define_inferred(
   assert(args.length == 2);
   Value *lhs = value_view_get(&args, 0);
   if (!mass_value_ensure_static_of(context, lhs, &descriptor_symbol)) return 0;
+
   Value *rhs = token_parse_single(context, parser, value_view_get(&args, 1));
   if (mass_has_error(context)) return 0;
 

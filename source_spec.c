@@ -1432,6 +1432,30 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Assignment_To_Constant);
     }
+    it("should allow reassignment of an argument to a local with the same name") {
+      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn(x : i64) -> _ { x := x; x = 42; x };"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(21) == 42);
+    }
+    it("should allow reassignment of an argument to a local with the same name and an explicit type") {
+      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn(x : i64) -> _ { x : i64 = x; x = 42; x };"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(21) == 42);
+    }
+    it("should allow reassignment of an argument to a local with the same name and a complex expression") {
+      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn(x : i64) -> _ { x : i64 = x + 21; x };"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(21) == 42);
+    }
     it("should report an error when LHS of the := is not a symbol") {
       test_program_inline_source_base(
         "main", &test_context,
