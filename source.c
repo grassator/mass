@@ -6754,6 +6754,7 @@ program_load_file_module_into_root_scope(
   Slice file_path
 ) {
   Module *module = program_module_from_file(context, file_path, context->compilation->root_scope);
+  if (mass_has_error(context)) return;
   program_import_module(context, module);
 }
 
