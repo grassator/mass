@@ -4823,7 +4823,7 @@ mass_define_stack_value_from_typed_symbol(
   //   2. Since we do not change the storage of a variable currently after it is created
   //      we can probably use this info for debugging.
   //   3. Allows for redeclaration of variables similar to Rust. It is unclear if that is good
-  //      longterm but it is good for experimentation at the moment.
+  //      long term, but it is good for experimentation at the moment.
   Scope *block_scope_from_now_on = scope_make(context->allocator, parser->scope);
   scope_define_value(block_scope_from_now_on, parser->epoch, source_range, typed_symbol->symbol, defined);
   parser->scope = block_scope_from_now_on;
@@ -6660,9 +6660,9 @@ program_absolute_path(
       .allocator = allocator_system,
       .capacity = 10 * 1024
     );
-    s32 current_dir_size = GetCurrentDirectory(0, 0) * sizeof(wchar_t);
+    DWORD current_dir_size = GetCurrentDirectoryW(0, 0) * sizeof(wchar_t);
     sys_buffer->occupied =
-      GetCurrentDirectory(current_dir_size, (wchar_t *)sys_buffer->memory) * sizeof(wchar_t);
+      GetCurrentDirectoryW(current_dir_size, (wchar_t *)sys_buffer->memory) * sizeof(wchar_t);
     fixed_buffer_append_s16(sys_buffer, L'\\');
     Allocator *convert_allocator = fixed_buffer_allocator_init(sys_buffer, &(Allocator){0});
     utf8_to_utf16_null_terminated(convert_allocator, raw_path);
