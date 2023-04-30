@@ -172,12 +172,22 @@ int main(s32 argc, char **argv) {
       Jit jit;
       jit_init(&jit, context.program);
       program_jit(&context, &jit);
-      if (mass_has_error(&context)) {
-        return mass_cli_print_error(&compilation, context.result);
-      }
-      fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);
+      if (mass_has_error(&context)) goto cli_run_error;
+      const Function_Literal *literal = value_as_function_literal(jit.program->entry_point);
+      Function_Info info;
+      mass_function_info_init_for_header_and_maybe_body(
+        &context, literal->own_scope, &literal->header, literal->body, &info
+      );
+      if (mass_has_error(&context)) goto cli_run_error;
+      Value *main_value = ensure_function_instance(&context, jit.program->entry_point, info.parameters);
+      if (mass_has_error(&context)) goto cli_run_error;
+      fn_type_opaque main = value_as_function(jit.program, main_value);
       main();
+      if (mass_has_error(&context)) goto cli_run_error;
       return 0;
+
+      cli_run_error:
+      return mass_cli_print_error(&compilation, context.result);
     }
   }
   return 0;
