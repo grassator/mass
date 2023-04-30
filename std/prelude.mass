@@ -81,13 +81,11 @@ unreachable :: fn() -> (Never) intrinsic {
     source_range : &MASS.Source_Range,
     payload : &Void
   ) -> (&MASS.Value) {
-    {
-      MASS.push_instruction(&builder.code_block, MASS.Instruction [
-        .tag = .Location,
-        .scope = 0,
-        .Location = [source_range.*]
-      ]);
-    }
+    MASS.push_instruction(&builder.code_block, MASS.Instruction [
+      .tag = .Location,
+      .scope = 0,
+      .Location = [source_range.*]
+    ]);
 
     {
       instruction : MASS.Instruction
