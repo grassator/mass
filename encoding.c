@@ -54,7 +54,7 @@ eager_encode_instruction_assembly(
   u8 sib_byte = 0;
   s32 displacement = 0;
 
-  u32 storage_count = countof(assembly->operands);
+  u8 storage_count = countof(assembly->operands);
   for (u8 storage_index = 0; storage_index < storage_count; ++storage_index) {
     const Storage *storage = &assembly->operands[storage_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
@@ -118,7 +118,7 @@ eager_encode_instruction_assembly(
       if (mod_r_m_storage_index != -1) {
         panic("Multiple MOD R/M operands are not supported in an instruction");
       }
-      mod_r_m_storage_index = storage_index;
+      mod_r_m_storage_index = (s8)storage_index;
       if (storage->tag == Storage_Tag_Register) {
         r_m = storage->Register.index;
         mod = MOD_Register;

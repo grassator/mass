@@ -13,7 +13,7 @@ mass_value_is_static(
     case Storage_Tag_Static:
     case Storage_Tag_Immediate: {
       return true;
-    } break;
+    }
     case Storage_Tag_Register:
     case Storage_Tag_Xmm:
     case Storage_Tag_Disjoint:
@@ -21,7 +21,7 @@ mass_value_is_static(
     case Storage_Tag_Eflags:
     default: {
       return false;
-    } break;
+    }
   }
 }
 
@@ -395,7 +395,7 @@ types_equal(
     switch (brand_comparison_mode) {
       case Brand_Comparison_Mode_Strict: {
         return false;
-      } break;
+      }
       case Brand_Comparison_Mode_Ignore: {
         // nothing to do
       } break;
@@ -641,7 +641,7 @@ storage_with_offset_and_bit_size(
     case Storage_Tag_Immediate: {
       result.Immediate.bits >>= offset_in_bits;
       return result;
-    } break;
+    }
     case Storage_Tag_Register: {
       result.Register.packed = bit_size.as_u64 != 64;
       result.Register.offset_in_bits = u64_to_u16(offset_in_bits);
@@ -716,14 +716,14 @@ storage_static_equal_internal(
     case Descriptor_Tag_Never:
     case Descriptor_Tag_Void: {
       return true;
-    } break;
+    }
     // Opaques, references and pointers can be compared with memcmp
     case Descriptor_Tag_Float:
     case Descriptor_Tag_Integer:
     case Descriptor_Tag_Raw:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
-    } break;
+    }
     case Descriptor_Tag_Fixed_Array: {
       // compare item by item
       if (a_descriptor->Fixed_Array.length != b_descriptor->Fixed_Array.length) {
@@ -1301,7 +1301,7 @@ value_as_function(
   }
 }
 
-static const Os
+static Os
 host_os() {
   #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
   return Os_Windows;
@@ -1322,11 +1322,9 @@ mass_ensure_symbol_for_map(
 ) {
   u64 hash = Symbol_Map__hash(name);
   const Symbol *symbol = 0;
-  if (!symbol) {
-    Symbol **cache_entry = hash_map_get_by_hash(map, hash, name);
-    if (cache_entry) {
-      symbol = *cache_entry;
-    }
+  Symbol **cache_entry = hash_map_get_by_hash(map, hash, name);
+  if (cache_entry) {
+    symbol = *cache_entry;
   }
   if (!symbol) {
     Symbol *heap_symbol = allocator_allocate(allocator, Symbol);
@@ -1473,7 +1471,7 @@ context_is_compile_time_eval(
   const Mass_Context *context
 ) {
   return context->compilation->jit.program == context->program;
-};
+}
 
 Mass_Context
 mass_context_from_compilation(
@@ -1517,7 +1515,7 @@ value_i64_cast_to(
     case Descriptor_Tag_Fixed_Array:
     case Descriptor_Tag_Function_Instance: {
       return Literal_Cast_Result_Target_Not_An_Integer;
-    } break;
+    }
   }
 
   u64 bit_size = target_descriptor->bit_size.as_u64;

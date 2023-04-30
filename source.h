@@ -34,11 +34,6 @@ mass_assign_helper(
   const Source_Range *source_range
 );
 
-static inline const Descriptor *
-mass_expected_result_descriptor(
-  const Expected_Result *expected_result
-);
-
 static Value *
 mass_expected_result_ensure_value_or_temp(
   Mass_Context *context,
@@ -79,12 +74,6 @@ mass_match_overload_or_error(
   const Source_Range *source_range
 );
 
-static inline Scope *
-scope_make(
-  const Allocator *allocator,
-  const Scope *parent
-);
-
 static inline bool
 value_is_intrinsic(
   Value *value
@@ -96,15 +85,6 @@ value_ensure_type(
   const Scope *scope,
   Value *value,
   Source_Range source_range
-);
-
-static inline void
-scope_define_value(
-  Scope *scope,
-  Epoch epoch,
-  Source_Range source_range,
-  const Symbol *symbol,
-  Value *value
 );
 
 static void
@@ -149,14 +129,6 @@ deduce_runtime_descriptor_for_value(
   const Descriptor *maybe_desired_descriptor
 );
 
-static Value *
-value_force(
-  Mass_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Value *value
-);
-
 static void
 value_force_exact(
   Mass_Context *context,
@@ -192,14 +164,6 @@ mass_implicit_function_parameter_factory_proc(
 );
 
 static Value *
-mass_module_get_impl(
-  Mass_Context *context,
-  const Module *module,
-  const Symbol *symbol,
-  const Source_Range *source_range
-);
-
-static Value *
 token_parse_block_statements(
   Mass_Context *program,
   Parser *parser,
@@ -227,11 +191,6 @@ program_import_module(
   Mass_Context *context,
   Module *module
 );
-
-static inline Mass_Result
-mass_success() {
-  return (Mass_Result){ .tag = Mass_Result_Tag_Success };
-}
 
 static void
 scope_define_enum(

@@ -74,12 +74,6 @@ context_temp_reset_to_mark(
   context->compilation->temp_buffer.occupied = mark.occupied;
 }
 
-static inline const Symbol *
-mass_ensure_symbol(
-  Compilation *compilation,
-  Slice name
-);
-
 static inline Value_View
 value_view_single(
   Value **value
@@ -238,12 +232,6 @@ storage_stack(
   s32 offset,
   Bits bit_size,
   Stack_Area area
-);
-
-static inline Storage
-storage_register(
-  Register reg,
-  Bits bit_size
 );
 
 static inline bool
@@ -429,16 +417,6 @@ static Slice
 source_from_source_range(
   Compilation *compilation,
   const Source_Range *source_range
-);
-
-static void *
-rip_value_pointer(
-  Value *value
-);
-
-static inline bool
-storage_is_label(
-  const Storage *operand
 );
 
 static inline bool

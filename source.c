@@ -1366,16 +1366,6 @@ scope_lookup_operator(
   return value_as_operator(maybe_operator_entry->value);
 }
 
-static inline bool
-value_match_symbol(
-  const Value *token,
-  Slice name
-) {
-  if (!value_is_symbol(token)) return false;
-  if (!name.length) return true;
-  return slice_equal(const_value_as_symbol(token)->name, name);
-}
-
 static inline const Descriptor *
 value_ensure_type(
   Mass_Context *context,
@@ -1459,11 +1449,6 @@ context_parse_error(
     .source_range = value_view_slice(&view, peek_index, peek_index).source_range,
   });
 }
-
-typedef struct {
-  Slice name;
-  Value *value;
-} Token_Match_Arg;
 
 static inline const Descriptor *
 token_match_type(
@@ -2312,8 +2297,6 @@ mass_c_struct(
   return result;
 }
 
-typedef void (*Compile_Time_Eval_Proc)(void *);
-
 // TODO this can probably now be implemented in terms of a mass_trampoline_call
 //      with a fake fn that has an inferred return type. But it might be too slow.
 static Value *
@@ -2822,7 +2805,7 @@ call_function_overload(
     );
 
     bool can_use_source_arg_as_is;
-    // If source args are on the stack or rip-relative we don't need to worry about their registers
+    // If source args are on the stack or rip-relative we don't need to worry about their registers,
     // but it is not true for all Storage_Tag_Memory, because indirect access uses registers
     if (
       maybe_source_storage &&
@@ -2891,7 +2874,7 @@ call_function_overload(
         stack_storage.flags |= Storage_Flags_Temporary;
         arg_value = value_make(context, stack_descriptor, stack_storage, *source_range);
       }
-    };
+    }
     if (should_assign) {
       mass_assign_helper(context, builder, arg_value, source_arg, source_range);
       if (mass_has_error(context)) return 0;
@@ -2989,10 +2972,10 @@ call_function_overload(
       }
     } break;
     case Function_Call_Jump_Syscall: {
-      Storage syscal_number_storage = storage_register(Register_A, (Bits){64});
+      Storage syscall_number_storage = storage_register(Register_A, (Bits){64});
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){mov, {syscal_number_storage, call_target_storage}}
+        &(Instruction_Assembly){mov, {syscall_number_storage, call_target_storage}}
       );
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
@@ -3501,7 +3484,7 @@ mass_ensure_trampoline(
     return *maybe_trampoline_pointer;
   }
 
-  // Trampoline needs to be compiled in the jit context so we substitute it here
+  // Trampoline needs to be compiled in the jit context, so we substitute it here
   Mass_Context jit_context = *context;
   jit_context.program = context->compilation->jit.program;
   context = &jit_context;
@@ -3961,13 +3944,13 @@ mass_handle_arithmetic_operation_lazy_proc(
       );
       storage_release_if_temporary(builder, &temp_rhs_storage);
 
-      // temp_a is used as a result so it is intentionnaly not released
+      // temp_a is used as a result, so it is intentionally not released
       return mass_expected_result_ensure_value_or_temp(
         context, builder, expected_result, temp_lhs
       );
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      // Save RDX as it will be used for the result overflow
+      // Save RDX as it will be used for the result overflow,
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
       Storage maybe_saved_rdx = {0};
@@ -4016,7 +3999,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         register_release(builder, maybe_saved_rdx.Register.index);
       }
 
-      // temp_a is used as a result so it is intentionnaly not released
+      // temp_a is used as a result, so it is intentionally not released
       return mass_expected_result_ensure_value_or_temp(
         context, builder, expected_result, temp_a
       );
@@ -4043,7 +4026,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       Expected_Result expected_divisor = mass_expected_result_exact(descriptor, temp_divisor_storage);
       (void)value_force(context, builder, &expected_divisor, payload->rhs);
 
-      // Save RDX as it will be used for the remainder
+      // Save RDX as it will be used for the remainder,
       // but we should not save or restore it if it is the result
       // @CopyPaste :SaveRDX
       Storage maybe_saved_rdx = {0};
@@ -4074,6 +4057,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           case 32: widen = cdq; break;
           case 16: widen = cwd; break;
           case 8: widen = cbw; break;
+          default: assert(false); break;
         }
         assert(widen);
         push_eagerly_encoded_assembly_no_source_range(
@@ -4102,7 +4086,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       if (payload->operator == Mass_Arithmetic_Operator_Remainder) {
         if (bit_size == 8) {
           // :64bitMode8BitOperations
-          // The encoder does not support access to AH so we hardcode byte of `mov AL, AH`
+          // The encoder does not support access to AH, so we hard code byte of `mov AL, AH`
           // This is not optimal, but it should do for now.
           push_instruction(&builder->code_block, (Instruction) {
             .tag = Instruction_Tag_Bytes,
@@ -4912,7 +4896,7 @@ mass_handle_field_access_lazy_proc(
   Expected_Result expected_struct = expected_result_any(payload->struct_->descriptor);
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
   if (mass_has_error(context)) return 0;
-  bool source_is_contant = struct_->flags & Value_Flags_Constant;
+  bool source_is_constant = struct_->flags & Value_Flags_Constant;
 
   Storage struct_storage = value_as_forced(struct_)->storage;
 
@@ -4927,7 +4911,7 @@ mass_handle_field_access_lazy_proc(
 
   Value *field_value = value_make(context, field->descriptor, field_storage, *source_range);
 
-  if (source_is_contant) {
+  if (source_is_constant) {
     field_value->flags |= Value_Flags_Constant;
   }
 
@@ -5226,7 +5210,7 @@ mass_struct_get(
     DYN_ARRAY_FOREACH(Struct_Field, it, fields) {
       // Only allow access to unnamed fields via numbers. This is a purely an empirical decision.
       // Allowing arbitrary fields just by index was very confusing in practice.
-      // A user of the language can always redifine this choice or use a specialized fn.
+      // A user of the language can always redefine this choice or use a specialized fn.
       if (it->name.length) continue;
       if (index == 0) {
         field = it;
@@ -5355,16 +5339,6 @@ mass_get(
 
   const Symbol *symbol = context->compilation->common_symbols.get;
   return mass_forward_call_to_alias(context, parser, parsed_args, symbol);
-}
-
-static Value *
-mass_handle_dot_operator(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args_view,
-  const Operator *operator
-) {
-  return mass_get(context, parser, args_view);
 }
 
 static Value *

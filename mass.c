@@ -94,8 +94,9 @@ int main(s32 argc, char **argv) {
   }
   Slice file_path = slice_from_c_string(raw_file_path);
 
-  Os os = Os_Windows;
+  Os os;
   switch(mode) {
+    default:
     case Mass_Cli_Mode_Compile: {
       os = Os_Windows;
       break;

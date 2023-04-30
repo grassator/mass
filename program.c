@@ -13,15 +13,15 @@ default_calling_convention_for_os(
   switch(os) {
     case Os_Windows: {
       return &calling_convention_x86_64_windows;
-    } break;
+    }
     case Os_Linux:
     case Os_Mac: {
       return &calling_convention_x86_64_system_v;
-    } break;
+    }
     default: {
       panic("Unsupported OS");
       return 0;
-    } break;
+    }
   }
 }
 
@@ -91,7 +91,7 @@ program_init(
     .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Read,
   };
-};
+}
 
 static void
 program_deinit(
