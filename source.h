@@ -244,11 +244,17 @@ scope_define_enum(
   u64 item_count
 );
 
+typedef enum {
+    Stack_Init_Mode_Zero,
+    Stack_Init_Mode_Uninitialized,
+} Stack_Init_Mode;
+
 static Value *
 mass_define_stack_value_from_typed_symbol(
   Mass_Context *context,
   Parser *parser,
   const Typed_Symbol *typed_symbol,
+  Stack_Init_Mode init_mode,
   Source_Range source_range
 );
 

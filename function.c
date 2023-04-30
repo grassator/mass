@@ -330,6 +330,37 @@ move_value(
     &builder->code_block, &(Instruction_Assembly){mov, {*target, *source}} );
 }
 
+static void
+mass_zero_storage(
+  Function_Builder *builder,
+  const Storage *target,
+  const Source_Range *source_range
+) {
+  static const Storage imm_zero_8  = {.tag = Storage_Tag_Immediate, .bit_size = {8},  .Immediate = { .bits = 0 } };
+  static const Storage imm_zero_16 = {.tag = Storage_Tag_Immediate, .bit_size = {16}, .Immediate = { .bits = 0 } };
+  static const Storage imm_zero_32 = {.tag = Storage_Tag_Immediate, .bit_size = {32}, .Immediate = { .bits = 0 } };
+  static const Storage imm_zero_64 = {.tag = Storage_Tag_Immediate, .bit_size = {64}, .Immediate = { .bits = 0 } };
+
+  u64 byte_size = target->bit_size.as_u64 / 8;
+  u64 offset = 0;
+  while (offset < byte_size) {
+    u64 remainder = byte_size - offset;
+    const Storage *zero;
+    if (remainder >= 8) {
+      zero = &imm_zero_64;
+    } else if (remainder >= 4) {
+      zero = &imm_zero_32;
+    } else if (remainder >= 2) {
+      zero = &imm_zero_16;
+    } else {
+      zero = &imm_zero_8;
+    }
+    Storage chunk = storage_with_offset_and_bit_size(target, u64_to_s32(offset), zero->bit_size);
+    move_value(builder, source_range, &chunk, zero);
+    offset += zero->bit_size.as_u64 / 8;
+  }
+}
+
 static inline u32
 make_trampoline(
   Virtual_Memory_Buffer *buffer,

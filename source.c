@@ -4706,6 +4706,7 @@ mass_typed_symbol(
 
 typedef struct {
   const Descriptor *descriptor;
+  Stack_Init_Mode init_mode;
 } Mass_Variable_Definition_Lazy_Payload;
 
 static Value *
@@ -4720,9 +4721,16 @@ mass_handle_variable_definition_lazy_proc(
   Storage storage = payload->descriptor->bit_size.as_u64
     ? reserve_stack_storage(builder, payload->descriptor->bit_size)
     : (Storage){.tag = Storage_Tag_Immediate, .bit_size = payload->descriptor->bit_size};
-  return value_make(
-    context, payload->descriptor, storage, *source_range
-  );
+  Value *result = value_make(context, payload->descriptor, storage, *source_range);
+  switch (payload->init_mode) {
+    case Stack_Init_Mode_Zero: {
+      mass_zero_storage(builder, &storage, source_range);
+    } break;
+    case Stack_Init_Mode_Uninitialized: {
+      // Nothing to do as we are OK with the garbage values
+    } break;
+  }
+  return result;
 }
 
 static Value *
@@ -4803,12 +4811,14 @@ mass_define_stack_value_from_typed_symbol(
   Mass_Context *context,
   Parser *parser,
   const Typed_Symbol *typed_symbol,
+  Stack_Init_Mode init_mode,
   Source_Range source_range
 ) {
   Mass_Variable_Definition_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
   *payload = (Mass_Variable_Definition_Lazy_Payload){
     .descriptor = typed_symbol->descriptor,
+    .init_mode = init_mode,
   };
   Value *defined = mass_make_lazy_value(
     context, parser, source_range, payload,
@@ -4844,7 +4854,9 @@ mass_operator_assignment(
   // redeclaration with the same name to happen while referring to the old variable
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
-    target = mass_define_stack_value_from_typed_symbol(context, parser, typed_symbol, target->source_range);
+    target = mass_define_stack_value_from_typed_symbol(
+      context, parser, typed_symbol, Stack_Init_Mode_Uninitialized, target->source_range
+    );
   }
 
   Value *source = token_parse_single(context, parser, value_view_get(&operands, 1));
@@ -6189,7 +6201,7 @@ token_parse_block_statements(
         );
       } else if (parse_result->descriptor == &descriptor_typed_symbol) {
         parse_result = mass_define_stack_value_from_typed_symbol(
-          context, parser, value_as_typed_symbol(parse_result), parse_result->source_range
+          context, parser, value_as_typed_symbol(parse_result), Stack_Init_Mode_Zero, parse_result->source_range
         );
       } else if (parse_result->descriptor == &descriptor_mass_while) {
         parse_result = mass_make_lazy_value(
@@ -6342,6 +6354,7 @@ token_define_local_variable(
     mass_allocate(context, Mass_Variable_Definition_Lazy_Payload);
   *variable_payload = (Mass_Variable_Definition_Lazy_Payload){
     .descriptor = variable_descriptor,
+    .init_mode = Stack_Init_Mode_Uninitialized,
   };
 
   Value *variable_value = mass_make_lazy_value(

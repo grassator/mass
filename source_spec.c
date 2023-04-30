@@ -1505,6 +1505,14 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+    it("should zero-out stack values") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: fn() -> (i64) { x : i64; x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 0);
+    }
     it("should be able to assign to a void value") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
