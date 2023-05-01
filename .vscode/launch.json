@@ -21,9 +21,13 @@
                     "description": "Enable pretty-printing for gdb",
                     "text": "-enable-pretty-printing",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Set disassembly syntax",
+                    "text": "set disassembly-flavor intel",
+                    "ignoreFailures": true
                 }
-            ],
-            // "preLaunchTask": "build",
+            ]
         }
     ]
 }
