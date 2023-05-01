@@ -681,7 +681,8 @@ spec("source") {
     }
 
     it("should correctly optimize call with a pointer coming from a stack") {
-      s64(*checker)(void *, void *, void *, void *, void *, void *) = (s64(*)())test_program_inline_source_function(
+      s64(*checker)(void *, void *, void *, void *, void *, void *) =
+              (s64(*)(void *, void *, void *, void *, void *, void *))test_program_inline_source_function(
         "outer", &test_context,
         "Payload :: c_struct [ lhs : i64 ];"
         "inner :: fn(x1 : &Void, x2 : &Void, x3 : &Void, x4 : i64) -> _ { x4 };"
