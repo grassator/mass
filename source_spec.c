@@ -680,6 +680,22 @@ spec("source") {
       check(actual == 42);
     }
 
+    it("should correctly optimize call with a pointer coming from a stack") {
+      s64(*checker)(void *, void *, void *, void *, void *, void *) = (s64(*)())test_program_inline_source_function(
+        "outer", &test_context,
+        "Payload :: c_struct [ lhs : i64 ];"
+        "inner :: fn(x1 : &Void, x2 : &Void, x3 : &Void, x4 : i64) -> _ { x4 };"
+        "outer :: fn(x1 : &Void, x2 : &Void, x3 : &Void, x4 : &Void, x5 : &Void, x6 : &Void) -> _ {\n"
+        "  saved := cast(&Payload, x6)\n"
+        "  inner(x1, x2, x3, saved.lhs)\n"
+        "}"
+      );
+      s64 expected = INT32_MAX;
+      check(spec_check_mass_result(test_context.result));
+      s64 actual = checker(0, 0, 0, 0, 0, &expected);
+      check(actual == expected);
+    }
+
     it("should be able to define a local function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,

@@ -171,18 +171,16 @@ eager_encode_instruction_assembly(
               }
             } else
             */
+            r_m = base;
             if (base == Register_SP || base == Register_R12) {
               // [RSP + X] and [R12 + X] always needs to be encoded as SIB because
               // 0b100 register index in MOD R/M is occupied by SIB byte indicator
               needs_sib = true;
-              r_m = 0b0100; // SIB
               sib_byte = (
                 ((sib_scale_bits & 0b11) << 6) |
                 ((Sib_Index_None & 0b111) << 3) |
                 ((base & 0b111) << 0)
               );
-            } else {
-              r_m = base;
             }
             // :RipRelativeEncoding
             // 0b101 value is occupied RIP-relative encoding indicator
