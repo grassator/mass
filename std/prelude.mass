@@ -84,7 +84,7 @@ unreachable :: fn() -> (Never) intrinsic {
   ) -> (&MASS.Value) {
     MASS.push_instruction(&builder.code_block, MASS.Instruction [
       .tag = .Location,
-      .scope = 0,
+      .scope = scope,
       .Location = [source_range.*]
     ]);
 
@@ -107,7 +107,7 @@ unreachable :: fn() -> (Never) intrinsic {
     .source_range = arguments.source_range,
     .Lazy = [
       .is_factory = false,
-      .scope = 0, // FIXME provide scope
+      .scope = parser.scope,
       .epoch = parser.epoch,
       .proc = lazy_value_proc,
       .payload = 0,
@@ -275,7 +275,7 @@ add_or_subtract :: fn(
     temp_lhs_register := temp_lhs_storage.Register.index
     expected_lhs := MASS.expected_result_exact_type(i64, temp_lhs_storage)
 
-    temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
+    temp_lhs := MASS.value_force(context, builder, scope, &expected_lhs, payload.lhs)
 
     if context.compilation.result.tag != .Success then {
       return 0
@@ -285,19 +285,17 @@ add_or_subtract :: fn(
     temp_rhs_register := temp_rhs_storage.Register.index
     expected_rhs := MASS.expected_result_exact_type(i64, temp_rhs_storage)
 
-    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
+    temp_rhs := MASS.value_force(context, builder, scope, &expected_rhs, payload.rhs)
 
     if context.compilation.result.tag != .Success then {
       return 0
     }
 
-    {
-      MASS.push_instruction(&builder.code_block, MASS.Instruction [
-        .tag = .Location,
-        .scope = 0,
-        .Location = [source_range.*]
-      ]);
-    }
+    MASS.push_instruction(&builder.code_block, [
+      .tag = .Location,
+      .scope = scope,
+      .Location = [source_range.*]
+    ]);
 
     {
       instruction := x86_64.op1_reg64_reg64_mr(payload.op_code, temp_lhs_register, temp_rhs_register)
@@ -320,7 +318,7 @@ add_or_subtract :: fn(
     .source_range = arguments.source_range,
     .Lazy = [
       .is_factory = false,
-      .scope = 0, // FIXME provide scope
+      .scope = parser.scope,
       .epoch = parser.epoch,
       .proc = lazy_value_proc,
       .payload = cast(&Void, payload),
@@ -361,7 +359,7 @@ compare :: fn(
     temp_lhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_lhs_register := temp_lhs_storage.Register.index
     expected_lhs := MASS.expected_result_exact_type(i64, temp_lhs_storage)
-    temp_lhs := MASS.value_force(context, builder, &expected_lhs, payload.lhs)
+    temp_lhs := MASS.value_force(context, builder, scope, &expected_lhs, payload.lhs)
 
     if context.compilation.result.tag != .Success then {
       return 0
@@ -370,7 +368,7 @@ compare :: fn(
     temp_rhs_storage := MASS.storage_register_temp(builder, [64]);
     temp_rhs_register := temp_rhs_storage.Register.index
     expected_rhs := MASS.expected_result_exact_type(i64, temp_rhs_storage)
-    temp_rhs := MASS.value_force(context, builder, &expected_rhs, payload.rhs)
+    temp_rhs := MASS.value_force(context, builder, scope, &expected_rhs, payload.rhs)
 
     if context.compilation.result.tag != .Success then {
       return 0
@@ -378,7 +376,7 @@ compare :: fn(
 
     MASS.push_instruction(&builder.code_block, [
       .tag = .Location,
-      .scope = 0,
+      .scope = scope,
       .Location = [source_range.*],
     ])
 
@@ -418,7 +416,7 @@ compare :: fn(
     .Lazy = [
       .is_factory = false,
       .epoch = parser.epoch,
-      .scope = 0, // FIXME provide scope
+      .scope = parser.scope,
       .proc = lazy_value_proc,
       .payload = cast(&Void, payload)
     ]

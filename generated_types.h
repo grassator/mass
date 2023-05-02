@@ -948,7 +948,7 @@ static Value * mass_syscall
   (Mass_Context * context, Parser * parser, Value_View args, const Function_Header * header, u64 number);
 
 static Value * value_force
-  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, Value * value);
+  (Mass_Context * context, Function_Builder * builder, const Scope * scope, const Expected_Result * expected_result, Value * value);
 
 static Value * mass_module_get_impl
   (Mass_Context * context, const Module * module, const Symbol * symbol, const Source_Range * source_range);

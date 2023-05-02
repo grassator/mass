@@ -436,6 +436,7 @@ push_instruction(
 static inline void
 push_eagerly_encoded_assembly_no_source_range(
   Code_Block *code_block,
+  const Scope *scope,
   const Instruction_Assembly *assembly
 ) {
   const Instruction_Encoding *encoding = encoding_match(assembly);
@@ -444,6 +445,7 @@ push_eagerly_encoded_assembly_no_source_range(
 
   push_instruction(code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
+    .scope = scope,
     .Bytes = result.bytes,
   });
 
@@ -451,6 +453,7 @@ push_eagerly_encoded_assembly_no_source_range(
   if (result.has_stack_patch) {
     push_instruction(code_block, (Instruction) {
       .tag = Instruction_Tag_Stack_Patch,
+      .scope = scope,
       .Stack_Patch = result.maybe_stack_patch,
     });
   }
@@ -458,6 +461,7 @@ push_eagerly_encoded_assembly_no_source_range(
   for (s32 i = 0; i < result.label_patch_count; i += 1) {
     push_instruction(code_block, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
+      .scope = scope,
       .Label_Patch = result.label_patches[i],
     });
   }
@@ -467,14 +471,16 @@ static inline void
 push_eagerly_encoded_assembly(
   Code_Block *code_block,
   Source_Range source_range,
+  const Scope *scope,
   const Instruction_Assembly *assembly
 ) {
   push_instruction(code_block, (Instruction) {
     .tag = Instruction_Tag_Location,
+    .scope = scope,
     .Location = { .source_range = source_range },
   });
 
-  push_eagerly_encoded_assembly_no_source_range(code_block, assembly);
+  push_eagerly_encoded_assembly_no_source_range(code_block, scope, assembly);
 }
 
 static void

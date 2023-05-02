@@ -31,6 +31,7 @@ mass_assign_helper(
   Function_Builder *builder,
   Value *target,
   Value *source,
+  const Scope *scope,
   const Source_Range *source_range
 );
 
@@ -38,6 +39,7 @@ static Value *
 mass_expected_result_ensure_value_or_temp(
   Mass_Context *context,
   Function_Builder *builder,
+  const Scope *scope,
   const Expected_Result *expected_result,
   Value *value
 );
@@ -133,6 +135,7 @@ static void
 value_force_exact(
   Mass_Context *context,
   Function_Builder *builder,
+  const Scope *scope,
   Value *target,
   Value *source
 );

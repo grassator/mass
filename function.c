@@ -83,6 +83,7 @@ register_bitset_from_storage(
 static void
 move_value(
   Function_Builder *builder,
+  const Scope *scope,
   const Source_Range *source_range,
   const Storage *target,
   const Storage *source
@@ -100,12 +101,13 @@ move_value(
     immediate.bit_size = source->bit_size;
     const void *source_memory = get_static_storage_with_bit_size(source, source->bit_size);
     memcpy(&immediate.Immediate.bits, source_memory, immediate.bit_size.as_u64 / 8);
-    move_value(builder, source_range, target, &immediate);
+    move_value(builder, scope, source_range, target, &immediate);
     return;
   }
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Location,
+    .scope = scope,
     .Location = { .source_range = *source_range },
   });
 
@@ -116,10 +118,10 @@ move_value(
     assert(target_bit_size == source_bit_size);
     if (target_bit_size == 32) {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){movss, {*target, *source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){movss, {*target, *source}} );
     } else if (target_bit_size == 64) {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){movsd, {*target, *source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){movsd, {*target, *source}} );
     } else {
       panic("Internal Error: XMM operand of unexpected size");
     }
@@ -139,54 +141,54 @@ move_value(
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){sete, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){sete, {temp}} );
         break;
       }
       case Compare_Type_Not_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setne, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setne, {temp}} );
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setb, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setb, {temp}} );
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setbe, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setbe, {temp}} );
         break;
       }
       case Compare_Type_Unsigned_Above: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){seta, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){seta, {temp}} );
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setae, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setae, {temp}} );
         break;
       }
 
       case Compare_Type_Signed_Less: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setl, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setl, {temp}} );
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setle, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setle, {temp}} );
         break;
       }
       case Compare_Type_Signed_Greater: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setg, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setg, {temp}} );
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){setge, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){setge, {temp}} );
         break;
       }
       default: {
@@ -198,9 +200,9 @@ move_value(
       Storage resized_temp = temp;
       resized_temp.bit_size = target->bit_size;
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){movsx, {resized_temp, temp}} );
+        &builder->code_block, scope, &(Instruction_Assembly){movsx, {resized_temp, temp}} );
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){mov, {*target, resized_temp}} );
+        &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, resized_temp}} );
       register_release(builder, temp.Register.index);
     }
     return;
@@ -219,15 +221,15 @@ move_value(
       .Register.index = source->Register.index,
     };
     push_eagerly_encoded_assembly_no_source_range(
-      &builder->code_block, &(Instruction_Assembly){mov, {temp_full_register, source_full_register}}
+      &builder->code_block, scope, &(Instruction_Assembly){mov, {temp_full_register, source_full_register}}
     );
     push_eagerly_encoded_assembly_no_source_range(
-      &builder->code_block, &(Instruction_Assembly){shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
+      &builder->code_block, scope, &(Instruction_Assembly){shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
     );
 
     Storage right_size_temp = temp_full_register;
     right_size_temp.bit_size = source->bit_size;
-    move_value(builder, source_range, target, &right_size_temp);
+    move_value(builder, scope, source_range, target, &right_size_temp);
     register_release(builder, temp_full_register.Register.index);
     return;
   }
@@ -253,31 +255,31 @@ move_value(
     // Clear bits from the target register
     {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){mov, {temp_full_register, imm64(clear_mask)}}
+        &builder->code_block, scope, &(Instruction_Assembly){mov, {temp_full_register, imm64(clear_mask)}}
       );
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){and, {target_full_register, temp_full_register}}
+        &builder->code_block, scope, &(Instruction_Assembly){and, {target_full_register, temp_full_register}}
       );
     }
 
     // Prepare new bits from the source register
     {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
+        &builder->code_block, scope, &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
       );
       Storage right_size_temp = temp_full_register;
       right_size_temp.bit_size = source->bit_size;
-      move_value(builder, source_range, &right_size_temp, source);
+      move_value(builder, scope, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, &(Instruction_Assembly){shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
+          &builder->code_block, scope, &(Instruction_Assembly){shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
         );
       }
     }
 
     // Merge new bits into the target register
     push_eagerly_encoded_assembly_no_source_range(
-      &builder->code_block, &(Instruction_Assembly){or, {target_full_register, temp_full_register}}
+      &builder->code_block, scope, &(Instruction_Assembly){or, {target_full_register, temp_full_register}}
     );
     register_release(builder, temp_full_register.Register.index);
     return;
@@ -289,7 +291,7 @@ move_value(
     if (is_zero && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){xor, {*target, *target}} );
+        &builder->code_block, scope, &(Instruction_Assembly){xor, {*target, *target}} );
       return;
     }
     Storage adjusted_source = *source;
@@ -300,13 +302,13 @@ move_value(
     if (is_64bit_immediate && target->tag != Storage_Tag_Register) {
       Storage temp = storage_register_temp(builder, adjusted_source.bit_size);
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){mov, {temp, adjusted_source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){mov, {temp, adjusted_source}} );
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){mov, {*target, temp}} );
+        &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, temp}} );
       register_release(builder, temp.Register.index);
     } else {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, &(Instruction_Assembly){mov, {*target, adjusted_source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, adjusted_source}} );
     }
     return;
   }
@@ -320,19 +322,20 @@ move_value(
       .Register.index = register_acquire_temp(builder),
     };
     // TODO avoid and extra source range push for recursion
-    move_value(builder, source_range, &temp, source);
-    move_value(builder, source_range, target, &temp);
+    move_value(builder, scope, source_range, &temp, source);
+    move_value(builder, scope, source_range, target, &temp);
     register_release(builder, temp.Register.index);
     return;
   }
 
   push_eagerly_encoded_assembly_no_source_range(
-    &builder->code_block, &(Instruction_Assembly){mov, {*target, *source}} );
+    &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, *source}} );
 }
 
 static void
 mass_zero_storage(
   Function_Builder *builder,
+  const Scope *scope,
   const Storage *target,
   const Source_Range *source_range
 ) {
@@ -356,7 +359,7 @@ mass_zero_storage(
       zero = &imm_zero_8;
     }
     Storage chunk = storage_with_offset_and_bit_size(target, u64_to_s32(offset), zero->bit_size);
-    move_value(builder, source_range, &chunk, zero);
+    move_value(builder, scope, source_range, &chunk, zero);
     offset += zero->bit_size.as_u64 / 8;
   }
 }
@@ -442,6 +445,7 @@ static void
 encode_inverted_conditional_jump(
   Function_Builder *builder,
   Label *to_label,
+  const Scope *scope,
   const Source_Range *source_range,
   const Value *value
 ) {
@@ -453,7 +457,7 @@ encode_inverted_conditional_jump(
     bool is_zero = memcmp(&storage->Immediate.bits, &(u64){0}, bit_size / 8) == 0;
     if (is_zero) {
       push_eagerly_encoded_assembly(
-        &builder->code_block, *source_range,
+        &builder->code_block, *source_range, scope,
         &(Instruction_Assembly){jmp, {code_label32(to_label)}}
       );
     } else {
@@ -479,7 +483,7 @@ encode_inverted_conditional_jump(
       default: assert(!"Unsupported comparison"); break;
     }
     push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
+      &builder->code_block, *source_range, scope,
       &(Instruction_Assembly){mnemonic, {code_label32(to_label)}}
     );
   } else {
@@ -488,10 +492,10 @@ encode_inverted_conditional_jump(
       bool is_packed = storage->Register.offset_in_bits != 0;
       if (is_packed) {
         test_storage = storage_register(register_acquire_temp(builder), value->descriptor->bit_size);
-        move_value(builder, source_range, &test_storage, storage);
+        move_value(builder, scope, source_range, &test_storage, storage);
       }
       push_eagerly_encoded_assembly(
-        &builder->code_block, *source_range,
+        &builder->code_block, *source_range, scope,
         &(Instruction_Assembly){x64_test, {test_storage, test_storage}}
       );
       if (is_packed) register_release(builder, test_storage.Register.index);
@@ -499,12 +503,12 @@ encode_inverted_conditional_jump(
       u64 bit_size = value->descriptor->bit_size.as_u64;
       if (bit_size == 32 || bit_size == 64) {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range,
+          &builder->code_block, *source_range, scope,
           &(Instruction_Assembly){cmp, {*storage, imm32(0)}}
         );
       } else if (bit_size == 8) {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range,
+          &builder->code_block, *source_range, scope,
           &(Instruction_Assembly){cmp, {*storage, imm8(0)}}
         );
       } else {
@@ -512,7 +516,7 @@ encode_inverted_conditional_jump(
       }
     }
     push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
+      &builder->code_block, *source_range, scope,
       &(Instruction_Assembly){jz, {code_label32(to_label)}}
     );
   }
@@ -783,14 +787,15 @@ mass_function_literal_instance_for_info(
     //      in the function, otherwise the return type of the function
     //      itself should be `never`
     Expected_Result expected_result = expected_result_any(&descriptor_never);
-    (void)value_force(context, builder, &expected_result, parse_result);
+    (void)value_force(context, builder, body_scope, &expected_result, parse_result);
   } else {
-    value_force_exact(context, builder, &builder->return_value, parse_result);
+    value_force_exact(context, builder, body_scope, &builder->return_value, parse_result);
   }
   if (mass_has_error(context)) return 0;
 
   push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Label,
+    .scope = body_scope,
     .Label.pointer = builder->code_block.end_label,
   });
 
@@ -800,7 +805,7 @@ mass_function_literal_instance_for_info(
     Storage callee_register_storage = storage_register(callee_register, (Bits){64});
     Storage caller_register_storage = storage_register(caller_register, (Bits){64});
     push_eagerly_encoded_assembly(
-      &builder->code_block, return_range,
+      &builder->code_block, return_range, body_scope,
       &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
     );
   }
@@ -866,11 +871,11 @@ program_init_startup_code(
   for (u64 i = 0; i < relocation_count; ++i) {
     Relocation *relocation = dyn_array_get(program->relocations, i);
     push_eagerly_encoded_assembly(
-      &builder.code_block, source_range,
+      &builder.code_block, source_range, context->compilation->root_scope,
       &(Instruction_Assembly){lea, {register_a, relocation->address_of}}
     );
     push_eagerly_encoded_assembly(
-      &builder.code_block, source_range,
+      &builder.code_block, source_range, context->compilation->root_scope,
       &(Instruction_Assembly){mov, {relocation->patch_at, register_a}}
     );
   }
@@ -879,7 +884,7 @@ program_init_startup_code(
   Value *entry_instance = ensure_function_instance(context, program->entry_point, params);
   assert(entry_instance->tag == Value_Tag_Forced);
   push_eagerly_encoded_assembly(
-    &builder.code_block, source_range,
+    &builder.code_block, source_range, context->compilation->root_scope,
     &(Instruction_Assembly){jmp, {entry_instance->Forced.storage}}
   );
 

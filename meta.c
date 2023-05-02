@@ -2403,6 +2403,7 @@ main(void) {
     type_function(Default, "value_force", "Value *", (Argument_Type[]){
       { "Mass_Context *", "context" },
       { "Function_Builder *", "builder" },
+      { "const Scope *", "scope" },
       { "const Expected_Result *", "expected_result" },
       { "Value *", "value" },
     })

@@ -1339,6 +1339,10 @@ compiler_scope_define_exports(
       .descriptor = &descriptor_function_builder_pointer
     },
     (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("scope")),
+      .descriptor = &descriptor_scope_pointer
+    },
+    (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("expected_result")),
       .descriptor = &descriptor_expected_result_pointer
     },

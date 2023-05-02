@@ -20,6 +20,7 @@ make_trampoline(
 static void
 move_value(
   Function_Builder *builder,
+  const Scope *scope,
   const Source_Range *source_range,
   const Storage *target,
   const Storage *source
