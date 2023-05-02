@@ -298,6 +298,15 @@ print_c_type(
             fprintf(file, "  %s_Tag_%s = %" PRIu64  ",\n", type->name, item->name, i);
           }
           fprintf(file, "} %s_Tag;\n\n", type->name);
+
+          char *lowercase_name = strtolower(type->name);
+          fprintf(file, "const char *%s_tag_name(%s_Tag value) {\n", lowercase_name, type->name);
+          for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+            Struct_Type *item = &type->union_.items[i];
+            fprintf(file, "  if (value == %"PRIu64") return \"%s_%s\";\n", i, type->name, item->name);
+          }
+          fprintf(file, "  return \"<unknown value>\";");
+          fprintf(file, "}\n\n");
         }
 
         // Write out individual structs
@@ -1523,7 +1532,7 @@ main(void) {
       { "Source_Range", "source_range" },
     }),
   }), (Struct_Item[]){
-    { "Scope *", "scope" },
+    { "const Scope *", "scope" },
   })));
 
   push_type(type_struct("Instruction_Bucket", (Struct_Item[]){

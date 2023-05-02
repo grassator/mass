@@ -1192,6 +1192,12 @@ typedef enum {
   Module_Exports_Tag_Selective = 2,
 } Module_Exports_Tag;
 
+const char *module_exports_tag_name(Module_Exports_Tag value) {
+  if (value == 0) return "Module_Exports_Not_Specified";
+  if (value == 1) return "Module_Exports_All";
+  if (value == 2) return "Module_Exports_Selective";
+  return "<unknown value>";}
+
 typedef struct Module_Exports_Selective {
   const Tuple * tuple;
 } Module_Exports_Selective;
@@ -1336,6 +1342,12 @@ typedef enum {
   Memory_Location_Tag_Stack = 2,
 } Memory_Location_Tag;
 
+const char *memory_location_tag_name(Memory_Location_Tag value) {
+  if (value == 0) return "Memory_Location_Instruction_Pointer_Relative";
+  if (value == 1) return "Memory_Location_Indirect";
+  if (value == 2) return "Memory_Location_Stack";
+  return "<unknown value>";}
+
 typedef struct Memory_Location_Instruction_Pointer_Relative {
   Label * label;
   s64 offset;
@@ -1382,6 +1394,16 @@ typedef enum {
   Storage_Tag_Memory = 5,
   Storage_Tag_Disjoint = 6,
 } Storage_Tag;
+
+const char *storage_tag_name(Storage_Tag value) {
+  if (value == 0) return "Storage_Immediate";
+  if (value == 1) return "Storage_Eflags";
+  if (value == 2) return "Storage_Register";
+  if (value == 3) return "Storage_Xmm";
+  if (value == 4) return "Storage_Static";
+  if (value == 5) return "Storage_Memory";
+  if (value == 6) return "Storage_Disjoint";
+  return "<unknown value>";}
 
 typedef struct Storage_Immediate {
   u64 bits;
@@ -1479,6 +1501,14 @@ typedef enum {
   Instruction_Tag_Location = 4,
 } Instruction_Tag;
 
+const char *instruction_tag_name(Instruction_Tag value) {
+  if (value == 0) return "Instruction_Label";
+  if (value == 1) return "Instruction_Bytes";
+  if (value == 2) return "Instruction_Label_Patch";
+  if (value == 3) return "Instruction_Stack_Patch";
+  if (value == 4) return "Instruction_Location";
+  return "<unknown value>";}
+
 typedef struct Instruction_Label {
   Label * pointer;
 } Instruction_Label;
@@ -1501,7 +1531,7 @@ typedef struct Instruction_Location {
 typedef struct Instruction {
   Instruction_Tag tag;
   char _tag_padding[4];
-  Scope * scope;
+  const Scope * scope;
   union {
     Instruction_Label Label;
     Instruction_Bytes Bytes;
@@ -1592,6 +1622,11 @@ typedef enum {
   Operator_Tag_Intrinsic = 1,
 } Operator_Tag;
 
+const char *operator_tag_name(Operator_Tag value) {
+  if (value == 0) return "Operator_Alias";
+  if (value == 1) return "Operator_Intrinsic";
+  return "<unknown value>";}
+
 typedef struct Operator_Alias {
   const Symbol * symbol;
 } Operator_Alias;
@@ -1657,6 +1692,12 @@ typedef enum {
   Overload_Match_Tag_Found = 2,
 } Overload_Match_Tag;
 
+const char *overload_match_tag_name(Overload_Match_Tag value) {
+  if (value == 0) return "Overload_Match_No_Match";
+  if (value == 1) return "Overload_Match_Undecidable";
+  if (value == 2) return "Overload_Match_Found";
+  return "<unknown value>";}
+
 typedef struct Overload_Match_Undecidable {
   Array_Undecidable_Match matches;
 } Overload_Match_Undecidable;
@@ -1703,6 +1744,11 @@ typedef enum {
   Value_Tag_Lazy = 0,
   Value_Tag_Forced = 1,
 } Value_Tag;
+
+const char *value_tag_name(Value_Tag value) {
+  if (value == 0) return "Value_Lazy";
+  if (value == 1) return "Value_Forced";
+  return "<unknown value>";}
 
 typedef struct Value_Lazy {
   _Bool is_factory;
@@ -1762,6 +1808,11 @@ typedef enum {
   Expected_Result_Tag_Flexible = 1,
 } Expected_Result_Tag;
 
+const char *expected_result_tag_name(Expected_Result_Tag value) {
+  if (value == 0) return "Expected_Result_Exact";
+  if (value == 1) return "Expected_Result_Flexible";
+  return "<unknown value>";}
+
 typedef struct Expected_Result_Exact {
   const Descriptor * descriptor;
   Storage storage;
@@ -1802,6 +1853,12 @@ typedef enum {
   Function_Parameter_Tag_Exact_Static = 2,
 } Function_Parameter_Tag;
 
+const char *function_parameter_tag_name(Function_Parameter_Tag value) {
+  if (value == 0) return "Function_Parameter_Runtime";
+  if (value == 1) return "Function_Parameter_Generic";
+  if (value == 2) return "Function_Parameter_Exact_Static";
+  return "<unknown value>";}
+
 typedef struct Function_Parameter_Generic {
   u64 is_static;
   Mass_Type_Constraint_Proc maybe_type_constraint;
@@ -1838,6 +1895,11 @@ typedef enum {
   Resolved_Function_Parameter_Tag_Known = 1,
 } Resolved_Function_Parameter_Tag;
 
+const char *resolved_function_parameter_tag_name(Resolved_Function_Parameter_Tag value) {
+  if (value == 0) return "Resolved_Function_Parameter_Unknown";
+  if (value == 1) return "Resolved_Function_Parameter_Known";
+  return "<unknown value>";}
+
 typedef struct Resolved_Function_Parameter_Known {
   Storage storage;
 } Resolved_Function_Parameter_Known;
@@ -1864,6 +1926,12 @@ typedef enum {
   Function_Return_Tag_Generic = 1,
   Function_Return_Tag_Exact = 2,
 } Function_Return_Tag;
+
+const char *function_return_tag_name(Function_Return_Tag value) {
+  if (value == 0) return "Function_Return_Inferred";
+  if (value == 1) return "Function_Return_Generic";
+  if (value == 2) return "Function_Return_Exact";
+  return "<unknown value>";}
 
 typedef struct Function_Return_Generic {
   Value_View type_expression;
@@ -1983,6 +2051,18 @@ typedef enum {
   Descriptor_Tag_Pointer_To = 8,
 } Descriptor_Tag;
 
+const char *descriptor_tag_name(Descriptor_Tag value) {
+  if (value == 0) return "Descriptor_Void";
+  if (value == 1) return "Descriptor_Never";
+  if (value == 2) return "Descriptor_Raw";
+  if (value == 3) return "Descriptor_Float";
+  if (value == 4) return "Descriptor_Integer";
+  if (value == 5) return "Descriptor_Function_Instance";
+  if (value == 6) return "Descriptor_Fixed_Array";
+  if (value == 7) return "Descriptor_Struct";
+  if (value == 8) return "Descriptor_Pointer_To";
+  return "<unknown value>";}
+
 typedef struct Descriptor_Integer {
   u64 is_signed;
 } Descriptor_Integer;
@@ -2075,6 +2155,35 @@ typedef enum {
   Mass_Error_Tag_No_Runtime_Use = 24,
   Mass_Error_Tag_Recursive_Intrinsic_Use = 25,
 } Mass_Error_Tag;
+
+const char *mass_error_tag_name(Mass_Error_Tag value) {
+  if (value == 0) return "Mass_Error_Unimplemented";
+  if (value == 1) return "Mass_Error_Unreachable_Statement";
+  if (value == 2) return "Mass_Error_Parse";
+  if (value == 3) return "Mass_Error_Assignment_To_Constant";
+  if (value == 4) return "Mass_Error_User_Defined";
+  if (value == 5) return "Mass_Error_Circular_Dependency";
+  if (value == 6) return "Mass_Error_Non_Trailing_Default_Argument";
+  if (value == 7) return "Mass_Error_Expected_Static";
+  if (value == 8) return "Mass_Error_Tokenizer";
+  if (value == 9) return "Mass_Error_Integer_Range";
+  if (value == 10) return "Mass_Error_File_Open";
+  if (value == 11) return "Mass_Error_File_Too_Large";
+  if (value == 12) return "Mass_Error_Dynamic_Library_Load";
+  if (value == 13) return "Mass_Error_Dynamic_Library_Symbol_Not_Found";
+  if (value == 14) return "Mass_Error_Operator_Fixity_Conflict";
+  if (value == 15) return "Mass_Error_Undefined_Variable";
+  if (value == 16) return "Mass_Error_Redefinition";
+  if (value == 17) return "Mass_Error_Unknown_Field";
+  if (value == 18) return "Mass_Error_Invalid_Identifier";
+  if (value == 19) return "Mass_Error_Type_Mismatch";
+  if (value == 20) return "Mass_Error_Epoch_Mismatch";
+  if (value == 21) return "Mass_Error_No_Matching_Overload";
+  if (value == 22) return "Mass_Error_Undecidable_Overload";
+  if (value == 23) return "Mass_Error_Non_Function_Overload";
+  if (value == 24) return "Mass_Error_No_Runtime_Use";
+  if (value == 25) return "Mass_Error_Recursive_Intrinsic_Use";
+  return "<unknown value>";}
 
 typedef struct Mass_Error_User_Defined {
   Slice name;
@@ -2232,6 +2341,11 @@ typedef enum {
   Mass_Result_Tag_Success = 0,
   Mass_Result_Tag_Error = 1,
 } Mass_Result_Tag;
+
+const char *mass_result_tag_name(Mass_Result_Tag value) {
+  if (value == 0) return "Mass_Result_Success";
+  if (value == 1) return "Mass_Result_Error";
+  return "<unknown value>";}
 
 typedef struct Mass_Result_Error {
   Mass_Error error;
