@@ -237,7 +237,35 @@ win32_print_stack(
   win32_print_stack(stack_pointer, return_address, compilation, jit);
 }
 
-static Scope*
+static void
+mass_print_instruction(
+  const Instruction *instruction
+) {
+  switch (instruction->tag) {
+    case Instruction_Tag_Bytes: {
+      printf("Bytes(");
+      for (u32 i = 0; i < instruction->Bytes.length; ++i) {
+        const char *maybe_space = i == 0 ? "" : " ";
+        printf("%s%02x", maybe_space, instruction->Bytes.memory[i]);
+      }
+      printf(")");
+    } break;
+    case Instruction_Tag_Label: {
+      printf("Label(%p)\n", instruction->Label.pointer);
+    } break;
+    case Instruction_Tag_Label_Patch: {
+      printf("Label_Patch(TODO)");
+    } break;
+    case Instruction_Tag_Stack_Patch: {
+      printf("Stack_Patch(TODO)");
+    } break;
+    case Instruction_Tag_Location: {
+      printf("Location(TODO)");
+    } break;
+  }
+}
+
+static const Scope*
 win32_debugger_maybe_scope_for_address(
   u64 rip,
   Jit *jit
@@ -247,7 +275,9 @@ win32_debugger_maybe_scope_for_address(
     if (instruction->scope) {
       return instruction->scope;
     } else {
-      printf("Found an instruction but it has no scope information\n");
+      printf("Found an instruction but it has no scope information. Instruction:\n  ");
+      mass_print_instruction(instruction);
+      printf("\n");
     }
   } else {
     printf("Could not find the instruction for the given IP\n");
@@ -291,14 +321,14 @@ win32_debugger_loop(
     } else if (
       slice_equal(command, slice_literal("locals"))
     ) {
-      Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
+      const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
         ContextRecord->Rip, exception_data->jit
       );
       if (maybe_scope) scope_print_names(maybe_scope);
     } else if (slice_starts_with(command, slice_literal("print "))) {
       Slice variable_name = slice_sub(command, strlen("print "), command.length);
       variable_name = slice_trim_whitespace(variable_name);
-      Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
+      const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
         ContextRecord->Rip, exception_data->jit
       );
       if (maybe_scope) {
