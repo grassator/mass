@@ -324,7 +324,7 @@ win32_debugger_loop(
       const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
         ContextRecord->Rip, exception_data->jit
       );
-      if (maybe_scope) scope_print_names(maybe_scope);
+      if (maybe_scope) scope_print_names(maybe_scope, Scope_Print_Flags_Stop_At_First_Declarative);
     } else if (slice_starts_with(command, slice_literal("print "))) {
       Slice variable_name = slice_sub(command, strlen("print "), command.length);
       variable_name = slice_trim_whitespace(variable_name);

@@ -94,9 +94,15 @@ mass_compilation_init_scopes(
   Compilation *compilation
 );
 
+typedef enum {
+  Scope_Print_Flags_None = 0b0,
+  Scope_Print_Flags_Stop_At_First_Declarative = 0b1,
+} Scope_Print_Flags;
+
 static void
 scope_print_names(
-  const Scope *scope
+  const Scope *scope,
+  Scope_Print_Flags flags
 );
 
 static Value *

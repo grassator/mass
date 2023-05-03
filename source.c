@@ -146,7 +146,8 @@ mass_copy_scope_exports(
 
 static void
 scope_print_names(
-  const Scope *scope
+  const Scope *scope,
+  Scope_Print_Flags flags
 ) {
   for (; scope; scope = scope->parent) {
     switch (scope->tag) {
@@ -157,17 +158,20 @@ scope_print_names(
       } break;
       case Scope_Tag_Declarative: {
         Scope_Map *map = scope->Declarative.map;
-        if (!map) continue;
-        for (u64 i = 0; i < map->capacity; ++i) {
-          Scope_Map__Entry *entry = &map->entries[i];
-          if (entry->occupied) {
-            slice_print(entry->value->name);
-            printf(" ; ");
+        if (map) {
+          for (u64 i = 0; i < map->capacity; ++i) {
+            Scope_Map__Entry *entry = &map->entries[i];
+            if (entry->occupied) {
+              slice_print(entry->value->name);
+              printf(" ; ");
+            }
           }
         }
+        if (flags & Scope_Print_Flags_Stop_At_First_Declarative) goto end;
       } break;
     }
   }
+  end:
   printf("\n");
 }
 
