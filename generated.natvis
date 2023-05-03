@@ -1221,6 +1221,21 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Scope">
+  <DisplayString Condition="tag == Scope_Tag_Imperative">
+    Imperative { Imperative }
+  </DisplayString>
+  <DisplayString Condition="tag == Scope_Tag_Declarative">
+    Declarative { Declarative }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="allocator">allocator</Item>
+    <Item Name="parent">parent</Item>
+    <Item Name="Imperative" Condition="tag == Scope_Tag_Imperative">Imperative</Item>
+    <Item Name="Declarative" Condition="tag == Scope_Tag_Declarative">Declarative</Item>
+  </Expand>
+</Type>
 <Type Name="Array_Overload">
   <Expand>
     <Item Name="[length]">data->length</Item>

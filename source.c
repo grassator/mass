@@ -94,15 +94,36 @@ expected_result_validate(
 }
 
 static inline Scope *
-scope_make(
+scope_make_declarative(
   const Allocator *allocator,
   const Scope *parent
 ) {
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
+    .tag = Scope_Tag_Declarative,
     .allocator = allocator,
     .parent = parent,
-    .map = 0,
+    .Declarative = {
+      .map = 0,
+    }
+  };
+  return scope;
+}
+
+static inline Scope *
+scope_make_imperative(
+  const Allocator *allocator,
+  const Scope *parent,
+  const Scope_Entry *scope_entry
+) {
+  Scope *scope = allocator_allocate(allocator, Scope);
+  *scope = (Scope) {
+    .tag = Scope_Tag_Imperative,
+    .allocator = allocator,
+    .parent = parent,
+    .Imperative = {
+      .entry = *scope_entry,
+    }
   };
   return scope;
 }
@@ -112,8 +133,10 @@ mass_copy_scope_exports(
   Scope *to,
   const Scope *from
 ) {
-  for (u64 i = 0; i < from->map->capacity; ++i) {
-    Scope_Map__Entry *map_entry = &from->map->entries[i];
+  assert(to->tag == Scope_Tag_Declarative);
+  assert(from->tag == Scope_Tag_Declarative);
+  for (u64 i = 0; i < from->Declarative.map->capacity; ++i) {
+    Scope_Map__Entry *map_entry = &from->Declarative.map->entries[i];
     if (!map_entry->occupied) continue;
     Scope_Entry *entry = map_entry->value;
     const Symbol *symbol = map_entry->key;
@@ -126,13 +149,23 @@ scope_print_names(
   const Scope *scope
 ) {
   for (; scope; scope = scope->parent) {
-    if (!scope->map) continue;
-    for (u64 i = 0; i < scope->map->capacity; ++i) {
-      Scope_Map__Entry *entry = &scope->map->entries[i];
-      if (entry->occupied) {
-        slice_print(entry->value->name);
+    switch (scope->tag) {
+      case Scope_Tag_Imperative: {
+        const Scope_Entry *entry = &scope->Imperative.entry;
+        slice_print(entry->name);
         printf(" ; ");
-      }
+      } break;
+      case Scope_Tag_Declarative: {
+        Scope_Map *map = scope->Declarative.map;
+        if (!map) continue;
+        for (u64 i = 0; i < map->capacity; ++i) {
+          Scope_Map__Entry *entry = &map->entries[i];
+          if (entry->occupied) {
+            slice_print(entry->value->name);
+            printf(" ; ");
+          }
+        }
+      } break;
     }
   }
   printf("\n");
@@ -143,10 +176,21 @@ scope_lookup_shallow(
   const Scope *scope,
   const Symbol *symbol
 ) {
-  if (!scope->map) return 0;
-  Scope_Entry **entry_pointer = hash_map_get(scope->map, symbol);
-  if (!entry_pointer) return 0;
-  return *entry_pointer;
+  switch (scope->tag) {
+    case Scope_Tag_Imperative: {
+      // TODO avoid cast
+      Scope_Entry *entry = (Scope_Entry *)&scope->Imperative.entry;
+      // TODO use symbols here?
+      if (slice_equal(entry->name, symbol->name)) return entry;
+    } break;
+    case Scope_Tag_Declarative: {
+      Scope_Map *map = scope->Declarative.map;
+      if (!map) return 0;
+      Scope_Entry **entry_pointer = hash_map_get(map, symbol);
+      if (entry_pointer) return *entry_pointer;
+    } break;
+  }
+  return 0;
 }
 
 static inline Scope_Entry *
@@ -1281,6 +1325,17 @@ mass_context_force_lookup(
   return scope_entry_force_value(context, entry);
 }
 
+static inline Scope *
+scope_find_nearest_declarative(
+  Scope *scope
+) {
+  // TODO avoid const cast here
+  for (; scope && scope->tag != Scope_Tag_Declarative; scope = (Scope *) scope->parent);
+  assert(scope);
+  return scope;
+}
+
+// TODO rename to `scope_define_declarative`
 static inline void
 scope_define_value(
   Scope *scope,
@@ -1289,8 +1344,9 @@ scope_define_value(
   const Symbol *symbol,
   Value *value
 ) {
-  if (!scope->map) {
-    scope->map = hash_map_make(Scope_Map, scope->allocator);
+  scope = scope_find_nearest_declarative(scope);
+  if (!scope->Declarative.map) {
+    scope->Declarative.map = hash_map_make(Scope_Map, scope->allocator);
   }
   Scope_Entry *it = scope_lookup_shallow(scope, symbol);
   if (it) {
@@ -1308,7 +1364,7 @@ scope_define_value(
       .epoch = epoch,
       .source_range = source_range,
     };
-    hash_map_set(scope->map, symbol, allocated);
+    hash_map_set(scope->Declarative.map, symbol, allocated);
   }
 }
 
@@ -2165,7 +2221,7 @@ mass_import(
       module = *module_pointer;
     } else {
       const Scope *root_scope = context->compilation->root_scope;
-      Scope *module_scope = scope_make(context->allocator, root_scope);
+      Scope *module_scope = scope_make_declarative(context->allocator, root_scope);
       module = program_module_from_file(context, file_path, module_scope);
       program_import_module(context, module);
       if (mass_has_error(context)) return 0;
@@ -2327,7 +2383,7 @@ compile_time_eval(
   Parser eval_parser = {
     .flags = Parser_Flags_None,
     .epoch = get_new_epoch(),
-    .scope = scope_make(context->allocator, parser->scope),
+    .scope = scope_make_declarative(context->allocator, parser->scope),
     .module = parser->module,
   };
   Value *expression_result_value = token_parse_expression(&eval_context, &eval_parser, view, &(u32){0}, 0);
@@ -3034,7 +3090,7 @@ mass_function_info_init_for_header_and_maybe_body(
   Temp_Mark temp_mark = context_temp_mark(&temp_context);
   Parser args_parser = {
     .flags = Parser_Flags_None,
-    .scope = scope_make(temp_context.temp_allocator, arguments_scope),
+    .scope = scope_make_declarative(temp_context.temp_allocator, arguments_scope),
   };
 
   *out_info = (Function_Info) {
@@ -3563,7 +3619,7 @@ mass_ensure_trampoline(
 
   // The code below is a specialized version of `mass_function_literal_instance_for_info`.
   // This avoids generating a literal with a text version of the body.
-  Scope *trampoline_scope = scope_make(context->allocator, context->compilation->root_scope);
+  Scope *trampoline_scope = scope_make_declarative(context->allocator, context->compilation->root_scope);
 
   Source_Range return_range;
   INIT_LITERAL_SOURCE_RANGE(&return_range, "()");
@@ -4834,9 +4890,12 @@ mass_define_stack_value_from_typed_symbol(
   //      we can probably use this info for debugging.
   //   3. Allows for redeclaration of variables similar to Rust. It is unclear if that is good
   //      long term, but it is good for experimentation at the moment.
-  Scope *block_scope_from_now_on = scope_make(context->allocator, parser->scope);
-  scope_define_value(block_scope_from_now_on, parser->epoch, source_range, typed_symbol->symbol, defined);
-  parser->scope = block_scope_from_now_on;
+  parser->scope = scope_make_imperative(context->allocator, parser->scope, &(const Scope_Entry) {
+    .value = defined,
+    .name = typed_symbol->symbol->name,
+    .epoch = parser->epoch,
+    .source_range = source_range
+  });
 
   return defined;
 }
@@ -5606,7 +5665,7 @@ mass_make_fake_function_literal(
   const Descriptor *returns,
   const Source_Range *source_range
 ) {
-  Scope *function_scope = scope_make(context->allocator, parser->scope);
+  Scope *function_scope = scope_make_declarative(context->allocator, parser->scope);
 
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
   *literal = (Function_Literal){
@@ -5675,7 +5734,7 @@ mass_parse_function_parameters(
   Value_View args_view
 ) {
   Parser arg_parser = *parser;
-  arg_parser.scope = scope_make(context->allocator, parser->scope);
+  arg_parser.scope = scope_make_declarative(context->allocator, parser->scope);
   arg_parser.epoch = get_new_epoch();
 
   Array_Function_Parameter result = (Array_Function_Parameter){&dyn_array_zero_items};
@@ -6126,6 +6185,8 @@ token_parse_block_statements(
     return mass_make_void(context, *source_range);
   }
   Value *block_result = 0;
+  Scope *block_declarative_scope = parser->scope;
+  assert(block_declarative_scope->tag == Scope_Tag_Declarative);
 
   Temp_Mark temp_mark = context_temp_mark(context);
   Array_Value_Ptr temp_lazy_statements = dyn_array_make(
@@ -6178,7 +6239,7 @@ token_parse_block_statements(
     if (mass_value_is_static(parse_result)) {
       if (parse_result->descriptor == &descriptor_ast_using) {
         const Module *module = value_as_ast_using(parse_result)->module;
-        mass_copy_scope_exports(parser->scope, module->exports.scope);
+        mass_copy_scope_exports(block_declarative_scope, module->exports.scope);
         continue;
       } else if (parse_result->descriptor == &descriptor_ast_return) {
         last_statement_was_return = true;
@@ -6267,7 +6328,7 @@ token_parse_block(
   const Source_Range *source_range
 ) {
   Parser block_parser = *parser;
-  block_parser.scope = scope_make(context->allocator, parser->scope);
+  block_parser.scope = scope_make_declarative(context->allocator, parser->scope);
   return token_parse_block_statements(context, &block_parser, group->first_statement, source_range);
 }
 
@@ -6358,9 +6419,12 @@ token_define_local_variable(
   const Source_Range *source_range = &symbol->source_range;
 
   // :ScopeForEachDeclaration
-  Scope *block_scope_from_now_on = scope_make(context->allocator, parser->scope);
-  scope_define_value(block_scope_from_now_on, parser->epoch, *source_range, value_as_symbol(symbol), variable_value);
-  parser->scope = block_scope_from_now_on;
+  parser->scope = scope_make_imperative(context->allocator, parser->scope, &(const Scope_Entry) {
+    .value = variable_value,
+    .name = value_as_symbol(symbol)->name,
+    .epoch = parser->epoch,
+    .source_range = *source_range
+  });
 
   Assignment *assignment = mass_allocate(context, Assignment);
   *assignment = (Assignment) {
@@ -6401,7 +6465,7 @@ scope_define_enum(
   u64 item_count
 ) {
   const Allocator *allocator = compilation->allocator;
-  Scope *enum_scope = scope_make(allocator, 0);
+  Scope *enum_scope = scope_make_declarative(allocator, 0);
   const Descriptor *enum_descriptor = value_as_type(enum_type_value)->descriptor;
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
@@ -6434,9 +6498,9 @@ mass_compilation_init_scopes(
 ) {
   Mass_Context context = mass_context_from_compilation(compilation);
   const Allocator *allocator = compilation->allocator;
-  Scope *root_scope =  scope_make(compilation->allocator, 0);
+  Scope *root_scope =  scope_make_declarative(compilation->allocator, 0);
   compilation->root_scope = root_scope;
-  Scope *module_scope = scope_make(allocator, root_scope);
+  Scope *module_scope = scope_make_declarative(allocator, root_scope);
   compilation->compiler_module = (Module) {
     .source_range = {0},
     .own_scope = module_scope,
@@ -6563,7 +6627,7 @@ module_process_exports(
       module->exports.scope = module->own_scope;
     } break;
     case Module_Exports_Tag_Selective: {
-      module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
+      module->exports.scope = scope_make_declarative(context->allocator, module->own_scope->parent);
 
       const Tuple *tuple = module->exports.Selective.tuple;
       for (u64 tuple_index = 0; tuple_index < dyn_array_length(tuple->items); ++tuple_index) {
@@ -6607,7 +6671,7 @@ mass_inline_module(
   Module *module = mass_allocate(context, Module);
   *module = (Module) {
     .source_range = args.source_range,
-    .own_scope = scope_make(context->allocator, parser->scope),
+    .own_scope = scope_make_declarative(context->allocator, parser->scope),
   };
   Parser module_parser = {
     .flags = Parser_Flags_Global,

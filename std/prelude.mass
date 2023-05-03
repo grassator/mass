@@ -561,7 +561,7 @@ c_enum :: fn(item_type : Type, tuple : MASS.Tuple) => (Type) intrinsic {
   item_descriptor := type_descriptor(item_type)
   tuple := meta.reify(arguments.1, MASS.Tuple)
 
-  enum_scope := MASS.scope_make(context.allocator, 0)
+  enum_scope := MASS.scope_make_declarative(context.allocator, 0)
   enum_module := allocate(context.allocator, MASS.Module)
   enum_module.* = [
     .source_range = arguments.source_range,

@@ -1638,10 +1638,16 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
-  export_compiler(push_type(type_struct("Scope", (Struct_Item[]){
+  export_compiler(push_type(add_common_fields(type_union("Scope", (Struct_Type[]){
+    struct_fields("Imperative", (Struct_Item[]){
+      { "Scope_Entry", "entry" },
+    }),
+    struct_fields("Declarative", (Struct_Item[]){
+      { "Scope_Map *", "map" },
+    }),
+  }), (Struct_Item[]){
     { "const Allocator *", "allocator" },
     { "const Scope *", "parent" },
-    { "Scope_Map *", "map" },
   })));
 
   push_type(type_struct("Overload", (Struct_Item[]){
@@ -2311,7 +2317,15 @@ main(void) {
   ));
 
   export_compiler(push_type(
-    type_function(Default, "scope_make", "Scope *", (Argument_Type[]){
+    type_function(Default, "scope_make_imperative", "Scope *", (Argument_Type[]){
+      { "const Allocator *", "allocator" },
+      { "const Scope *", "parent" },
+      { "const Scope_Entry *", "entry" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "scope_make_declarative", "Scope *", (Argument_Type[]){
       { "const Allocator *", "allocator" },
       { "const Scope *", "parent" },
     })

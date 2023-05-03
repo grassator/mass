@@ -563,7 +563,7 @@ mass_infer_function_return_type(
   const Scope *scope,
   Value *body
 ) {
-  Scope *body_scope = scope_make(context->allocator, scope);
+  Scope *body_scope = scope_make_declarative(context->allocator, scope);
   const Descriptor *return_descriptor = 0; // Inferred
   Parser body_parser = {
     .return_descriptor_pointer = &return_descriptor,
@@ -664,7 +664,7 @@ mass_function_literal_instance_for_info(
   dyn_array_push(literal->instances, cached_instance);
 
   const Descriptor *return_descriptor = fn_info->return_descriptor;
-  Scope *body_scope = scope_make(context->allocator, literal->own_scope);
+  Scope *body_scope = scope_make_declarative(context->allocator, literal->own_scope);
   Parser body_parser = {
     .return_descriptor_pointer = &return_descriptor,
     .flags = Parser_Flags_None,

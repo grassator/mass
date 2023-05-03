@@ -283,6 +283,27 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Scope")),
     type_scope_value
   );
+  Source_Range Scope_Tag__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Scope_Tag__source_range, "Scope_Tag");
+  scope_define_enum(
+    compilation, scope, Scope_Tag__source_range,
+    slice_literal("Scope_Tag"), type_scope_tag_value,
+    scope_tag_items, countof(scope_tag_items)
+  );
+  Source_Range Scope_Imperative__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Scope_Imperative__source_range, "Scope_Imperative");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Scope_Imperative__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Scope_Imperative")),
+    type_scope_imperative_value
+  );
+  Source_Range Scope_Declarative__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Scope_Declarative__source_range, "Scope_Declarative");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Scope_Declarative__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Scope_Declarative")),
+    type_scope_declarative_value
+  );
   Source_Range Value_Flags__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Value_Flags__source_range, "Value_Flags");
   scope_define_enum(
@@ -1165,7 +1186,23 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    scope_make, "scope_make", &descriptor_scope_pointer,
+    scope_make_imperative, "scope_make_imperative", &descriptor_scope_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parent")),
+      .descriptor = &descriptor_scope_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("entry")),
+      .descriptor = &descriptor_scope_entry_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    scope_make_declarative, "scope_make_declarative", &descriptor_scope_pointer,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
       .descriptor = &descriptor_allocator_pointer

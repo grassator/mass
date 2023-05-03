@@ -219,7 +219,7 @@ spec("source") {
         allocator_allocate(test_context.allocator, Value),
         &descriptor_i64, imm64(42), (Source_Range){0}
       );
-      Scope *root_scope = scope_make(test_context.allocator, 0);
+      Scope *root_scope = scope_make_declarative(test_context.allocator, 0);
       const Symbol *symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       scope_define_value(root_scope, (Epoch){0}, (Source_Range){0}, symbol, test);
       Scope_Entry *entry = scope_lookup(root_scope, symbol);
@@ -231,7 +231,7 @@ spec("source") {
         allocator_allocate(test_context.allocator, Value),
         &descriptor_i64, imm64(42), (Source_Range){0}
       );
-      Scope *root_scope = scope_make(test_context.allocator, 0);
+      Scope *root_scope = scope_make_declarative(test_context.allocator, 0);
       const Symbol *global_symbol = mass_ensure_symbol(&test_compilation, slice_literal("global"));
       scope_define_value(root_scope, (Epoch){0}, (Source_Range){0}, global_symbol, global);
 
@@ -240,14 +240,14 @@ spec("source") {
         allocator_allocate(test_context.allocator, Value),
         &descriptor_i64, imm64(1), (Source_Range){0}
       );
-      Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
+      Scope *scope_level_1 = scope_make_declarative(test_context.allocator, root_scope);
       scope_define_value(scope_level_1, (Epoch){0}, (Source_Range){0}, test_symbol, level_1_test);
 
       Value *level_2_test = value_init(
         allocator_allocate(test_context.allocator, Value),
         &descriptor_i64, imm64(2), (Source_Range){0}
       );
-      Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
+      Scope *scope_level_2 = scope_make_declarative(test_context.allocator, scope_level_1);
       scope_define_value(scope_level_2, (Epoch){0}, (Source_Range){0}, test_symbol,  level_2_test);
 
       Scope_Entry *entry = scope_lookup(scope_level_2, global_symbol);

@@ -429,6 +429,8 @@ typedef struct Operator_Map Operator_Map;
 typedef struct Operator_Symbol_Map Operator_Symbol_Map;
 
 typedef struct Scope Scope;
+typedef struct Scope_Imperative Scope_Imperative;
+typedef struct Scope_Declarative Scope_Declarative;
 typedef dyn_array_type(Scope *) Array_Scope_Ptr;
 typedef dyn_array_type(const Scope *) Array_Const_Scope_Ptr;
 
@@ -911,7 +913,10 @@ static Value * mass_tuple_get
 static const Descriptor * descriptor_pointer_to
   (Compilation * compilation, const Descriptor * descriptor);
 
-static Scope * scope_make
+static Scope * scope_make_imperative
+  (const Allocator * allocator, const Scope * parent, const Scope_Entry * entry);
+
+static Scope * scope_make_declarative
   (const Allocator * allocator, const Scope * parent);
 
 static const Symbol * mass_ensure_symbol
@@ -1667,13 +1672,43 @@ typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
 hash_map_template(Operator_Map, const Symbol *, Operator *, hash_pointer, const_void_pointer_equal)
 hash_map_template(Operator_Symbol_Map, const Symbol *, const Symbol *, hash_pointer, const_void_pointer_equal)
+typedef enum {
+  Scope_Tag_Imperative = 0,
+  Scope_Tag_Declarative = 1,
+} Scope_Tag;
+
+const char *scope_tag_name(Scope_Tag value) {
+  if (value == 0) return "Scope_Imperative";
+  if (value == 1) return "Scope_Declarative";
+  return "<unknown value>";}
+
+typedef struct Scope_Imperative {
+  Scope_Entry entry;
+} Scope_Imperative;
+typedef struct Scope_Declarative {
+  Scope_Map * map;
+} Scope_Declarative;
 typedef struct Scope {
+  Scope_Tag tag;
+  char _tag_padding[4];
   const Allocator * allocator;
   const Scope * parent;
-  Scope_Map * map;
+  union {
+    Scope_Imperative Imperative;
+    Scope_Declarative Declarative;
+  };
 } Scope;
+static inline const Scope_Imperative *
+scope_as_imperative(const Scope *scope) {
+  assert(scope->tag == Scope_Tag_Imperative);
+  return &scope->Imperative;
+}
+static inline const Scope_Declarative *
+scope_as_declarative(const Scope *scope) {
+  assert(scope->tag == Scope_Tag_Declarative);
+  return &scope->Declarative;
+}
 typedef dyn_array_type(Scope) Array_Scope;
-
 typedef struct Overload {
   Value * value;
   Value * next;
@@ -2789,6 +2824,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(operator_symbol_map, Operator_Symbol_Map);
 static Descriptor descriptor_scope;
 static Descriptor descriptor_array_scope;
 static Descriptor descriptor_array_scope_ptr;
+static Descriptor descriptor_array_const_scope_ptr;
 static Descriptor descriptor_scope_pointer;
 static Descriptor descriptor_scope_pointer_pointer;
 static Descriptor descriptor_overload;
@@ -3089,7 +3125,8 @@ static Descriptor descriptor_mass_constraint_function_instance_type;
 static Descriptor descriptor_mass_tuple_length;
 static Descriptor descriptor_mass_tuple_get;
 static Descriptor descriptor_descriptor_pointer_to;
-static Descriptor descriptor_scope_make;
+static Descriptor descriptor_scope_make_imperative;
+static Descriptor descriptor_scope_make_declarative;
 static Descriptor descriptor_mass_ensure_symbol;
 static Descriptor descriptor_scope_define_value;
 static Descriptor descriptor_same_type;
@@ -4552,7 +4589,36 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_entry_ptr, scope_entry_pointer, Array_S
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_entry, scope_entry, Array_Scope_Entry);
 DEFINE_VALUE_IS_AS_HELPERS(Scope_Entry, scope_entry);
 DEFINE_VALUE_IS_AS_HELPERS(Scope_Entry *, scope_entry_pointer);
+/*union struct start */
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_ptr, scope_pointer, Array_Scope_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope, scope, Array_Scope);
+MASS_DEFINE_OPAQUE_C_TYPE(scope_tag, Scope_Tag)
+static C_Enum_Item scope_tag_items[] = {
+{ .name = slice_literal_fields("Imperative"), .value = 0 },
+{ .name = slice_literal_fields("Declarative"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(scope_imperative, Scope_Imperative,
+  {
+    .descriptor = &descriptor_scope_entry,
+    .name = slice_literal_fields("entry"),
+    .offset = offsetof(Scope_Imperative, entry),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(scope_imperative);
+MASS_DEFINE_STRUCT_DESCRIPTOR(scope_declarative, Scope_Declarative,
+  {
+    .descriptor = &descriptor_scope_map_pointer,
+    .name = slice_literal_fields("map"),
+    .offset = offsetof(Scope_Declarative, map),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(scope_declarative);
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
+  {
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_scope_tag,
+    .offset = offsetof(Scope, tag),
+  },
   {
     .descriptor = &descriptor_allocator_pointer,
     .name = slice_literal_fields("allocator"),
@@ -4564,16 +4630,20 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
     .offset = offsetof(Scope, parent),
   },
   {
-    .descriptor = &descriptor_scope_map_pointer,
-    .name = slice_literal_fields("map"),
-    .offset = offsetof(Scope, map),
+    .name = slice_literal_fields("Imperative"),
+    .descriptor = &descriptor_scope_imperative,
+    .offset = offsetof(Scope, Imperative),
+  },
+  {
+    .name = slice_literal_fields("Declarative"),
+    .descriptor = &descriptor_scope_declarative,
+    .offset = offsetof(Scope, Declarative),
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope);
-MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope_ptr, scope_pointer, Array_Scope_Ptr);
-MASS_DEFINE_C_DYN_ARRAY_TYPE(array_scope, scope, Array_Scope);
 DEFINE_VALUE_IS_AS_HELPERS(Scope, scope);
 DEFINE_VALUE_IS_AS_HELPERS(Scope *, scope_pointer);
+/*union struct end*/
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload, Overload,
   {
     .descriptor = &descriptor_value_pointer,
