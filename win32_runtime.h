@@ -361,7 +361,12 @@ mass_debug_print_value(
     case Storage_Tag_Memory: {
       switch (storage->Memory.location.tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          printf("TODO RIP relative addressing");
+          const Memory_Location_Instruction_Pointer_Relative *rip_relative =
+            &storage->Memory.location.Instruction_Pointer_Relative;
+          Label *label = rip_relative->label;
+          assert(label->resolved);
+          assert(label->section);
+          printf("TODO support RIP-relative storage");
         } break;
         case Memory_Location_Tag_Indirect: {
           const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
