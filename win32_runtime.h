@@ -285,6 +285,174 @@ win32_debugger_maybe_scope_for_address(
   return 0;
 }
 
+static const void *
+win32_debugger_register_memory(
+  CONTEXT *ContextRecord,
+  Register reg
+) {
+  switch (reg) {
+    case Register_A: return &ContextRecord->Rax;
+    case Register_C: return &ContextRecord->Rcx;
+    case Register_D: return &ContextRecord->Rdx;
+    case Register_B: return &ContextRecord->Rbx;
+    case Register_SP: return &ContextRecord->Rsp;
+    case Register_BP: return &ContextRecord->Rbp;
+    case Register_SI: return &ContextRecord->Rsi;
+    case Register_DI: return &ContextRecord->Rdi;
+    case Register_R8: return &ContextRecord->R8;
+    case Register_R9: return &ContextRecord->R9;
+    case Register_R10: return &ContextRecord->R10;
+    case Register_R11: return &ContextRecord->R11;
+    case Register_R12: return &ContextRecord->R12;
+    case Register_R13: return &ContextRecord->R13;
+    case Register_R14: return &ContextRecord->R14;
+    case Register_R15: return &ContextRecord->R15;
+    default: assert(!"Unknown general purpose register index"); break;
+  }
+  return 0;
+}
+
+static void
+mass_debug_print_value(
+  CONTEXT *ContextRecord,
+  Value *value
+) {
+  assert(value->tag == Value_Tag_Forced);
+  const Storage *storage = &value->Forced.storage;
+  const void *memory = 0;
+  switch (storage->tag) {
+    case Storage_Tag_Immediate: {
+      memory = &storage->Immediate.bits;
+    } break;
+    case Storage_Tag_Eflags: {
+      // TODO storage->Eflags.compare_type
+      memory = &ContextRecord->EFlags;
+    } break;
+    case Storage_Tag_Register: {
+      memory = win32_debugger_register_memory(ContextRecord, storage->Register.index);
+      assert(storage->Register.offset_in_bits % 8 == 0);
+      memory = ((u8 *)memory) + (storage->Register.offset_in_bits / 8);
+    } break;
+    case Storage_Tag_Xmm: {
+      switch (storage->Xmm.index) {
+        case Register_Xmm0: memory = &ContextRecord->Xmm0; break;
+        case Register_Xmm1: memory = &ContextRecord->Xmm1; break;
+        case Register_Xmm2: memory = &ContextRecord->Xmm2; break;
+        case Register_Xmm3: memory = &ContextRecord->Xmm3; break;
+        case Register_Xmm4: memory = &ContextRecord->Xmm4; break;
+        case Register_Xmm5: memory = &ContextRecord->Xmm5; break;
+        case Register_Xmm6: memory = &ContextRecord->Xmm6; break;
+        case Register_Xmm7: memory = &ContextRecord->Xmm7; break;
+        case Register_Xmm8: memory = &ContextRecord->Xmm8; break;
+        case Register_Xmm9: memory = &ContextRecord->Xmm9; break;
+        case Register_Xmm10: memory = &ContextRecord->Xmm10; break;
+        case Register_Xmm11: memory = &ContextRecord->Xmm11; break;
+        case Register_Xmm12: memory = &ContextRecord->Xmm12; break;
+        case Register_Xmm13: memory = &ContextRecord->Xmm13; break;
+        case Register_Xmm14: memory = &ContextRecord->Xmm14; break;
+        case Register_Xmm15: memory = &ContextRecord->Xmm15; break;
+        default: assert(!"Unknown XMM register index"); break;
+      }
+    } break;
+    case Storage_Tag_Static: {
+      printf("TODO support static storage");
+      return;
+    }
+    case Storage_Tag_Memory: {
+      switch (storage->Memory.location.tag) {
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          printf("TODO RIP relative addressing");
+        } break;
+        case Memory_Location_Tag_Indirect: {
+          const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
+          memory = win32_debugger_register_memory(ContextRecord, indirect->base_register);
+          memory = ((u8 *)memory) + indirect->offset;
+        } break;
+        case Memory_Location_Tag_Stack: {
+          const Memory_Location_Stack *stack = &storage->Memory.location.Stack;
+          switch (stack->area) {
+            case Stack_Area_Local: {
+              memory = win32_debugger_register_memory(ContextRecord, Register_SP);
+              memory = ((u8 *)memory) + stack->offset;
+            } break;
+            case Stack_Area_Received_Argument: {
+              printf("TODO support stack argument storage");
+            } break;
+            case Stack_Area_Call_Target_Argument: {
+              assert("Got an unexpected call target argument stack storage");
+            } break;
+          }
+        } break;
+      }
+    } break;
+    case Storage_Tag_Disjoint: {
+      printf("TODO support disjoint storage");
+      return;
+    }
+  }
+  const Descriptor *descriptor = value->descriptor;
+  u64 byte_size = descriptor_byte_size(descriptor);
+  switch (descriptor->tag) {
+    case Descriptor_Tag_Void: {
+      assert(byte_size == 0);
+      printf("<void>");
+    } break;
+    case Descriptor_Tag_Never: {
+      assert(byte_size == 0);
+      printf("<never>");
+    } break;
+    case Descriptor_Tag_Raw: {
+      printf("<raw>[");
+      for (u64 i = 0; i < byte_size; ++i) {
+        const char *space = i == 0 ? "" : " ";
+        printf("%s%02x", space, ((u8 *)memory)[i]);
+      }
+      printf("]");
+    } break;
+    case Descriptor_Tag_Float: {
+      if (byte_size == 8) {
+        printf("%f", *(f64 *)memory);
+      } else if (byte_size == 4) {
+        printf("%f", *(f32 *)memory);
+      } else {
+        assert(!"Unsupported float byte size");
+      }
+    } break;
+    case Descriptor_Tag_Integer: {
+      if (descriptor->Integer.is_signed) {
+        switch (byte_size) {
+          case 1: printf("%"PRIs8"", *(s8 *)memory); break;
+          case 2: printf("%"PRIs16"", *(s16 *)memory); break;
+          case 4: printf("%"PRIs32"", *(s32 *)memory); break;
+          case 8: printf("%"PRIs64"", *(s64 *)memory); break;
+          default: assert(!"Unsupported integer byte size"); break;
+        }
+      } else {
+        switch (byte_size) {
+          case 1: printf("%"PRIu8"", *(u8 *)memory); break;
+          case 2: printf("%"PRIu16"", *(u16 *)memory); break;
+          case 4: printf("%"PRIu32"", *(u32 *)memory); break;
+          case 8: printf("%"PRIu64"", *(u64 *)memory); break;
+          default: assert(!"Unsupported integer byte size"); break;
+        }
+      }
+    } break;
+    case Descriptor_Tag_Function_Instance: {
+      printf("TODO support function instances");
+    } break;
+    case Descriptor_Tag_Fixed_Array: {
+      printf("TODO support array");
+    } break;
+    case Descriptor_Tag_Struct: {
+      printf("TODO support structs");
+    } break;
+    case Descriptor_Tag_Pointer_To: {
+      printf("TODO support pointer types");
+    } break;
+  }
+  printf("\n");
+}
+
 static void
 win32_debugger_loop(
   CONTEXT *ContextRecord,
@@ -336,7 +504,7 @@ win32_debugger_loop(
         Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
         Value *value = scope_entry->value;
         if (value) {
-          printf("TODO support printing of values\n");
+          mass_debug_print_value(ContextRecord, value);
         } else {
           printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
         }
