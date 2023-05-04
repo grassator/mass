@@ -507,9 +507,8 @@ win32_debugger_loop(
       if (maybe_scope) {
         const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
         Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
-        Value *value = scope_entry->value;
-        if (value) {
-          mass_debug_print_value(ContextRecord, value);
+        if (scope_entry) {
+          mass_debug_print_value(ContextRecord, scope_entry->value);
         } else {
           printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
         }
