@@ -1050,7 +1050,6 @@ mass_assign_helper(
         .expression = source,
       };
       Expected_Result expected_result = expected_result_any(target->descriptor);
-      const Scope *scope = 0; // FIXME provide a scope here
       source = mass_cast_lazy_proc(context, builder, &expected_result, scope, source_range, &lazy_payload);
       if (mass_has_error(context)) return;
       source_storage = &value_as_forced(source)->storage;
