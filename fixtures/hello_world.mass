@@ -5,11 +5,5 @@ main :: fn() -> () {
   message :: "Hello, World!\n"
   io.print(message)
 
-  {
-    i : s64 = -21 - 21
-
-    unreachable()
-  }
-
   process.exit(0)
 }
