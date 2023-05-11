@@ -312,6 +312,94 @@ win32_debugger_register_memory(
   return 0;
 }
 
+// TODO catch cycles
+static void
+mass_print_value_with_descriptor_and_memory(
+  const Descriptor *descriptor,
+  const u8 *memory,
+  u64 depth
+) {
+  if (depth > 5) {
+    printf("<...>");
+    return;
+  }
+  u64 byte_size = descriptor_byte_size(descriptor);
+  switch (descriptor->tag) {
+    case Descriptor_Tag_Void: {
+      assert(byte_size == 0);
+      printf("<void>");
+    } break;
+    case Descriptor_Tag_Never: {
+      assert(byte_size == 0);
+      printf("<never>");
+    } break;
+    case Descriptor_Tag_Raw: {
+      printf("<raw>[");
+      for (u64 i = 0; i < byte_size; ++i) {
+        const char *space = i == 0 ? "" : " ";
+        printf("%s%02x", space, ((u8 *)memory)[i]);
+      }
+      printf("]");
+    } break;
+    case Descriptor_Tag_Float: {
+      if (byte_size == 8) {
+        printf("%f", *(f64 *)memory);
+      } else if (byte_size == 4) {
+        printf("%f", *(f32 *)memory);
+      } else {
+        assert(!"Unsupported float byte size");
+      }
+    } break;
+    case Descriptor_Tag_Integer: {
+      if (descriptor->Integer.is_signed) {
+        switch (byte_size) {
+          case 1: printf("%"PRIs8"", *(s8 *)memory); break;
+          case 2: printf("%"PRIs16"", *(s16 *)memory); break;
+          case 4: printf("%"PRIs32"", *(s32 *)memory); break;
+          case 8: printf("%"PRIs64"", *(s64 *)memory); break;
+          default: assert(!"Unsupported integer byte size"); break;
+        }
+      } else {
+        switch (byte_size) {
+          case 1: printf("%"PRIu8"", *(u8 *)memory); break;
+          case 2: printf("%"PRIu16"", *(u16 *)memory); break;
+          case 4: printf("%"PRIu32"", *(u32 *)memory); break;
+          case 8: printf("%"PRIu64"", *(u64 *)memory); break;
+          default: assert(!"Unsupported integer byte size"); break;
+        }
+      }
+    } break;
+    case Descriptor_Tag_Function_Instance: {
+      printf("TODO support function instances");
+    } break;
+    case Descriptor_Tag_Fixed_Array: {
+      printf("[");
+      const Descriptor *item_descriptor = descriptor->Fixed_Array.item;
+      u64 item_byte_size = descriptor_byte_size(item_descriptor);
+      for (u64 i = 0; i < descriptor->Fixed_Array.length; ++i) {
+        if (i != 0) printf(", ");
+        const u8 *field_memory = memory + item_byte_size * i;
+        mass_print_value_with_descriptor_and_memory(item_descriptor, field_memory, depth + 1);
+      }
+      printf("]");
+    } break;
+    case Descriptor_Tag_Struct: {
+      printf("[");
+      for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
+        if (i != 0) printf(", ");
+        const Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+        printf(".%"PRIslice" = ", SLICE_EXPAND_PRINTF(field->name));
+        const u8 *field_memory = memory + field->offset;
+        mass_print_value_with_descriptor_and_memory(field->descriptor, field_memory, depth + 1);
+      }
+      printf("]");
+    } break;
+    case Descriptor_Tag_Pointer_To: {
+      printf("TODO support pointer types");
+    } break;
+  }
+}
+
 static void
 mass_debug_print_value(
   CONTEXT *ContextRecord,
@@ -397,66 +485,7 @@ mass_debug_print_value(
       return;
     }
   }
-  const Descriptor *descriptor = value->descriptor;
-  u64 byte_size = descriptor_byte_size(descriptor);
-  switch (descriptor->tag) {
-    case Descriptor_Tag_Void: {
-      assert(byte_size == 0);
-      printf("<void>");
-    } break;
-    case Descriptor_Tag_Never: {
-      assert(byte_size == 0);
-      printf("<never>");
-    } break;
-    case Descriptor_Tag_Raw: {
-      printf("<raw>[");
-      for (u64 i = 0; i < byte_size; ++i) {
-        const char *space = i == 0 ? "" : " ";
-        printf("%s%02x", space, ((u8 *)memory)[i]);
-      }
-      printf("]");
-    } break;
-    case Descriptor_Tag_Float: {
-      if (byte_size == 8) {
-        printf("%f", *(f64 *)memory);
-      } else if (byte_size == 4) {
-        printf("%f", *(f32 *)memory);
-      } else {
-        assert(!"Unsupported float byte size");
-      }
-    } break;
-    case Descriptor_Tag_Integer: {
-      if (descriptor->Integer.is_signed) {
-        switch (byte_size) {
-          case 1: printf("%"PRIs8"", *(s8 *)memory); break;
-          case 2: printf("%"PRIs16"", *(s16 *)memory); break;
-          case 4: printf("%"PRIs32"", *(s32 *)memory); break;
-          case 8: printf("%"PRIs64"", *(s64 *)memory); break;
-          default: assert(!"Unsupported integer byte size"); break;
-        }
-      } else {
-        switch (byte_size) {
-          case 1: printf("%"PRIu8"", *(u8 *)memory); break;
-          case 2: printf("%"PRIu16"", *(u16 *)memory); break;
-          case 4: printf("%"PRIu32"", *(u32 *)memory); break;
-          case 8: printf("%"PRIu64"", *(u64 *)memory); break;
-          default: assert(!"Unsupported integer byte size"); break;
-        }
-      }
-    } break;
-    case Descriptor_Tag_Function_Instance: {
-      printf("TODO support function instances");
-    } break;
-    case Descriptor_Tag_Fixed_Array: {
-      printf("TODO support array");
-    } break;
-    case Descriptor_Tag_Struct: {
-      printf("TODO support structs");
-    } break;
-    case Descriptor_Tag_Pointer_To: {
-      printf("TODO support pointer types");
-    } break;
-  }
+  mass_print_value_with_descriptor_and_memory(value->descriptor, memory, 0);
   printf("\n");
 }
 
