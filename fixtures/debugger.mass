@@ -1,7 +1,8 @@
 main :: fn() -> () {
   process :: import("std/process")
-  foo := [ .a = cast(s64, 42), .b = [ .nested = cast(s64, 9) ] ]
+  struct := [ .a = cast(s64, 42), .b = [ .nested = cast(s64, 9) ] ]
   arr : s64 * 2 = [1, 2]
+  f := fn(x : s64) -> () { }
   unreachable()
 
   process.exit(0)

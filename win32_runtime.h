@@ -370,7 +370,13 @@ mass_print_value_with_descriptor_and_memory(
       }
     } break;
     case Descriptor_Tag_Function_Instance: {
-      printf("TODO support function instances");
+      Bucket_Buffer *buffer = bucket_buffer_make();
+      mass_append_function_signature_string(buffer, descriptor->Function_Instance.info);
+      Fixed_Buffer *fixed_buffer = bucket_buffer_to_fixed_buffer(allocator_default, buffer);
+      bucket_buffer_destroy(buffer);
+      Slice slice = fixed_buffer_slice(fixed_buffer, (Range_u64){0, fixed_buffer->occupied});
+      printf("%"PRIslice"", SLICE_EXPAND_PRINTF(slice));
+      fixed_buffer_destroy(fixed_buffer);
     } break;
     case Descriptor_Tag_Fixed_Array: {
       printf("[");
