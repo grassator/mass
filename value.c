@@ -69,7 +69,7 @@ mass_error_append_descriptor(
 );
 
 static void
-mass_error_append_function_signature_string(
+mass_append_function_signature_string(
   Bucket_Buffer *result,
   const Function_Info *info
 ) {
@@ -150,7 +150,7 @@ mass_error_append_descriptor(
       bucket_buffer_append(result, "]");
     } break;
     case Descriptor_Tag_Function_Instance: {
-      mass_error_append_function_signature_string(result, descriptor->Function_Instance.info);
+      mass_append_function_signature_string(result, descriptor->Function_Instance.info);
     } break;
   }
 }
@@ -285,7 +285,7 @@ mass_error_to_string(
       for (u64 i = 0; i < dyn_array_length(overloads->matches); ++i) {
         if (i != 0) bucket_buffer_append(buffer, "\n  ");
         const Undecidable_Match *match = dyn_array_get(overloads->matches, i);
-        mass_error_append_function_signature_string(buffer, match->info);
+        mass_append_function_signature_string(buffer, match->info);
       }
     } break;
     case Mass_Error_Tag_Non_Function_Overload: {
