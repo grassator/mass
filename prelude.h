@@ -3668,6 +3668,30 @@ bucket_buffer_append_slice(
   return (Slice){.bytes = (char *)bytes, .length = slice.length};
 }
 
+static inline Slice
+bucket_buffer_append_c_string_no_null(
+  Bucket_Buffer *buffer,
+  const char *string
+) {
+  Slice result = {0};
+  if (!string[0]) return result;
+  u64 length = strlen(string);
+  s8 *bytes = bucket_buffer_allocate_bytes(buffer, length, 1);
+  memcpy(bytes, string, length);
+  return (Slice){.bytes = (char *)bytes, .length = length};
+}
+
+#define bucket_buffer_append(buffer, x) _Generic((x),           \
+  u8: bucket_buffer_append_u8, u16: bucket_buffer_append_u16,   \
+  u32: bucket_buffer_append_u32, u64: bucket_buffer_append_u64, \
+  s8: bucket_buffer_append_s8, s16: bucket_buffer_append_s16,   \
+  s32: bucket_buffer_append_s32, s64: bucket_buffer_append_s64, \
+  f32: bucket_buffer_append_f32, f64: bucket_buffer_append_f64, \
+  char *: bucket_buffer_append_c_string_no_null,                \
+  const char *: bucket_buffer_append_c_string_no_null,          \
+  Slice: bucket_buffer_append_slice                             \
+)((buffer), (x))
+
 static inline s64
 bucket_buffer_pointer_to_offset(
   const Bucket_Buffer *buffer,
