@@ -60,116 +60,94 @@ source_range_print_start_position(
   slice_print(file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
-#define APPEND_SLICE(...)\
-  fixed_buffer_resizing_append_slice(&result, (__VA_ARGS__))
-#define APPEND_LITERAL(_STRING_)\
-  APPEND_SLICE(slice_literal(_STRING_))
-
 
 static void
-mass_error_append_descriptor_impl(
-  Fixed_Buffer *result,
+mass_error_append_descriptor(
+  Bucket_Buffer *result,
   const Descriptor *descriptor,
   u64 level
 );
 
-#define mass_error_append_descriptor(...)\
-  mass_error_append_descriptor_impl(__VA_ARGS__, 0)
-
 static void
 mass_error_append_function_signature_string(
-  Fixed_Buffer *result,
+  Bucket_Buffer *result,
   const Function_Info *info
 ) {
-  APPEND_LITERAL("(");
-  bool first = true;
-  DYN_ARRAY_FOREACH(Resolved_Function_Parameter, arg, info->parameters) {
-    if (first) first = false;
-    else APPEND_LITERAL(", ");
-    APPEND_SLICE(arg->symbol->name);
-    APPEND_LITERAL(" : ");
-    mass_error_append_descriptor(result, arg->descriptor);
+  bucket_buffer_append(result, "(");
+  for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
+    Resolved_Function_Parameter *arg = dyn_array_get(info->parameters, i);
+    if (i != 0) bucket_buffer_append(result, ", ");
+    bucket_buffer_append(result, arg->symbol->name);
+    bucket_buffer_append(result, " : ");
+    mass_error_append_descriptor(result, arg->descriptor, 1);
   }
-  APPEND_LITERAL(")");
-  if (info->flags & Function_Info_Flags_Compile_Time) {
-    APPEND_LITERAL(" => ");
-  } else {
-    APPEND_LITERAL(" -> ");
-  }
+  bucket_buffer_append(result, ")");
+  const char *arrow = info->flags & Function_Info_Flags_Compile_Time ? " => " : " -> ";
+  bucket_buffer_append(result, arrow);
   if (info->return_descriptor) {
-    mass_error_append_descriptor(result, info->return_descriptor);
+    mass_error_append_descriptor(result, info->return_descriptor, 1);
   } else {
-    APPEND_LITERAL("_");
+    bucket_buffer_append(result, "_");
   }
 }
 
 static void
-mass_error_append_descriptor_impl(
-  Fixed_Buffer *result,
+mass_error_append_descriptor(
+  Bucket_Buffer *result,
   const Descriptor *descriptor,
   u64 level
 ) {
   if (descriptor->brand) {
-    APPEND_SLICE(descriptor->brand->name);
+    bucket_buffer_append(result, descriptor->brand->name);
     return;
   }
   if (level > 3) {
-    APPEND_LITERAL("..");
+    bucket_buffer_append(result, "..");
     return;
   }
   char print_buffer[32] = {0};
   switch(descriptor->tag) {
     case Descriptor_Tag_Void: {
-      APPEND_LITERAL("()");
+      bucket_buffer_append(result, "()");
     } break;
     case Descriptor_Tag_Never: {
-      APPEND_LITERAL("never");
+      bucket_buffer_append(result, "Never");
     } break;
     case Descriptor_Tag_Integer:
     case Descriptor_Tag_Float: {
-      APPEND_LITERAL("<");
-      if (descriptor->tag == Descriptor_Tag_Float) {
-        APPEND_LITERAL("f");
-      } else {
-        if (descriptor->Integer.is_signed) {
-          APPEND_LITERAL("s");
-        } else {
-          APPEND_LITERAL("u");
-        }
-      }
+      const char *prefix = descriptor->tag == Descriptor_Tag_Float ? "f" : descriptor->Integer.is_signed ? "s" : "u";
+      bucket_buffer_append(result, prefix);
       u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
-      APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
-      APPEND_LITERAL(">");
+      bucket_buffer_append(result, print_buffer);
     } break;
     case Descriptor_Tag_Raw: {
-      APPEND_LITERAL("<i");
+      bucket_buffer_append(result, "i");
       u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
-      APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
-      APPEND_LITERAL(">");
+      bucket_buffer_append(result, print_buffer);
     } break;
     case Descriptor_Tag_Pointer_To: {
-      APPEND_LITERAL("&");
-      mass_error_append_descriptor_impl(result, descriptor->Pointer_To.descriptor, level + 1);
+      bucket_buffer_append(result, "&");
+      mass_error_append_descriptor(result, descriptor->Pointer_To.descriptor, level + 1);
     } break;
     case Descriptor_Tag_Fixed_Array: {
-      mass_error_append_descriptor_impl(result, descriptor->Fixed_Array.item, level + 1);
+      mass_error_append_descriptor(result, descriptor->Fixed_Array.item, level + 1);
       u64 item_count = descriptor->Fixed_Array.length;
       u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, item_count);
-      APPEND_LITERAL("*");
-      APPEND_SLICE((Slice){.bytes = print_buffer, .length = length});
+      bucket_buffer_append(result, "*");
+      bucket_buffer_append(result, print_buffer);
     } break;
     case Descriptor_Tag_Struct: {
-      APPEND_LITERAL("[");
+      bucket_buffer_append(result, "[");
       bool is_first = true;
       DYN_ARRAY_FOREACH(Struct_Field, it, descriptor->Struct.fields) {
-        if (is_first) is_first = false; else APPEND_LITERAL(", ");
+        if (is_first) is_first = false; else bucket_buffer_append(result, ", ");
         if (it->name.length) {
-          APPEND_SLICE(it->name);
-          APPEND_LITERAL(" : ");
+          bucket_buffer_append(result, it->name);
+          bucket_buffer_append(result, " : ");
         }
-        mass_error_append_descriptor_impl(result, it->descriptor, level + 1);
+        mass_error_append_descriptor(result, it->descriptor, level + 1);
       }
-      APPEND_LITERAL("]");
+      bucket_buffer_append(result, "]");
     } break;
     case Descriptor_Tag_Function_Instance: {
       mass_error_append_function_signature_string(result, descriptor->Function_Instance.info);
@@ -182,170 +160,170 @@ mass_error_to_string(
   Compilation *compilation,
   Mass_Error const* error
 ) {
-  Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
+  Bucket_Buffer *buffer = bucket_buffer_make();
   switch(error->tag) {
     case Mass_Error_Tag_Unimplemented: {
-      APPEND_LITERAL("Unimplemented Feature: ");
-      APPEND_SLICE(error->detailed_message);
+      bucket_buffer_append(buffer, "Unimplemented Feature: ");
+      bucket_buffer_append(buffer, error->detailed_message);
     } break;
     case Mass_Error_Tag_Unreachable_Statement: {
-      APPEND_LITERAL("Unreachable Statement");
+      bucket_buffer_append(buffer, "Unreachable Statement");
       if (error->detailed_message.length) {
-        APPEND_LITERAL(": ");
-        APPEND_SLICE(error->detailed_message);
+        bucket_buffer_append(buffer, ": ");
+        bucket_buffer_append(buffer, error->detailed_message);
       }
     } break;
     case Mass_Error_Tag_User_Defined: {
-      APPEND_SLICE(error->User_Defined.name);
-      APPEND_LITERAL(": ");
-      APPEND_SLICE(error->detailed_message);
+      bucket_buffer_append(buffer, error->User_Defined.name);
+      bucket_buffer_append(buffer, ": ");
+      bucket_buffer_append(buffer, error->detailed_message);
     } break;
     case Mass_Error_Tag_Assignment_To_Constant: {
-      APPEND_LITERAL("Trying to assign to a constant value");
+      bucket_buffer_append(buffer, "Trying to assign to a constant value");
     } break;
     case Mass_Error_Tag_Parse: {
-      APPEND_LITERAL("Unable to parse the expression");
+      bucket_buffer_append(buffer, "Unable to parse the expression");
       if (error->detailed_message.length) {
-        APPEND_LITERAL(": ");
-        APPEND_SLICE(error->detailed_message);
+        bucket_buffer_append(buffer, ": ");
+        bucket_buffer_append(buffer, error->detailed_message);
       }
     } break;
     case Mass_Error_Tag_Tokenizer: {
-      APPEND_LITERAL("Error while tokenizing");
+      bucket_buffer_append(buffer, "Error while tokenizing");
       if (error->detailed_message.length) {
-        APPEND_LITERAL(": ");
-        APPEND_SLICE(error->detailed_message);
+        bucket_buffer_append(buffer, ": ");
+        bucket_buffer_append(buffer, error->detailed_message);
       }
     } break;
     case Mass_Error_Tag_Undefined_Variable: {
-      APPEND_LITERAL("Undefined variable '");
-      APPEND_SLICE(error->Undefined_Variable.name);
-      APPEND_LITERAL("'");
+      bucket_buffer_append(buffer, "Undefined variable '");
+      bucket_buffer_append(buffer, error->Undefined_Variable.name);
+      bucket_buffer_append(buffer, "'");
     } break;
     case Mass_Error_Tag_Redefinition: {
-      APPEND_LITERAL("Redefinition of binding ");
-      APPEND_SLICE(error->Redefinition.name);
-      APPEND_LITERAL("\n  previously defined here:\n  ");
+      bucket_buffer_append(buffer, "Redefinition of binding ");
+      bucket_buffer_append(buffer, error->Redefinition.name);
+      bucket_buffer_append(buffer, "\n  previously defined here:\n  ");
       Slice other_source = source_from_source_range(compilation, &error->other_source_range);
-      APPEND_SLICE(other_source);
+      bucket_buffer_append(buffer, other_source);
     } break;
     case Mass_Error_Tag_Circular_Dependency: {
-      APPEND_LITERAL("Circular dependency when resolving ");
-      APPEND_SLICE(error->Circular_Dependency.name);
+      bucket_buffer_append(buffer, "Circular dependency when resolving ");
+      bucket_buffer_append(buffer, error->Circular_Dependency.name);
     } break;
     case Mass_Error_Tag_Unknown_Field: {
-      APPEND_LITERAL("Field ");
-      APPEND_SLICE(error->Unknown_Field.name);
-      APPEND_LITERAL(" does not exist on type ");
-      mass_error_append_descriptor(result, error->Unknown_Field.type);
+      bucket_buffer_append(buffer, "Field ");
+      bucket_buffer_append(buffer, error->Unknown_Field.name);
+      bucket_buffer_append(buffer, " does not exist on type ");
+      mass_error_append_descriptor(buffer, error->Unknown_Field.type, 0);
     } break;
     case Mass_Error_Tag_Invalid_Identifier: {
-      APPEND_LITERAL("Invalid identifier");
+      bucket_buffer_append(buffer, "Invalid identifier");
     } break;
     case Mass_Error_Tag_Dynamic_Library_Load: {
-      APPEND_LITERAL("Unable to load a dynamic library ");
-      APPEND_SLICE(error->Dynamic_Library_Load.library_name);
+      bucket_buffer_append(buffer, "Unable to load a dynamic library ");
+      bucket_buffer_append(buffer, error->Dynamic_Library_Load.library_name);
     } break;
     case Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found: {
-      APPEND_LITERAL("Unable to resolve a symbol ");
-      APPEND_SLICE(error->Dynamic_Library_Symbol_Not_Found.symbol_name);
-      APPEND_LITERAL(" from a dynamic library ");
-      APPEND_SLICE(error->Dynamic_Library_Symbol_Not_Found.library_name);
+      bucket_buffer_append(buffer, "Unable to resolve a symbol ");
+      bucket_buffer_append(buffer, error->Dynamic_Library_Symbol_Not_Found.symbol_name);
+      bucket_buffer_append(buffer, " from a dynamic library ");
+      bucket_buffer_append(buffer, error->Dynamic_Library_Symbol_Not_Found.library_name);
     } break;
     case Mass_Error_Tag_File_Open: {
-      APPEND_LITERAL("Can not open file ");
-      APPEND_SLICE(error->File_Open.path);
+      bucket_buffer_append(buffer, "Can not open file ");
+      bucket_buffer_append(buffer, error->File_Open.path);
     } break;
     case Mass_Error_Tag_File_Too_Large: {
-      APPEND_LITERAL("File ");
-      APPEND_SLICE(error->File_Too_Large.path);
-      APPEND_LITERAL(" is larger than 4GB");
+      bucket_buffer_append(buffer, "File ");
+      bucket_buffer_append(buffer, error->File_Too_Large.path);
+      bucket_buffer_append(buffer, " is larger than 4GB");
     } break;
     case Mass_Error_Tag_Expected_Static: {
-      APPEND_LITERAL("Expected value to be static (compile-time known)");
+      bucket_buffer_append(buffer, "Expected value to be static (compile-time known)");
     } break;
     case Mass_Error_Tag_Operator_Fixity_Conflict: {
       if (error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Prefix) {
-        APPEND_LITERAL("There is already a prefix operator ");
+        bucket_buffer_append(buffer, "There is already a prefix operator ");
       } else {
-        APPEND_LITERAL("There is already a infix or postfix operator ");
+        bucket_buffer_append(buffer, "There is already a infix or postfix operator ");
       }
-      APPEND_SLICE(error->Operator_Fixity_Conflict.symbol);
-      APPEND_LITERAL(" defined in this scope");
+      bucket_buffer_append(buffer, error->Operator_Fixity_Conflict.symbol);
+      bucket_buffer_append(buffer, " defined in this scope");
     } break;
     case Mass_Error_Tag_Non_Trailing_Default_Argument: {
-      APPEND_LITERAL("An argument without a default value can not come after an argument that has one");
+      bucket_buffer_append(buffer, "An argument without a default value can not come after an argument that has one");
     } break;
     case Mass_Error_Tag_Type_Mismatch: {
       Mass_Error_Type_Mismatch const *mismatch = &error->Type_Mismatch;
       if (error->detailed_message.length) {
-        APPEND_SLICE(error->detailed_message);
+        bucket_buffer_append(buffer, error->detailed_message);
       } else {
-        APPEND_LITERAL("Type mismatch: expected ");
-        mass_error_append_descriptor(result, mismatch->expected);
-        APPEND_LITERAL(", got ");
-        mass_error_append_descriptor(result, mismatch->actual);
+        bucket_buffer_append(buffer, "Type mismatch: expected ");
+        mass_error_append_descriptor(buffer, mismatch->expected, 0);
+        bucket_buffer_append(buffer, ", got ");
+        mass_error_append_descriptor(buffer, mismatch->actual, 0);
       }
     } break;
     case Mass_Error_Tag_Integer_Range: {
-      APPEND_LITERAL("Value does not fit into integer of type ");
-      mass_error_append_descriptor(result, error->Integer_Range.descriptor);
+      bucket_buffer_append(buffer, "Value does not fit into integer of type ");
+      mass_error_append_descriptor(buffer, error->Integer_Range.descriptor, 0);
     } break;
     case Mass_Error_Tag_Epoch_Mismatch: {
-      APPEND_LITERAL("Trying to access a value from the wrong execution epoch ");
+      bucket_buffer_append(buffer, "Trying to access a value from the wrong execution epoch ");
       Slice source = source_from_source_range(compilation, &error->source_range);
-      APPEND_SLICE(source);
-      APPEND_LITERAL(".\n");
-      APPEND_LITERAL(
+      bucket_buffer_append(buffer, source);
+      bucket_buffer_append(buffer, ".\n");
+      bucket_buffer_append(buffer,
         "This happens when you access value from runtime in compile-time execution "
         "or a runtime value from a different stack frame than current function call."
       );
     } break;
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
-      APPEND_LITERAL("Could not decide which overload is better: \n  ");
+      bucket_buffer_append(buffer, "Could not decide which overload is better: \n  ");
       for (u64 i = 0; i < dyn_array_length(overloads->matches); ++i) {
-        if (i != 0) APPEND_LITERAL("\n  ");
+        if (i != 0) bucket_buffer_append(buffer, "\n  ");
         const Undecidable_Match *match = dyn_array_get(overloads->matches, i);
-        mass_error_append_function_signature_string(result, match->info);
+        mass_error_append_function_signature_string(buffer, match->info);
       }
     } break;
     case Mass_Error_Tag_Non_Function_Overload: {
-      APPEND_LITERAL("Trying to define a non-function overload ");
+      bucket_buffer_append(buffer, "Trying to define a non-function overload ");
       Slice source = source_from_source_range(compilation, &error->source_range);
-      APPEND_SLICE(source);
+      bucket_buffer_append(buffer, source);
     } break;
     case Mass_Error_Tag_No_Matching_Overload: {
       Mass_Error_No_Matching_Overload const *no_match = &error->No_Matching_Overload;
-      APPEND_LITERAL("Could not find matching overload for call.\n  Arguments: ");
+      bucket_buffer_append(buffer, "Could not find matching overload for call.\n  Arguments: ");
       for (u64 i = 0; i < dyn_array_length(no_match->arguments); ++i) {
-        if (i != 0) APPEND_LITERAL(", ");
+        if (i != 0) bucket_buffer_append(buffer, ", ");
         const Resolved_Function_Parameter *arg = dyn_array_get(no_match->arguments, i);
-        mass_error_append_descriptor(result, arg->descriptor);
+        mass_error_append_descriptor(buffer, arg->descriptor, 0);
       }
-      APPEND_LITERAL("\n  Source code: ");
+      bucket_buffer_append(buffer, "\n  Source code: ");
       Slice source = source_from_source_range(compilation, &error->source_range);
-      APPEND_SLICE(source);
+      bucket_buffer_append(buffer, source);
     } break;
     case Mass_Error_Tag_No_Runtime_Use: {
       if (error->detailed_message.length) {
-        APPEND_SLICE(error->detailed_message);
+        bucket_buffer_append(buffer, error->detailed_message);
       } else {
-        APPEND_LITERAL("Value can't be used at runtime");
+        bucket_buffer_append(buffer, "Value can't be used at runtime");
       }
-      APPEND_LITERAL(":\n");
+      bucket_buffer_append(buffer, ":\n");
       Slice source = source_from_source_range(compilation, &error->source_range);
-      APPEND_SLICE(source);
+      bucket_buffer_append(buffer, source);
     } break;
     case Mass_Error_Tag_Recursive_Intrinsic_Use: {
-      APPEND_LITERAL("Recursive calls to intrinsics are not allowed.\n");
-      APPEND_LITERAL("Since an intrinsic is called during compilation of a fn body\n");
-      APPEND_LITERAL("if it contains a direct or indirect call to itself\n");
-      APPEND_LITERAL("as the body is not read - we can not execute it.");
+      bucket_buffer_append(buffer, "Recursive calls to intrinsics are not allowed.\n");
+      bucket_buffer_append(buffer, "Since an intrinsic is called during compilation of a fn body\n");
+      bucket_buffer_append(buffer, "if it contains a direct or indirect call to itself\n");
+      bucket_buffer_append(buffer, "as the body is not read - we can not execute it.");
     } break;
   }
-  #undef APPEND_SLICE
-  #undef APPEND_LITERAL
+  Fixed_Buffer *result = bucket_buffer_to_fixed_buffer(allocator_system, buffer);
+  bucket_buffer_destroy(buffer);
   return result;
 }
 
