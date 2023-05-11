@@ -315,6 +315,7 @@ win32_debugger_register_memory(
 static void
 mass_debug_print_value(
   CONTEXT *ContextRecord,
+  Function_Builder *builder,
   Value *value
 ) {
   assert(value->tag == Value_Tag_Forced);
@@ -370,15 +371,16 @@ mass_debug_print_value(
         } break;
         case Memory_Location_Tag_Indirect: {
           const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
-          memory = win32_debugger_register_memory(ContextRecord, indirect->base_register);
+          memory = *(const void **)win32_debugger_register_memory(ContextRecord, indirect->base_register);
           memory = ((u8 *)memory) + indirect->offset;
         } break;
         case Memory_Location_Tag_Stack: {
           const Memory_Location_Stack *stack = &storage->Memory.location.Stack;
           switch (stack->area) {
             case Stack_Area_Local: {
-              memory = win32_debugger_register_memory(ContextRecord, Register_SP);
-              memory = ((u8 *)memory) + stack->offset;
+              memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
+              s32 effective_offset = builder->stack_reserve + stack->offset;
+              memory = ((u8 *)memory) + effective_offset;
             } break;
             case Stack_Area_Received_Argument: {
               printf("TODO support stack argument storage");
@@ -499,6 +501,14 @@ win32_debugger_loop(
       );
       if (maybe_scope) scope_print_names(maybe_scope, Scope_Print_Flags_Stop_At_First_Declarative);
     } else if (slice_starts_with(command, slice_literal("print "))) {
+      Jit *jit = exception_data->jit;
+      s64 runtime_function_index = win32_get_function_index_from_address(ContextRecord->Rip, jit);
+      if (runtime_function_index < 0) {
+        printf("Variable printing is not available in external code.\n");
+        return;
+      }
+
+      Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
       Slice variable_name = slice_sub(command, strlen("print "), command.length);
       variable_name = slice_trim_whitespace(variable_name);
       const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
@@ -508,7 +518,7 @@ win32_debugger_loop(
         const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
         Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
         if (scope_entry) {
-          mass_debug_print_value(ContextRecord, scope_entry->value);
+          mass_debug_print_value(ContextRecord, builder, scope_entry->value);
         } else {
           printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
         }
