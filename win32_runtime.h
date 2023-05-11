@@ -401,7 +401,9 @@ mass_print_value_with_descriptor_and_memory(
       printf("]");
     } break;
     case Descriptor_Tag_Pointer_To: {
-      printf("TODO support pointer types");
+      const void *pointer = *(const void **)memory;
+      printf("&<%p>: ", pointer);
+      mass_print_value_with_descriptor_and_memory(descriptor->Pointer_To.descriptor, pointer, depth + 1);
     } break;
   }
 }
