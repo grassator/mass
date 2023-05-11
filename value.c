@@ -778,18 +778,6 @@ storage_static_equal(
   return storage_static_equal_internal(a_descriptor, a_memory, b_descriptor, b_memory);
 }
 
-static bool
-storage_static_equal_values(
-  const Value *a,
-  const Value *b
-) {
-  if (a->tag != Value_Tag_Forced) return false;
-  if (b->tag != Value_Tag_Forced) return false;
-  return storage_static_equal(
-    a->descriptor, &a->Forced.storage, b->descriptor, &b->Forced.storage
-  );
-}
-
 static inline bool
 storage_equal(
   const Storage *a,
