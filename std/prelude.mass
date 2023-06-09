@@ -93,6 +93,7 @@ unreachable :: fn() -> (Never) intrinsic {
       instruction.tag = .Bytes
       instruction.Bytes.memory.0 = 0xCC
       instruction.Bytes.length = 1
+      instruction.scope = scope
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
