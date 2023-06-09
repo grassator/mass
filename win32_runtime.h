@@ -455,9 +455,8 @@ mass_debug_print_value(
       }
     } break;
     case Storage_Tag_Static: {
-      printf("TODO support static storage");
-      return;
-    }
+      memory = storage->Static.pointer;
+    } break;
     case Storage_Tag_Memory: {
       switch (storage->Memory.location.tag) {
         case Memory_Location_Tag_Instruction_Pointer_Relative: {
