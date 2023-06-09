@@ -178,10 +178,10 @@ win32_instruction_for_address(
         *maybe_out_source_range = instruction->Location.source_range;
       }
       if (instruction->tag != Instruction_Tag_Bytes) continue;
-      current_offset += instruction->Bytes.length;
       if (current_offset == relative_instruction_byte_offset) {
         return instruction;
       }
+      current_offset += instruction->Bytes.length;
     }
   }
   return 0;
