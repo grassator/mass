@@ -503,9 +503,15 @@ win32_debugger_loop(
   Win32_Exception_Data *exception_data
 ) {
   char line_buffer[256] = {0};
+  const char *auto_command = 0;
   for (;;) {
     fputs("mdb> ", stdout);
-    const char *command_c_string = fgets(line_buffer, countof(line_buffer), stdin);
+    const char *command_c_string = auto_command;
+    if (auto_command) {
+      auto_command = 0;
+    } else {
+      command_c_string = fgets(line_buffer, countof(line_buffer), stdin);
+    }
     if (!command_c_string) break;
 
     Slice command = slice_from_c_string(command_c_string);
