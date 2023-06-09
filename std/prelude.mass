@@ -510,12 +510,17 @@ allocate :: fn(allocator : &MASS.Allocator, @type : Type) -> _ {
   ))
 }
 
+make :: fn(allocator : &MASS.Allocator, value) -> _ {
+  pointer := allocate(allocator, type_of(value))
+  pointer.* = value
+  pointer
+}
+
 Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
   meta :: import("std/meta")
   item_type := meta.reify(arguments.0, Type).*
   item_descriptor := type_descriptor(item_type)
   length := meta.reify(arguments.1, i64).*
-  array_descriptor := allocate(context.allocator, MASS.Descriptor)
 
   raw_bit_size := MASS.i64_unsigned_multiply(item_descriptor.bit_size.as_u64, length)
   if MASS.i64_bitwise_and(raw_bit_size, 0xffff_ffff_8000_0000) != 0 then {
@@ -526,14 +531,14 @@ Array :: fn(item_type : Type, length : i64) => (Type) intrinsic {
     return 0
   }
 
-  array_descriptor.* = [
+  array_descriptor := make(context.allocator, MASS.Descriptor [
     .tag = .Fixed_Array,
     .brand = 0,
     .own_module = 0,
     .bit_size = [raw_bit_size],
     .bit_alignment = item_descriptor.bit_alignment,
     .Fixed_Array = [item_descriptor, length]
-  ]
+  ])
 
   type := Type[array_descriptor]
 
