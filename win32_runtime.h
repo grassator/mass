@@ -405,6 +405,9 @@ mass_print_value_with_descriptor_and_memory(
       printf("&<%p>: ", pointer);
       mass_print_value_with_descriptor_and_memory(descriptor->Pointer_To.descriptor, pointer, depth + 1);
     } break;
+    default: {
+      assert(!"Unknown descriptor tag");
+    } break;
   }
 }
 
