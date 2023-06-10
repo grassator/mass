@@ -147,6 +147,7 @@ calling_convention_x86_64_common_end_proc(
 
   // their sum must then be 16-byte aligned as per ABI
   s32 return_address_size = X86_64_REGISTER_SIZE;
+  // :StackLayout
   s32 argument_stack_base = builder->stack_reserve + push_size + return_address_size;
   if (argument_stack_base % 16) {
     argument_stack_base += X86_64_REGISTER_SIZE;

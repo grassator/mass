@@ -481,7 +481,12 @@ mass_debug_print_value(
               memory = ((u8 *)memory) + effective_offset;
             } break;
             case Stack_Area_Received_Argument: {
-              printf("TODO support stack argument storage");
+              // :StackLayout
+              memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
+              s32 push_size = calling_convention_x86_64_push_size(builder);
+              s32 return_address_size = X86_64_REGISTER_SIZE;
+              s32 effective_offset = builder->stack_reserve + push_size + return_address_size + stack->offset;
+              memory = ((u8 *)memory) + effective_offset;
             } break;
             case Stack_Area_Call_Target_Argument: {
               assert("Got an unexpected call target argument stack storage");
