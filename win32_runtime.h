@@ -406,6 +406,8 @@ mass_debugger_value_memory(
 // TODO catch cycles
 static void
 mass_print_value_with_descriptor_and_memory(
+  CONTEXT *ContextRecord,
+  Function_Builder *builder,
   const Descriptor *descriptor,
   const u8 *memory,
   u64 depth
@@ -480,25 +482,73 @@ mass_print_value_with_descriptor_and_memory(
       for (u64 i = 0; i < descriptor->Fixed_Array.length; ++i) {
         if (i != 0) printf(", ");
         const u8 *field_memory = memory + item_byte_size * i;
-        mass_print_value_with_descriptor_and_memory(item_descriptor, field_memory, depth + 1);
+        mass_print_value_with_descriptor_and_memory(
+          ContextRecord, builder, item_descriptor, field_memory, depth + 1
+        );
       }
       printf("]");
     } break;
     case Descriptor_Tag_Struct: {
+      // FIXME Right now there is no real concept of a tagged union, so at least for the ones
+      //       coming from the compiler we just do a bit of duck typing check.
+      const Struct_Field *tag_field;
+      bool has_tag = struct_find_field_by_name(descriptor, slice_literal("tag"), &tag_field, &(u64){ 0 });
+      Scope_Map *tag_scope_map = 0;
+      Slice chosen_tag = {0};
+      if (
+        has_tag &&
+        tag_field->descriptor->bit_size.as_u64 == 32 &&
+        tag_field->descriptor->tag == Descriptor_Tag_Raw &&
+        tag_field->descriptor->brand &&
+        tag_field->descriptor->own_module &&
+        tag_field->descriptor->own_module->own_scope->tag == Scope_Tag_Declarative
+      ) {
+        tag_scope_map = tag_field->descriptor->own_module->own_scope->Declarative.map;
+        const u8 *field_memory = memory + tag_field->offset;
+        for (u64 i = 0; i < tag_scope_map->capacity; ++i) {
+          Scope_Map__Entry *entry = &tag_scope_map->entries[i];
+          if (entry->occupied) {
+            const void *value_memory = mass_debugger_value_memory(
+              ContextRecord, builder, entry->value->value
+            );
+            if (memcmp(field_memory, value_memory, 4) == 0) {
+              chosen_tag = entry->value->name;
+              printf(".%"PRIslice"", SLICE_EXPAND_PRINTF(chosen_tag));
+              break;
+            }
+          }
+        }
+        if (chosen_tag.length == 0) {
+          printf("<INVALID TAG %d>", *(u32*)field_memory);
+        }
+      }
       printf("[");
       for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
-        if (i != 0) printf(", ");
         const Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+        // If we are in the tagged union only print selected field
+        if (tag_scope_map && !slice_equal(field->name, chosen_tag)) {
+          // FIXME @Speed this is slow but getting a symbol here for a hash lookup is awkward atm
+          for (u64 i = 0; i < tag_scope_map->capacity; ++i) {
+            Scope_Map__Entry *entry = &tag_scope_map->entries[i];
+            if (entry->occupied && slice_equal(entry->value->name, field->name)) goto skip_field;
+          }
+        }
         printf(".%"PRIslice" = ", SLICE_EXPAND_PRINTF(field->name));
         const u8 *field_memory = memory + field->offset;
-        mass_print_value_with_descriptor_and_memory(field->descriptor, field_memory, depth + 1);
+        mass_print_value_with_descriptor_and_memory(
+          ContextRecord, builder, field->descriptor, field_memory, depth + 1
+        );
+        if (i + 1 != dyn_array_length(descriptor->Struct.fields)) printf(", ");
+        skip_field:;
       }
       printf("]");
     } break;
     case Descriptor_Tag_Pointer_To: {
       const void *pointer = *(const void **)memory;
       printf("&<%p>: ", pointer);
-      mass_print_value_with_descriptor_and_memory(descriptor->Pointer_To.descriptor, pointer, depth + 1);
+      mass_print_value_with_descriptor_and_memory(
+        ContextRecord, builder, descriptor->Pointer_To.descriptor, pointer, depth + 1
+      );
     } break;
     default: {
       assert(!"Unknown descriptor tag");
@@ -513,7 +563,7 @@ mass_debug_print_value(
   Value *value
 ) {
   const void *memory = mass_debugger_value_memory(ContextRecord, builder, value);
-  mass_print_value_with_descriptor_and_memory(value->descriptor, memory, 0);
+  mass_print_value_with_descriptor_and_memory(ContextRecord, builder, value->descriptor, memory, 0);
   printf("\n");
 }
 
