@@ -319,6 +319,10 @@ mass_print_value_with_descriptor_and_memory(
   const u8 *memory,
   u64 depth
 ) {
+  if (memory == 0) {
+    printf("<NULL>");
+    return;
+  }
   if (depth > 5) {
     printf("<...>");
     return;
