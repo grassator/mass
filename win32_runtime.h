@@ -320,7 +320,6 @@ mass_debugger_value_memory(
 ) {
   assert(value->tag == Value_Tag_Forced);
   const Storage *storage = &value->Forced.storage;
-  const void *memory = 0;
   switch (storage->tag) {
     case Storage_Tag_Immediate: {
       return &storage->Immediate.bits;
@@ -398,9 +397,9 @@ mass_debugger_value_memory(
     } break;
     case Storage_Tag_Disjoint: {
       printf("TODO support disjoint storage");
-      return 0;
     }
   }
+  return 0;
 }
 
 // TODO catch cycles

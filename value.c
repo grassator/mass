@@ -117,12 +117,12 @@ mass_error_append_descriptor(
     case Descriptor_Tag_Float: {
       const char *prefix = descriptor->tag == Descriptor_Tag_Float ? "f" : descriptor->Integer.is_signed ? "s" : "u";
       bucket_buffer_append(result, prefix);
-      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
+      snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
       bucket_buffer_append(result, print_buffer);
     } break;
     case Descriptor_Tag_Raw: {
       bucket_buffer_append(result, "i");
-      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
+      snprintf(print_buffer, countof(print_buffer), "%"PRIu64, descriptor->bit_size.as_u64);
       bucket_buffer_append(result, print_buffer);
     } break;
     case Descriptor_Tag_Pointer_To: {
@@ -132,7 +132,7 @@ mass_error_append_descriptor(
     case Descriptor_Tag_Fixed_Array: {
       mass_error_append_descriptor(result, descriptor->Fixed_Array.item, level + 1);
       u64 item_count = descriptor->Fixed_Array.length;
-      u64 length = snprintf(print_buffer, countof(print_buffer), "%"PRIu64, item_count);
+      snprintf(print_buffer, countof(print_buffer), "%"PRIu64, item_count);
       bucket_buffer_append(result, "*");
       bucket_buffer_append(result, print_buffer);
     } break;
