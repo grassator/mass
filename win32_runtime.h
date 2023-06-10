@@ -312,6 +312,97 @@ win32_debugger_register_memory(
   return 0;
 }
 
+static const void *
+mass_debugger_value_memory(
+  CONTEXT *ContextRecord,
+  Function_Builder *builder,
+  const Value *value
+) {
+  assert(value->tag == Value_Tag_Forced);
+  const Storage *storage = &value->Forced.storage;
+  const void *memory = 0;
+  switch (storage->tag) {
+    case Storage_Tag_Immediate: {
+      return &storage->Immediate.bits;
+    }
+    case Storage_Tag_Eflags: {
+      // TODO storage->Eflags.compare_type
+      return &ContextRecord->EFlags;
+    }
+    case Storage_Tag_Register: {
+      const void *memory = win32_debugger_register_memory(ContextRecord, storage->Register.index);
+      assert(storage->Register.offset_in_bits % 8 == 0);
+      return ((u8 *)memory) + (storage->Register.offset_in_bits / 8);
+    }
+    case Storage_Tag_Xmm: {
+      switch (storage->Xmm.index) {
+        case Register_Xmm0: return &ContextRecord->Xmm0;
+        case Register_Xmm1: return &ContextRecord->Xmm1;
+        case Register_Xmm2: return &ContextRecord->Xmm2;
+        case Register_Xmm3: return &ContextRecord->Xmm3;
+        case Register_Xmm4: return &ContextRecord->Xmm4;
+        case Register_Xmm5: return &ContextRecord->Xmm5;
+        case Register_Xmm6: return &ContextRecord->Xmm6;
+        case Register_Xmm7: return &ContextRecord->Xmm7;
+        case Register_Xmm8: return &ContextRecord->Xmm8;
+        case Register_Xmm9: return &ContextRecord->Xmm9;
+        case Register_Xmm10: return &ContextRecord->Xmm10;
+        case Register_Xmm11: return &ContextRecord->Xmm11;
+        case Register_Xmm12: return &ContextRecord->Xmm12;
+        case Register_Xmm13: return &ContextRecord->Xmm13;
+        case Register_Xmm14: return &ContextRecord->Xmm14;
+        case Register_Xmm15: return &ContextRecord->Xmm15;
+        default: assert(!"Unknown XMM register index"); break;
+      }
+    } break;
+    case Storage_Tag_Static: {
+      return storage->Static.pointer;
+    }
+    case Storage_Tag_Memory: {
+      switch (storage->Memory.location.tag) {
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          const Memory_Location_Instruction_Pointer_Relative *rip_relative =
+            &storage->Memory.location.Instruction_Pointer_Relative;
+          Label *label = rip_relative->label;
+          assert(label->resolved);
+          assert(label->section);
+          return ((u8*)label->section->buffer.memory) + label->offset_in_section;
+        }
+        case Memory_Location_Tag_Indirect: {
+          const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
+          const void *memory = *(const void **)win32_debugger_register_memory(ContextRecord, indirect->base_register);
+          return ((u8 *)memory) + indirect->offset;
+        }
+        case Memory_Location_Tag_Stack: {
+          const Memory_Location_Stack *stack = &storage->Memory.location.Stack;
+          switch (stack->area) {
+            case Stack_Area_Local: {
+              const void *memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
+              s32 effective_offset = builder->stack_reserve + stack->offset;
+              return ((u8 *)memory) + effective_offset;
+            }
+            case Stack_Area_Received_Argument: {
+              // :StackLayout
+              const void *memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
+              s32 push_size = calling_convention_x86_64_push_size(builder);
+              s32 return_address_size = X86_64_REGISTER_SIZE;
+              s32 effective_offset = builder->stack_reserve + push_size + return_address_size + stack->offset;
+              return ((u8 *)memory) + effective_offset;
+            }
+            case Stack_Area_Call_Target_Argument: {
+              assert("Got an unexpected call target argument stack storage");
+            } break;
+          }
+        } break;
+      }
+    } break;
+    case Storage_Tag_Disjoint: {
+      printf("TODO support disjoint storage");
+      return 0;
+    }
+  }
+}
+
 // TODO catch cycles
 static void
 mass_print_value_with_descriptor_and_memory(
@@ -421,89 +512,7 @@ mass_debug_print_value(
   Function_Builder *builder,
   Value *value
 ) {
-  assert(value->tag == Value_Tag_Forced);
-  const Storage *storage = &value->Forced.storage;
-  const void *memory = 0;
-  switch (storage->tag) {
-    case Storage_Tag_Immediate: {
-      memory = &storage->Immediate.bits;
-    } break;
-    case Storage_Tag_Eflags: {
-      // TODO storage->Eflags.compare_type
-      memory = &ContextRecord->EFlags;
-    } break;
-    case Storage_Tag_Register: {
-      memory = win32_debugger_register_memory(ContextRecord, storage->Register.index);
-      assert(storage->Register.offset_in_bits % 8 == 0);
-      memory = ((u8 *)memory) + (storage->Register.offset_in_bits / 8);
-    } break;
-    case Storage_Tag_Xmm: {
-      switch (storage->Xmm.index) {
-        case Register_Xmm0: memory = &ContextRecord->Xmm0; break;
-        case Register_Xmm1: memory = &ContextRecord->Xmm1; break;
-        case Register_Xmm2: memory = &ContextRecord->Xmm2; break;
-        case Register_Xmm3: memory = &ContextRecord->Xmm3; break;
-        case Register_Xmm4: memory = &ContextRecord->Xmm4; break;
-        case Register_Xmm5: memory = &ContextRecord->Xmm5; break;
-        case Register_Xmm6: memory = &ContextRecord->Xmm6; break;
-        case Register_Xmm7: memory = &ContextRecord->Xmm7; break;
-        case Register_Xmm8: memory = &ContextRecord->Xmm8; break;
-        case Register_Xmm9: memory = &ContextRecord->Xmm9; break;
-        case Register_Xmm10: memory = &ContextRecord->Xmm10; break;
-        case Register_Xmm11: memory = &ContextRecord->Xmm11; break;
-        case Register_Xmm12: memory = &ContextRecord->Xmm12; break;
-        case Register_Xmm13: memory = &ContextRecord->Xmm13; break;
-        case Register_Xmm14: memory = &ContextRecord->Xmm14; break;
-        case Register_Xmm15: memory = &ContextRecord->Xmm15; break;
-        default: assert(!"Unknown XMM register index"); break;
-      }
-    } break;
-    case Storage_Tag_Static: {
-      memory = storage->Static.pointer;
-    } break;
-    case Storage_Tag_Memory: {
-      switch (storage->Memory.location.tag) {
-        case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          const Memory_Location_Instruction_Pointer_Relative *rip_relative =
-            &storage->Memory.location.Instruction_Pointer_Relative;
-          Label *label = rip_relative->label;
-          assert(label->resolved);
-          assert(label->section);
-          memory = ((u8*)label->section->buffer.memory) + label->offset_in_section;
-        } break;
-        case Memory_Location_Tag_Indirect: {
-          const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
-          memory = *(const void **)win32_debugger_register_memory(ContextRecord, indirect->base_register);
-          memory = ((u8 *)memory) + indirect->offset;
-        } break;
-        case Memory_Location_Tag_Stack: {
-          const Memory_Location_Stack *stack = &storage->Memory.location.Stack;
-          switch (stack->area) {
-            case Stack_Area_Local: {
-              memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
-              s32 effective_offset = builder->stack_reserve + stack->offset;
-              memory = ((u8 *)memory) + effective_offset;
-            } break;
-            case Stack_Area_Received_Argument: {
-              // :StackLayout
-              memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
-              s32 push_size = calling_convention_x86_64_push_size(builder);
-              s32 return_address_size = X86_64_REGISTER_SIZE;
-              s32 effective_offset = builder->stack_reserve + push_size + return_address_size + stack->offset;
-              memory = ((u8 *)memory) + effective_offset;
-            } break;
-            case Stack_Area_Call_Target_Argument: {
-              assert("Got an unexpected call target argument stack storage");
-            } break;
-          }
-        } break;
-      }
-    } break;
-    case Storage_Tag_Disjoint: {
-      printf("TODO support disjoint storage");
-      return;
-    }
-  }
+  const void *memory = mass_debugger_value_memory(ContextRecord, builder, value);
   mass_print_value_with_descriptor_and_memory(value->descriptor, memory, 0);
   printf("\n");
 }
