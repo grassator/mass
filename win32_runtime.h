@@ -465,7 +465,7 @@ mass_debug_print_value(
           Label *label = rip_relative->label;
           assert(label->resolved);
           assert(label->section);
-          printf("TODO support RIP-relative storage");
+          memory = ((u8*)label->section->buffer.memory) + label->offset_in_section;
         } break;
         case Memory_Location_Tag_Indirect: {
           const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
