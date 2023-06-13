@@ -77,7 +77,11 @@ mass_append_function_signature_string(
   for (u64 i = 0; i < dyn_array_length(info->parameters); ++i) {
     Resolved_Function_Parameter *arg = dyn_array_get(info->parameters, i);
     if (i != 0) bucket_buffer_append(result, ", ");
-    bucket_buffer_append(result, arg->symbol->name);
+    if (arg->symbol) {
+      bucket_buffer_append(result, arg->symbol->name);
+    } else {
+      bucket_buffer_append(result, "_");
+    }
     bucket_buffer_append(result, " : ");
     mass_error_append_descriptor(result, arg->descriptor, 1);
   }
@@ -1069,7 +1073,7 @@ function_info_init(
   };
 }
 
-static inline Descriptor *
+static Descriptor *
 descriptor_function_instance(
   const Allocator *allocator,
   const Function_Info *info,
