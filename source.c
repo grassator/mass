@@ -2727,12 +2727,6 @@ typedef struct {
 } Saved_Register;
 typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 
-typedef struct {
-  Value_View args;
-  Value *overload;
-  const Function_Info *info;
-} Mass_Function_Call_Lazy_Payload;
-
 static void
 mass_assert_storage_is_valid_in_context(
   const Storage *storage,
@@ -4555,38 +4549,6 @@ mass_size_of(
   if (mass_has_error(context)) return 0;
   i64 literal = { .bits = descriptor_byte_size(descriptor) };
   return value_make(context, &descriptor_i64, storage_immediate(&literal), args.source_range);
-}
-
-static Value *
-mass_syscall(
-  Mass_Context *context,
-  Parser *parser,
-  Value_View args,
-  const Function_Header *header,
-  u64 number
-) {
-  Function_Info *fn_info = mass_allocate(context, Function_Info);
-  mass_function_info_init_for_header_and_maybe_body(context, parser->scope, header, 0, fn_info);
-  if (mass_has_error(context)) return 0;
-  Function_Call_Setup call_setup =
-    calling_convention_x86_64_system_v_syscall.call_setup_proc(context->allocator, fn_info);
-
-  Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, fn_info, call_setup, 0);
-
-  Value *overload = value_make(context, fn_descriptor, imm64(number), args.source_range);
-
-  Mass_Function_Call_Lazy_Payload *call_payload =
-    allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
-  *call_payload = (Mass_Function_Call_Lazy_Payload){
-    .overload = overload,
-    .args = args,
-  };
-
-  const Descriptor *lazy_descriptor = fn_info->return_descriptor;
-  Value *result = mass_make_lazy_value(
-    context, parser, args.source_range, call_payload, lazy_descriptor, (Lazy_Value_Proc)call_function_overload
-  );
-  return result;
 }
 
 static Value *

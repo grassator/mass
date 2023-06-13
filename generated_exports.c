@@ -381,6 +381,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Intrinsic_Proc")),
     type_mass_intrinsic_proc_value
   );
+  Source_Range Function_Info__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Info__source_range, "Function_Info");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Info__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Info")),
+    type_function_info_value
+  );
   Source_Range Function_Header__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Header__source_range, "Function_Header");
   scope_define_value(
@@ -394,6 +401,13 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Function_Literal__source_range,
     mass_ensure_symbol(compilation, slice_literal("Function_Literal")),
     type_function_literal_value
+  );
+  Source_Range Function_Call_Lazy_Payload__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Call_Lazy_Payload__source_range, "Function_Call_Lazy_Payload");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Call_Lazy_Payload__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Call_Lazy_Payload")),
+    type_mass_function_call_lazy_payload_value
   );
   Source_Range Tuple__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Tuple__source_range, "Tuple");
@@ -605,12 +619,33 @@ compiler_scope_define_exports(
     slice_literal("Os"), type_os_value,
     os_items, countof(os_items)
   );
+  Source_Range Calling_Convention_Call_Setup_Proc__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Calling_Convention_Call_Setup_Proc__source_range, "Calling_Convention_Call_Setup_Proc");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Calling_Convention_Call_Setup_Proc__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Calling_Convention_Call_Setup_Proc")),
+    type_calling_convention_call_setup_proc_value
+  );
+  Source_Range Calling_Convention__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Calling_Convention__source_range, "Calling_Convention");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Calling_Convention__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Calling_Convention")),
+    type_calling_convention_value
+  );
   Source_Range Compilation__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Compilation__source_range, "Compilation");
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, Compilation__source_range,
     mass_ensure_symbol(compilation, slice_literal("Compilation")),
     type_compilation_value
+  );
+  Source_Range Lazy_Value_Proc__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Lazy_Value_Proc__source_range, "Lazy_Value_Proc");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Lazy_Value_Proc__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Lazy_Value_Proc")),
+    type_lazy_value_proc_value
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
@@ -1342,30 +1377,6 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
-    mass_syscall, "syscall", &descriptor_value_pointer,
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
-      .descriptor = &descriptor_mass_context_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
-      .descriptor = &descriptor_parser_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
-      .descriptor = &descriptor_value_view
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("header")),
-      .descriptor = &descriptor_function_header_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("number")),
-      .descriptor = &descriptor_i64
-    }
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None,
     value_force, "value_force", &descriptor_value_pointer,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
@@ -1666,6 +1677,118 @@ compiler_scope_define_exports(
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
       .descriptor = &descriptor_i64
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    value_make, "value_make", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("storage")),
+      .descriptor = &descriptor_storage
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("source_range")),
+      .descriptor = &descriptor_source_range
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    descriptor_function_instance, "descriptor_function_instance", &descriptor_descriptor_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("info")),
+      .descriptor = &descriptor_function_info_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("call_setup")),
+      .descriptor = &descriptor_function_call_setup
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("program")),
+      .descriptor = &descriptor_program_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_result_is_error, "result_is_error", &descriptor__bool,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("result")),
+      .descriptor = &descriptor_mass_result_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    calling_convention_x86_64_system_v_syscall_setup_proc, "calling_convention_x86_64_system_v_syscall_setup_proc", &descriptor_function_call_setup,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("function")),
+      .descriptor = &descriptor_function_info_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    mass_function_info_init_for_header_and_maybe_body, "function_info_init_for_header_and_maybe_body", &descriptor_void,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("scope")),
+      .descriptor = &descriptor_scope_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("header")),
+      .descriptor = &descriptor_function_header_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("maybe_body")),
+      .descriptor = &descriptor_value_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("out_info")),
+      .descriptor = &descriptor_function_info_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    call_function_overload, "call_function_overload", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("expected_result")),
+      .descriptor = &descriptor_expected_result_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("scope")),
+      .descriptor = &descriptor_scope_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("source_range")),
+      .descriptor = &descriptor_source_range_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("payload")),
+      .descriptor = &descriptor_mass_function_call_lazy_payload_pointer
     }
   );
   MASS_DEFINE_FUNCTION(

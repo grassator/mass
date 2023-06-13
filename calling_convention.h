@@ -41,12 +41,6 @@ static const Calling_Convention calling_convention_x86_64_system_v = {
   ),
 };
 
-static Function_Call_Setup
-calling_convention_x86_64_system_v_syscall_setup_proc(
-  const Allocator *allocator,
-  const Function_Info *function
-);
-
 static const Calling_Convention calling_convention_x86_64_system_v_syscall = {
   .call_setup_proc = calling_convention_x86_64_system_v_syscall_setup_proc,
   .register_volatile_bitset = (

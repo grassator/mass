@@ -1800,12 +1800,12 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("Function_Info", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Function_Info_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Array_Resolved_Function_Parameter", "parameters" },
     { "const Descriptor *", "return_descriptor" },
-  }));
+  })));
 
   push_type(type_enum("Function_Header_Flags", (Enum_Type_Item[]){
     { "None", 0 },
@@ -1864,6 +1864,15 @@ main(void) {
     { "Storage", "caller_return" },
     { "Storage", "callee_return" },
   }));
+
+  export_compiler_custom_name(
+    "Function_Call_Lazy_Payload",
+    push_type(type_struct("Mass_Function_Call_Lazy_Payload", (Struct_Item[]){
+      { "Value_View", "args" },
+      { "Value *", "overload" },
+      { "const Function_Info *", "info" },
+    }))
+  );
 
   export_compiler(push_type(type_struct("Tuple", (Struct_Item[]){
     { "Epoch", "epoch" },
@@ -2023,15 +2032,15 @@ main(void) {
     { "u32", "_os_padding"},
   }));
 
-  push_type(type_function(Typedef, "Calling_Convention_Call_Setup_Proc", "Function_Call_Setup", (Argument_Type[]){
+  export_compiler(push_type(type_function(Typedef, "Calling_Convention_Call_Setup_Proc", "Function_Call_Setup", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
-  }));
+  })));
 
-  push_type(type_struct("Calling_Convention", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Calling_Convention", (Struct_Item[]){
     { "Register_Bitset", "register_volatile_bitset" },
     { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
-  }));
+  })));
 
   push_type(type_function(Typedef, "Mass_Trampoline_Proc", "void", (Argument_Type[]){
     { "void *", "returns" },
@@ -2179,14 +2188,14 @@ main(void) {
     { "Operator", "apply_operator" },
   })));
 
-  push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
+  export_compiler(push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
     { "Mass_Context *", "context" },
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
     { "const Scope *", "scope" },
     { "const Source_Range *", "source_range" },
     { "const void *", "payload" },
-  }));
+  })));
 
   push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){
     { "None", 0 },
@@ -2403,16 +2412,6 @@ main(void) {
     })
   ));
 
-  export_compiler_custom_name("syscall", push_type(
-    type_function(Default, "mass_syscall", "Value *", (Argument_Type[]){
-      { "Mass_Context *", "context" },
-      { "Parser *", "parser" },
-      { "Value_View", "args" },
-      { "const Function_Header *", "header" },
-      { "u64", "number" },
-    })
-  ));
-
   export_compiler_custom_name("value_force", push_type(
     type_function(Default, "value_force", "Value *", (Argument_Type[]){
       { "Mass_Context *", "context" },
@@ -2479,6 +2478,50 @@ main(void) {
       })
     ));
   }
+
+  export_compiler(push_type(type_function(Default, "value_make", "Value *", (Argument_Type[]){
+    { "Mass_Context *", "context" },
+    { "const Descriptor *", "descriptor" },
+    { "Storage", "storage" },
+    { "Source_Range", "source_range" },
+  })));
+
+  export_compiler(push_type(type_function(Default, "descriptor_function_instance", "Descriptor *", (Argument_Type[]){
+    { "const Allocator *", "allocator" },
+    { "const Function_Info *", "info" },
+    { "Function_Call_Setup", "call_setup" },
+    { "const Program *", "program" },
+  })));
+
+  export_compiler_custom_name("result_is_error", push_type(
+    type_function(Default, "mass_result_is_error", "_Bool", (Argument_Type[]){
+      { "Mass_Result *", "result" },
+    })
+  ));
+
+  export_compiler(push_type(type_function(Default, "calling_convention_x86_64_system_v_syscall_setup_proc", "Function_Call_Setup", (Argument_Type[]){
+    { "const Allocator *", "allocator" },
+    { "const Function_Info *", "function" },
+  })));
+
+  export_compiler_custom_name("function_info_init_for_header_and_maybe_body", push_type(
+    type_function(Default, "mass_function_info_init_for_header_and_maybe_body", "void", (Argument_Type[]){
+      { "Mass_Context *", "context" },
+      { "const Scope *", "scope" },
+      { "const Function_Header *", "header" },
+      { "Value *", "maybe_body" },
+      { "Function_Info *", "out_info" },
+    })
+  ));
+
+  export_compiler(push_type(type_function(Default, "call_function_overload", "Value *", (Argument_Type[]){
+    { "Mass_Context *", "context" },
+    { "Function_Builder *", "builder" },
+    { "const Expected_Result *", "expected_result" },
+    { "const Scope *", "scope" },
+    { "const Source_Range *", "source_range" },
+    { "const Mass_Function_Call_Lazy_Payload *", "payload" },
+  })));
 
   export_compiler_custom_name("integer_add", push_type(type_intrinsic("mass_integer_add")));
   export_compiler_custom_name("integer_subtract", push_type(type_intrinsic("mass_integer_subtract")));

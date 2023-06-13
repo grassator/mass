@@ -605,6 +605,10 @@ typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
 typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
 
+typedef struct Mass_Function_Call_Lazy_Payload Mass_Function_Call_Lazy_Payload;
+typedef dyn_array_type(Mass_Function_Call_Lazy_Payload *) Array_Mass_Function_Call_Lazy_Payload_Ptr;
+typedef dyn_array_type(const Mass_Function_Call_Lazy_Payload *) Array_Const_Mass_Function_Call_Lazy_Payload_Ptr;
+
 typedef struct Tuple Tuple;
 typedef dyn_array_type(Tuple *) Array_Tuple_Ptr;
 typedef dyn_array_type(const Tuple *) Array_Const_Tuple_Ptr;
@@ -949,9 +953,6 @@ static Expected_Result mass_expected_result_exact
 static Expected_Result mass_expected_result_exact_type
   (Type type, Storage storage);
 
-static Value * mass_syscall
-  (Mass_Context * context, Parser * parser, Value_View args, const Function_Header * header, u64 number);
-
 static Value * value_force
   (Mass_Context * context, Function_Builder * builder, const Scope * scope, const Expected_Result * expected_result, Value * value);
 
@@ -1020,6 +1021,24 @@ static _Bool mass_i64_signed_greater_equal
 
 static _Bool mass_i64_unsigned_greater_equal
   (i64 a, i64 b);
+
+static Value * value_make
+  (Mass_Context * context, const Descriptor * descriptor, Storage storage, Source_Range source_range);
+
+static Descriptor * descriptor_function_instance
+  (const Allocator * allocator, const Function_Info * info, Function_Call_Setup call_setup, const Program * program);
+
+static _Bool mass_result_is_error
+  (Mass_Result * result);
+
+static Function_Call_Setup calling_convention_x86_64_system_v_syscall_setup_proc
+  (const Allocator * allocator, const Function_Info * function);
+
+static void mass_function_info_init_for_header_and_maybe_body
+  (Mass_Context * context, const Scope * scope, const Function_Header * header, Value * maybe_body, Function_Info * out_info);
+
+static Value * call_function_overload
+  (Mass_Context * context, Function_Builder * builder, const Expected_Result * expected_result, const Scope * scope, const Source_Range * source_range, const Mass_Function_Call_Lazy_Payload * payload);
 
 static Value * mass_integer_add
   (Mass_Context * context, Parser * parser, Value_View args);
@@ -2048,6 +2067,13 @@ typedef struct Function_Call_Setup {
 } Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
+typedef struct Mass_Function_Call_Lazy_Payload {
+  Value_View args;
+  Value * overload;
+  const Function_Info * info;
+} Mass_Function_Call_Lazy_Payload;
+typedef dyn_array_type(Mass_Function_Call_Lazy_Payload) Array_Mass_Function_Call_Lazy_Payload;
+
 typedef struct Tuple {
   Epoch epoch;
   const Scope * scope_where_it_was_created;
@@ -2959,6 +2985,11 @@ static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
 static Descriptor descriptor_function_call_setup_pointer;
 static Descriptor descriptor_function_call_setup_pointer_pointer;
+static Descriptor descriptor_mass_function_call_lazy_payload;
+static Descriptor descriptor_array_mass_function_call_lazy_payload;
+static Descriptor descriptor_array_mass_function_call_lazy_payload_ptr;
+static Descriptor descriptor_mass_function_call_lazy_payload_pointer;
+static Descriptor descriptor_mass_function_call_lazy_payload_pointer_pointer;
 static Descriptor descriptor_tuple;
 static Descriptor descriptor_array_tuple;
 static Descriptor descriptor_array_tuple_ptr;
@@ -3137,7 +3168,6 @@ static Descriptor descriptor_storage_register_temp;
 static Descriptor descriptor_storage_release_if_temporary;
 static Descriptor descriptor_mass_expected_result_exact;
 static Descriptor descriptor_mass_expected_result_exact_type;
-static Descriptor descriptor_mass_syscall;
 static Descriptor descriptor_value_force;
 static Descriptor descriptor_mass_module_get_impl;
 static Descriptor descriptor_mass_forward_call_to_alias;
@@ -3161,6 +3191,12 @@ static Descriptor descriptor_mass_i64_signed_greater;
 static Descriptor descriptor_mass_i64_unsigned_greater;
 static Descriptor descriptor_mass_i64_signed_greater_equal;
 static Descriptor descriptor_mass_i64_unsigned_greater_equal;
+static Descriptor descriptor_value_make;
+static Descriptor descriptor_descriptor_function_instance;
+static Descriptor descriptor_mass_result_is_error;
+static Descriptor descriptor_calling_convention_x86_64_system_v_syscall_setup_proc;
+static Descriptor descriptor_mass_function_info_init_for_header_and_maybe_body;
+static Descriptor descriptor_call_function_overload;
 static Descriptor descriptor_mass_integer_add;
 static Descriptor descriptor_mass_integer_subtract;
 static Descriptor descriptor_mass_integer_multiply;
@@ -5443,6 +5479,28 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_setup_ptr, function_call_setup_
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_setup, function_call_setup, Array_Function_Call_Setup);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup, function_call_setup);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup *, function_call_setup_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_function_call_lazy_payload, Mass_Function_Call_Lazy_Payload,
+  {
+    .descriptor = &descriptor_value_view,
+    .name = slice_literal_fields("args"),
+    .offset = offsetof(Mass_Function_Call_Lazy_Payload, args),
+  },
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("overload"),
+    .offset = offsetof(Mass_Function_Call_Lazy_Payload, overload),
+  },
+  {
+    .descriptor = &descriptor_function_info_pointer,
+    .name = slice_literal_fields("info"),
+    .offset = offsetof(Mass_Function_Call_Lazy_Payload, info),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_function_call_lazy_payload);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_function_call_lazy_payload_ptr, mass_function_call_lazy_payload_pointer, Array_Mass_Function_Call_Lazy_Payload_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_mass_function_call_lazy_payload, mass_function_call_lazy_payload, Array_Mass_Function_Call_Lazy_Payload);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_Function_Call_Lazy_Payload, mass_function_call_lazy_payload);
+DEFINE_VALUE_IS_AS_HELPERS(Mass_Function_Call_Lazy_Payload *, mass_function_call_lazy_payload_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
   {
     .descriptor = &descriptor_epoch,

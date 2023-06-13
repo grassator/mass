@@ -6,7 +6,43 @@ make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Fu
     // AMD64 ABI A.2.1.4
     // System-calls are limited to six arguments, no argument is passed directly on the stack.
     assert(length(signature.parameters) <= 6)
-    MASS.syscall(context, parser, arguments, &signature, number)
+    fn_info := allocate(context.allocator, MASS.Function_Info)
+    MASS.function_info_init_for_header_and_maybe_body(context, parser.scope, &signature, 0, fn_info)
+    if MASS.result_is_error(context.result) then return 0
+    call_setup := MASS.calling_convention_x86_64_system_v_syscall_setup_proc(context.allocator, fn_info)
+
+    fn_descriptor := MASS.descriptor_function_instance(context.allocator, fn_info, call_setup, 0)
+    storage := MASS.Storage [
+      .tag = .Immediate,
+      .flags = .None,
+      .bit_size = [64],
+      .Immediate = [.bits = number],
+    ]
+    source_range := arguments.source_range
+    overload := MASS.value_make(context, fn_descriptor, storage, source_range)
+
+    call_payload := allocate(context.allocator, MASS.Function_Call_Lazy_Payload)
+    call_payload.* = [
+      .overload = overload,
+      .args = arguments,
+      .info = 0, // should this be fn_info?
+    ]
+
+    lazy_value := allocate(context.allocator, MASS.Value)
+    lazy_value.* = [
+      .tag = .Lazy,
+      .flags = .None,
+      .descriptor = fn_info.return_descriptor,
+      .source_range = source_range,
+      .Lazy = [
+        .is_factory = false,
+        .scope = parser.scope,
+        .epoch = parser.epoch,
+        .proc = cast(MASS.Lazy_Value_Proc, MASS.call_function_overload),
+        .payload = cast(&Void, call_payload),
+      ],
+    ]
+    lazy_value
   })
 }
 

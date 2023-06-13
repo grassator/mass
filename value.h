@@ -274,7 +274,7 @@ value_init(
   return result;
 }
 
-static inline Value *
+static Value *
 value_make(
   Mass_Context *context,
   const Descriptor *descriptor,
