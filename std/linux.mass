@@ -25,7 +25,7 @@ make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Fu
     call_payload.* = [
       .overload = overload,
       .args = arguments,
-      .info = 0, // should this be fn_info?
+      .info = fn_info,
     ]
 
     lazy_value := allocate(context.allocator, MASS.Value)
