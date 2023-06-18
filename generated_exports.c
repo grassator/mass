@@ -1729,6 +1729,18 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
+    calling_convention_x86_64_system_v_call_setup_proc, "calling_convention_x86_64_system_v_call_setup_proc", &descriptor_function_call_setup,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("function")),
+      .descriptor = &descriptor_function_info_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
     calling_convention_x86_64_system_v_syscall_setup_proc, "calling_convention_x86_64_system_v_syscall_setup_proc", &descriptor_function_call_setup,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),

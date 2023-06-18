@@ -1,5 +1,20 @@
 STDOUT_FILENO :: 1
 
+Register :: MASS.Register
+
+system_v_call_setup :: MASS.Calling_Convention [
+  .call_setup_proc = MASS.calling_convention_x86_64_system_v_call_setup_proc,
+  .register_volatile_bitset = [
+    // Arguments
+    (1 << zero_extend(i64, Register.DI)) | (1 << zero_extend(i64, Register.SI)) | (1 << zero_extend(i64, Register.D)) |
+    (1 << zero_extend(i64, Register.C)) | (1 << zero_extend(i64, Register.R8)) | (1 << zero_extend(i64, Register.R9)) |
+    // Varargs / Return
+    (1 << zero_extend(i64, Register.A)) | (1 << zero_extend(i64, Register.D)) | // 'D' is used both for args and return
+    // Other
+    (1 << zero_extend(i64, Register.R10)) | (1 << zero_extend(i64, Register.R11))
+  ]
+]
+
 make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Function_Literal) {
   signature (intrinsic {
     meta :: import("std/meta")

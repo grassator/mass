@@ -1031,6 +1031,9 @@ static Descriptor * descriptor_function_instance
 static _Bool mass_result_is_error
   (Mass_Result * result);
 
+static Function_Call_Setup calling_convention_x86_64_system_v_call_setup_proc
+  (const Allocator * allocator, const Function_Info * function);
+
 static Function_Call_Setup calling_convention_x86_64_system_v_syscall_setup_proc
   (const Allocator * allocator, const Function_Info * function);
 
@@ -3194,6 +3197,7 @@ static Descriptor descriptor_mass_i64_unsigned_greater_equal;
 static Descriptor descriptor_value_make;
 static Descriptor descriptor_descriptor_function_instance;
 static Descriptor descriptor_mass_result_is_error;
+static Descriptor descriptor_calling_convention_x86_64_system_v_call_setup_proc;
 static Descriptor descriptor_calling_convention_x86_64_system_v_syscall_setup_proc;
 static Descriptor descriptor_mass_function_info_init_for_header_and_maybe_body;
 static Descriptor descriptor_call_function_overload;

@@ -2499,6 +2499,11 @@ main(void) {
     })
   ));
 
+  export_compiler(push_type(type_function(Default, "calling_convention_x86_64_system_v_call_setup_proc", "Function_Call_Setup", (Argument_Type[]){
+    { "const Allocator *", "allocator" },
+    { "const Function_Info *", "function" },
+  })));
+
   export_compiler(push_type(type_function(Default, "calling_convention_x86_64_system_v_syscall_setup_proc", "Function_Call_Setup", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function" },
