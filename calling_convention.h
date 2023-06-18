@@ -41,19 +41,6 @@ static const Calling_Convention calling_convention_x86_64_system_v = {
   ),
 };
 
-static const Calling_Convention calling_convention_x86_64_system_v_syscall = {
-  .call_setup_proc = calling_convention_x86_64_system_v_syscall_setup_proc,
-  .register_volatile_bitset = (
-    // Arguments
-    (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
-    (1llu << Register_R10) | (1llu << Register_R8) | (1llu << Register_R9) |
-    // Return
-    (1llu << Register_A) |
-    // Other
-    (1llu << Register_C) | (1llu << Register_R11)
-  ),
-};
-
 #endif // CALLING_CONVENTION_H
 
 static void
