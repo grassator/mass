@@ -111,11 +111,41 @@
   static const Symbol mass_meta_brand_##_NAME_ = {.name = slice_literal_fields(#_NAME_) };\
   MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _C_TYPE_, &(mass_meta_brand_##_NAME_), __VA_ARGS__)
 
-#define MASS_DEFINE_C_DYN_ARRAY_TYPE(_NAME_, _ITEM_, _C_TYPE_)\
-  MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_,  _C_TYPE_, \
+#define MASS_DEFINE_C_DYN_ARRAY_TYPE(_NAME_, _ITEM_, _C_TYPE_) \
+  MASS_DEFINE_STRUCT_DESCRIPTOR(dyn_##_NAME_, dyn_array_struct(_C_TYPE_), \
+    {\
+      .descriptor = &descriptor_allocator_pointer,\
+      .name = slice_literal_fields("allocator"),\
+      .offset = offsetof(Dyn_Array_Internal, allocator),\
+    },\
+    {\
+      .descriptor = &descriptor_i64,\
+      .name = slice_literal_fields("length"),\
+      .offset = offsetof(Dyn_Array_Internal, length),\
+    },\
+    {\
+      .descriptor = &descriptor_i64,\
+      .name = slice_literal_fields("capacity"),\
+      .offset = offsetof(Dyn_Array_Internal, capacity),\
+    },\
+    {\
+      .descriptor = &(Descriptor){\
+        .tag = Descriptor_Tag_Fixed_Array,\
+        .Fixed_Array = { .item = &descriptor_i64 }\
+      },\
+      .name = slice_literal_fields("items"),\
+      .offset = offsetof(Dyn_Array_Internal, items),\
+    },\
+  );\
+  MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_,  _C_TYPE_, 0/*no brand*/, \
     {\
       .descriptor = &descriptor_dyn_array_internal_pointer,\
       .name = slice_literal_fields("internal"),\
+      .offset = 0,\
+    },\
+    {\
+      .descriptor = &descriptor_dyn_##_NAME_##_pointer,\
+      .name = slice_literal_fields("data"),\
       .offset = 0,\
     },\
   )
