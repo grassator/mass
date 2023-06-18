@@ -615,6 +615,8 @@ get_target_os :: fn() -> (Os) intrinsic {
   meta.immediate(context.compilation, context.program.os, arguments.source_range)
 }
 
+length :: fn(array ~ is_fixed_array_type) -> (i64) { type_descriptor(type_of(array)).Fixed_Array.length }
+
 // TODO move this to something like c_prelude_interop
 length :: fn(array : [internal : &MASS.Dyn_Array_Internal]) -> (i64) { array.internal.length }
 
