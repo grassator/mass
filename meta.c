@@ -1773,7 +1773,7 @@ main(void) {
     { "Value *", "maybe_default_value" },
   }));
 
-  push_type(add_common_fields(type_union("Resolved_Function_Parameter", (Struct_Type[]){
+  export_compiler(push_type(add_common_fields(type_union("Resolved_Function_Parameter", (Struct_Type[]){
     struct_empty("Unknown"),
     struct_fields("Known", (Struct_Item[]){
       { "Storage", "storage" },
@@ -1784,7 +1784,7 @@ main(void) {
     { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
     { "Value *", "maybe_default_value" },
-  }));
+  })));
 
   push_type(type_enum("Function_Info_Flags", (Enum_Type_Item[]){
     { "None", 0 },
@@ -1838,10 +1838,10 @@ main(void) {
     { "Array_Function_Specialization", "specializations"},
   })));
 
-  push_type(type_enum("Function_Call_Jump", (Enum_Type_Item[]){
+  export_compiler(push_type(type_enum("Function_Call_Jump", (Enum_Type_Item[]){
     { "Call", 0 },
     { "Syscall", 1},
-  }));
+  })));
 
   push_type(type_enum("Function_Call_Parameter_Flags", (Enum_Type_Item[]){
     { "None", 0 },
@@ -2271,6 +2271,21 @@ main(void) {
     { "const Instruction_Encoding *", "encoding_list" },
     { "u64", "encoding_count" },
   }));
+
+  export_compiler(push_type(type_function(Default, "x86_64_system_v_classify", "System_V_Classification", (Argument_Type[]){
+    {"const Descriptor *", "descriptor"},
+  })));
+
+  export_compiler(push_type(type_function(Default, "x86_64_system_v_parameter_for_classification", "Function_Call_Parameter", (Argument_Type[]){
+    {"const Allocator *", "allocator"},
+    {"System_V_Register_State *", "registers"},
+    {"const System_V_Classification *", "classification"},
+    {"u64 *", "stack_offset"},
+  })));
+
+  export_compiler(push_type(type_function(Default, "call_setup_fill_parameter_register_bitset", "void", (Argument_Type[]){
+    {"Function_Call_Setup *", "setup"},
+  })));
 
   export_compiler(push_type(type_function(Default, "push_instruction", "void", (Argument_Type[]){
     {"Code_Block *", "code_block"},

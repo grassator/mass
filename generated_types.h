@@ -844,6 +844,15 @@ typedef struct X64_Mnemonic X64_Mnemonic;
 typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
 typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
+static System_V_Classification x86_64_system_v_classify
+  (const Descriptor * descriptor);
+
+static Function_Call_Parameter x86_64_system_v_parameter_for_classification
+  (const Allocator * allocator, System_V_Register_State * registers, const System_V_Classification * classification, u64 * stack_offset);
+
+static void call_setup_fill_parameter_register_bitset
+  (Function_Call_Setup * setup);
+
 static void push_instruction
   (Code_Block * code_block, Instruction instruction);
 
@@ -3236,6 +3245,9 @@ static Descriptor descriptor_array_x64_mnemonic;
 static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
+static Descriptor descriptor_x86_64_system_v_classify;
+static Descriptor descriptor_x86_64_system_v_parameter_for_classification;
+static Descriptor descriptor_call_setup_fill_parameter_register_bitset;
 static Descriptor descriptor_push_instruction;
 static Descriptor descriptor_mass_get;
 static Descriptor descriptor_mass_get_from_descriptor_module;

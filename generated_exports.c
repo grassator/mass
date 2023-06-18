@@ -388,6 +388,27 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Intrinsic_Proc")),
     type_mass_intrinsic_proc_value
   );
+  Source_Range Resolved_Function_Parameter__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Resolved_Function_Parameter__source_range, "Resolved_Function_Parameter");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Resolved_Function_Parameter__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Resolved_Function_Parameter")),
+    type_resolved_function_parameter_value
+  );
+  Source_Range Resolved_Function_Parameter_Tag__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Resolved_Function_Parameter_Tag__source_range, "Resolved_Function_Parameter_Tag");
+  scope_define_enum(
+    compilation, scope, Resolved_Function_Parameter_Tag__source_range,
+    slice_literal("Resolved_Function_Parameter_Tag"), type_resolved_function_parameter_tag_value,
+    resolved_function_parameter_tag_items, countof(resolved_function_parameter_tag_items)
+  );
+  Source_Range Resolved_Function_Parameter_Known__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Resolved_Function_Parameter_Known__source_range, "Resolved_Function_Parameter_Known");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Resolved_Function_Parameter_Known__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Resolved_Function_Parameter_Known")),
+    type_resolved_function_parameter_known_value
+  );
   Source_Range Function_Info__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Info__source_range, "Function_Info");
   scope_define_value(
@@ -408,6 +429,13 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Function_Literal__source_range,
     mass_ensure_symbol(compilation, slice_literal("Function_Literal")),
     type_function_literal_value
+  );
+  Source_Range Function_Call_Jump__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Call_Jump__source_range, "Function_Call_Jump");
+  scope_define_enum(
+    compilation, scope, Function_Call_Jump__source_range,
+    slice_literal("Function_Call_Jump"), type_function_call_jump_value,
+    function_call_jump_items, countof(function_call_jump_items)
   );
   Source_Range Function_Call_Parameter__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Call_Parameter__source_range, "Function_Call_Parameter");
@@ -709,6 +737,42 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, Lazy_Value_Proc__source_range,
     mass_ensure_symbol(compilation, slice_literal("Lazy_Value_Proc")),
     type_lazy_value_proc_value
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    x86_64_system_v_classify, "x86_64_system_v_classify", &descriptor_system_v_classification,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("descriptor")),
+      .descriptor = &descriptor_descriptor_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    x86_64_system_v_parameter_for_classification, "x86_64_system_v_parameter_for_classification", &descriptor_function_call_parameter,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("allocator")),
+      .descriptor = &descriptor_allocator_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("registers")),
+      .descriptor = &descriptor_system_v_register_state_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("classification")),
+      .descriptor = &descriptor_system_v_classification_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("stack_offset")),
+      .descriptor = &descriptor_i64_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    call_setup_fill_parameter_register_bitset, "call_setup_fill_parameter_register_bitset", &descriptor_void,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("setup")),
+      .descriptor = &descriptor_function_call_setup_pointer
+    }
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
