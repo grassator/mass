@@ -1,4 +1,4 @@
-exports [.reify, .static_value, .immediate, .same_type, .context_error, .Value]
+exports [.reify, .static_value, .immediate_storage, .immediate, .same_type, .context_error, .Value]
 
 Value :: MASS.Value
 Source_Range :: MASS.Source_Range
@@ -50,6 +50,24 @@ static_value :: fn(
   static_value
 }
 
+immediate_storage :: fn(
+  source
+) -> (MASS.Storage) {
+  type :: type_of(source)
+  descriptor :: type_descriptor(type)
+  type_bit_size :: descriptor.bit_size
+  static_assert(type_bit_size <= 64, "Type is too large to fit into an immediate")
+
+  storage := MASS.Storage [
+    .tag = .Immediate,
+    .flags = .None,
+    .bit_size = type_bit_size,
+    .Immediate = [.bits = 0],
+  ]
+  cast(type, storage.Immediate.bits) = source
+  storage
+}
+
 immediate :: fn(
   compilation : &MASS.Compilation,
   source,
@@ -64,10 +82,7 @@ immediate :: fn(
   static_value.tag = .Forced
   static_value.source_range = source_range
   static_value.descriptor = descriptor
-
-  static_value.Forced.storage.tag = .Immediate
-  static_value.Forced.storage.bit_size = type_bit_size
-  cast(type, static_value.Forced.storage.Immediate.bits) = source
+  static_value.Forced.storage = immediate_storage(source)
 
   static_value
 }

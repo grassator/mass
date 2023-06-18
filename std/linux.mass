@@ -2,6 +2,7 @@ STDOUT_FILENO :: 1
 
 make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Function_Literal) {
   signature (intrinsic {
+    meta :: import("std/meta")
     using unsigned
     // AMD64 ABI A.2.1.4
     // System-calls are limited to six arguments, no argument is passed directly on the stack.
@@ -12,12 +13,7 @@ make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Fu
     call_setup := MASS.calling_convention_x86_64_system_v_syscall_setup_proc(context.allocator, fn_info)
 
     fn_descriptor := MASS.descriptor_function_instance(context.allocator, fn_info, call_setup, 0)
-    storage := MASS.Storage [
-      .tag = .Immediate,
-      .flags = .None,
-      .bit_size = [64],
-      .Immediate = [.bits = number],
-    ]
+    storage := meta.immediate_storage(number)
     source_range := arguments.source_range
     overload := MASS.value_make(context, fn_descriptor, storage, source_range)
 
