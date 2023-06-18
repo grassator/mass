@@ -430,6 +430,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("List_Node")),
     type_list_node_value
   );
+  Source_Range Struct_Field__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Struct_Field__source_range, "Struct_Field");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Struct_Field__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Struct_Field")),
+    type_struct_field_value
+  );
   Source_Range Descriptor__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Descriptor__source_range, "Descriptor");
   scope_define_value(
@@ -1700,6 +1707,18 @@ compiler_scope_define_exports(
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
       .descriptor = &descriptor_i64
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    slice_equal, "slice_equal", &descriptor__bool,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("a")),
+      .descriptor = &descriptor_slice
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
+      .descriptor = &descriptor_slice
     }
   );
   MASS_DEFINE_FUNCTION(

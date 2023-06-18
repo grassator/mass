@@ -1894,12 +1894,12 @@ main(void) {
     { "const Descriptor *", "descriptor"},
   }));
 
-  push_type(type_struct("Struct_Field", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Struct_Field", (Struct_Item[]){
     // TODO This should probably be "const Symbol *", but generating that is a giant pain
     { "Slice", "name"},
     { "const Descriptor *", "descriptor"},
     { "u64", "offset" },
-  }));
+  })));
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Void"),
@@ -2484,6 +2484,11 @@ main(void) {
       })
     ));
   }
+
+  export_compiler(push_type(type_function(Default, "slice_equal", "_Bool", (Argument_Type[]){
+    { "Slice", "a" },
+    { "Slice", "b" },
+  })));
 
   export_compiler(push_type(type_function(Default, "value_make", "Value *", (Argument_Type[]){
     { "Mass_Context *", "context" },

@@ -618,5 +618,26 @@ get_target_os :: fn() -> (Os) intrinsic {
 length :: fn(array ~ is_fixed_array_type) -> (i64) { type_descriptor(type_of(array)).Fixed_Array.length }
 
 // TODO move this to something like c_prelude_interop
-length :: fn(array : [internal : &MASS.Dyn_Array_Internal]) -> (i64) { array.internal.length }
+is_c_dyn_array :: fn(t : Type) -> (bool) {
+  descriptor := type_descriptor(t)
+  if descriptor.tag != .Struct then return false
+  s := descriptor.Struct
+  if s.fields.data.length != 2 then return false
+  fields := cast(&(MASS.Struct_Field * 2), &s.fields.data.items)
+  if MASS.slice_equal(fields.0.name, "internal") != true then return false
+  if MASS.slice_equal(fields.1.name, "data") != true then return false
+  internal := fields.0.descriptor
+  if internal != type_descriptor(&MASS.Dyn_Array_Internal) then return false
+  return true
+}
+
+dyn_array_get :: fn(array ~ is_c_dyn_array, offset : i64) -> _ {
+  item_descriptor :: type_descriptor(type_of(array.data.items)).Fixed_Array.item
+  item_type :: Type[item_descriptor]
+  using unsigned
+  assert(offset < array.data.length)
+
+  unchecked_get_at_index(cast(&item_type, &array.data.items), offset)
+}
+length :: fn(array ~ is_c_dyn_array) -> (i64) { array.internal.length }
 

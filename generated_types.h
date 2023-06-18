@@ -1029,6 +1029,9 @@ static _Bool mass_i64_signed_greater_equal
 static _Bool mass_i64_unsigned_greater_equal
   (i64 a, i64 b);
 
+static _Bool slice_equal
+  (Slice a, Slice b);
+
 static Value * value_make
   (Mass_Context * context, const Descriptor * descriptor, Storage storage, Source_Range source_range);
 
@@ -3213,6 +3216,7 @@ static Descriptor descriptor_mass_i64_signed_greater;
 static Descriptor descriptor_mass_i64_unsigned_greater;
 static Descriptor descriptor_mass_i64_signed_greater_equal;
 static Descriptor descriptor_mass_i64_unsigned_greater_equal;
+static Descriptor descriptor_slice_equal;
 static Descriptor descriptor_value_make;
 static Descriptor descriptor_descriptor_function_instance;
 static Descriptor descriptor_mass_result_is_error;
