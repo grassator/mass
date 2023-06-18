@@ -112,7 +112,7 @@
   MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(_NAME_, _C_TYPE_, &(mass_meta_brand_##_NAME_), __VA_ARGS__)
 
 #define MASS_DEFINE_C_DYN_ARRAY_TYPE(_NAME_, _ITEM_, _C_TYPE_) \
-  MASS_DEFINE_STRUCT_DESCRIPTOR(dyn_##_NAME_, dyn_array_struct(_C_TYPE_), \
+  MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(dyn_##_NAME_, dyn_array_struct(_C_TYPE_), 0/*no brand*/, \
     {\
       .descriptor = &descriptor_allocator_pointer,\
       .name = slice_literal_fields("allocator"),\
@@ -131,7 +131,7 @@
     {\
       .descriptor = &(Descriptor){\
         .tag = Descriptor_Tag_Fixed_Array,\
-        .Fixed_Array = { .item = &descriptor_##_NAME_ }\
+        .Fixed_Array = { .item = &descriptor_##_ITEM_ }\
       },\
       .name = slice_literal_fields("items"),\
       .offset = offsetof(Dyn_Array_Internal, items),\
