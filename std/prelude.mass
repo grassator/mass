@@ -637,7 +637,7 @@ dyn_array_get :: fn(array ~ is_c_dyn_array, offset : i64) -> _ {
   using unsigned
   assert(offset < array.data.length)
 
-  unchecked_get_at_index(cast(&item_type, &array.data.items), offset)
+  cast(&item_type, &unchecked_get_at_index(cast(&item_type, &array.data.items), offset))
 }
 length :: fn(array ~ is_c_dyn_array) -> (i64) { array.internal.length }
 
