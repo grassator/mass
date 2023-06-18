@@ -367,11 +367,28 @@ typedef enum {
   Brand_Comparison_Mode_One_Unbranded,
 } Brand_Comparison_Mode;
 
+typedef struct Types_Equal_Nested_List {
+  const Descriptor *descriptor;
+  struct Types_Equal_Nested_List *previous;
+} Types_Equal_Nested_List;
+
+static inline bool
+is_in_types_equal_nested_list(
+  const Types_Equal_Nested_List* list,
+  const Descriptor *descriptor
+) {
+  for (; list; list = list->previous) {
+    if (list->descriptor == descriptor) return true;
+  }
+  return false;
+}
+
 static bool
-types_equal(
+types_equal_internal(
   const Descriptor *a,
   const Descriptor *b,
-  Brand_Comparison_Mode brand_comparison_mode
+  Brand_Comparison_Mode brand_comparison_mode,
+  Types_Equal_Nested_List *nested_list
 ) {
   if (a->brand != b->brand) {
     switch (brand_comparison_mode) {
@@ -391,6 +408,9 @@ types_equal(
   if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
   if (a->bit_alignment.as_u64 != b->bit_alignment.as_u64) return false;
 
+  if (is_in_types_equal_nested_list(nested_list, a)) return true;
+  nested_list = &(Types_Equal_Nested_List){a, nested_list};
+
   switch(a->tag) {
     case Descriptor_Tag_Void:
     case Descriptor_Tag_Never:
@@ -401,10 +421,10 @@ types_equal(
       return a->Integer.is_signed == b->Integer.is_signed;
     }
     case Descriptor_Tag_Pointer_To: {
-      return types_equal(a->Pointer_To.descriptor, b->Pointer_To.descriptor, brand_comparison_mode);
+      return types_equal_internal(a->Pointer_To.descriptor, b->Pointer_To.descriptor, brand_comparison_mode, nested_list);
     }
     case Descriptor_Tag_Fixed_Array: {
-      return types_equal(a->Fixed_Array.item, b->Fixed_Array.item, brand_comparison_mode) &&
+      return types_equal_internal(a->Fixed_Array.item, b->Fixed_Array.item, brand_comparison_mode, nested_list) &&
         a->Fixed_Array.length == b->Fixed_Array.length;
     }
     case Descriptor_Tag_Struct: {
@@ -414,7 +434,7 @@ types_equal(
       for (u64 i = 0; i < dyn_array_length(a->Struct.fields); ++i) {
         const Descriptor *a_field = dyn_array_get(a->Struct.fields, i)->descriptor;
         const Descriptor *b_field = dyn_array_get(b->Struct.fields, i)->descriptor;
-        if (!types_equal(a_field, b_field, brand_comparison_mode)) return false;
+        if (!types_equal_internal(a_field, b_field, brand_comparison_mode, nested_list)) return false;
       }
       return true;
     }
@@ -429,6 +449,15 @@ types_equal(
       return false;
     }
   }
+}
+
+static bool
+types_equal(
+  const Descriptor *a,
+  const Descriptor *b,
+  Brand_Comparison_Mode brand_comparison_mode
+) {
+  return types_equal_internal(a, b, brand_comparison_mode, 0);
 }
 
 static inline bool
