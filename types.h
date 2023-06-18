@@ -131,7 +131,7 @@
     {\
       .descriptor = &(Descriptor){\
         .tag = Descriptor_Tag_Fixed_Array,\
-        .Fixed_Array = { .item = &descriptor_i64 }\
+        .Fixed_Array = { .item = &descriptor_##_NAME_ }\
       },\
       .name = slice_literal_fields("items"),\
       .offset = offsetof(Dyn_Array_Internal, items),\
