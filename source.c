@@ -2557,7 +2557,12 @@ mass_cast_lazy_proc(
     );
   } else {
     if (cast_to_bit_size.as_u64 > original_bit_size.as_u64) {
-      panic("TODO user error");
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = source_range,
+        .detailed_message = "Target type must be smaller or equal to the source type",
+        .Type_Mismatch = { .expected = &target_descriptor, .actual = source_descriptor },
+      });
       return 0;
     } else {
       const Storage *original_storage = &value_as_forced(value)->storage;
