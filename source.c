@@ -1044,8 +1044,8 @@ mass_assign_helper(
         }
       }
     }
-    if (descriptor_is_integer(target->descriptor)) {
-       Mass_Cast_Lazy_Payload lazy_payload = {
+    if (descriptor_is_integer(target->descriptor) || target->descriptor->tag == Descriptor_Tag_Raw) {
+      Mass_Cast_Lazy_Payload lazy_payload = {
         .target = target->descriptor,
         .expression = source,
       };
