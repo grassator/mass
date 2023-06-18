@@ -2654,6 +2654,16 @@ mass_zero_extend(
     context, parser->scope, value_view_get(&args_view, 0), args_view.source_range
   );
   if (mass_has_error(context)) return 0;
+  if (target_descriptor->bit_size.as_u64 > 64) {
+    mass_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = args_view.source_range,
+      .detailed_message = "Target type must be smaller or equal to 64 bits",
+      .Type_Mismatch = { .expected = &descriptor_void, .actual = target_descriptor },
+    });
+    return 0;
+  }
+
   Value *expression = value_view_get(&args_view, 1);
 
   Mass_Cast_Lazy_Payload lazy_payload = {
@@ -2662,7 +2672,8 @@ mass_zero_extend(
   };
 
   if (mass_value_is_static(expression)) {
-    Expected_Result expected_result = expected_result_any(target_descriptor);
+    Storage storage = storage_immediate_with_bit_size(&(u64){0}, target_descriptor->bit_size);
+    Expected_Result expected_result = mass_expected_result_exact(target_descriptor, storage);
     return mass_zero_extend_lazy_proc(context, 0, &expected_result, parser->scope, &args_view.source_range, &lazy_payload);
   }
 
