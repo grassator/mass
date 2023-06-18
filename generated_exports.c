@@ -409,6 +409,55 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Function_Literal")),
     type_function_literal_value
   );
+  Source_Range Function_Call_Parameter__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Call_Parameter__source_range, "Function_Call_Parameter");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Call_Parameter__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Call_Parameter")),
+    type_function_call_parameter_value
+  );
+  Source_Range Function_Call_Setup__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Function_Call_Setup__source_range, "Function_Call_Setup");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Function_Call_Setup__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Function_Call_Setup")),
+    type_function_call_setup_value
+  );
+  Source_Range SYSTEM_V_ARGUMENT_CLASS__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&SYSTEM_V_ARGUMENT_CLASS__source_range, "SYSTEM_V_ARGUMENT_CLASS");
+  scope_define_enum(
+    compilation, scope, SYSTEM_V_ARGUMENT_CLASS__source_range,
+    slice_literal("SYSTEM_V_ARGUMENT_CLASS"), type_system_v_argument_class_value,
+    system_v_argument_class_items, countof(system_v_argument_class_items)
+  );
+  Source_Range System_V_Classification__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&System_V_Classification__source_range, "System_V_Classification");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, System_V_Classification__source_range,
+    mass_ensure_symbol(compilation, slice_literal("System_V_Classification")),
+    type_system_v_classification_value
+  );
+  Source_Range System_V_Registers__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&System_V_Registers__source_range, "System_V_Registers");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, System_V_Registers__source_range,
+    mass_ensure_symbol(compilation, slice_literal("System_V_Registers")),
+    type_system_v_registers_value
+  );
+  Source_Range System_V_Register_State__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&System_V_Register_State__source_range, "System_V_Register_State");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, System_V_Register_State__source_range,
+    mass_ensure_symbol(compilation, slice_literal("System_V_Register_State")),
+    type_system_v_register_state_value
+  );
+  Source_Range System_V_Eightbyte_Array__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&System_V_Eightbyte_Array__source_range, "System_V_Eightbyte_Array");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, System_V_Eightbyte_Array__source_range,
+    mass_ensure_symbol(compilation, slice_literal("System_V_Eightbyte_Array")),
+    type_system_v_eightbyte_array_value
+  );
   Source_Range Function_Call_Lazy_Payload__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Call_Lazy_Payload__source_range, "Function_Call_Lazy_Payload");
   scope_define_value(

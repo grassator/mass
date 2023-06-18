@@ -183,48 +183,19 @@ calling_convention_x86_64_common_end_proc(
   }
 }
 
-typedef enum {
-  SYSTEM_V_NO_CLASS,
-  SYSTEM_V_INTEGER,
-  SYSTEM_V_SSE,
-  SYSTEM_V_SSEUP,
-  SYSTEM_V_X87,
-  SYSTEM_V_X87UP,
-  SYSTEM_V_COMPLEX_X87,
-  SYSTEM_V_MEMORY,
-} SYSTEM_V_ARGUMENT_CLASS;
-typedef dyn_array_type(SYSTEM_V_ARGUMENT_CLASS) Array_SYSTEM_V_ARGUMENT_CLASS;
-
-typedef struct {
-  SYSTEM_V_ARGUMENT_CLASS class;
-  const Descriptor *descriptor;
-  u64 eightbyte_count;
-} System_V_Classification;
-
-typedef struct {
-  const Register *items;
-  u32 count;
-  u32 index;
-} System_V_Registers;
-
-typedef struct {
-  System_V_Registers general;
-  System_V_Registers vector;
-} System_V_Register_State;
-
 static void
 x86_64_system_v_adjust_classification_if_no_register_available(
   System_V_Register_State *registers,
   System_V_Classification *classification
 ) {
-  if (classification->class == SYSTEM_V_INTEGER) {
+  if (classification->class == SYSTEM_V_ARGUMENT_CLASS_INTEGER) {
     if (registers->general.index + classification->eightbyte_count > registers->general.count) {
-      classification->class = SYSTEM_V_MEMORY;
+      classification->class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
     }
   }
-  if (classification->class == SYSTEM_V_SSE) {
+  if (classification->class == SYSTEM_V_ARGUMENT_CLASS_SSE) {
     if (registers->vector.index + classification->eightbyte_count > registers->vector.count) {
-      classification->class = SYSTEM_V_MEMORY;
+      classification->class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
     }
   }
 }
@@ -239,10 +210,10 @@ x86_64_system_v_parameter_for_classification(
   u64 byte_size = descriptor_byte_size(classification->descriptor);
   Storage storage = imm0;
   switch(classification->class) {
-    case SYSTEM_V_NO_CLASS: {
+    case SYSTEM_V_ARGUMENT_CLASS_NO_CLASS: {
       goto absolute;
     } break;
-    case SYSTEM_V_INTEGER: {
+    case SYSTEM_V_ARGUMENT_CLASS_INTEGER: {
       System_V_Registers *gpr = &registers->general;
       assert (gpr->index + classification->eightbyte_count <= gpr->count);
       if (classification->eightbyte_count == 1) {
@@ -282,7 +253,7 @@ x86_64_system_v_parameter_for_classification(
       }
       goto absolute;
     } break;
-    case SYSTEM_V_SSE: {
+    case SYSTEM_V_ARGUMENT_CLASS_SSE: {
       assert (registers->vector.index + classification->eightbyte_count <= registers->vector.count);
       if (classification->eightbyte_count == 1) {
         Register reg = registers->vector.items[registers->vector.index++];
@@ -292,7 +263,7 @@ x86_64_system_v_parameter_for_classification(
       }
       goto absolute;
     } break;
-    case SYSTEM_V_MEMORY: {
+    case SYSTEM_V_ARGUMENT_CLASS_MEMORY: {
       u64 alignment = descriptor_byte_alignment(classification->descriptor);
       *stack_offset = u64_align(*stack_offset, u64_max(8, alignment));
       Bits bit_size = classification->descriptor->bit_size;
@@ -304,10 +275,10 @@ x86_64_system_v_parameter_for_classification(
       *stack_offset += byte_size;
       return result;
     } break;
-    case SYSTEM_V_SSEUP:
-    case SYSTEM_V_X87:
-    case SYSTEM_V_X87UP:
-    case SYSTEM_V_COMPLEX_X87: {
+    case SYSTEM_V_ARGUMENT_CLASS_SSEUP:
+    case SYSTEM_V_ARGUMENT_CLASS_X87:
+    case SYSTEM_V_ARGUMENT_CLASS_X87UP:
+    case SYSTEM_V_ARGUMENT_CLASS_COMPLEX_X87: {
       panic("TODO");
     } break;
     default: {
@@ -393,11 +364,6 @@ x86_64_system_v_has_unaligned(
   return false;
 }
 
-typedef struct {
-  SYSTEM_V_ARGUMENT_CLASS classes[8];
-  u64 count;
-} System_V_Eightbyte_Array;
-
 static void
 x86_64_system_v_classify_field_recursively(
   System_V_Eightbyte_Array *eightbyte_array,
@@ -416,29 +382,29 @@ x86_64_system_v_classify(
   switch(descriptor->tag) {
     case Descriptor_Tag_Never:
     case Descriptor_Tag_Void: {
-      return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
+      return (System_V_Classification){ .class = SYSTEM_V_ARGUMENT_CLASS_NO_CLASS, .descriptor = descriptor };
     } break;
     case Descriptor_Tag_Function_Instance:
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Raw:
     case Descriptor_Tag_Integer: {
       if (descriptor->bit_size.as_u64 == 0) {
-        return (System_V_Classification){ .class = SYSTEM_V_NO_CLASS, .descriptor = descriptor };
+        return (System_V_Classification){ .class = SYSTEM_V_ARGUMENT_CLASS_NO_CLASS, .descriptor = descriptor };
       }
       if (byte_size <= eightbyte) {
-        SYSTEM_V_ARGUMENT_CLASS class = SYSTEM_V_INTEGER;
+        SYSTEM_V_ARGUMENT_CLASS class = SYSTEM_V_ARGUMENT_CLASS_INTEGER;
         return (System_V_Classification){
           .class = class,
           .descriptor = descriptor,
           .eightbyte_count = 1,
         };
       } else {
-        return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
+        return (System_V_Classification){ .class = SYSTEM_V_ARGUMENT_CLASS_MEMORY, .descriptor = descriptor };
       }
     } break;
     case Descriptor_Tag_Float: {
       assert(byte_size <= eightbyte);
-      return (System_V_Classification){ .class = SYSTEM_V_SSE, .descriptor = descriptor };
+      return (System_V_Classification){ .class = SYSTEM_V_ARGUMENT_CLASS_SSE, .descriptor = descriptor };
     } break;
     case Descriptor_Tag_Struct: {
       it = (System_V_Aggregate_Iterator) {
@@ -461,7 +427,7 @@ x86_64_system_v_classify(
   // 1. If the size of an object is larger than eight eightbytes,
   // or it contains unaligned fields, it has class MEMORY
   if (byte_size > 8 * eightbyte || x86_64_system_v_has_unaligned(it)) {
-    return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
+    return (System_V_Classification){ .class = SYSTEM_V_ARGUMENT_CLASS_MEMORY, .descriptor = descriptor };
   }
   // 2. If a C++ object is non-trivial for the purpose of calls, as specified in the
   // C++ ABI 13, it is passed by invisible reference (the object is replaced in the
@@ -469,7 +435,7 @@ x86_64_system_v_classify(
   bool is_c_plus_plus_non_trivial = false; // TODO allow to specify / detect this
   if (is_c_plus_plus_non_trivial) {
     panic("TODO propagate somehow to the caller that this in an implicit reference");
-    return (System_V_Classification){ .class = SYSTEM_V_INTEGER, .descriptor = descriptor };
+    return (System_V_Classification){ .class = SYSTEM_V_ARGUMENT_CLASS_INTEGER, .descriptor = descriptor };
   }
 
   // 3. If the size of the aggregate exceeds a single eightbyte, each is classified
@@ -479,58 +445,58 @@ x86_64_system_v_classify(
     .count = (byte_size + eightbyte - 1) / (eightbyte),
   };
   for (u32 i = 0; i < eightbyte_array.count; ++i) {
-    eightbyte_array.classes[i] = SYSTEM_V_NO_CLASS;
+    eightbyte_array.classes[i] = SYSTEM_V_ARGUMENT_CLASS_NO_CLASS;
   }
 
   // 4. Each field of an object is classified recursively so that always two fields are considered.
   // The resulting class is calculated according to the classes of the fields in the eightbyte:
   x86_64_system_v_classify_field_recursively(&eightbyte_array, &it, 0);
 
-  SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
+  SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_ARGUMENT_CLASS_NO_CLASS;
 
   // 5. Then a post merger cleanup is done:
   for (u32 i = 0; i < eightbyte_array.count; ++i) {
     bool is_first = i == 0;
     SYSTEM_V_ARGUMENT_CLASS *class = &eightbyte_array.classes[i];
     SYSTEM_V_ARGUMENT_CLASS preceeded_by_class =
-      is_first ? SYSTEM_V_NO_CLASS : eightbyte_array.classes[i - 1];
+      is_first ? SYSTEM_V_ARGUMENT_CLASS_NO_CLASS : eightbyte_array.classes[i - 1];
 
     // 5(a) If one of the classes is MEMORY, the whole argument is passed in memory.
-    if (*class == SYSTEM_V_MEMORY) {
-      struct_class = SYSTEM_V_MEMORY;
+    if (*class == SYSTEM_V_ARGUMENT_CLASS_MEMORY) {
+      struct_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
       break;
     }
     // 5(b) If X87UP is not preceded by X87, the whole argument is passed in memory.
-    if (*class == SYSTEM_V_X87UP && preceeded_by_class != SYSTEM_V_X87) {
-      struct_class = SYSTEM_V_MEMORY;
+    if (*class == SYSTEM_V_ARGUMENT_CLASS_X87UP && preceeded_by_class != SYSTEM_V_ARGUMENT_CLASS_X87) {
+      struct_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
       break;
     }
     // 5(c) If the size of the aggregate exceeds two eightbytes and the first eightbyte
     // isn't SSE or any other eightbyte isn’t SSEUP, the whole argument is passed in memory.
     if (byte_size > 2 * eightbyte) {
       if (is_first) {
-        if (*class != SYSTEM_V_SSE) {
-          struct_class = SYSTEM_V_MEMORY;
+        if (*class != SYSTEM_V_ARGUMENT_CLASS_SSE) {
+          struct_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
           break;
         }
       } else {
-        if (*class != SYSTEM_V_SSEUP) {
-          struct_class = SYSTEM_V_MEMORY;
+        if (*class != SYSTEM_V_ARGUMENT_CLASS_SSEUP) {
+          struct_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
           break;
         }
       }
     }
     // 5(d) If SSEUP is not preceded by SSE or SSEUP, it is converted to SSE.
     if (
-      *class == SYSTEM_V_SSEUP &&
-      !(preceeded_by_class == SYSTEM_V_SSE || preceeded_by_class == SYSTEM_V_SSEUP)
+      *class == SYSTEM_V_ARGUMENT_CLASS_SSEUP &&
+      !(preceeded_by_class == SYSTEM_V_ARGUMENT_CLASS_SSE || preceeded_by_class == SYSTEM_V_ARGUMENT_CLASS_SSEUP)
     ) {
-      *class = SYSTEM_V_SSE;
+      *class = SYSTEM_V_ARGUMENT_CLASS_SSE;
     }
   }
 
   // FIXME we should return the whole array instead  of doing this
-  if (struct_class == SYSTEM_V_NO_CLASS) {
+  if (struct_class == SYSTEM_V_ARGUMENT_CLASS_NO_CLASS) {
     struct_class = eightbyte_array.classes[0];
   }
   System_V_Classification classification = {
@@ -578,12 +544,12 @@ x86_64_system_v_classify_field_recursively(
 
         SYSTEM_V_ARGUMENT_CLASS field_class;
         if (item_byte_size == 0) {
-          field_class = SYSTEM_V_NO_CLASS;
+          field_class = SYSTEM_V_ARGUMENT_CLASS_NO_CLASS;
         } else {
           if (item_byte_size <= eightbyte) {
-            field_class = descriptor_is_float(it->item) ? SYSTEM_V_SSE : SYSTEM_V_INTEGER;
+            field_class = descriptor_is_float(it->item) ? SYSTEM_V_ARGUMENT_CLASS_SSE : SYSTEM_V_ARGUMENT_CLASS_INTEGER;
           } else {
-            field_class = SYSTEM_V_MEMORY;
+            field_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
           }
         }
 
@@ -595,33 +561,33 @@ x86_64_system_v_classify_field_recursively(
           *eightbyte_class = field_class;
         } else
         // 4(b) If one of the classes is NO_CLASS, the resulting class is the other class.
-        if (field_class == SYSTEM_V_NO_CLASS) {
+        if (field_class == SYSTEM_V_ARGUMENT_CLASS_NO_CLASS) {
           eightbyte_class = eightbyte_class;
-        } else if (eightbyte_class == SYSTEM_V_NO_CLASS) {
+        } else if (eightbyte_class == SYSTEM_V_ARGUMENT_CLASS_NO_CLASS) {
           *eightbyte_class = field_class;
         } else
         // 4(c) If one of the classes is MEMORY, the result is the MEMORY class.
-        if (field_class == SYSTEM_V_MEMORY) {
-          *eightbyte_class = SYSTEM_V_MEMORY;
+        if (field_class == SYSTEM_V_ARGUMENT_CLASS_MEMORY) {
+          *eightbyte_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
         } else
         // 4(d) If one of the classes is INTEGER, the result is the INTEGER class.
-        if (*eightbyte_class == SYSTEM_V_INTEGER || field_class == SYSTEM_V_INTEGER) {
-          *eightbyte_class = SYSTEM_V_INTEGER;
+        if (*eightbyte_class == SYSTEM_V_ARGUMENT_CLASS_INTEGER || field_class == SYSTEM_V_ARGUMENT_CLASS_INTEGER) {
+          *eightbyte_class = SYSTEM_V_ARGUMENT_CLASS_INTEGER;
         } else
         // 4(e) If one of the classes is X87, X87UP, COMPLEX_X87 class, MEMORY is used as class.
         if (
-          *eightbyte_class == SYSTEM_V_X87 ||
-          *eightbyte_class == SYSTEM_V_X87UP ||
-          *eightbyte_class == SYSTEM_V_COMPLEX_X87 ||
-          field_class == SYSTEM_V_X87 ||
-          field_class == SYSTEM_V_X87UP ||
-          field_class == SYSTEM_V_COMPLEX_X87
+          *eightbyte_class == SYSTEM_V_ARGUMENT_CLASS_X87 ||
+          *eightbyte_class == SYSTEM_V_ARGUMENT_CLASS_X87UP ||
+          *eightbyte_class == SYSTEM_V_ARGUMENT_CLASS_COMPLEX_X87 ||
+          field_class == SYSTEM_V_ARGUMENT_CLASS_X87 ||
+          field_class == SYSTEM_V_ARGUMENT_CLASS_X87UP ||
+          field_class == SYSTEM_V_ARGUMENT_CLASS_COMPLEX_X87
         ) {
-          *eightbyte_class = SYSTEM_V_MEMORY;
+          *eightbyte_class = SYSTEM_V_ARGUMENT_CLASS_MEMORY;
         }
         // 4(f) Otherwise class SSE is used.
         else {
-          *eightbyte_class = SYSTEM_V_SSE;
+          *eightbyte_class = SYSTEM_V_ARGUMENT_CLASS_SSE;
         }
 
         break;
@@ -686,7 +652,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     };
 
     System_V_Classification classification = x86_64_system_v_classify(return_descriptor);
-    if (classification.class == SYSTEM_V_MEMORY) {
+    if (classification.class == SYSTEM_V_ARGUMENT_CLASS_MEMORY) {
       is_indirect_return = true;
       Bits bit_size = return_descriptor->bit_size;
       result.caller_return = storage_indirect(bit_size, Register_A);
@@ -812,7 +778,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     //      can be understood together with the item 4. System-calls are limited to six arguments,
     //      no argument is passed directly on the stack. While in user space MEMORY class arguments
     //      are passed on the stack.
-    if (classification.class != SYSTEM_V_INTEGER) {
+    if (classification.class != SYSTEM_V_ARGUMENT_CLASS_INTEGER) {
       // FIXME user error
       assert("Unsupported system V argument class in a syscall");
     }

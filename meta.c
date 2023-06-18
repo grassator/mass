@@ -1849,15 +1849,15 @@ main(void) {
     { "Implicit_Pointer", 1 << 1 },
   }));
 
-  push_type(type_struct("Function_Call_Parameter", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Function_Call_Parameter", (Struct_Item[]){
     { "Function_Call_Parameter_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "u64", "original_index" },
-  }));
+  })));
 
-  push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
     { "u32", "parameters_stack_size"},
     { "u32", "_parameters_stack_size_padding"},
     { "Function_Call_Jump", "jump"},
@@ -1867,7 +1867,41 @@ main(void) {
     { "Register_Bitset", "parameter_registers_bitset" },
     { "Storage", "caller_return" },
     { "Storage", "callee_return" },
-  }));
+  })));
+
+  export_compiler(push_type(type_enum("SYSTEM_V_ARGUMENT_CLASS", (Enum_Type_Item[]){
+    { "NO_CLASS", 0 },
+    { "INTEGER", 1 },
+    { "SSE", 2 },
+    { "SSEUP", 3 },
+    { "X87", 4 },
+    { "X87UP", 5 },
+    { "COMPLEX_X87", 6 },
+    { "MEMORY", 7 },
+  })));
+
+  export_compiler(push_type(type_struct("System_V_Classification", (Struct_Item[]){
+    { "SYSTEM_V_ARGUMENT_CLASS", "class" },
+    { "u32", "_flags_padding" },
+    { "const Descriptor *", "descriptor" },
+    { "u64", "eightbyte_count" },
+  })));
+
+  export_compiler(push_type(type_struct("System_V_Registers", (Struct_Item[]){
+    { "const Register *", "items" },
+    { "u32", "count" },
+    { "u32", "index" },
+  })));
+
+  export_compiler(push_type(type_struct("System_V_Register_State", (Struct_Item[]){
+    { "System_V_Registers", "general" },
+    { "System_V_Registers", "vector" },
+  })));
+
+  export_compiler(push_type(type_struct("System_V_Eightbyte_Array", (Struct_Item[]){
+    { "SYSTEM_V_ARGUMENT_CLASS", "classes", 8 },
+    { "u64", "count" },
+  })));
 
   export_compiler_custom_name(
     "Function_Call_Lazy_Payload",

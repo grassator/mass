@@ -609,6 +609,49 @@ typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
 typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
 
+typedef enum SYSTEM_V_ARGUMENT_CLASS {
+  SYSTEM_V_ARGUMENT_CLASS_NO_CLASS = 0,
+  SYSTEM_V_ARGUMENT_CLASS_INTEGER = 1,
+  SYSTEM_V_ARGUMENT_CLASS_SSE = 2,
+  SYSTEM_V_ARGUMENT_CLASS_SSEUP = 3,
+  SYSTEM_V_ARGUMENT_CLASS_X87 = 4,
+  SYSTEM_V_ARGUMENT_CLASS_X87UP = 5,
+  SYSTEM_V_ARGUMENT_CLASS_COMPLEX_X87 = 6,
+  SYSTEM_V_ARGUMENT_CLASS_MEMORY = 7,
+} SYSTEM_V_ARGUMENT_CLASS;
+
+const char *system_v_argument_class_name(SYSTEM_V_ARGUMENT_CLASS value) {
+  if (value == 0) return "SYSTEM_V_ARGUMENT_CLASS_NO_CLASS";
+  if (value == 1) return "SYSTEM_V_ARGUMENT_CLASS_INTEGER";
+  if (value == 2) return "SYSTEM_V_ARGUMENT_CLASS_SSE";
+  if (value == 3) return "SYSTEM_V_ARGUMENT_CLASS_SSEUP";
+  if (value == 4) return "SYSTEM_V_ARGUMENT_CLASS_X87";
+  if (value == 5) return "SYSTEM_V_ARGUMENT_CLASS_X87UP";
+  if (value == 6) return "SYSTEM_V_ARGUMENT_CLASS_COMPLEX_X87";
+  if (value == 7) return "SYSTEM_V_ARGUMENT_CLASS_MEMORY";
+  assert(!"Unexpected value for enum SYSTEM_V_ARGUMENT_CLASS");
+  return 0;
+};
+
+typedef dyn_array_type(SYSTEM_V_ARGUMENT_CLASS *) Array_SYSTEM_V_ARGUMENT_CLASS_Ptr;
+typedef dyn_array_type(const SYSTEM_V_ARGUMENT_CLASS *) Array_Const_SYSTEM_V_ARGUMENT_CLASS_Ptr;
+
+typedef struct System_V_Classification System_V_Classification;
+typedef dyn_array_type(System_V_Classification *) Array_System_V_Classification_Ptr;
+typedef dyn_array_type(const System_V_Classification *) Array_Const_System_V_Classification_Ptr;
+
+typedef struct System_V_Registers System_V_Registers;
+typedef dyn_array_type(System_V_Registers *) Array_System_V_Registers_Ptr;
+typedef dyn_array_type(const System_V_Registers *) Array_Const_System_V_Registers_Ptr;
+
+typedef struct System_V_Register_State System_V_Register_State;
+typedef dyn_array_type(System_V_Register_State *) Array_System_V_Register_State_Ptr;
+typedef dyn_array_type(const System_V_Register_State *) Array_Const_System_V_Register_State_Ptr;
+
+typedef struct System_V_Eightbyte_Array System_V_Eightbyte_Array;
+typedef dyn_array_type(System_V_Eightbyte_Array *) Array_System_V_Eightbyte_Array_Ptr;
+typedef dyn_array_type(const System_V_Eightbyte_Array *) Array_Const_System_V_Eightbyte_Array_Ptr;
+
 typedef struct Mass_Function_Call_Lazy_Payload Mass_Function_Call_Lazy_Payload;
 typedef dyn_array_type(Mass_Function_Call_Lazy_Payload *) Array_Mass_Function_Call_Lazy_Payload_Ptr;
 typedef dyn_array_type(const Mass_Function_Call_Lazy_Payload *) Array_Const_Mass_Function_Call_Lazy_Payload_Ptr;
@@ -2085,6 +2128,33 @@ typedef struct Function_Call_Setup {
 } Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
+typedef struct System_V_Classification {
+  SYSTEM_V_ARGUMENT_CLASS class;
+  u32 _flags_padding;
+  const Descriptor * descriptor;
+  u64 eightbyte_count;
+} System_V_Classification;
+typedef dyn_array_type(System_V_Classification) Array_System_V_Classification;
+
+typedef struct System_V_Registers {
+  const Register * items;
+  u32 count;
+  u32 index;
+} System_V_Registers;
+typedef dyn_array_type(System_V_Registers) Array_System_V_Registers;
+
+typedef struct System_V_Register_State {
+  System_V_Registers general;
+  System_V_Registers vector;
+} System_V_Register_State;
+typedef dyn_array_type(System_V_Register_State) Array_System_V_Register_State;
+
+typedef struct System_V_Eightbyte_Array {
+  SYSTEM_V_ARGUMENT_CLASS classes[8];
+  u64 count;
+} System_V_Eightbyte_Array;
+typedef dyn_array_type(System_V_Eightbyte_Array) Array_System_V_Eightbyte_Array;
+
 typedef struct Mass_Function_Call_Lazy_Payload {
   Value_View args;
   Value * overload;
@@ -3009,6 +3079,32 @@ static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
 static Descriptor descriptor_function_call_setup_pointer;
 static Descriptor descriptor_function_call_setup_pointer_pointer;
+static Descriptor descriptor_system_v_argument_class;
+static Descriptor descriptor_array_system_v_argument_class;
+static Descriptor descriptor_array_system_v_argument_class_ptr;
+static Descriptor descriptor_array_const_system_v_argument_class_ptr;
+static Descriptor descriptor_system_v_argument_class_pointer;
+static Descriptor descriptor_system_v_argument_class_pointer_pointer;
+static Descriptor descriptor_system_v_classification;
+static Descriptor descriptor_array_system_v_classification;
+static Descriptor descriptor_array_system_v_classification_ptr;
+static Descriptor descriptor_system_v_classification_pointer;
+static Descriptor descriptor_system_v_classification_pointer_pointer;
+static Descriptor descriptor_system_v_registers;
+static Descriptor descriptor_array_system_v_registers;
+static Descriptor descriptor_array_system_v_registers_ptr;
+static Descriptor descriptor_system_v_registers_pointer;
+static Descriptor descriptor_system_v_registers_pointer_pointer;
+static Descriptor descriptor_system_v_register_state;
+static Descriptor descriptor_array_system_v_register_state;
+static Descriptor descriptor_array_system_v_register_state_ptr;
+static Descriptor descriptor_system_v_register_state_pointer;
+static Descriptor descriptor_system_v_register_state_pointer_pointer;
+static Descriptor descriptor_system_v_eightbyte_array;
+static Descriptor descriptor_array_system_v_eightbyte_array;
+static Descriptor descriptor_array_system_v_eightbyte_array_ptr;
+static Descriptor descriptor_system_v_eightbyte_array_pointer;
+static Descriptor descriptor_system_v_eightbyte_array_pointer_pointer;
 static Descriptor descriptor_mass_function_call_lazy_payload;
 static Descriptor descriptor_array_mass_function_call_lazy_payload;
 static Descriptor descriptor_array_mass_function_call_lazy_payload_ptr;
@@ -3416,6 +3512,7 @@ static Descriptor descriptor_i8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descr
 static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
 static Descriptor descriptor_i8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_i8);
 static Descriptor descriptor_i8_7 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 7, &descriptor_i8);
+static Descriptor descriptor_system_v_argument_class_8 = MASS_DESCRIPTOR_STATIC_ARRAY(SYSTEM_V_ARGUMENT_CLASS, 8, &descriptor_system_v_argument_class);
 static Descriptor descriptor_i8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_i8);
 static Descriptor descriptor_i8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_i8);
 static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
@@ -5518,6 +5615,97 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_setup_ptr, function_call_setup_
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_setup, function_call_setup, Array_Function_Call_Setup);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup, function_call_setup);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Setup *, function_call_setup_pointer);
+MASS_DEFINE_OPAQUE_C_TYPE(system_v_argument_class, SYSTEM_V_ARGUMENT_CLASS)
+static C_Enum_Item system_v_argument_class_items[] = {
+{ .name = slice_literal_fields("NO_CLASS"), .value = 0 },
+{ .name = slice_literal_fields("INTEGER"), .value = 1 },
+{ .name = slice_literal_fields("SSE"), .value = 2 },
+{ .name = slice_literal_fields("SSEUP"), .value = 3 },
+{ .name = slice_literal_fields("X87"), .value = 4 },
+{ .name = slice_literal_fields("X87UP"), .value = 5 },
+{ .name = slice_literal_fields("COMPLEX_X87"), .value = 6 },
+{ .name = slice_literal_fields("MEMORY"), .value = 7 },
+};
+DEFINE_VALUE_IS_AS_HELPERS(SYSTEM_V_ARGUMENT_CLASS, system_v_argument_class);
+DEFINE_VALUE_IS_AS_HELPERS(SYSTEM_V_ARGUMENT_CLASS *, system_v_argument_class_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(system_v_classification, System_V_Classification,
+  {
+    .descriptor = &descriptor_system_v_argument_class,
+    .name = slice_literal_fields("class"),
+    .offset = offsetof(System_V_Classification, class),
+  },
+  {
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .offset = offsetof(System_V_Classification, descriptor),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("eightbyte_count"),
+    .offset = offsetof(System_V_Classification, eightbyte_count),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(system_v_classification);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_classification_ptr, system_v_classification_pointer, Array_System_V_Classification_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_classification, system_v_classification, Array_System_V_Classification);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Classification, system_v_classification);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Classification *, system_v_classification_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(system_v_registers, System_V_Registers,
+  {
+    .descriptor = &descriptor_register_pointer,
+    .name = slice_literal_fields("items"),
+    .offset = offsetof(System_V_Registers, items),
+  },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("count"),
+    .offset = offsetof(System_V_Registers, count),
+  },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("index"),
+    .offset = offsetof(System_V_Registers, index),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(system_v_registers);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_registers_ptr, system_v_registers_pointer, Array_System_V_Registers_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_registers, system_v_registers, Array_System_V_Registers);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Registers, system_v_registers);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Registers *, system_v_registers_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(system_v_register_state, System_V_Register_State,
+  {
+    .descriptor = &descriptor_system_v_registers,
+    .name = slice_literal_fields("general"),
+    .offset = offsetof(System_V_Register_State, general),
+  },
+  {
+    .descriptor = &descriptor_system_v_registers,
+    .name = slice_literal_fields("vector"),
+    .offset = offsetof(System_V_Register_State, vector),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(system_v_register_state);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_register_state_ptr, system_v_register_state_pointer, Array_System_V_Register_State_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_register_state, system_v_register_state, Array_System_V_Register_State);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Register_State, system_v_register_state);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Register_State *, system_v_register_state_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(system_v_eightbyte_array, System_V_Eightbyte_Array,
+  {
+    .descriptor = &descriptor_system_v_argument_class_8,
+    .name = slice_literal_fields("classes"),
+    .offset = offsetof(System_V_Eightbyte_Array, classes),
+  },
+  {
+    .descriptor = &descriptor_i64,
+    .name = slice_literal_fields("count"),
+    .offset = offsetof(System_V_Eightbyte_Array, count),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(system_v_eightbyte_array);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_eightbyte_array_ptr, system_v_eightbyte_array_pointer, Array_System_V_Eightbyte_Array_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_system_v_eightbyte_array, system_v_eightbyte_array, Array_System_V_Eightbyte_Array);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Eightbyte_Array, system_v_eightbyte_array);
+DEFINE_VALUE_IS_AS_HELPERS(System_V_Eightbyte_Array *, system_v_eightbyte_array_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_function_call_lazy_payload, Mass_Function_Call_Lazy_Payload,
   {
     .descriptor = &descriptor_value_view,
