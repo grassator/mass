@@ -122,6 +122,13 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Quoted")),
     type_quoted_value
   );
+  Source_Range Spread__source_range;
+  INIT_LITERAL_SOURCE_RANGE(&Spread__source_range, "Spread");
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, Spread__source_range,
+    mass_ensure_symbol(compilation, slice_literal("Spread")),
+    type_spread_value
+  );
   Source_Range Named_Accessor__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Named_Accessor__source_range, "Named_Accessor");
   scope_define_value(
@@ -902,6 +909,22 @@ compiler_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
     mass_named_accessor, "named_accessor", &descriptor_value_pointer,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
+      .descriptor = &descriptor_mass_context_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("parser")),
+      .descriptor = &descriptor_parser_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("args")),
+      .descriptor = &descriptor_value_view
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Intrinsic,
+    mass_spread, "spread", &descriptor_value_pointer,
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("context")),
       .descriptor = &descriptor_mass_context_pointer

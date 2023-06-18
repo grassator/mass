@@ -743,11 +743,25 @@ mass_process_tuple_as_descriptor(
       goto err;
     }
   } else if (descriptor->tag == Descriptor_Tag_Fixed_Array) {
-    u64 length = descriptor->Fixed_Array.length;
-    if ((length != dyn_array_length(tuple->items))) {
-      Slice message = length > dyn_array_length(tuple->items)
+    // TODO support spreading in the middle of the tuple
+    Spread *spread = 0;
+
+    u64 array_length = descriptor->Fixed_Array.length;
+    u64 tuple_length = dyn_array_length(tuple->items);
+    if (tuple_length) {
+      Value *last_item = *dyn_array_last(tuple->items);
+      if (value_is_spread(last_item)) {
+        tuple_length -= 1;
+        spread = value_as_spread(last_item);
+        // TODO support runtime values - we need to make sure that if it is a lazy value it is only forced once
+        if (!mass_value_ensure_static(context, spread->value)) return 0;
+      }
+    }
+
+    if (tuple_length > array_length || (!spread && tuple_length < array_length)) {
+      Slice message = array_length > tuple_length
         ? slice_literal("Tuple does not have enough items to match the array it is assigned to")
-        : slice_literal("Tuple has too many items for the struct it is assigned to");
+        : slice_literal("Tuple has too many items for the array it is assigned to");
       report_error_proc(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = *source_range,
@@ -759,8 +773,13 @@ mass_process_tuple_as_descriptor(
     const Descriptor *item_descriptor = descriptor->Fixed_Array.item;
     u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
-    for (u64 index = 0; index < length; ++index) {
-      Value *tuple_item = *dyn_array_get(tuple->items, index);
+    for (u64 index = 0; index < array_length; ++index) {
+      Value *tuple_item;
+      if (!spread || index < tuple_length) {
+        tuple_item = *dyn_array_get(tuple->items, index);
+      } else {
+        tuple_item = spread->value;
+      }
       bool success = process_item_at_offset_proc(
         context, item_descriptor, item_byte_size * index, tuple_item, source_range, payload
       );
@@ -1698,6 +1717,24 @@ mass_named_accessor(
   );
   return result;
 }
+
+static Value *
+mass_spread(
+  Mass_Context *context,
+  Parser *parser,
+  Value_View args
+) {
+  assert(args.length == 1);
+  Value *value = value_view_get(&args, 0);
+
+  Spread spread = {.value = value };
+  Value *result = value_init(
+    mass_allocate(context, Value),
+    &descriptor_spread, storage_immediate(&spread), args.source_range
+  );
+  return result;
+}
+
 
 static inline const Descriptor *
 token_match_type(
@@ -6568,6 +6605,7 @@ mass_compilation_init_scopes(
 
   MASS_INTRINSIC_OPERATOR("@", Operator_Flags_None, Prefix, 20, "eval");
   MASS_INTRINSIC_OPERATOR(".", Operator_Flags_None, Prefix, 30, "named_accessor");
+  MASS_INTRINSIC_OPERATOR("...", Operator_Flags_None, Prefix, 1, "spread");
 
   MASS_ALIAS_OPERATOR("==", Operator_Flags_None, Infix, 7, "equal");
   MASS_ALIAS_OPERATOR("!=", Operator_Flags_None, Infix, 7, "not_equal");

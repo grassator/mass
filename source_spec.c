@@ -1965,6 +1965,80 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support initializing a fixed-size array from a tuple with only a spread") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+        "foo : i64 * 3 = [...42]\n"
+        "foo.1"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should support initializing a fixed-size array from a tuple with a spread as the last element") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+        "foo : i64 * 3 = [1, 2, ...42]\n"
+        "foo.2"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should support initializing a fixed-size array from a tuple with a spread after the last element") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+          "foo : i64 * 3 = [1, 2, 3, ...42]\n"
+          "foo.2"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 3);
+    }
+
+    it("should support auto casts when spreading in a tuple for a fixed array") {
+      u32(*checker)(void) = (u32(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (i32) {"
+        "foo : i32 * 3 = [...42]\n"
+        "foo.2"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should report an error when initializing a fixed array from a tuple with a spread and too many elements") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+          "foo : i64 * 3 = [1, 2, 3, 4, ...42]\n"
+          "foo.2"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+    }
+
+    it("should report an error when spread is not in the last position") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: fn() -> (i64) {"
+        "foo : i64 * 3 = [1, ...42, 2]\n"
+        "foo.2"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+    }
+
     it("should report an error when fixed size array size does not resolve to an integer") {
       test_program_inline_source_base(
         "test", &test_context,

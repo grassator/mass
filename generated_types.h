@@ -212,6 +212,10 @@ typedef struct Quoted Quoted;
 typedef dyn_array_type(Quoted *) Array_Quoted_Ptr;
 typedef dyn_array_type(const Quoted *) Array_Const_Quoted_Ptr;
 
+typedef struct Spread Spread;
+typedef dyn_array_type(Spread *) Array_Spread_Ptr;
+typedef dyn_array_type(const Spread *) Array_Const_Spread_Ptr;
+
 typedef struct Named_Accessor Named_Accessor;
 typedef dyn_array_type(Named_Accessor *) Array_Named_Accessor_Ptr;
 typedef dyn_array_type(const Named_Accessor *) Array_Const_Named_Accessor_Ptr;
@@ -848,6 +852,9 @@ static Value * mass_struct_get
 static Value * mass_named_accessor
   (Mass_Context * context, Parser * parser, Value_View args);
 
+static Value * mass_spread
+  (Mass_Context * context, Parser * parser, Value_View args);
+
 static Value * mass_typed_symbol
   (Mass_Context * context, Parser * parser, Value_View args);
 
@@ -1339,6 +1346,11 @@ typedef struct Quoted {
   Value * value;
 } Quoted;
 typedef dyn_array_type(Quoted) Array_Quoted;
+
+typedef struct Spread {
+  Value * value;
+} Spread;
+typedef dyn_array_type(Spread) Array_Spread;
 
 typedef struct Named_Accessor {
   const Symbol * symbol;
@@ -2510,6 +2522,7 @@ typedef struct Common_Symbols {
   const Symbol * operator_fat_arrow;
   const Symbol * operator_space;
   const Symbol * operator_tilde;
+  const Symbol * operator_dot_dot_dot;
 } Common_Symbols;
 typedef dyn_array_type(Common_Symbols) Array_Common_Symbols;
 
@@ -2717,6 +2730,11 @@ static Descriptor descriptor_array_quoted;
 static Descriptor descriptor_array_quoted_ptr;
 static Descriptor descriptor_quoted_pointer;
 static Descriptor descriptor_quoted_pointer_pointer;
+static Descriptor descriptor_spread;
+static Descriptor descriptor_array_spread;
+static Descriptor descriptor_array_spread_ptr;
+static Descriptor descriptor_spread_pointer;
+static Descriptor descriptor_spread_pointer_pointer;
 static Descriptor descriptor_named_accessor;
 static Descriptor descriptor_array_named_accessor;
 static Descriptor descriptor_array_named_accessor_ptr;
@@ -3136,6 +3154,7 @@ static Descriptor descriptor_mass_dereference;
 static Descriptor descriptor_mass_array_like_get;
 static Descriptor descriptor_mass_struct_get;
 static Descriptor descriptor_mass_named_accessor;
+static Descriptor descriptor_mass_spread;
 static Descriptor descriptor_mass_typed_symbol;
 static Descriptor descriptor_mass_pointer_to;
 static Descriptor descriptor_mass_pointer_to_type;
@@ -3882,6 +3901,18 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_quoted_ptr, quoted_pointer, Array_Quoted_Ptr)
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_quoted, quoted, Array_Quoted);
 DEFINE_VALUE_IS_AS_HELPERS(Quoted, quoted);
 DEFINE_VALUE_IS_AS_HELPERS(Quoted *, quoted_pointer);
+MASS_DEFINE_STRUCT_DESCRIPTOR(spread, Spread,
+  {
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("value"),
+    .offset = offsetof(Spread, value),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(spread);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_spread_ptr, spread_pointer, Array_Spread_Ptr);
+MASS_DEFINE_C_DYN_ARRAY_TYPE(array_spread, spread, Array_Spread);
+DEFINE_VALUE_IS_AS_HELPERS(Spread, spread);
+DEFINE_VALUE_IS_AS_HELPERS(Spread *, spread_pointer);
 MASS_DEFINE_STRUCT_DESCRIPTOR(named_accessor, Named_Accessor,
   {
     .descriptor = &descriptor_symbol_pointer,
@@ -6457,6 +6488,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("operator_tilde"),
     .offset = offsetof(Common_Symbols, operator_tilde),
+  },
+  {
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("operator_dot_dot_dot"),
+    .offset = offsetof(Common_Symbols, operator_dot_dot_dot),
   },
 );
 MASS_DEFINE_TYPE_VALUE(common_symbols);

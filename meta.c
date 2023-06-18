@@ -1408,6 +1408,10 @@ main(void) {
     { "Value *", "value" },
   })));
 
+  export_compiler(push_type(type_struct("Spread", (Struct_Item[]){
+    { "Value *", "value" },
+  })));
+
   export_compiler(push_type(type_struct("Named_Accessor", (Struct_Item[]){
     { "const Symbol *", "symbol" },
   })));
@@ -2164,6 +2168,7 @@ main(void) {
     { "const Symbol *", "operator_fat_arrow" },
     { "const Symbol *", "operator_space" },
     { "const Symbol *", "operator_tilde" },
+    { "const Symbol *", "operator_dot_dot_dot" },
   }));
 
   export_compiler(push_type(type_struct("Compilation", (Struct_Item[]){
@@ -2255,6 +2260,7 @@ main(void) {
   export_compiler_custom_name("unchecked_get_at_index", push_type(type_intrinsic("mass_array_like_get")));
   export_compiler_custom_name("struct_get", push_type(type_intrinsic("mass_struct_get")));
   export_compiler_custom_name("named_accessor", push_type(type_intrinsic("mass_named_accessor")));
+  export_compiler_custom_name("spread", push_type(type_intrinsic("mass_spread")));
   export_compiler_custom_name("typed_symbol", push_type(type_intrinsic("mass_typed_symbol")));
   export_compiler_custom_name("pointer_to", push_type(type_intrinsic("mass_pointer_to")));
   export_compiler_custom_name("pointer_to_type", push_type(type_intrinsic("mass_pointer_to_type")));

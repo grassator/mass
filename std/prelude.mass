@@ -82,7 +82,7 @@ unreachable :: fn() -> (Never) intrinsic {
     {
       instruction : MASS.Instruction
       instruction.tag = .Bytes
-      instruction.Bytes.memory.0 = 0xCC
+      instruction.Bytes.memory = [0xCC, ...0]
       instruction.Bytes.length = 1
       instruction.scope = scope
       MASS.push_instruction(&builder.code_block, instruction);
@@ -236,9 +236,7 @@ x86_64 :: module {
 
     instruction : Instruction
     instruction.tag = .Bytes
-    instruction.Bytes.memory.0 = cast(i8, rex)
-    instruction.Bytes.memory.1 = op_code
-    instruction.Bytes.memory.2 = mod_reg_rm
+    instruction.Bytes.memory = [cast(i8, rex), op_code, mod_reg_rm, ...0]
     instruction.Bytes.length = 3
     instruction
   }
