@@ -63,15 +63,6 @@ make_never :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (
 
 
 Void :: type_of(())
-make_void :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
-  value := allocate(allocator, MASS.Value)
-  value.source_range = source_range.*
-  value.tag = .Forced
-  value.descriptor = Void
-  value.Forced.storage.tag = .Immediate
-  value.Forced.storage.bit_size = [0]
-  value
-}
 
 unreachable :: fn() -> (Never) intrinsic {
   lazy_value_proc :: fn(
