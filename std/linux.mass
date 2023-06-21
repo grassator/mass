@@ -2,7 +2,7 @@ STDOUT_FILENO :: 1
 
 Register :: MASS.Register
 
-system_v_call_setup :: MASS.Calling_Convention [
+calling_convention_x86_64_system_v :: MASS.Calling_Convention [
   .call_setup_proc = MASS.calling_convention_x86_64_system_v_call_setup_proc,
   .register_volatile_bitset = [
     // Arguments
@@ -14,6 +14,108 @@ system_v_call_setup :: MASS.Calling_Convention [
     (1 << zero_extend(i64, Register.R10)) | (1 << zero_extend(i64, Register.R11))
   ]
 ]
+
+SYSTEM_V_MAX_PARAM_COUNT :: 6
+
+// FIXME this breaks when actually used on Linux
+calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
+  allocator : &MASS.Allocator,
+  function : &MASS.Function_Info
+) -> (MASS.Function_Call_Setup) {
+  using unsigned
+  meta :: import("std/meta")
+
+  param_count := length(function.parameters)
+  assert(param_count <= SYSTEM_V_MAX_PARAM_COUNT)
+  // TODO abstract this into dyn_array_make
+
+  internal_byte_size := size_of(MASS.Dyn_Array_Internal)
+  items_array_type :: MASS.Function_Call_Parameter * SYSTEM_V_MAX_PARAM_COUNT
+  items_byte_size := MASS.i64_unsigned_divide(
+    type_descriptor(MASS.Function_Call_Parameter * SYSTEM_V_MAX_PARAM_COUNT).bit_size.as_u64,
+    8
+  )
+  param_data_size := internal_byte_size + items_byte_size
+  param_data := cast(&MASS.Dyn_Array_Internal, MASS.allocator_allocate_bytes(
+    allocator,
+    param_data_size,
+    MASS.i64_unsigned_divide(type_descriptor(MASS.Function_Call_Parameter).bit_alignment.as_u64, 8)
+  ))
+  param_data.allocator = allocator
+  param_data.capacity = SYSTEM_V_MAX_PARAM_COUNT
+  param_data.length = 0
+
+  result := MASS.Function_Call_Setup [
+    .parameters_stack_size = 0,
+    .jump = .Syscall,
+    .calling_convention = &calling_convention_x86_64_system_v,
+    .parameters = [.internal = param_data],
+    .parameter_registers_bitset = [0],
+    .callee_return = meta.immediate_storage(0),
+    .caller_return = meta.immediate_storage(0),
+  ]
+  return_descriptor := function.return_descriptor
+  if return_descriptor.bit_size.as_u64 != 0 then {
+    // TODO provide user error? or should it be handled earlier?
+    assert(return_descriptor.bit_size.as_u64 <= 64)
+
+    common_storage := MASS.storage_register(.A, return_descriptor.bit_size)
+    result.callee_return = common_storage
+    result.caller_return = common_storage
+  }
+
+  // FIXME making this a global results in wrong values inside
+  calling_convention_x86_64_system_v_general_registers : (MASS.Register * SYSTEM_V_MAX_PARAM_COUNT) = [
+    .DI, .SI, .D, .R10, .R8, .R9
+  ]
+
+  registers := MASS.System_V_Register_State [
+    .general = [
+      .items = &calling_convention_x86_64_system_v_general_registers,
+      .count = SYSTEM_V_MAX_PARAM_COUNT,
+      .index = 0,
+    ],
+    .vector = [
+      .items = 0,
+      .count = 0,
+      .index = 0,
+    ],
+  ]
+
+  stack_offset := 0
+  param_index := 0
+  while param_index != param_count {
+    param := dyn_array_get(function.parameters, param_index)
+    if param.tag != .Known then {
+      classification := MASS.x86_64_system_v_classify(param.descriptor)
+      // TODO figure out how item 6. Only values of class INTEGER or class MEMORY are passed to the kernel.
+      //      can be understood together with the item 4. System-calls are limited to six arguments,
+      //      no argument is passed directly on the stack. While in user space MEMORY class arguments
+      //      are passed on the stack.
+      if classification.class != .INTEGER then {
+        // FIXME user error "Unsupported system V argument class in a syscall"
+        assert(false)
+      }
+      if zero_extend(i64, registers.general.index) + classification.eightbyte_count > zero_extend(i64, registers.general.count) then {
+        // FIXME user error System V syscall support no more than 6 arguments
+        assert(false)
+      }
+
+      parameter := MASS.x86_64_system_v_parameter_for_classification(
+        allocator, &registers, &classification, &stack_offset
+      )
+      parameter.original_index = param_index //:ParameterOriginalIndex
+      // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
+      dyn_array_push(result.parameters, parameter)
+    }
+    param_index = param_index + 1
+  }
+
+  assert(stack_offset == 0)
+  MASS.call_setup_fill_parameter_register_bitset(&result)
+
+  result
+}
 
 make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Function_Literal) {
   signature (intrinsic {
