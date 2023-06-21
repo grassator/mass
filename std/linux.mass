@@ -17,7 +17,7 @@ calling_convention_x86_64_system_v :: MASS.Calling_Convention [
 
 SYSTEM_V_MAX_PARAM_COUNT :: 6
 
-// FIXME this breaks when actually used on Linux
+// FIXME this breaks when actually used on Linux - it looks like we mess up the descriptor for the parameters
 calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   allocator : &MASS.Allocator,
   function : &MASS.Function_Info
