@@ -643,6 +643,26 @@ dyn_array_item_type :: fn(t : Type) => (Type) {
   Type[item_descriptor]
 }
 
+dyn_array_make_internal :: fn(allocator, @item_type : Type, capacity) -> (&MASS.Dyn_Array_Internal) {
+  using unsigned
+
+  item_byte_size :: size_of(item_type)
+  internal_byte_size :: size_of(MASS.Dyn_Array_Internal)
+
+  static_assert(align_of(item_type) <= 8)
+
+  allocation_size := internal_byte_size + MASS.i64_unsigned_multiply(item_byte_size, capacity)
+  internal := cast(&MASS.Dyn_Array_Internal, MASS.allocator_allocate_bytes(
+    allocator,
+    allocation_size,
+    align_of(item_type)
+  ))
+  internal.allocator = allocator
+  internal.capacity = capacity
+  internal.length = 0
+  internal
+}
+
 dyn_array_get :: fn(array ~ is_c_dyn_array, offset : i64) -> _ {
   item_type :: dyn_array_item_type(type_of(array))
   using unsigned

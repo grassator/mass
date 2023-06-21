@@ -29,27 +29,13 @@ calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   assert(param_count <= SYSTEM_V_MAX_PARAM_COUNT)
   // TODO abstract this into dyn_array_make
 
-  internal_byte_size := size_of(MASS.Dyn_Array_Internal)
-  items_array_type :: MASS.Function_Call_Parameter * SYSTEM_V_MAX_PARAM_COUNT
-  items_byte_size := MASS.i64_unsigned_divide(
-    type_descriptor(MASS.Function_Call_Parameter * SYSTEM_V_MAX_PARAM_COUNT).bit_size.as_u64,
-    8
-  )
-  param_data_size := internal_byte_size + items_byte_size
-  param_data := cast(&MASS.Dyn_Array_Internal, MASS.allocator_allocate_bytes(
-    allocator,
-    param_data_size,
-    MASS.i64_unsigned_divide(type_descriptor(MASS.Function_Call_Parameter).bit_alignment.as_u64, 8)
-  ))
-  param_data.allocator = allocator
-  param_data.capacity = SYSTEM_V_MAX_PARAM_COUNT
-  param_data.length = 0
+  parameters_internal := dyn_array_make_internal(allocator, MASS.Function_Call_Parameter, SYSTEM_V_MAX_PARAM_COUNT)
 
   result := MASS.Function_Call_Setup [
     .parameters_stack_size = 0,
     .jump = .Syscall,
     .calling_convention = &calling_convention_x86_64_system_v,
-    .parameters = [.internal = param_data],
+    .parameters = [.internal = parameters_internal],
     .parameter_registers_bitset = [0],
     .callee_return = meta.immediate_storage(0),
     .caller_return = meta.immediate_storage(0),
