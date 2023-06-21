@@ -4563,7 +4563,7 @@ mass_parse_type(
   return value_make(context, &descriptor_type, storage_immediate(&type), args.source_range);
 }
 
-static const Descriptor *
+static Value *
 mass_type_only_token_parse_expression(
   Mass_Context *context,
   Parser *parser,
@@ -4575,7 +4575,7 @@ mass_type_only_token_parse_expression(
   parser->flags = saved_flags;
   if (mass_has_error(context)) return 0;
 
-  return value->descriptor;
+  return value;
 }
 
 static Value *
@@ -4586,7 +4586,7 @@ mass_type_of(
 ) {
   assert(args.length == 1);
   Value *value = value_view_get(&args, 0);
-  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, value);
+  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, value)->descriptor;
   Type type = { descriptor };
   if (mass_has_error(context)) return 0;
   return value_make(context, &descriptor_type, storage_immediate(&type), args.source_range);
@@ -4600,7 +4600,7 @@ mass_size_of(
 ) {
   assert(args.length == 1);
   Value *value = value_view_get(&args, 0);
-  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, value);
+  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, value)->descriptor;
   if (mass_has_error(context)) return 0;
   i64 literal = { .bits = descriptor_byte_size(descriptor) };
   return value_make(context, &descriptor_i64, storage_immediate(&literal), args.source_range);
