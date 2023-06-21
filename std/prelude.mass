@@ -631,13 +631,37 @@ is_c_dyn_array :: fn(t : Type) -> (bool) {
   return true
 }
 
-dyn_array_get :: fn(array ~ is_c_dyn_array, offset : i64) -> _ {
-  item_descriptor :: type_descriptor(type_of(array.data.items)).Fixed_Array.item
-  item_type :: Type[item_descriptor]
-  using unsigned
-  assert(offset < array.data.length)
+dyn_array_item_type :: fn(t : Type) => (Type) {
+  assert(is_c_dyn_array(t))
+  s := type_descriptor(t).Struct
+  array_fields := cast(&(MASS.Struct_Field * 2), &s.fields.data.items)
+  data_descriptor := array_fields.1.descriptor.Pointer_To.descriptor
+  data_fields := cast(&(MASS.Struct_Field * 4), &data_descriptor.Struct.fields.data.items)
+  items_field := data_fields.3
+  assert(MASS.slice_equal(items_field.name, "items"))
+  item_descriptor := items_field.descriptor.Fixed_Array.item
+  Type[item_descriptor]
+}
 
-  cast(&item_type, &unchecked_get_at_index(cast(&item_type, &array.data.items), offset))
+dyn_array_get :: fn(array ~ is_c_dyn_array, offset : i64) -> _ {
+  item_type :: dyn_array_item_type(type_of(array))
+  using unsigned
+  item_byte_size := MASS.i64_unsigned_divide(type_descriptor(item_type).bit_size.as_u64, 8)
+  assert(offset < array.data.length)
+  base_pointer := cast(i64, &array.data.items)
+  item_pointer := cast(&item_type, base_pointer + MASS.i64_unsigned_multiply(item_byte_size, offset))
+  item_pointer
+}
+
+// TODO make more type-safe
+dyn_array_push :: fn(array ~ is_c_dyn_array, item) -> () {
+  using unsigned
+  item_type :: dyn_array_item_type(type_of(array))
+  assert(array.data.length + 1 <= array.data.capacity)
+  base_pointer := cast(i64, &array.data.items)
+  item_pointer := cast(&item_type, base_pointer + MASS.i64_unsigned_multiply(size_of(item), array.data.length))
+  item_pointer.* = item
+  array.data.length = array.data.length + 1
 }
 length :: fn(array ~ is_c_dyn_array) -> (i64) { array.internal.length }
 
