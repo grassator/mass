@@ -491,12 +491,12 @@ type_descriptor :: fn(type : Type) -> (&MASS.Descriptor) {
   cast(&MASS.Descriptor, type)
 }
 
+align_of :: fn(type : Type) => (i64) {
+  MASS.i64_unsigned_divide(type_descriptor(type).bit_alignment.as_u64, 8)
+}
+
 allocate :: fn(allocator : &MASS.Allocator, @type : Type) -> _ {
-  cast(&type, MASS.allocator_allocate_bytes(
-    allocator,
-    MASS.i64_unsigned_divide(type_descriptor(type).bit_size.as_u64, 8),
-    MASS.i64_unsigned_divide(type_descriptor(type).bit_alignment.as_u64, 8)
-  ))
+  cast(&type, MASS.allocator_allocate_bytes(allocator, size_of(type), align_of(type)))
 }
 
 make :: fn(allocator : &MASS.Allocator, value) -> _ {
