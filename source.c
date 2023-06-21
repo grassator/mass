@@ -2714,9 +2714,11 @@ mass_zero_extend(
   };
 
   if (mass_value_is_static(expression)) {
-    Storage storage = storage_immediate_with_bit_size(&(u64){0}, target_descriptor->bit_size);
-    Expected_Result expected_result = mass_expected_result_exact(target_descriptor, storage);
-    return mass_zero_extend_lazy_proc(context, 0, &expected_result, parser->scope, &args_view.source_range, &lazy_payload);
+    u64 result = 0;
+    const void *source_memory = storage_static_memory(&value_as_forced(expression)->storage);
+    memcpy(&result, source_memory, descriptor_byte_size(target_descriptor));
+    Storage storage = storage_immediate_with_bit_size(&result, target_descriptor->bit_size);
+    return value_make(context, target_descriptor, storage, args_view.source_range);
   }
 
   Mass_Cast_Lazy_Payload *heap_payload = mass_allocate(context, Mass_Cast_Lazy_Payload);
