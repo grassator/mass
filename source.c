@@ -4600,7 +4600,16 @@ mass_size_of(
 ) {
   assert(args.length == 1);
   Value *value = value_view_get(&args, 0);
-  const Descriptor *descriptor = mass_type_only_token_parse_expression(context, parser, value)->descriptor;
+  const Descriptor *descriptor;
+  Value *parsed_value = mass_type_only_token_parse_expression(context, parser, value);
+  // When you are doing `size_of(u32)` you are most likely not interested in the size
+  // of the `Type` type, but rather want to know the size of the actual type.
+  // This makes it inconsistent with `type_of` but it is probably an OK tradeoff.
+  if (value_is_type(parsed_value)) {
+    descriptor = value_as_type(parsed_value)->descriptor;
+  } else {
+    descriptor = parsed_value->descriptor;
+  }
   if (mass_has_error(context)) return 0;
   i64 literal = { .bits = descriptor_byte_size(descriptor) };
   return value_make(context, &descriptor_i64, storage_immediate(&literal), args.source_range);
