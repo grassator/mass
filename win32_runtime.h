@@ -41,16 +41,16 @@ typedef struct {
 
 static s64
 win32_get_function_index_from_address(
-  DWORD64 instruction_address,
+  u64 instruction_address,
   Jit *jit
 ) {
   Win32_Jit_Info *info = jit->platform_specific_payload;
   Section *code_section = &jit->program->memory.code;
   Virtual_Memory_Buffer *code_buffer = &code_section->buffer;
-  if(instruction_address < (DWORD64)code_buffer->memory) return -1;
-  if(instruction_address >= (DWORD64)code_buffer->memory + code_buffer->occupied) return -1;
+  if(instruction_address < (u64)code_buffer->memory) return -1;
+  if(instruction_address >= (u64)code_buffer->memory + code_buffer->occupied) return -1;
 
-  u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (DWORD64)code_buffer->memory);
+  u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (u64)code_buffer->memory);
 
   // Do a binary search
   s64 left_bound = 0;
