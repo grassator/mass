@@ -5,6 +5,104 @@
 #include "program.h"
 #include "source.h"
 
+
+typedef enum {
+  Debugger_Register_Type_General,
+  Debugger_Register_Type_Vector,
+  Debugger_Register_Type_Stack_Pointer,
+  Debugger_Register_Type_Instruction_Pointer,
+  Debugger_Register_Type_Opaque,
+} Debugger_Register_Type;
+
+typedef struct {
+  Slice name;
+  u64 offset;
+  u32 bit_size;
+  Debugger_Register_Type type;
+} Debugger_Register_Info;
+
+static const Debugger_Register_Info DEBUGGER_X86_64_REGISTER_INFO_ARRAY[] = {
+  {.name = slice_literal_fields("rip"), .bit_size = 64, .offset = 0, .type = Debugger_Register_Type_Instruction_Pointer},
+  {.name = slice_literal_fields("eflags"), .bit_size = 32, .offset = 8, .type = Debugger_Register_Type_Opaque},
+
+  {.name = slice_literal_fields("rax"), .bit_size = 64, .offset = 16, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("rcx"), .bit_size = 64, .offset = 24, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("rdx"), .bit_size = 64, .offset = 32, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("rbx"), .bit_size = 64, .offset = 40, .type = Debugger_Register_Type_General},
+
+  {.name = slice_literal_fields("rsp"), .bit_size = 64, .offset = 48, .type = Debugger_Register_Type_Stack_Pointer},
+  {.name = slice_literal_fields("rbp"), .bit_size = 64, .offset = 56, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("rsi"), .bit_size = 64, .offset = 64, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("rdi"), .bit_size = 64, .offset = 72, .type = Debugger_Register_Type_General},
+
+  {.name = slice_literal_fields("r8"),  .bit_size = 64, .offset = 80, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("r9"), .bit_size = 64, .offset = 88, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("r10"), .bit_size = 64, .offset = 96, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("r11"), .bit_size = 64, .offset = 104, .type = Debugger_Register_Type_General},
+
+  {.name = slice_literal_fields("r12"), .bit_size = 64, .offset = 112, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("r13"), .bit_size = 64, .offset = 120, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("r14"), .bit_size = 64, .offset = 128, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("r15"), .bit_size = 64, .offset = 136, .type = Debugger_Register_Type_General},
+
+  {.name = slice_literal_fields("xmm0"), .bit_size = 128, .offset = 144, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm1"), .bit_size = 128, .offset = 160, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm2"), .bit_size = 128, .offset = 176, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm3"), .bit_size = 128, .offset = 192, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm4"), .bit_size = 128, .offset = 208, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm5"), .bit_size = 128, .offset = 224, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm6"), .bit_size = 128, .offset = 240, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm7"), .bit_size = 128, .offset = 256, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm8"), .bit_size = 128, .offset = 272, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm9"), .bit_size = 128, .offset = 288, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm10"), .bit_size = 128, .offset = 304, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm11"), .bit_size = 128, .offset = 320, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm12"), .bit_size = 128, .offset = 336, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm13"), .bit_size = 128, .offset = 352, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm14"), .bit_size = 128, .offset = 368, .type = Debugger_Register_Type_General},
+  {.name = slice_literal_fields("xmm15"), .bit_size = 128, .offset = 384, .type = Debugger_Register_Type_General},
+};
+
+typedef struct {
+  Compilation *compilation;
+  Jit *jit;
+
+  const Debugger_Register_Info *register_info;
+  u64 register_count;
+  u8* register_memory;
+} Debugger_Context;
+
+static u64
+debugger_first_register_value_with_type(
+  const Debugger_Context *debugger_context,
+  Debugger_Register_Type type
+) {
+  for (u64 i = 0; i < debugger_context->register_count; ++i) {
+    const Debugger_Register_Info *register_info = &debugger_context->register_info[i];
+    if (register_info->type == type) {
+      assert(register_info->bit_size == 64); // We support only 64 architectures for now
+      return *(const u64*)(debugger_context->register_memory + register_info->offset);
+    }
+  }
+  assert(!"Could not find a register with specified type");
+  return 0;
+}
+
+static void*
+debugger_register_memory_with_name(
+  Debugger_Context *debugger_context,
+  Slice name
+) {
+  for (u64 i = 0; i < debugger_context->register_count; ++i) {
+    const Debugger_Register_Info *register_info = &debugger_context->register_info[i];
+    if (slice_equal(register_info->name, name)) {
+      return debugger_context->register_memory + register_info->offset;
+    }
+  }
+  assert(!"Could not find a register with specified name");
+  return 0;
+}
+
 static DWORD
 win32_section_permissions_to_virtual_protect_flags(
   Section_Permissions permissions
@@ -220,27 +318,27 @@ win32_debugger_maybe_scope_for_address(
 }
 
 static const void *
-win32_debugger_register_memory(
-  CONTEXT *ContextRecord,
+debugger_x86_64_register_memory(
+  Debugger_Context *debugger_context,
   Register reg
 ) {
   switch (reg) {
-    case Register_A: return &ContextRecord->Rax;
-    case Register_C: return &ContextRecord->Rcx;
-    case Register_D: return &ContextRecord->Rdx;
-    case Register_B: return &ContextRecord->Rbx;
-    case Register_SP: return &ContextRecord->Rsp;
-    case Register_BP: return &ContextRecord->Rbp;
-    case Register_SI: return &ContextRecord->Rsi;
-    case Register_DI: return &ContextRecord->Rdi;
-    case Register_R8: return &ContextRecord->R8;
-    case Register_R9: return &ContextRecord->R9;
-    case Register_R10: return &ContextRecord->R10;
-    case Register_R11: return &ContextRecord->R11;
-    case Register_R12: return &ContextRecord->R12;
-    case Register_R13: return &ContextRecord->R13;
-    case Register_R14: return &ContextRecord->R14;
-    case Register_R15: return &ContextRecord->R15;
+    case Register_A: return debugger_register_memory_with_name(debugger_context, slice_literal("rax"));
+    case Register_C: return debugger_register_memory_with_name(debugger_context, slice_literal("rcx"));
+    case Register_D: return debugger_register_memory_with_name(debugger_context, slice_literal("rdx"));
+    case Register_B: return debugger_register_memory_with_name(debugger_context, slice_literal("rbx"));
+    case Register_SP: return debugger_register_memory_with_name(debugger_context, slice_literal("rsp"));
+    case Register_BP: return debugger_register_memory_with_name(debugger_context, slice_literal("rbp"));
+    case Register_SI: return debugger_register_memory_with_name(debugger_context, slice_literal("rsi"));
+    case Register_DI: return debugger_register_memory_with_name(debugger_context, slice_literal("rdi"));
+    case Register_R8: return debugger_register_memory_with_name(debugger_context, slice_literal("r8"));
+    case Register_R9: return debugger_register_memory_with_name(debugger_context, slice_literal("r9"));
+    case Register_R10: return debugger_register_memory_with_name(debugger_context, slice_literal("r10"));
+    case Register_R11: return debugger_register_memory_with_name(debugger_context, slice_literal("r11"));
+    case Register_R12: return debugger_register_memory_with_name(debugger_context, slice_literal("r12"));
+    case Register_R13: return debugger_register_memory_with_name(debugger_context, slice_literal("r13"));
+    case Register_R14: return debugger_register_memory_with_name(debugger_context, slice_literal("r14"));
+    case Register_R15: return debugger_register_memory_with_name(debugger_context, slice_literal("r15"));
     default: assert(!"Unknown general purpose register index"); break;
   }
   return 0;
@@ -248,7 +346,7 @@ win32_debugger_register_memory(
 
 static const void *
 mass_debugger_value_memory(
-  CONTEXT *ContextRecord,
+  Debugger_Context *debugger_context,
   Function_Builder *builder,
   const Value *value
 ) {
@@ -260,31 +358,32 @@ mass_debugger_value_memory(
     }
     case Storage_Tag_Eflags: {
       // TODO storage->Eflags.compare_type
-      return &ContextRecord->EFlags;
+      assert(!"TODO");
+      return 0;
     }
     case Storage_Tag_Register: {
-      const void *memory = win32_debugger_register_memory(ContextRecord, storage->Register.index);
+      const void *memory = debugger_x86_64_register_memory(debugger_context, storage->Register.index);
       assert(storage->Register.offset_in_bits % 8 == 0);
       return ((u8 *)memory) + (storage->Register.offset_in_bits / 8);
     }
     case Storage_Tag_Xmm: {
       switch (storage->Xmm.index) {
-        case Register_Xmm0: return &ContextRecord->Xmm0;
-        case Register_Xmm1: return &ContextRecord->Xmm1;
-        case Register_Xmm2: return &ContextRecord->Xmm2;
-        case Register_Xmm3: return &ContextRecord->Xmm3;
-        case Register_Xmm4: return &ContextRecord->Xmm4;
-        case Register_Xmm5: return &ContextRecord->Xmm5;
-        case Register_Xmm6: return &ContextRecord->Xmm6;
-        case Register_Xmm7: return &ContextRecord->Xmm7;
-        case Register_Xmm8: return &ContextRecord->Xmm8;
-        case Register_Xmm9: return &ContextRecord->Xmm9;
-        case Register_Xmm10: return &ContextRecord->Xmm10;
-        case Register_Xmm11: return &ContextRecord->Xmm11;
-        case Register_Xmm12: return &ContextRecord->Xmm12;
-        case Register_Xmm13: return &ContextRecord->Xmm13;
-        case Register_Xmm14: return &ContextRecord->Xmm14;
-        case Register_Xmm15: return &ContextRecord->Xmm15;
+        case Register_Xmm0: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm0"));
+        case Register_Xmm1: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm1"));
+        case Register_Xmm2: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm2"));
+        case Register_Xmm3: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm3"));
+        case Register_Xmm4: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm4"));
+        case Register_Xmm5: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm5"));
+        case Register_Xmm6: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm6"));
+        case Register_Xmm7: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm7"));
+        case Register_Xmm8: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm8"));
+        case Register_Xmm9: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm9"));
+        case Register_Xmm10: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm10"));
+        case Register_Xmm11: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm11"));
+        case Register_Xmm12: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm12"));
+        case Register_Xmm13: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm13"));
+        case Register_Xmm14: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm14"));
+        case Register_Xmm15: return debugger_register_memory_with_name(debugger_context, slice_literal("xmm15"));
         default: assert(!"Unknown XMM register index"); break;
       }
     } break;
@@ -303,20 +402,20 @@ mass_debugger_value_memory(
         }
         case Memory_Location_Tag_Indirect: {
           const Memory_Location_Indirect *indirect = &storage->Memory.location.Indirect;
-          const void *memory = *(const void **)win32_debugger_register_memory(ContextRecord, indirect->base_register);
+          const void *memory = *(const void **) debugger_x86_64_register_memory(debugger_context, indirect->base_register);
           return ((u8 *)memory) + indirect->offset;
         }
         case Memory_Location_Tag_Stack: {
           const Memory_Location_Stack *stack = &storage->Memory.location.Stack;
           switch (stack->area) {
             case Stack_Area_Local: {
-              const void *memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
+              const void *memory = *(const void **) debugger_x86_64_register_memory(debugger_context, Register_SP);
               s32 effective_offset = builder->stack_reserve + stack->offset;
               return ((u8 *)memory) + effective_offset;
             }
             case Stack_Area_Received_Argument: {
               // :StackLayout
-              const void *memory = *(const void **)win32_debugger_register_memory(ContextRecord, Register_SP);
+              const void *memory = *(const void **) debugger_x86_64_register_memory(debugger_context, Register_SP);
               s32 push_size = calling_convention_x86_64_push_size(builder);
               s32 return_address_size = X86_64_REGISTER_SIZE;
               s32 effective_offset = builder->stack_reserve + push_size + return_address_size + stack->offset;
@@ -339,7 +438,7 @@ mass_debugger_value_memory(
 // TODO catch cycles
 static void
 mass_print_value_with_descriptor_and_memory(
-  CONTEXT *ContextRecord,
+  Debugger_Context *debugger_context,
   Function_Builder *builder,
   const Descriptor *descriptor,
   const u8 *memory,
@@ -416,7 +515,7 @@ mass_print_value_with_descriptor_and_memory(
         if (i != 0) printf(", ");
         const u8 *field_memory = memory + item_byte_size * i;
         mass_print_value_with_descriptor_and_memory(
-          ContextRecord, builder, item_descriptor, field_memory, depth + 1
+          debugger_context, builder, item_descriptor, field_memory, depth + 1
         );
       }
       printf("]");
@@ -442,7 +541,7 @@ mass_print_value_with_descriptor_and_memory(
           Scope_Map__Entry *entry = &tag_scope_map->entries[i];
           if (entry->occupied) {
             const void *value_memory = mass_debugger_value_memory(
-              ContextRecord, builder, entry->value->value
+              debugger_context, builder, entry->value->value
             );
             if (memcmp(field_memory, value_memory, 4) == 0) {
               chosen_tag = entry->value->name;
@@ -469,7 +568,7 @@ mass_print_value_with_descriptor_and_memory(
         printf(".%"PRIslice" = ", SLICE_EXPAND_PRINTF(field->name));
         const u8 *field_memory = memory + field->offset;
         mass_print_value_with_descriptor_and_memory(
-          ContextRecord, builder, field->descriptor, field_memory, depth + 1
+          debugger_context, builder, field->descriptor, field_memory, depth + 1
         );
         if (i + 1 != dyn_array_length(descriptor->Struct.fields)) printf(", ");
         skip_field:;
@@ -480,7 +579,7 @@ mass_print_value_with_descriptor_and_memory(
       const void *pointer = *(const void **)memory;
       printf("&<%p>: ", pointer);
       mass_print_value_with_descriptor_and_memory(
-        ContextRecord, builder, descriptor->Pointer_To.descriptor, pointer, depth + 1
+        debugger_context, builder, descriptor->Pointer_To.descriptor, pointer, depth + 1
       );
     } break;
     default: {
@@ -491,19 +590,18 @@ mass_print_value_with_descriptor_and_memory(
 
 static void
 mass_debug_print_value(
-  CONTEXT *ContextRecord,
+  Debugger_Context *debugger_context,
   Function_Builder *builder,
   Value *value
 ) {
-  const void *memory = mass_debugger_value_memory(ContextRecord, builder, value);
-  mass_print_value_with_descriptor_and_memory(ContextRecord, builder, value->descriptor, memory, 0);
+  const void *memory = mass_debugger_value_memory(debugger_context, builder, value);
+  mass_print_value_with_descriptor_and_memory(debugger_context, builder, value->descriptor, memory, 0);
   printf("\n");
 }
 
 static void
-win32_debugger_loop(
-  CONTEXT *ContextRecord,
-  Win32_Exception_Data *exception_data
+debugger_loop(
+  Debugger_Context *debugger_context
 ) {
   char line_buffer[256] = {0};
   const char *auto_command = 0;
@@ -517,6 +615,13 @@ win32_debugger_loop(
     }
     if (!command_c_string) break;
 
+    u64 stack_pointer = debugger_first_register_value_with_type(
+      debugger_context, Debugger_Register_Type_Stack_Pointer);
+    u64 instruction_pointer = debugger_first_register_value_with_type(
+      debugger_context, Debugger_Register_Type_Instruction_Pointer);
+    Compilation *compilation = debugger_context->compilation;
+    Jit *jit = debugger_context->jit;
+
     Slice command = slice_from_c_string(command_c_string);
     command = slice_trim_whitespace(command);
     if (
@@ -528,22 +633,14 @@ win32_debugger_loop(
       slice_equal(command, slice_literal("backtrace")) ||
       slice_equal(command, slice_literal("bt"))
     ) {
-      win32_print_stack(
-        ContextRecord->Rsp,
-        ContextRecord->Rip,
-        exception_data->compilation,
-        exception_data->jit
-      );
+      win32_print_stack(stack_pointer, instruction_pointer, compilation, jit);
     } else if (
       slice_equal(command, slice_literal("locals"))
     ) {
-      const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
-        ContextRecord->Rip, exception_data->jit
-      );
+      const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(instruction_pointer, jit);
       if (maybe_scope) scope_print_names(maybe_scope, Scope_Print_Flags_Stop_At_First_Declarative);
     } else if (slice_starts_with(command, slice_literal("print "))) {
-      Jit *jit = exception_data->jit;
-      s64 runtime_function_index = win32_get_function_index_from_address(ContextRecord->Rip, jit);
+      s64 runtime_function_index = win32_get_function_index_from_address(instruction_pointer, jit);
       if (runtime_function_index < 0) {
         printf("Variable printing is not available in external code.\n");
         return;
@@ -552,14 +649,12 @@ win32_debugger_loop(
       Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
       Slice variable_name = slice_sub(command, strlen("print "), command.length);
       variable_name = slice_trim_whitespace(variable_name);
-      const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(
-        ContextRecord->Rip, exception_data->jit
-      );
+      const Scope *maybe_scope = win32_debugger_maybe_scope_for_address(instruction_pointer, jit);
       if (maybe_scope) {
-        const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
+        const Symbol *variable_symbol = mass_ensure_symbol(compilation, variable_name);
         Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
         if (scope_entry) {
-          mass_debug_print_value(ContextRecord, builder, scope_entry->value);
+          mass_debug_print_value(debugger_context, builder, scope_entry->value);
         } else {
           printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
         }
@@ -595,8 +690,40 @@ win32_program_test_exception_handler(
         break;
       }
       case EXCEPTION_BREAKPOINT: {
+        // we could probably iterate over the array, but ContextRecord is definitely big enough as we copy from it
+        u64 register_memory_size = sizeof(*ContextRecord);
+        u8 *register_memory = malloc(register_memory_size);
+        Debugger_Context debugger_context = {
+          .register_info = DEBUGGER_X86_64_REGISTER_INFO_ARRAY,
+          .register_count = countof(DEBUGGER_X86_64_REGISTER_INFO_ARRAY),
+          .register_memory = register_memory,
+          .compilation = exception_data->compilation,
+          .jit = exception_data->jit,
+        };
+        #define win32_copy_reg(_NAME_)\
+          do {\
+            char field_name[] = #_NAME_;         \
+            for (int i = 0; i < countof(field_name); ++i) field_name[i] = (char)tolower(field_name[i]);                  \
+            void *register_memory = debugger_register_memory_with_name(&debugger_context, slice_from_c_string(field_name));\
+            memcpy(register_memory, &ContextRecord->_NAME_, sizeof(ContextRecord->_NAME_));\
+      } while(0)
+        win32_copy_reg(Rip); win32_copy_reg(EFlags);
+
+        win32_copy_reg(Rax); win32_copy_reg(Rcx); win32_copy_reg(Rdx); win32_copy_reg(Rbx);
+        win32_copy_reg(Rsp); win32_copy_reg(Rbp); win32_copy_reg(Rsi); win32_copy_reg(Rdi);
+
+        win32_copy_reg(R8); win32_copy_reg(R9); win32_copy_reg(R10); win32_copy_reg(R11);
+        win32_copy_reg(R12); win32_copy_reg(R13); win32_copy_reg(R14); win32_copy_reg(R15);
+
+        win32_copy_reg(Xmm0);  win32_copy_reg(Xmm1);  win32_copy_reg(Xmm2);  win32_copy_reg(Xmm3);
+        win32_copy_reg(Xmm4);  win32_copy_reg(Xmm5);  win32_copy_reg(Xmm6);  win32_copy_reg(Xmm7);
+        win32_copy_reg(Xmm8);  win32_copy_reg(Xmm9);  win32_copy_reg(Xmm10); win32_copy_reg(Xmm11);
+        win32_copy_reg(Xmm12); win32_copy_reg(Xmm13); win32_copy_reg(Xmm14); win32_copy_reg(Xmm15);
+        #undef win32_copy_reg
+
         printf("Unhandled Exception: User Breakpoint hit\n");
-        win32_debugger_loop(ContextRecord, exception_data);
+        debugger_loop(&debugger_context);
+        free(register_memory);
         // Move instruction pointer over the int3 (0xCC) instruction
         ContextRecord->Rip += 1;
         return ExceptionContinueExecution;
