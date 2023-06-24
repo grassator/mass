@@ -64,6 +64,7 @@ static const Debugger_Register_Info DEBUGGER_X86_64_REGISTER_INFO_ARRAY[] = {
 };
 
 typedef struct {
+  Allocator *temp_allocator;
   Compilation *compilation;
   Jit *jit;
 
@@ -690,10 +691,15 @@ win32_program_test_exception_handler(
         break;
       }
       case EXCEPTION_BREAKPOINT: {
+        Virtual_Memory_Buffer temp_buffer;
+        virtual_memory_buffer_init(&temp_buffer, 4096 * 64);
+        Allocator *temp_allocator = virtual_memory_buffer_allocator_make(&temp_buffer);
+
         // we could probably iterate over the array, but ContextRecord is definitely big enough as we copy from it
-        u64 register_memory_size = sizeof(*ContextRecord);
-        u8 *register_memory = malloc(register_memory_size);
+        u8 *register_memory = (u8 *)allocator_allocate(temp_allocator, CONTEXT);
+
         Debugger_Context debugger_context = {
+          .temp_allocator = temp_allocator,
           .register_info = DEBUGGER_X86_64_REGISTER_INFO_ARRAY,
           .register_count = countof(DEBUGGER_X86_64_REGISTER_INFO_ARRAY),
           .register_memory = register_memory,
@@ -723,7 +729,6 @@ win32_program_test_exception_handler(
 
         printf("Unhandled Exception: User Breakpoint hit\n");
         debugger_loop(&debugger_context);
-        free(register_memory);
         // Move instruction pointer over the int3 (0xCC) instruction
         ContextRecord->Rip += 1;
         return ExceptionContinueExecution;
