@@ -32,72 +32,6 @@ typedef struct {
   Compilation *compilation;
 } Win32_Exception_Data;
 
-static void
-win32_print_register_state(
-  CONTEXT *ContextRecord
-) {
-  printf("RIP = 0x%016llX\n", ContextRecord->Rip);
-  printf("EF = 0x%08X\n", (u32)ContextRecord->EFlags);
-  printf("\n");
-
-  printf("RAX = 0x%016llX\n", ContextRecord->Rax);
-  printf("RCX = 0x%016llX\n", ContextRecord->Rcx);
-  printf("RDX = 0x%016llX\n", ContextRecord->Rdx);
-  printf("RBX = 0x%016llX\n", ContextRecord->Rbx);
-  printf("RSP = 0x%016llX\n", ContextRecord->Rsp);
-  printf("RBP = 0x%016llX\n", ContextRecord->Rbp);
-  printf("RSI = 0x%016llX\n", ContextRecord->Rsi);
-  printf("RDI = 0x%016llX\n", ContextRecord->Rdi);
-
-  printf("R8  = 0x%016llX\n",  ContextRecord->R8);
-  printf("R9  = 0x%016llX\n",  ContextRecord->R9);
-  printf("R10 = 0x%016llX\n", ContextRecord->R10);
-  printf("R11 = 0x%016llX\n", ContextRecord->R11);
-  printf("R12 = 0x%016llX\n", ContextRecord->R12);
-  printf("R13 = 0x%016llX\n", ContextRecord->R13);
-  printf("R14 = 0x%016llX\n", ContextRecord->R14);
-  printf("R15 = 0x%016llX\n", ContextRecord->R15);
-  printf("\n");
-
-  struct { const char *name; bool value; } flags[] = {
-    { .name = "CF", .value = !!(ContextRecord->EFlags & 0x0001) },
-    { .name = "PF", .value = !!(ContextRecord->EFlags & 0x0004) },
-    { .name = "AF", .value = !!(ContextRecord->EFlags & 0x0008) },
-    { .name = "ZF", .value = !!(ContextRecord->EFlags & 0x0040) },
-    { .name = "SF", .value = !!(ContextRecord->EFlags & 0x0080) },
-    { .name = "TF", .value = !!(ContextRecord->EFlags & 0x0100) },
-    { .name = "IF", .value = !!(ContextRecord->EFlags & 0x0200) },
-    { .name = "DF", .value = !!(ContextRecord->EFlags & 0x0400) },
-    { .name = "OF", .value = !!(ContextRecord->EFlags & 0x0800) },
-  };
-
-  u64 length = 0;
-  // Table header
-  for (u64 i = 0; i < countof(flags); ++i) {
-    if (i != 0) {
-      length += strlen(" | ");
-      printf(" | ");
-    }
-    length += strlen(flags[i].name);
-    printf("%s", flags[i].name);
-  }
-  printf("\n");
-  for (u64 i = 0; i < length; ++i) {
-    // TODO @Speed
-    printf("%c", '-');
-  }
-  printf("\n");
-  // Table values
-  for (u64 i = 0; i < countof(flags); ++i) {
-    if (i != 0) {
-      length += strlen("  | ");
-      printf("  | ");
-    }
-    printf("%c", flags[i].value ? 'x' : ' ');
-  }
-  printf("\n");
-}
-
 typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
 
 typedef struct {
@@ -600,11 +534,6 @@ win32_debugger_loop(
         exception_data->compilation,
         exception_data->jit
       );
-    } else if (
-      slice_equal(command, slice_literal("registers"))
-    ) {
-      // TODO support this for each stack frame
-      win32_print_register_state(ContextRecord);
     } else if (
       slice_equal(command, slice_literal("locals"))
     ) {
