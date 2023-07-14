@@ -2513,6 +2513,31 @@ spec("source") {
       check(checker(1, 2, 3, 4, 5, 6, test_128bit) == 42);
     }
 
+    // Both System_V and win64 will pass 7th argument on the stack
+    it("should be able to pass an empty struct as an argument") {
+      u64(*checker)(u64) = (u64(*)(u64))test_program_inline_source_function(
+        "checker", &test_context,
+        "f :: fn(x : Void, y : u64) -> (u64) { y }\n"
+        "checker :: fn(x : u64) -> (u64) {"
+        "  f((), x)"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(42) == 42);
+    }
+    // MSVC does not allow to
+    #if defined(__clang__) || defined(__GNUC__)
+      it("should agree with the C compilers about zero-sized struct ABI") {
+        struct zero_size {};
+        u64(*checker)(struct zero_size, u64) = (u64(*)(struct zero_size, u64))test_program_inline_source_function(
+          "checker", &test_context,
+          "checker :: fn(nothing : Void, x : u64) -> (u64) {x}"
+        );
+        check(spec_check_mass_result(test_context.result));
+        check(checker((struct zero_size){}, 42) == 42);
+      }
+    #endif
+
     it("should correctly handle 192bit struct arguments") {
       u64(*checker)(Test_192bit) = (u64(*)(Test_192bit))test_program_inline_source_function(
         "checker", &test_context,

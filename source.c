@@ -2892,11 +2892,32 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(call_setup->parameters); ++i) {
     Function_Call_Parameter *call_param = dyn_array_get(call_setup->parameters, i);
     Value *target_param = dyn_array_push_uninitialized(target_params);
+
+    bool is_zero_sized = call_param->descriptor->bit_size.as_u64 == 0;
     if (call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer) {
       value_init(target_param, &descriptor_void_pointer, call_param->storage, *source_range);
+
+      // :ZeroSizeImplicitPointer
+      // On windows, zero-sized values end up as an implicit pointer because
+      // they are not exactly 1, 2, 4 or 8 bytes as the calling convention says:
+      //   https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#calling-convention-defaults
+      if (is_zero_sized) {
+        Storage null_storage = storage_immediate_with_bit_size(&(u64){0}, (Bits) { 64 });
+        Value* arg_value = value_make(context, target_param->descriptor, null_storage, *source_range);
+        dyn_array_push(temp_arguments, arg_value);
+        continue;
+      }
     } else {
       value_init(target_param, call_param->descriptor, call_param->storage, *source_range);
+      // If argument is not an implicit pointer and zero size, we don't really need a register for it
+      if (is_zero_sized) {
+        Storage void_storage = storage_immediate_with_bit_size(0, (Bits) { 0 });
+        Value* arg_value = value_make(context, target_param->descriptor, void_storage, *source_range);
+        dyn_array_push(temp_arguments, arg_value);
+        continue;
+      }
     }
+
     if (call_param->flags & Function_Call_Parameter_Flags_Uninitialized) {
       Storage source_storage = reserve_stack_storage(builder, target_param->descriptor->bit_size);
       Value *arg_value = value_make(context, target_param->descriptor, source_storage, *source_range);
@@ -3053,10 +3074,16 @@ call_function_overload(
     const Storage *param_storage = &value_as_forced(param)->storage;
     const Storage *source_storage = &value_as_forced(source_arg)->storage;
     bool is_implicit_pointer = !!(call_param->flags & Function_Call_Parameter_Flags_Implicit_Pointer);
+    bool is_zero_sized = call_param->descriptor->bit_size.as_u64 == 0;
     if (storage_equal(param_storage, source_storage) && !is_implicit_pointer) continue;
 
     if (is_implicit_pointer) {
-      mass_storage_load_address(builder, source_range, scope, param_storage, source_storage);
+      // :ZeroSizeImplicitPointer
+      if (is_zero_sized) {
+        move_value(builder, scope, source_range, param_storage, source_storage);
+      } else {
+        mass_storage_load_address(builder, source_range, scope, param_storage, source_storage);
+      }
     } else if (storage_is_indirect(param_storage)) {
       Register base_register = param_storage->Memory.location.Indirect.base_register;
       Storage target_storage = storage_register(base_register, (Bits){64});
