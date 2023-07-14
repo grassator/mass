@@ -24,6 +24,7 @@
     <ProjectGuid>{9e9cbb36-7a44-4d97-a59e-1addeb4f7767}</ProjectGuid>
     <RootNamespace>mass</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>tests</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -150,6 +151,34 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="tokenizer.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="value.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="encoding.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="function.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="instruction.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="generated_exports.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="pe32.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="program.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
+    <ClInclude Include="source.c">
+      <FileType>CppCode</FileType>
+    </ClInclude>
     <ClCompile Include="source_spec.c">
       <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatWarningAsError>
       <MultiProcessorCompilation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</MultiProcessorCompilation>
@@ -159,6 +188,33 @@
     <Natvis Include="debug.natvis" />
     <Natvis Include="generated.natvis" />
     <Natvis Include="prelude.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="bdd-for-c.h" />
+    <ClInclude Include="calling_convention.h" />
+    <ClInclude Include="function.h" />
+    <ClInclude Include="generated_types.h" />
+    <ClInclude Include="posix_runtime.h" />
+    <ClInclude Include="prelude.h" />
+    <ClInclude Include="program.h" />
+    <ClInclude Include="source.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="value.h" />
+    <ClInclude Include="win32_platform.h" />
+    <ClInclude Include="win32_runtime.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="build.bat" />
+    <None Include="build.sh" />
+    <None Include="LICENSE.md" />
+    <None Include="loc.bat" />
+    <None Include="README.md" />
+    <None Include="release.bat" />
+    <None Include="test.bat" />
+    <None Include="test.sh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

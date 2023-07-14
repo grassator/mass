@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source_spec.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="debug.natvis" />
+    <Natvis Include="prelude.natvis" />
+    <Natvis Include="generated.natvis" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="posix_runtime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="prelude.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="generated_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="function.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="value.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="win32_platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="win32_runtime.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="program.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="calling_convention.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bdd-for-c.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoding.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="function.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="instruction.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="generated_exports.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pe32.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="program.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="source.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tokenizer.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="value.c">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="test.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="test.sh" />
+    <None Include="release.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="README.md" />
+    <None Include="loc.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="LICENSE.md" />
+    <None Include="build.sh" />
+    <None Include="build.bat">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
+  </ItemGroup>
+</Project>
