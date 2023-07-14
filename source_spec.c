@@ -2525,7 +2525,8 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker(42) == 42);
     }
-    // MSVC does not allow to
+
+    // MSVC does not allow to have zero-sized structs so we only test this for GCC and CLANG
     #if defined(__clang__) || defined(__GNUC__)
       it("should agree with the C compilers about zero-sized struct ABI") {
         struct zero_size {};
