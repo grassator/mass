@@ -35,4 +35,3 @@ fi
 $CC $FLAGS mass.c -o build/mass -lm -ldl
 
 $CC $FLAGS source_spec.c -o build/source_spec -lm -ldl
-objdump -d build/source_spec -l > build/source_spec.S
