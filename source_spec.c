@@ -2872,6 +2872,20 @@ spec("source") {
     }
   }
 
+  describe("Standard IO") {
+    it("should be able to print 'Hello World'") {
+      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> () {"
+          "io :: import(\"std/io\")\n"
+          "io.print(\"Hello, world!\\n\")"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+  }
+
   describe("Complex Examples") {
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz =
