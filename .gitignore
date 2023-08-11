@@ -3,6 +3,5 @@
 .gdb_history
 temp/
 build/
-cmake-build-debug*
-cmake-build-release*
+cmake-build-*
 minimal.exe
