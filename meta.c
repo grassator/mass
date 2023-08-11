@@ -2564,11 +2564,6 @@ main(void) {
     { "const Function_Info *", "function" },
   })));
 
-  export_compiler(push_type(type_function(Default, "calling_convention_x86_64_system_v_syscall_setup_proc", "Function_Call_Setup", (Argument_Type[]){
-    { "const Allocator *", "allocator" },
-    { "const Function_Info *", "function" },
-  })));
-
   export_compiler_custom_name("function_info_init_for_header_and_maybe_body", push_type(
     type_function(Default, "mass_function_info_init_for_header_and_maybe_body", "void", (Argument_Type[]){
       { "Mass_Context *", "context" },

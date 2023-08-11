@@ -1096,9 +1096,6 @@ static _Bool mass_result_is_error
 static Function_Call_Setup calling_convention_x86_64_system_v_call_setup_proc
   (const Allocator * allocator, const Function_Info * function);
 
-static Function_Call_Setup calling_convention_x86_64_system_v_syscall_setup_proc
-  (const Allocator * allocator, const Function_Info * function);
-
 static void mass_function_info_init_for_header_and_maybe_body
   (Mass_Context * context, const Scope * scope, const Function_Header * header, Value * maybe_body, Function_Info * out_info);
 
@@ -3329,7 +3326,6 @@ static Descriptor descriptor_value_make;
 static Descriptor descriptor_descriptor_function_instance;
 static Descriptor descriptor_mass_result_is_error;
 static Descriptor descriptor_calling_convention_x86_64_system_v_call_setup_proc;
-static Descriptor descriptor_calling_convention_x86_64_system_v_syscall_setup_proc;
 static Descriptor descriptor_mass_function_info_init_for_header_and_maybe_body;
 static Descriptor descriptor_call_function_overload;
 static Descriptor descriptor_mass_integer_add;
