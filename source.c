@@ -3194,7 +3194,7 @@ mass_function_info_init_for_header_and_maybe_body(
         descriptor = deduce_runtime_descriptor_for_value(context, param->maybe_default_value, 0);
       }
       Storage storage = storage_immediate(&descriptor);
-      Value *param_value = value_make(&temp_context, &descriptor_descriptor_pointer, storage, source_range);
+      Value *param_value = value_make(&temp_context, &descriptor_type, storage, source_range);
       scope_define_value(args_parser.scope, VALUE_STATIC_EPOCH, source_range, param->symbol, param_value);
     }
   }

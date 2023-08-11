@@ -19,15 +19,17 @@ get :: fn(string : String, offset : i64) => (i8) {
   get(string, offset)
 }
 
+type_pointee :: fn(t : Type) => _ { Type[type_descriptor(t).Pointer_To.descriptor] }
+
 // TODO runtime version should be implemented in the userland
 unchecked_get_at_index :: fn(
   x ~ is_pointer_type,
   offset : i64
-) -> ((x.*).Pointer_To.descriptor) MASS.unchecked_get_at_index
+) -> (type_pointee(x)) MASS.unchecked_get_at_index
 unchecked_get_at_index :: fn(
   x ~ is_pointer_type,
   offset : i64
-) => ((x.*).Pointer_To.descriptor) MASS.unchecked_get_at_index
+) => (type_pointee(x)) MASS.unchecked_get_at_index
 
 get :: fn(x ~ is_struct_type, rhs) -> _ MASS.struct_get
 get :: fn(x ~ is_fixed_array_type, rhs) -> _ MASS.unchecked_get_at_index
@@ -631,8 +633,7 @@ is_c_dyn_array :: fn(t : Type) -> (bool) {
   return true
 }
 
-dyn_array_item_type :: fn(t : Type) => (Type) {
-  assert(is_c_dyn_array(t))
+dyn_array_item_type :: fn(t ~ is_c_dyn_array) => (Type) {
   s := type_descriptor(t).Struct
   array_fields := cast(&(MASS.Struct_Field * 2), &s.fields.data.items)
   data_descriptor := array_fields.1.descriptor.Pointer_To.descriptor
@@ -674,7 +675,7 @@ dyn_array_get :: fn(array ~ is_c_dyn_array, offset : i64) -> _ {
 }
 
 // TODO make more type-safe
-dyn_array_push :: fn(array ~ is_c_dyn_array, item) -> () {
+dyn_array_push :: fn(array ~ is_c_dyn_array, item : dyn_array_item_type(array)) -> () {
   using unsigned
   item_type :: dyn_array_item_type(type_of(array))
   assert(array.data.length + 1 <= array.data.capacity)
