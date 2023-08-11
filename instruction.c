@@ -50,7 +50,7 @@
   }
 
 #define mnemonic(_name_, ...)\
-  const X64_Mnemonic *_name_ = &(const X64_Mnemonic){\
+  const X64_Mnemonic *x64_##_name_ = &(const X64_Mnemonic){\
     .name = #_name_,\
     .encoding_list = (const Instruction_Encoding[]){__VA_ARGS__},\
     .encoding_count = countof((const Instruction_Encoding[]){__VA_ARGS__}),\

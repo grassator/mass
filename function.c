@@ -118,10 +118,10 @@ move_value(
     assert(target_bit_size == source_bit_size);
     if (target_bit_size == 32) {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){movss, {*target, *source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_movss, {*target, *source}} );
     } else if (target_bit_size == 64) {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){movsd, {*target, *source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_movsd, {*target, *source}} );
     } else {
       panic("Internal Error: XMM operand of unexpected size");
     }
@@ -141,54 +141,54 @@ move_value(
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){sete, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_sete, {temp}} );
         break;
       }
       case Compare_Type_Not_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setne, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setne, {temp}} );
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setb, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setb, {temp}} );
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setbe, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setbe, {temp}} );
         break;
       }
       case Compare_Type_Unsigned_Above: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){seta, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_seta, {temp}} );
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setae, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setae, {temp}} );
         break;
       }
 
       case Compare_Type_Signed_Less: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setl, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setl, {temp}} );
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setle, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setle, {temp}} );
         break;
       }
       case Compare_Type_Signed_Greater: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setg, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setg, {temp}} );
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){setge, {temp}} );
+          &builder->code_block, scope, &(Instruction_Assembly){x64_setge, {temp}} );
         break;
       }
       default: {
@@ -200,9 +200,9 @@ move_value(
       Storage resized_temp = temp;
       resized_temp.bit_size = target->bit_size;
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){movsx, {resized_temp, temp}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_movsx, {resized_temp, temp}} );
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, resized_temp}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {*target, resized_temp}} );
       register_release(builder, temp.Register.index);
     }
     return;
@@ -221,10 +221,10 @@ move_value(
       .Register.index = source->Register.index,
     };
     push_eagerly_encoded_assembly_no_source_range(
-      &builder->code_block, scope, &(Instruction_Assembly){mov, {temp_full_register, source_full_register}}
+      &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {temp_full_register, source_full_register}}
     );
     push_eagerly_encoded_assembly_no_source_range(
-      &builder->code_block, scope, &(Instruction_Assembly){shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
+      &builder->code_block, scope, &(Instruction_Assembly){x64_shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
     );
 
     Storage right_size_temp = temp_full_register;
@@ -255,31 +255,31 @@ move_value(
     // Clear bits from the target register
     {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){mov, {temp_full_register, imm64(clear_mask)}}
+        &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {temp_full_register, imm64(clear_mask)}}
       );
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){and, {target_full_register, temp_full_register}}
+        &builder->code_block, scope, &(Instruction_Assembly){x64_and, {target_full_register, temp_full_register}}
       );
     }
 
     // Prepare new bits from the source register
     {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
+        &builder->code_block, scope, &(Instruction_Assembly){x64_xor, {temp_full_register, temp_full_register}}
       );
       Storage right_size_temp = temp_full_register;
       right_size_temp.bit_size = source->bit_size;
       move_value(builder, scope, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
+          &builder->code_block, scope, &(Instruction_Assembly){x64_shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
         );
       }
     }
 
     // Merge new bits into the target register
     push_eagerly_encoded_assembly_no_source_range(
-      &builder->code_block, scope, &(Instruction_Assembly){or, {target_full_register, temp_full_register}}
+      &builder->code_block, scope, &(Instruction_Assembly){x64_or, {target_full_register, temp_full_register}}
     );
     register_release(builder, temp_full_register.Register.index);
     return;
@@ -291,7 +291,7 @@ move_value(
     if (is_zero && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){xor, {*target, *target}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_xor, {*target, *target}} );
       return;
     }
     Storage adjusted_source = *source;
@@ -302,13 +302,13 @@ move_value(
     if (is_64bit_immediate && target->tag != Storage_Tag_Register) {
       Storage temp = storage_register_temp(builder, adjusted_source.bit_size);
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){mov, {temp, adjusted_source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {temp, adjusted_source}} );
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, temp}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {*target, temp}} );
       register_release(builder, temp.Register.index);
     } else {
       push_eagerly_encoded_assembly_no_source_range(
-        &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, adjusted_source}} );
+        &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {*target, adjusted_source}} );
     }
     return;
   }
@@ -329,7 +329,7 @@ move_value(
   }
 
   push_eagerly_encoded_assembly_no_source_range(
-    &builder->code_block, scope, &(Instruction_Assembly){mov, {*target, *source}} );
+    &builder->code_block, scope, &(Instruction_Assembly){x64_mov, {*target, *source}} );
 }
 
 static void
@@ -371,8 +371,8 @@ make_trampoline(
 ) {
   u32 result = u64_to_u32(buffer->occupied);
   Storage rax = storage_register(Register_A, (Bits){64});
-  encode_and_write_assembly(buffer, &(Instruction_Assembly) {mov, {rax, imm64(address)}});
-  encode_and_write_assembly(buffer, &(Instruction_Assembly) {jmp, {rax}});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_mov, {rax, imm64(address)}});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_jmp, {rax}});
   return result;
 }
 
@@ -405,13 +405,13 @@ fn_encode(
         out_layout->volatile_register_push_offsets[push_index++] =
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
         Storage to_save = storage_register(reg_index, (Bits){64});
-        encode_and_write_assembly(buffer, &(Instruction_Assembly) {push, {to_save}});
+        encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_push, {to_save}});
       }
     }
   }
 
   Storage rsp = storage_register(Register_SP, (Bits){64});
-  encode_and_write_assembly(buffer, &(Instruction_Assembly) {sub, {rsp, stack_size_operand}});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_sub, {rsp, stack_size_operand}});
   out_layout->stack_allocation_offset_in_prolog =
     u64_to_u8(code_base_rva + buffer->occupied -out_layout->begin_rva);
   out_layout->size_of_prolog =
@@ -424,7 +424,7 @@ fn_encode(
     }
   }
 
-  encode_and_write_assembly(buffer, &(Instruction_Assembly) {add, {rsp, stack_size_operand}});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_add, {rsp, stack_size_operand}});
 
   // :RegisterPushPop
   // Pop non-volatile registers (in original order)
@@ -432,12 +432,12 @@ fn_encode(
     if (register_bitset_get(builder->register_used_bitset.bits, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset.bits, reg_index)) {
         Storage to_save = storage_register(reg_index, (Bits){64});
-        encode_and_write_assembly(buffer, &(Instruction_Assembly) {pop, {to_save}});
+        encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_pop, {to_save}});
       }
     }
   }
 
-  encode_and_write_assembly(buffer, &(Instruction_Assembly) {ret});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {x64_ret});
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 }
 
@@ -458,7 +458,7 @@ encode_inverted_conditional_jump(
     if (is_zero) {
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){jmp, {code_label32(to_label)}}
+        &(Instruction_Assembly){x64_jmp, {code_label32(to_label)}}
       );
     } else {
       // nothing to do, just fall through to the next code
@@ -468,18 +468,18 @@ encode_inverted_conditional_jump(
   if (storage->tag == Storage_Tag_Eflags) {
     const X64_Mnemonic *mnemonic = 0;
     switch(storage->Eflags.compare_type) {
-      case Compare_Type_Equal: mnemonic = jne; break;
-      case Compare_Type_Not_Equal: mnemonic = je; break;
+      case Compare_Type_Equal: mnemonic = x64_jne; break;
+      case Compare_Type_Not_Equal: mnemonic = x64_je; break;
 
-      case Compare_Type_Unsigned_Below: mnemonic = jae; break;
-      case Compare_Type_Unsigned_Below_Equal: mnemonic = ja; break;
-      case Compare_Type_Unsigned_Above: mnemonic = jbe; break;
-      case Compare_Type_Unsigned_Above_Equal: mnemonic = jb; break;
+      case Compare_Type_Unsigned_Below: mnemonic = x64_jae; break;
+      case Compare_Type_Unsigned_Below_Equal: mnemonic = x64_ja; break;
+      case Compare_Type_Unsigned_Above: mnemonic = x64_jbe; break;
+      case Compare_Type_Unsigned_Above_Equal: mnemonic = x64_jb; break;
 
-      case Compare_Type_Signed_Less: mnemonic = jge; break;
-      case Compare_Type_Signed_Less_Equal: mnemonic = jg; break;
-      case Compare_Type_Signed_Greater: mnemonic = jle; break;
-      case Compare_Type_Signed_Greater_Equal: mnemonic = jl; break;
+      case Compare_Type_Signed_Less: mnemonic = x64_jge; break;
+      case Compare_Type_Signed_Less_Equal: mnemonic = x64_jg; break;
+      case Compare_Type_Signed_Greater: mnemonic = x64_jle; break;
+      case Compare_Type_Signed_Greater_Equal: mnemonic = x64_jl; break;
       default: assert(!"Unsupported comparison"); break;
     }
     push_eagerly_encoded_assembly(
@@ -496,7 +496,7 @@ encode_inverted_conditional_jump(
       }
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){x64_test, {test_storage, test_storage}}
+        &(Instruction_Assembly){x64_x64_test, {test_storage, test_storage}}
       );
       if (is_packed) register_release(builder, test_storage.Register.index);
     } else {
@@ -504,12 +504,12 @@ encode_inverted_conditional_jump(
       if (bit_size == 32 || bit_size == 64) {
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){cmp, {*storage, imm32(0)}}
+          &(Instruction_Assembly){x64_cmp, {*storage, imm32(0)}}
         );
       } else if (bit_size == 8) {
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){cmp, {*storage, imm8(0)}}
+          &(Instruction_Assembly){x64_cmp, {*storage, imm8(0)}}
         );
       } else {
         assert(!"Unsupported value inside `if`");
@@ -517,7 +517,7 @@ encode_inverted_conditional_jump(
     }
     push_eagerly_encoded_assembly(
       &builder->code_block, *source_range, scope,
-      &(Instruction_Assembly){jz, {code_label32(to_label)}}
+      &(Instruction_Assembly){x64_jz, {code_label32(to_label)}}
     );
   }
 }
@@ -806,7 +806,7 @@ mass_function_literal_instance_for_info(
     Storage caller_register_storage = storage_register(caller_register, (Bits){64});
     push_eagerly_encoded_assembly(
       &builder->code_block, return_range, body_scope,
-      &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
+      &(Instruction_Assembly){x64_mov, {caller_register_storage, callee_register_storage}}
     );
   }
 
@@ -872,11 +872,11 @@ program_init_startup_code(
     Relocation *relocation = dyn_array_get(program->relocations, i);
     push_eagerly_encoded_assembly(
       &builder.code_block, source_range, context->compilation->root_scope,
-      &(Instruction_Assembly){lea, {register_a, relocation->address_of}}
+      &(Instruction_Assembly){x64_lea, {register_a, relocation->address_of}}
     );
     push_eagerly_encoded_assembly(
       &builder.code_block, source_range, context->compilation->root_scope,
-      &(Instruction_Assembly){mov, {relocation->patch_at, register_a}}
+      &(Instruction_Assembly){x64_mov, {relocation->patch_at, register_a}}
     );
   }
 
@@ -885,7 +885,7 @@ program_init_startup_code(
   assert(entry_instance->tag == Value_Tag_Forced);
   push_eagerly_encoded_assembly(
     &builder.code_block, source_range, context->compilation->root_scope,
-    &(Instruction_Assembly){jmp, {entry_instance->Forced.storage}}
+    &(Instruction_Assembly){x64_jmp, {entry_instance->Forced.storage}}
   );
 
   program->entry_point = function;

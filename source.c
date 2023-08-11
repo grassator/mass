@@ -284,7 +284,7 @@ mass_storage_load_address(
   assert(register_storage.bit_size.as_u64 == 64);
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range, scope,
-    &(Instruction_Assembly){lea, {register_storage, storage_adjusted_for_lea(*source)}}
+    &(Instruction_Assembly){x64_lea, {register_storage, storage_adjusted_for_lea(*source)}}
   );
 
   if (!can_reuse_result_as_temp) {
@@ -2316,7 +2316,7 @@ mass_handle_while_lazy_proc(
 
   push_eagerly_encoded_assembly(
     &builder->code_block, payload->body->source_range, scope,
-    &(Instruction_Assembly){jmp, {code_label32(continue_label)}}
+    &(Instruction_Assembly){x64_jmp, {code_label32(continue_label)}}
   );
 
   push_instruction(&builder->code_block, (Instruction) {
@@ -3057,7 +3057,7 @@ call_function_overload(
 
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){mov, {saved->stack, saved->reg}}
+        &(Instruction_Assembly){x64_mov, {saved->stack, saved->reg}}
       );
     }
   }
@@ -3104,7 +3104,7 @@ call_function_overload(
       if (storage_is_label(&call_target_storage)) {
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){call, {call_target_storage}}
+          &(Instruction_Assembly){x64_call, {call_target_storage}}
         );
       } else {
         Register temp_reg = register_acquire_temp(builder);
@@ -3112,7 +3112,7 @@ call_function_overload(
         move_value(builder, scope, source_range, &reg, &call_target_storage);
         push_eagerly_encoded_assembly(
           &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){call, {reg}}
+          &(Instruction_Assembly){x64_call, {reg}}
         );
         register_release(builder, temp_reg);
       }
@@ -3121,11 +3121,11 @@ call_function_overload(
       Storage syscall_number_storage = storage_register(Register_A, (Bits){64});
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){mov, {syscall_number_storage, call_target_storage}}
+        &(Instruction_Assembly){x64_mov, {syscall_number_storage, call_target_storage}}
       );
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){asm_syscall}
+        &(Instruction_Assembly){x64_asm_syscall}
       );
     } break;
   }
@@ -3139,7 +3139,7 @@ call_function_overload(
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
     push_eagerly_encoded_assembly(
       &builder->code_block, *source_range, scope,
-      &(Instruction_Assembly){mov, {saved->reg, saved->stack}}
+      &(Instruction_Assembly){x64_mov, {saved->reg, saved->stack}}
     );
   }
 
@@ -4083,7 +4083,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       if (mass_has_error(context)) return 0;
 
-      const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
+      const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? x64_add : x64_sub;
 
       push_eagerly_encoded_assembly(
         &builder->code_block, result_range, scope,
@@ -4137,7 +4137,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         .Location = { .source_range = result_range },
       });
 
-      const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
+      const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? x64_imul : x64_mul;
       push_eagerly_encoded_assembly(
         &builder->code_block, result_range, scope,
         &(Instruction_Assembly){mnemonic, {temp_b_storage}}
@@ -4202,10 +4202,10 @@ mass_handle_arithmetic_operation_lazy_proc(
       if (descriptor_is_signed_integer(descriptor)){
         const X64_Mnemonic *widen = 0;
         switch (bit_size) {
-          case 64: widen = cqo; break;
-          case 32: widen = cdq; break;
-          case 16: widen = cwd; break;
-          case 8: widen = cbw; break;
+          case 64: widen = x64_cqo; break;
+          case 32: widen = x64_cdq; break;
+          case 16: widen = x64_cwd; break;
+          case 8: widen = x64_cbw; break;
           default: assert(false); break;
         }
         assert(widen);
@@ -4213,22 +4213,22 @@ mass_handle_arithmetic_operation_lazy_proc(
           &builder->code_block, scope, &(Instruction_Assembly){widen}
         );
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){idiv, {temp_divisor_storage}}
+          &builder->code_block, scope, &(Instruction_Assembly){x64_idiv, {temp_divisor_storage}}
         );
       } else {
         if (bit_size == 8) {
           Storage reg_ax = storage_register(Register_A, (Bits){16});
           push_eagerly_encoded_assembly_no_source_range(
-            &builder->code_block, scope, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend_storage}}
+            &builder->code_block, scope, &(Instruction_Assembly){x64_movzx, {reg_ax, temp_dividend_storage}}
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
           push_eagerly_encoded_assembly_no_source_range(
-            &builder->code_block, scope, &(Instruction_Assembly){xor, {reg_d, reg_d}}
+            &builder->code_block, scope, &(Instruction_Assembly){x64_xor, {reg_d, reg_d}}
           );
         }
         push_eagerly_encoded_assembly_no_source_range(
-          &builder->code_block, scope, &(Instruction_Assembly){asm_div, {temp_divisor_storage}}
+          &builder->code_block, scope, &(Instruction_Assembly){x64_asm_div, {temp_divisor_storage}}
         );
       }
 
@@ -4387,7 +4387,7 @@ mass_handle_integer_comparison_lazy_proc(
 
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range, scope,
-    &(Instruction_Assembly){cmp, {temp_a_storage, temp_b_storage}}
+    &(Instruction_Assembly){x64_cmp, {temp_a_storage, temp_b_storage}}
   );
 
   Value *comparison_value = value_make(
@@ -4490,7 +4490,7 @@ mass_handle_generic_comparison_lazy_proc(
 
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){cmp, {temp_a_storage, temp_b_storage}}
+        &(Instruction_Assembly){x64_cmp, {temp_a_storage, temp_b_storage}}
       );
 
       result = value_make(context, &descriptor__bool, storage_eflags(compare_type), *source_range);
@@ -5113,7 +5113,7 @@ mass_handle_array_access_lazy_proc(
       // TODO @InstructionQuality this should use shifts for power-of-2 item byte sizes
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){imul, {base_storage, byte_size_storage}}
+        &(Instruction_Assembly){x64_imul, {base_storage, byte_size_storage}}
       );
       register_release(builder, byte_size_register);
     }
@@ -5130,7 +5130,7 @@ mass_handle_array_access_lazy_proc(
 
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){add, {base_storage, address_storage}}
+        &(Instruction_Assembly){x64_add, {base_storage, address_storage}}
       );
       register_release(builder, address_register);
     }
@@ -5613,7 +5613,7 @@ mass_handle_if_expression_lazy_proc(
     after_then_body_source_range.offsets.from = after_then_body_source_range.offsets.to;
     push_eagerly_encoded_assembly(
       &builder->code_block, after_then_body_source_range, scope,
-      &(Instruction_Assembly){jmp, {code_label32(after_label)}}
+      &(Instruction_Assembly){x64_jmp, {code_label32(after_label)}}
     );
     push_instruction(&builder->code_block, (Instruction) {
       .tag = Instruction_Tag_Label,
@@ -6194,7 +6194,7 @@ mass_handle_explicit_return_lazy_proc(
 
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range, scope,
-    &(Instruction_Assembly) {jmp, {return_label}}
+    &(Instruction_Assembly) {x64_jmp, {return_label}}
   );
 
   const Descriptor *expected_descriptor = mass_expected_result_descriptor(expected_result);
@@ -6927,8 +6927,7 @@ mass_maybe_trim_shebang(
     if (ch == '#') {
       // Skip till the end of line
       for (; offsets->from < offsets->to; offsets->from += 1) {
-        char ch = source_range->file->text.bytes[offsets->from];
-        if (ch == '\n') {
+        if (source_range->file->text.bytes[offsets->from] == '\n') {
           offsets->from += 1;
           goto next;
         }
