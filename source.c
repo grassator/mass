@@ -560,6 +560,14 @@ anonymous_struct_descriptor_from_tuple(
         return 0;
       } break;
     }
+    if (!field_descriptor) {
+      mass_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_No_Runtime_Use,
+        .source_range = item->source_range,
+        .detailed_message = slice_literal("Could not deduce a runtime type for the tuple element"),
+      });
+      return 0;
+    }
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
     if (name.length) {
       u64 *previous_index = hash_map_get(field_name_set, name);
@@ -928,6 +936,9 @@ deduce_runtime_descriptor_for_value(
       }
     } else if (same_type(value->descriptor, &descriptor_named_accessor)) {
       const Named_Accessor *accessor = value_as_named_accessor(value);
+      if (!maybe_desired_descriptor) {
+        return 0;
+      }
       Module *module = maybe_desired_descriptor->own_module;
       if (!module) return 0;
       Scope_Entry *entry = scope_lookup_shallow(module->exports.scope, accessor->symbol);
