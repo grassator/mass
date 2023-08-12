@@ -2829,8 +2829,8 @@ spec("source") {
   }
   #endif
 
-  #if defined(__linux__)
   describe("Linux") {
+    #if defined(__linux__)
     it("should be able to determine the OS type") {
       Os(*checker)(void) = (Os(*)(void))test_program_inline_source_function(
         "checker", &test_context,
@@ -2839,8 +2839,18 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == Os_Linux);
     }
+    #endif
+    it("should be error out when trying to make a syscall with too large return type") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> () { test :: import(\"std/linux\").make_syscall((fn() -> (i64 * 2)), 1); test() }\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_User_Defined);
+      check(slice_equal(error->User_Defined.name, slice_literal("Syscall_Type_Too_Large")));
+    }
   }
-  #endif
 
   describe("External (DLL Imports)") {
     #if defined(__linux__)

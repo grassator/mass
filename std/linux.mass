@@ -18,11 +18,14 @@ calling_convention_x86_64_system_v :: MASS.Calling_Convention [
 SYSTEM_V_SYSCALL_MAX_PARAM_COUNT :: 6
 
 calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
-  allocator : &MASS.Allocator,
-  function : &MASS.Function_Info
+  context : &MASS.Context,
+  function : &MASS.Function_Info,
+  header : &MASS.Function_Header
 ) -> (MASS.Function_Call_Setup) {
   using unsigned
   meta :: import("std/meta")
+
+  allocator := context.allocator
 
   param_count := length(function.parameters)
   assert(param_count <= SYSTEM_V_SYSCALL_MAX_PARAM_COUNT)
@@ -41,8 +44,15 @@ calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   ]
   return_descriptor := function.return_descriptor
   if return_descriptor.bit_size.as_u64 != 0 then {
-    // TODO provide user error? or should it be handled earlier?
-    assert(return_descriptor.bit_size.as_u64 <= 64)
+    if return_descriptor.bit_size.as_u64 > 64 then {
+      error : MASS.Error
+      error.tag = .User_Defined
+      error.User_Defined.name = "Syscall_Type_Too_Large"
+      error.source_range = header.returns.source_range
+      error.detailed_message = "Return type is too large too be used for a syscall"
+      meta.context_error(context, error)
+      return result
+    }
 
     common_storage := MASS.storage_register(.A, return_descriptor.bit_size)
     result.callee_return = common_storage
@@ -112,7 +122,8 @@ make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Fu
     fn_info := allocate(context.allocator, MASS.Function_Info)
     MASS.function_info_init_for_header_and_maybe_body(context, parser.scope, &signature, 0, fn_info)
     if MASS.result_is_error(context.result) then return 0
-    call_setup := calling_convention_x86_64_system_v_syscall_setup_proc(context.allocator, fn_info)
+    call_setup := calling_convention_x86_64_system_v_syscall_setup_proc(context, fn_info, &signature)
+    if MASS.result_is_error(context.result) then return 0
 
     fn_descriptor := MASS.descriptor_function_instance(context.allocator, fn_info, call_setup, 0)
     storage := meta.immediate_storage(number)
