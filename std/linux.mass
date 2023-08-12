@@ -15,7 +15,7 @@ calling_convention_x86_64_system_v :: MASS.Calling_Convention [
   ]
 ]
 
-SYSTEM_V_MAX_PARAM_COUNT :: 6
+SYSTEM_V_SYSCALL_MAX_PARAM_COUNT :: 6
 
 calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   allocator : &MASS.Allocator,
@@ -25,10 +25,10 @@ calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   meta :: import("std/meta")
 
   param_count := length(function.parameters)
-  assert(param_count <= SYSTEM_V_MAX_PARAM_COUNT)
+  assert(param_count <= SYSTEM_V_SYSCALL_MAX_PARAM_COUNT)
   // TODO abstract this into dyn_array_make
 
-  parameters_internal := dyn_array_make_internal(allocator, MASS.Function_Call_Parameter, SYSTEM_V_MAX_PARAM_COUNT)
+  parameters_internal := dyn_array_make_internal(allocator, MASS.Function_Call_Parameter, SYSTEM_V_SYSCALL_MAX_PARAM_COUNT)
 
   result := MASS.Function_Call_Setup [
     .parameters_stack_size = 0,
@@ -50,14 +50,14 @@ calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   }
 
   // FIXME making this a global results in wrong values inside
-  calling_convention_x86_64_system_v_general_registers : (MASS.Register * SYSTEM_V_MAX_PARAM_COUNT) = [
+  calling_convention_x86_64_system_v_general_registers : (MASS.Register * SYSTEM_V_SYSCALL_MAX_PARAM_COUNT) = [
     .DI, .SI, .D, .R10, .R8, .R9
   ]
 
   registers := MASS.System_V_Register_State [
     .general = [
       .items = &calling_convention_x86_64_system_v_general_registers,
-      .count = SYSTEM_V_MAX_PARAM_COUNT,
+      .count = SYSTEM_V_SYSCALL_MAX_PARAM_COUNT,
       .index = 0,
     ],
     .vector = [
@@ -108,7 +108,7 @@ make_syscall :: fn(@signature : MASS.Function_Header, @number : i64) => (MASS.Fu
     using unsigned
     // AMD64 ABI A.2.1.4
     // System-calls are limited to six arguments, no argument is passed directly on the stack.
-    assert(length(signature.parameters) <= 6)
+    assert(length(signature.parameters) <= SYSTEM_V_SYSCALL_MAX_PARAM_COUNT)
     fn_info := allocate(context.allocator, MASS.Function_Info)
     MASS.function_info_init_for_header_and_maybe_body(context, parser.scope, &signature, 0, fn_info)
     if MASS.result_is_error(context.result) then return 0
