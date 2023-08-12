@@ -31,21 +31,19 @@ static_value :: fn(
   pointer ~ is_pointer_type,
   source_range : Source_Range
 ) -> (&Value) {
-  type :: type_of(pointer)
-  static_assert(type.tag == .Pointer_To)
-  pointee_type :: (type.Pointer_To.*).descriptor
-  pointee_bit_size :: (pointee_type.*).bit_size
-  static_assert(pointee_bit_size > 64)
+  descriptor :: type_descriptor(type_of(pointer))
+  static_assert(descriptor.tag == .Pointer_To)
+  pointee_descriptor :: descriptor.Pointer_To.descriptor
 
   static_value := allocate(compilation.allocator, Value)
   static_value.tag = .Forced
   static_value.source_range = source_range
-  static_value.descriptor = pointee_type
+  static_value.descriptor = pointee_descriptor
 
   static_value.Forced.storage.tag = .Static
-  static_value.Forced.storage.bit_size = pointee_bit_size
+  static_value.Forced.storage.bit_size = pointee_descriptor.bit_size
 
-  static_value.Forced.storage.Static.pointer = pointer
+  static_value.Forced.storage.Static.pointer = cast(&Void, pointer)
 
   static_value
 }
