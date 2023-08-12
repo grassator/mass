@@ -1,4 +1,4 @@
-exports [.reify, .static_value, .immediate_storage, .immediate, .same_type, .context_error, .Value]
+exports [.reify, .static_value, .immediate_storage, .immediate, .same_type, .context_error, .Value, .source_range_here]
 
 Value :: MASS.Value
 Source_Range :: MASS.Source_Range
@@ -89,4 +89,9 @@ immediate :: fn(
 
 reify :: fn(value : &Value, @type : Type) -> _ {
   cast(&type, pointer_from_static_value(value, type))
+}
+
+source_range_here :: fn() -> (Source_Range) intrinsic {
+  source_range_copy := make(context.allocator, arguments.source_range)
+  static_value(context.compilation, source_range_copy, arguments.source_range)
 }
