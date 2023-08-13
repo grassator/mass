@@ -209,7 +209,7 @@ move_value(
   }
   if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
     assert(source_bit_size <= 32);
-    assert(source->Register.offset_in_bits <= 32);
+    assert(source->Register.offset_in_bits <= 64 - source_bit_size);
     Storage temp_full_register = {
       .tag = Storage_Tag_Register,
       .bit_size = {64},
