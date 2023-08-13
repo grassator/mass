@@ -1197,7 +1197,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -1211,7 +1211,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2467,7 +2467,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2481,7 +2481,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2495,7 +2495,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2509,7 +2509,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2523,7 +2523,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2537,7 +2537,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2551,7 +2551,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2565,7 +2565,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2633,7 +2633,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2647,7 +2647,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
@@ -2661,7 +2661,7 @@
   <Expand>
     <CustomListItems>
       <Variable Name="i" InitialValue="0" />
-      <Size>occupied</Size>
+      <Size>capacity</Size>
       <Loop>
         <If Condition="entries[i].occupied">
           <Item Name="{entries[i].key->name.bytes,[entries[i].key->name.length]s}">entries[i].value</Item>
