@@ -263,7 +263,7 @@ add_or_subtract :: fn(
     ]);
 
     {
-      instruction := x86_64.op1_reg64_reg64_mr(payload.op_code, temp_lhs_register, temp_rhs_register)
+      instruction := x86_64.op1_reg64_reg64_mr(scope, payload.op_code, temp_lhs_register, temp_rhs_register)
       MASS.push_instruction(&builder.code_block, instruction);
     }
 
@@ -346,7 +346,7 @@ compare :: fn(
     ])
 
     {
-      instruction := x86_64.op1_reg64_reg64_mr(0x39, temp_lhs_register, temp_rhs_register)
+      instruction := x86_64.op1_reg64_reg64_mr(scope, 0x39, temp_lhs_register, temp_rhs_register)
       MASS.push_instruction(&builder.code_block, instruction)
     }
 

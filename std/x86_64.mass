@@ -7,10 +7,16 @@ REX_X :: 0b0010 // Extension of the SIB index field
 REX_R :: 0b0100 // Extension of the ModR/M reg field
 REX_W :: 0b1000 // 0 = Storage size determined by CS.D; 1 = 64 Bit Storage Size
 
+Scope :: MASS.Scope
 Register :: MASS.Register
 Instruction :: MASS.Instruction
 
-op1_reg64_reg64_mr :: fn(op_code : i8, target : Register, source : Register) -> (Instruction) {
+op1_reg64_reg64_mr :: fn(
+  scope : &Scope,
+  op_code : i8,
+  target : Register,
+  source : Register
+) -> (Instruction) {
   using MASS_I64_MATH
 
   lhs_reg_index := zero_extend(i64, target)
@@ -22,9 +28,12 @@ op1_reg64_reg64_mr :: fn(op_code : i8, target : Register, source : Register) -> 
 
   mod_reg_rm := cast(i8, (0b11 << 6) | ((rhs_reg_index & 0b111) << 3) | (lhs_reg_index & 0b111))
 
-  instruction : Instruction
-  instruction.tag = .Bytes
-  instruction.Bytes.memory = [cast(i8, rex), op_code, mod_reg_rm, ...0]
-  instruction.Bytes.length = 3
-  instruction
+  [
+    .scope = scope,
+    .tag = .Bytes,
+    .Bytes = [
+      .memory = [cast(i8, rex), op_code, mod_reg_rm, ...0],
+      .length = 3,
+    ]
+  ]
 }
