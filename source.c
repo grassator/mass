@@ -2870,25 +2870,6 @@ mass_x86_64_call_encode_proc(
   }
 }
 
-static void
-mass_x86_64_system_v_syscall_encode_proc(
-  Function_Builder *builder,
-  Storage address_storage,
-  const Source_Range *source_range,
-  const Scope *scope
-) {
-  Storage syscall_number_storage = storage_register(register_acquire(builder, Register_A), (Bits){64});
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range, scope,
-    &(Instruction_Assembly){x64_mov, {syscall_number_storage, address_storage}}
-  );
-  push_eagerly_encoded_assembly(
-    &builder->code_block, *source_range, scope,
-    &(Instruction_Assembly){x64_asm_syscall}
-  );
-  register_release(builder, Register_A);
-}
-
 static Value *
 call_function_overload(
   Mass_Context *context,

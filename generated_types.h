@@ -569,21 +569,6 @@ typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
-typedef enum Function_Call_Jump {
-  Function_Call_Jump_Call = 0,
-  Function_Call_Jump_Syscall = 1,
-} Function_Call_Jump;
-
-const char *function_call_jump_name(Function_Call_Jump value) {
-  if (value == 0) return "Function_Call_Jump_Call";
-  if (value == 1) return "Function_Call_Jump_Syscall";
-  assert(!"Unexpected value for enum Function_Call_Jump");
-  return 0;
-};
-
-typedef dyn_array_type(Function_Call_Jump *) Array_Function_Call_Jump_Ptr;
-typedef dyn_array_type(const Function_Call_Jump *) Array_Const_Function_Call_Jump_Ptr;
-
 typedef enum Function_Call_Parameter_Flags {
   Function_Call_Parameter_Flags_None = 0,
   Function_Call_Parameter_Flags_Uninitialized = 1,
@@ -606,9 +591,6 @@ typedef dyn_array_type(Function_Call_Parameter *) Array_Function_Call_Parameter_
 typedef dyn_array_type(const Function_Call_Parameter *) Array_Const_Function_Call_Parameter_Ptr;
 
 typedef void (*Mass_Call_Encode_Proc)
-  (Function_Builder * builder, Storage address_storage, const Source_Range * source_range, const Scope * scope);
-
-static void mass_x86_64_system_v_syscall_encode_proc
   (Function_Builder * builder, Storage address_storage, const Source_Range * source_range, const Scope * scope);
 
 typedef struct Function_Call_Setup Function_Call_Setup;
@@ -996,6 +978,9 @@ static void scope_define_value
 
 static _Bool same_type
   (const Descriptor * a, const Descriptor * b);
+
+static Register register_acquire
+  (Function_Builder * builder, Register reg);
 
 static Register register_acquire_temp
   (Function_Builder * builder);
@@ -3068,12 +3053,6 @@ static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
 static Descriptor descriptor_function_literal_pointer;
 static Descriptor descriptor_function_literal_pointer_pointer;
-static Descriptor descriptor_function_call_jump;
-static Descriptor descriptor_array_function_call_jump;
-static Descriptor descriptor_array_function_call_jump_ptr;
-static Descriptor descriptor_array_const_function_call_jump_ptr;
-static Descriptor descriptor_function_call_jump_pointer;
-static Descriptor descriptor_function_call_jump_pointer_pointer;
 static Descriptor descriptor_function_call_parameter_flags;
 static Descriptor descriptor_array_function_call_parameter_flags;
 static Descriptor descriptor_array_function_call_parameter_flags_ptr;
@@ -3086,7 +3065,6 @@ static Descriptor descriptor_array_function_call_parameter_ptr;
 static Descriptor descriptor_function_call_parameter_pointer;
 static Descriptor descriptor_function_call_parameter_pointer_pointer;
 static Descriptor descriptor_mass_call_encode_proc;
-static Descriptor descriptor_mass_x86_64_system_v_syscall_encode_proc;
 static Descriptor descriptor_function_call_setup;
 static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
@@ -3298,6 +3276,7 @@ static Descriptor descriptor_scope_make_declarative;
 static Descriptor descriptor_mass_ensure_symbol;
 static Descriptor descriptor_scope_define_value;
 static Descriptor descriptor_same_type;
+static Descriptor descriptor_register_acquire;
 static Descriptor descriptor_register_acquire_temp;
 static Descriptor descriptor_register_release;
 static Descriptor descriptor_storage_register;
@@ -5546,13 +5525,6 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_literal_ptr, function_literal_pointe
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_literal, function_literal, Array_Function_Literal);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal *, function_literal_pointer);
-MASS_DEFINE_OPAQUE_C_TYPE(function_call_jump, Function_Call_Jump)
-static C_Enum_Item function_call_jump_items[] = {
-{ .name = slice_literal_fields("Call"), .value = 0 },
-{ .name = slice_literal_fields("Syscall"), .value = 1 },
-};
-DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Jump, function_call_jump);
-DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Jump *, function_call_jump_pointer);
 MASS_DEFINE_OPAQUE_C_TYPE(function_call_parameter_flags, Function_Call_Parameter_Flags)
 static C_Enum_Item function_call_parameter_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },

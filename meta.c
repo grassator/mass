@@ -1838,11 +1838,6 @@ main(void) {
     { "Array_Function_Specialization", "specializations"},
   })));
 
-  export_compiler(push_type(type_enum("Function_Call_Jump", (Enum_Type_Item[]){
-    { "Call", 0 },
-    { "Syscall", 1},
-  })));
-
   push_type(type_enum("Function_Call_Parameter_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Uninitialized", 1 << 0 },
@@ -1863,13 +1858,6 @@ main(void) {
     { "const Source_Range *", "source_range" },
     { "const Scope *", "scope" },
   }));
-
-  export_compiler_custom_name("x86_64_system_v_syscall_encode_proc", push_type(type_function(Default, "mass_x86_64_system_v_syscall_encode_proc", "void", (Argument_Type[]){
-    { "Function_Builder *", "builder" },
-    { "Storage", "address_storage" },
-    { "const Source_Range *", "source_range" },
-    { "const Scope *", "scope" },
-  })));
 
   export_compiler(push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
     { "u32", "parameters_stack_size"},
@@ -2429,6 +2417,13 @@ main(void) {
     type_function(Default, "same_type", "_Bool", (Argument_Type[]){
       { "const Descriptor *", "a" },
       { "const Descriptor *", "b" },
+    })
+  ));
+
+  export_compiler(push_type(
+    type_function(Default, "register_acquire", "Register", (Argument_Type[]){
+      { "Function_Builder *", "builder" },
+      { "Register", "reg" },
     })
   ));
 

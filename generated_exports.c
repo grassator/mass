@@ -430,39 +430,12 @@ compiler_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("Function_Literal")),
     type_function_literal_value
   );
-  Source_Range Function_Call_Jump__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&Function_Call_Jump__source_range, "Function_Call_Jump");
-  scope_define_enum(
-    compilation, scope, Function_Call_Jump__source_range,
-    slice_literal("Function_Call_Jump"), type_function_call_jump_value,
-    function_call_jump_items, countof(function_call_jump_items)
-  );
   Source_Range Function_Call_Parameter__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Call_Parameter__source_range, "Function_Call_Parameter");
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, Function_Call_Parameter__source_range,
     mass_ensure_symbol(compilation, slice_literal("Function_Call_Parameter")),
     type_function_call_parameter_value
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None,
-    mass_x86_64_system_v_syscall_encode_proc, "x86_64_system_v_syscall_encode_proc", &descriptor_void,
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
-      .descriptor = &descriptor_function_builder_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("address_storage")),
-      .descriptor = &descriptor_storage
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("source_range")),
-      .descriptor = &descriptor_source_range_pointer
-    },
-    (Resolved_Function_Parameter) {
-      .symbol = mass_ensure_symbol(compilation, slice_literal("scope")),
-      .descriptor = &descriptor_scope_pointer
-    }
   );
   Source_Range Function_Call_Setup__source_range;
   INIT_LITERAL_SOURCE_RANGE(&Function_Call_Setup__source_range, "Function_Call_Setup");
@@ -1456,6 +1429,18 @@ compiler_scope_define_exports(
     (Resolved_Function_Parameter) {
       .symbol = mass_ensure_symbol(compilation, slice_literal("b")),
       .descriptor = &descriptor_descriptor_pointer
+    }
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
+    register_acquire, "register_acquire", &descriptor_register,
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("builder")),
+      .descriptor = &descriptor_function_builder_pointer
+    },
+    (Resolved_Function_Parameter) {
+      .symbol = mass_ensure_symbol(compilation, slice_literal("reg")),
+      .descriptor = &descriptor_register
     }
   );
   MASS_DEFINE_FUNCTION(

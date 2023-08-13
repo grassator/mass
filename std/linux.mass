@@ -17,6 +17,33 @@ calling_convention_x86_64_system_v :: MASS.Calling_Convention [
 
 SYSTEM_V_SYSCALL_MAX_PARAM_COUNT :: 6
 
+x86_64_system_v_syscall_encode_proc :: fn(
+  builder : &MASS.Function_Builder,
+  address_storage : MASS.Storage,
+  source_range : &MASS.Source_Range,
+  scope : &MASS.Scope
+) -> () {
+  x86_64 :: import("std/x86_64")
+  meta :: import("std/meta")
+
+  rax := MASS.register_acquire(builder, .A)
+  syscall_number := cast(&i64, meta.pointer_from_static_storage(&address_storage)).*
+
+  // mov rax, imm64
+  move_instruction := x86_64.op1_plus_r64_imm64(scope, 0xB8, rax, syscall_number)
+  MASS.push_instruction(&builder.code_block, move_instruction)
+
+  MASS.push_instruction(&builder.code_block, [
+    .tag = .Bytes,
+    .scope = scope,
+    .Bytes = [
+      .memory = [0x0F, 0x05, ...0], // syscall
+      .length = 2,
+    ]
+  ])
+  MASS.register_release(builder, .A);
+}
+
 calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
   context : &MASS.Context,
   function : &MASS.Function_Info,
@@ -35,7 +62,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
 
   result := MASS.Function_Call_Setup [
     .parameters_stack_size = 0,
-    .call_encode_proc = MASS.x86_64_system_v_syscall_encode_proc,
+    .call_encode_proc = x86_64_system_v_syscall_encode_proc,
     .calling_convention = &calling_convention_x86_64_system_v,
     .parameters = [.internal = parameters_internal],
     .parameter_registers_bitset = [0],

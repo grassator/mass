@@ -1,4 +1,10 @@
+// Since these functions are used very early in the Prelude,
+// they are only allowed to use a very limited set of features
+// leading to quite funky code. It might be better to not use
+// them at all and instead define necessary stuff as intrinsics
+
 exports [
+  .op1_plus_r64_imm64,
   .op1_reg64_reg64_mr
 ]
 
@@ -10,6 +16,35 @@ REX_W :: 0b1000 // 0 = Storage size determined by CS.D; 1 = 64 Bit Storage Size
 Scope :: MASS.Scope
 Register :: MASS.Register
 Instruction :: MASS.Instruction
+
+op1_plus_r64_imm64 :: fn(
+  scope : &Scope,
+  op_code : i8,
+  target : Register,
+  source : i64
+) -> (Instruction) {
+  using MASS_I64_MATH
+
+  target_reg_index := zero_extend(i64, target)
+
+  rex := 0x40 + REX_W
+  rex = if target_reg_index & 0b1000 != 0 then rex + REX_B else rex
+  op_code_64 := zero_extend(i64, op_code) + (target_reg_index & 0b111)
+  imm := cast(i8 * 8, source)
+
+  [
+    .scope = scope,
+    .tag = .Bytes,
+    .Bytes = [
+      .memory = [
+        cast(i8, rex), cast(i8, op_code_64),
+        imm.0, imm.1, imm.2, imm.3, imm.4, imm.5, imm.6, imm.7,
+        ...0
+      ],
+      .length = 10,
+    ]
+  ]
+}
 
 op1_reg64_reg64_mr :: fn(
   scope : &Scope,

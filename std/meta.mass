@@ -1,4 +1,14 @@
-exports [.reify, .static_value, .immediate_storage, .immediate, .same_type, .context_error, .Value, .source_range_here]
+exports [
+  .reify,
+  .static_value,
+  .immediate_storage,
+  .immediate,
+  .same_type,
+  .context_error,
+  .Value,
+  .source_range_here,
+  .pointer_from_static_storage
+]
 
 Value :: MASS.Value
 Source_Range :: MASS.Source_Range
@@ -10,20 +20,24 @@ context_error :: fn(context : &MASS.Context, error : MASS.Error) -> () {
   context.compilation.result.Error.error = error
 }
 
+pointer_from_static_storage :: fn(storage : &MASS.Storage) -> (&Void) {
+  if storage.tag == .Static then {
+    storage.Static.pointer
+  } else if storage.tag == .Immediate then {
+    &storage.Immediate.bits
+  } else {
+    assert(false)
+    0
+  }
+}
+
 pointer_from_static_value :: fn(value : &Value, type : Type) -> (&type_of(())) {
   assert(same_type(value.descriptor, type_descriptor(type)))
   assert(value.tag == .Forced)
   storage := &value.Forced.storage
   assert((value.descriptor.*).bit_size.as_u64 == storage.bit_size.as_u64)
 
-  if storage.tag == .Static then {
-    storage.Static.pointer
-  } else if storage.tag == .Immediate then {
-    &storage.Immediate.bits
-  } else {
-    assert(storage.tag == .Static)
-    0
-  }
+  pointer_from_static_storage(storage)
 }
 
 static_value :: fn(
