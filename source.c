@@ -2887,7 +2887,6 @@ call_function_overload(
       assert(runtime_storage->bit_size.as_u64 == 64);
       move_value(builder, scope, source_range, &call_target_storage, runtime_storage);
       storage_release_if_temporary(builder, runtime_storage);
-      runtime_value = 0;
     }
   }
 
