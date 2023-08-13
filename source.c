@@ -6572,17 +6572,45 @@ mass_alias_operator(
   Operator_Fixity fixity,
   u32 precedence
 ) {
-    Operator *op = mass_allocate(context, Operator);
-    *op = (Operator){
-      .tag = Operator_Tag_Alias,
+  Operator *op = mass_allocate(context, Operator);
+  *op = (Operator){
+    .tag = Operator_Tag_Alias,
+    .flags = flags,
+    .fixity = fixity,
+    .precedence = precedence,
+    .associativity = Operator_Associativity_Left,
+    .Alias = { .symbol = mass_ensure_symbol(context->compilation, alias) },
+  };
+  const Symbol *symbol = mass_ensure_symbol(context->compilation, symbol_slice);
+  scope_define_operator(context, context->compilation->root_scope, *source_range, symbol, op);
+}
+
+static void
+mass_intrinsic_operator(
+  Mass_Context *context,
+  const Source_Range *source_range,
+  Slice symbol_slice,
+  Slice intrinsic,
+  Operator_Flags flags,
+  Operator_Fixity fixity,
+  u32 precedence
+) {
+  Operator *op = mass_allocate(context, Operator);
+  *op = (Operator) {
+    .tag = Operator_Tag_Intrinsic,
       .flags = flags,
       .fixity = fixity,
       .precedence = precedence,
       .associativity = Operator_Associativity_Left,
-      .Alias = { .symbol = mass_ensure_symbol(context->compilation, alias) },
-    };
-    const Symbol *symbol = mass_ensure_symbol(context->compilation, symbol_slice);
-    scope_define_operator(context, context->compilation->root_scope, *source_range, symbol, op);
+      .Intrinsic = {
+        .body = scope_lookup(
+          context->compilation->compiler_module.own_scope,
+          mass_ensure_symbol(context->compilation, intrinsic)
+        )->value
+      },
+  };
+  const Symbol *symbol = mass_ensure_symbol(context->compilation, symbol_slice);
+  scope_define_operator(context, context->compilation->root_scope, *source_range, symbol, op);
 }
 
 static void
@@ -6616,24 +6644,12 @@ mass_compilation_init_scopes(
   global_scope_define_exports(compilation, root_scope);
   #define MASS_INTRINSIC_OPERATOR(_SYMBOL_, _FLAGS_, _FIXITY_, _PRECEDENCE_, _INTRINSIC_)\
     do {\
-      Operator *op = mass_allocate(&context, Operator);\
-      *op = (Operator){\
-        .tag = Operator_Tag_Intrinsic,\
-        .flags = (_FLAGS_),\
-        .fixity = Operator_Fixity_##_FIXITY_,\
-        .precedence = (_PRECEDENCE_),\
-        .associativity = Operator_Associativity_Left,\
-        .Intrinsic = {\
-          .body = scope_lookup(\
-            module_scope,\
-            mass_ensure_symbol(compilation, slice_literal(_INTRINSIC_))\
-          )->value\
-        },\
-      };\
-      const Symbol *symbol = mass_ensure_symbol(compilation, slice_literal(_SYMBOL_));\
       Source_Range source_range;\
-      INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));                              \
-      scope_define_operator(&context, root_scope, source_range, symbol, op);\
+      INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));\
+      mass_intrinsic_operator(\
+        &context, &source_range, slice_literal(_SYMBOL_), slice_literal(_INTRINSIC_),\
+        (_FLAGS_), Operator_Fixity_##_FIXITY_, (_PRECEDENCE_)\
+      );\
     } while(false)
 
   #define MASS_ALIAS_OPERATOR(_SYMBOL_, _FLAGS_, _FIXITY_, _PRECEDENCE_, _ALIAS_)\
