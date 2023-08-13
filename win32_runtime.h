@@ -439,7 +439,6 @@ mass_debugger_value_memory(
 // TODO catch cycles
 static void
 mass_print_value_with_descriptor_and_memory(
-  Debugger_Context *debugger_context,
   const Descriptor *descriptor,
   const u8 *memory,
   u64 depth
@@ -515,7 +514,7 @@ mass_print_value_with_descriptor_and_memory(
         if (i != 0) printf(", ");
         const u8 *field_memory = memory + item_byte_size * i;
         mass_print_value_with_descriptor_and_memory(
-          debugger_context, item_descriptor, field_memory, depth + 1
+           item_descriptor, field_memory, depth + 1
         );
       }
       printf("]");
@@ -566,7 +565,7 @@ mass_print_value_with_descriptor_and_memory(
         printf(".%"PRIslice" = ", SLICE_EXPAND_PRINTF(field->name));
         const u8 *field_memory = memory + field->offset;
         mass_print_value_with_descriptor_and_memory(
-          debugger_context, field->descriptor, field_memory, depth + 1
+           field->descriptor, field_memory, depth + 1
         );
         if (i + 1 != dyn_array_length(descriptor->Struct.fields)) printf(", ");
         skip_field:;
@@ -577,7 +576,7 @@ mass_print_value_with_descriptor_and_memory(
       const void *pointer = *(const void **)memory;
       printf("&<%p>: ", pointer);
       mass_print_value_with_descriptor_and_memory(
-        debugger_context, descriptor->Pointer_To.descriptor, pointer, depth + 1
+         descriptor->Pointer_To.descriptor, pointer, depth + 1
       );
     } break;
     default: {
@@ -593,7 +592,7 @@ mass_debug_print_value(
   Value *value
 ) {
   const void *memory = mass_debugger_value_memory(debugger_context, builder, value);
-  mass_print_value_with_descriptor_and_memory(debugger_context, value->descriptor, memory, 0);
+  mass_print_value_with_descriptor_and_memory(value->descriptor, memory, 0);
   printf("\n");
 }
 
