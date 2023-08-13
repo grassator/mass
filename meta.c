@@ -2812,7 +2812,7 @@ main(void) {
   }
 
   {
-    const char *filename = "../generated.natvis";
+    const char *filename = "../generated_gdb.py";
 
     File_Info generated_file_info;
     bool info_success = file_info_c_string(filename, &generated_file_info);
@@ -2820,6 +2820,60 @@ main(void) {
       !info_success ||
       generated_file_info.last_modified_time < this_file_info.last_modified_time
     ) {
+      #pragma warning(disable : 4996)
+      FILE *file = fopen(filename, "wb");
+      if (!file) exit(1);
+      fprintf(file, "MASS_TYPES = {\n");
+
+      for (uint32_t i = 0; i < type_count; ++i) {
+        Meta_Type *type = &types[i];
+        const char *type_kind = "";
+
+        switch(type->tag) {
+          case Meta_Type_Tag_Struct: {
+            type_kind = "struct";
+            break;
+          }
+          case Meta_Type_Tag_Tagged_Union: {
+            type_kind = "tagged_union";
+            break;
+          }
+          case Meta_Type_Tag_Hash_Map: {
+            type_kind = "hash_map";
+            break;
+          }
+          case Meta_Type_Tag_Enum: {
+            type_kind = "enum";
+            break;
+          }
+          case Meta_Type_Tag_Raw:
+          case Meta_Type_Tag_C_Opaque:
+          case Meta_Type_Tag_Integer:
+          case Meta_Type_Tag_Float:
+          case Meta_Type_Tag_Function: {
+            continue; // nothing to do
+          }
+        }
+        fprintf(file, "  '%s': '%s',\n", type->name, type_kind);
+      }
+      fprintf(file, "}\n");
+
+      fclose(file);
+      printf("GDP pretty printers generated at: %s\n", filename);
+    } else {
+      printf("GDP pretty printers up to date at: %s (skipped)\n", filename);
+    }
+  }
+
+  {
+    const char *filename = "../generated.natvis";
+
+    File_Info generated_file_info;
+    bool info_success = file_info_c_string(filename, &generated_file_info);
+    if (
+      !info_success ||
+      generated_file_info.last_modified_time < this_file_info.last_modified_time
+      ) {
       #pragma warning(disable : 4996)
       FILE *file = fopen(filename, "wb");
       if (!file) exit(1);
