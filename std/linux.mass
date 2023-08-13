@@ -35,7 +35,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc :: fn(
 
   result := MASS.Function_Call_Setup [
     .parameters_stack_size = 0,
-    .jump = .Syscall,
+    .call_encode_proc = MASS.x86_64_system_v_syscall_encode_proc,
     .calling_convention = &calling_convention_x86_64_system_v,
     .parameters = [.internal = parameters_internal],
     .parameter_registers_bitset = [0],

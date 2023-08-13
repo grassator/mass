@@ -605,6 +605,12 @@ typedef struct Function_Call_Parameter Function_Call_Parameter;
 typedef dyn_array_type(Function_Call_Parameter *) Array_Function_Call_Parameter_Ptr;
 typedef dyn_array_type(const Function_Call_Parameter *) Array_Const_Function_Call_Parameter_Ptr;
 
+typedef void (*Mass_Call_Encode_Proc)
+  (Function_Builder * builder, Storage address_storage, const Source_Range * source_range, const Scope * scope);
+
+static void mass_x86_64_system_v_syscall_encode_proc
+  (Function_Builder * builder, Storage address_storage, const Source_Range * source_range, const Scope * scope);
+
 typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
 typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
@@ -2124,8 +2130,7 @@ typedef dyn_array_type(Function_Call_Parameter) Array_Function_Call_Parameter;
 typedef struct Function_Call_Setup {
   u32 parameters_stack_size;
   u32 _parameters_stack_size_padding;
-  Function_Call_Jump jump;
-  u32 _jump_padding;
+  Mass_Call_Encode_Proc call_encode_proc;
   const Calling_Convention * calling_convention;
   Array_Function_Call_Parameter parameters;
   Register_Bitset parameter_registers_bitset;
@@ -3080,6 +3085,8 @@ static Descriptor descriptor_array_function_call_parameter;
 static Descriptor descriptor_array_function_call_parameter_ptr;
 static Descriptor descriptor_function_call_parameter_pointer;
 static Descriptor descriptor_function_call_parameter_pointer_pointer;
+static Descriptor descriptor_mass_call_encode_proc;
+static Descriptor descriptor_mass_x86_64_system_v_syscall_encode_proc;
 static Descriptor descriptor_function_call_setup;
 static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
@@ -5581,6 +5588,26 @@ MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_parameter_ptr, function_call_pa
 MASS_DEFINE_C_DYN_ARRAY_TYPE(array_function_call_parameter, function_call_parameter, Array_Function_Call_Parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter, function_call_parameter);
 DEFINE_VALUE_IS_AS_HELPERS(Function_Call_Parameter *, function_call_parameter_pointer);
+MASS_DEFINE_FUNCTION_DESCRIPTOR(
+  mass_call_encode_proc,
+  &descriptor_void,
+  {
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
+    .descriptor = &descriptor_function_builder_pointer,
+  },
+  {
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
+    .descriptor = &descriptor_storage,
+  },
+  {
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
+    .descriptor = &descriptor_source_range_pointer,
+  },
+  {
+    .tag = Resolved_Function_Parameter_Tag_Unknown,
+    .descriptor = &descriptor_scope_pointer,
+  }
+)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   {
     .descriptor = &descriptor_i32,
@@ -5588,9 +5615,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
     .offset = offsetof(Function_Call_Setup, parameters_stack_size),
   },
   {
-    .descriptor = &descriptor_function_call_jump,
-    .name = slice_literal_fields("jump"),
-    .offset = offsetof(Function_Call_Setup, jump),
+    .descriptor = &descriptor_mass_call_encode_proc,
+    .name = slice_literal_fields("call_encode_proc"),
+    .offset = offsetof(Function_Call_Setup, call_encode_proc),
   },
   {
     .descriptor = &descriptor_calling_convention_pointer,

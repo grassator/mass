@@ -2846,6 +2846,49 @@ mass_function_runtime_value_for_call(
   }
 }
 
+static void
+mass_x86_64_call_encode_proc(
+  Function_Builder *builder,
+  Storage address_storage,
+  const Source_Range *source_range,
+  const Scope *scope
+) {
+  if (address_storage.tag == Storage_Tag_Immediate) {
+    Register temp_reg = register_acquire_temp(builder);
+    Storage reg = storage_register(temp_reg, (Bits){64});
+    move_value(builder, scope, source_range, &reg, &address_storage);
+    push_eagerly_encoded_assembly(
+      &builder->code_block, *source_range, scope,
+      &(Instruction_Assembly){x64_call, {reg}}
+    );
+    register_release(builder, temp_reg);
+  } else {
+    push_eagerly_encoded_assembly(
+      &builder->code_block, *source_range, scope,
+      &(Instruction_Assembly){x64_call, {address_storage}}
+    );
+  }
+}
+
+static void
+mass_x86_64_system_v_syscall_encode_proc(
+  Function_Builder *builder,
+  Storage address_storage,
+  const Source_Range *source_range,
+  const Scope *scope
+) {
+  Storage syscall_number_storage = storage_register(register_acquire(builder, Register_A), (Bits){64});
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range, scope,
+    &(Instruction_Assembly){x64_mov, {syscall_number_storage, address_storage}}
+  );
+  push_eagerly_encoded_assembly(
+    &builder->code_block, *source_range, scope,
+    &(Instruction_Assembly){x64_asm_syscall}
+  );
+  register_release(builder, Register_A);
+}
+
 static Value *
 call_function_overload(
   Mass_Context *context,
@@ -3118,37 +3161,7 @@ call_function_overload(
     call_setup->parameters_stack_size
   );
 
-  switch(call_setup->jump) {
-    case Function_Call_Jump_Call: {
-      if (call_target_storage.tag == Storage_Tag_Immediate) {
-        Register temp_reg = register_acquire_temp(builder);
-        Storage reg = storage_register(temp_reg, (Bits){64});
-        move_value(builder, scope, source_range, &reg, &call_target_storage);
-        push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){x64_call, {reg}}
-        );
-        register_release(builder, temp_reg);
-      } else {
-        push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){x64_call, {call_target_storage}}
-        );
-      }
-    } break;
-    case Function_Call_Jump_Syscall: {
-      Storage syscall_number_storage = storage_register(register_acquire(builder, Register_A), (Bits){64});
-      push_eagerly_encoded_assembly(
-        &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){x64_mov, {syscall_number_storage, call_target_storage}}
-      );
-      push_eagerly_encoded_assembly(
-        &builder->code_block, *source_range, scope,
-        &(Instruction_Assembly){x64_asm_syscall}
-      );
-      register_release(builder, Register_A);
-    } break;
-  }
+  call_setup->call_encode_proc(builder, call_target_storage, source_range, scope);
   storage_release_if_temporary(builder, &call_target_storage);
 
   register_release_bitset(builder, all_used_arguments_register_bitset | temp_register_argument_bitset);

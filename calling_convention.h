@@ -4,6 +4,14 @@
 #include "types.h"
 #include "value.h"
 
+static void
+mass_x86_64_call_encode_proc(
+  Function_Builder *builder,
+  Storage address_storage,
+  const Source_Range *source_range,
+  const Scope *scope
+);
+
 static Function_Call_Setup
 calling_convention_x86_64_windows_call_setup_proc(
   const Allocator *allocator,
@@ -626,7 +634,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
-    .jump = Function_Call_Jump_Call,
+    .call_encode_proc = mass_x86_64_call_encode_proc,
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   bool is_indirect_return = false;
@@ -731,7 +739,7 @@ calling_convention_x86_64_windows_call_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
-    .jump = Function_Call_Jump_Call,
+    .call_encode_proc = mass_x86_64_call_encode_proc,
     .calling_convention = &calling_convention_x86_64_windows,
   };
   const Descriptor *return_descriptor = function->return_descriptor;

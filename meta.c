@@ -1857,11 +1857,24 @@ main(void) {
     { "u64", "original_index" },
   })));
 
+  push_type(type_function(Typedef, "Mass_Call_Encode_Proc", "void", (Argument_Type[]){
+    { "Function_Builder *", "builder" },
+    { "Storage", "address_storage" },
+    { "const Source_Range *", "source_range" },
+    { "const Scope *", "scope" },
+  }));
+
+  export_compiler_custom_name("x86_64_system_v_syscall_encode_proc", push_type(type_function(Default, "mass_x86_64_system_v_syscall_encode_proc", "void", (Argument_Type[]){
+    { "Function_Builder *", "builder" },
+    { "Storage", "address_storage" },
+    { "const Source_Range *", "source_range" },
+    { "const Scope *", "scope" },
+  })));
+
   export_compiler(push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
     { "u32", "parameters_stack_size"},
     { "u32", "_parameters_stack_size_padding"},
-    { "Function_Call_Jump", "jump"},
-    { "u32", "_jump_padding" },
+    { "Mass_Call_Encode_Proc", "call_encode_proc" },
     { "const Calling_Convention *", "calling_convention" },
     { "Array_Function_Call_Parameter", "parameters" },
     { "Register_Bitset", "parameter_registers_bitset" },
