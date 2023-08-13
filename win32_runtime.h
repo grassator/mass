@@ -438,7 +438,7 @@ mass_debugger_value_memory(
 
 // TODO catch cycles
 static void
-mass_print_value_with_descriptor_and_memory(
+mass_print_value_with_descriptor_and_memory_internal(
   const Descriptor *descriptor,
   const u8 *memory,
   u64 depth
@@ -513,8 +513,8 @@ mass_print_value_with_descriptor_and_memory(
       for (u64 i = 0; i < descriptor->Fixed_Array.length; ++i) {
         if (i != 0) printf(", ");
         const u8 *field_memory = memory + item_byte_size * i;
-        mass_print_value_with_descriptor_and_memory(
-           item_descriptor, field_memory, depth + 1
+        mass_print_value_with_descriptor_and_memory_internal(
+          item_descriptor, field_memory, depth + 1
         );
       }
       printf("]");
@@ -564,8 +564,8 @@ mass_print_value_with_descriptor_and_memory(
         }
         printf(".%"PRIslice" = ", SLICE_EXPAND_PRINTF(field->name));
         const u8 *field_memory = memory + field->offset;
-        mass_print_value_with_descriptor_and_memory(
-           field->descriptor, field_memory, depth + 1
+        mass_print_value_with_descriptor_and_memory_internal(
+          field->descriptor, field_memory, depth + 1
         );
         if (i + 1 != dyn_array_length(descriptor->Struct.fields)) printf(", ");
         skip_field:;
@@ -575,14 +575,22 @@ mass_print_value_with_descriptor_and_memory(
     case Descriptor_Tag_Pointer_To: {
       const void *pointer = *(const void **)memory;
       printf("&<%p>: ", pointer);
-      mass_print_value_with_descriptor_and_memory(
-         descriptor->Pointer_To.descriptor, pointer, depth + 1
+      mass_print_value_with_descriptor_and_memory_internal(
+        descriptor->Pointer_To.descriptor, pointer, depth + 1
       );
     } break;
     default: {
       assert(!"Unknown descriptor tag");
     } break;
   }
+}
+
+static void
+mass_print_value_with_descriptor_and_memory(
+  const Descriptor *descriptor,
+  const void *memory
+) {
+  mass_print_value_with_descriptor_and_memory_internal(descriptor, memory, 0);
 }
 
 static void
@@ -641,7 +649,7 @@ debugger_loop(
         Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
         if (scope_entry) {
           const void *memory = mass_debugger_value_memory(debugger_context, builder, scope_entry->value);
-          mass_print_value_with_descriptor_and_memory(scope_entry->value->descriptor, memory, 0);
+          mass_print_value_with_descriptor_and_memory(scope_entry->value->descriptor, memory);
           printf("\n");
         } else {
           printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
