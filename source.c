@@ -2833,8 +2833,8 @@ static Value *
 mass_function_runtime_value_for_call(
   Mass_Context *context,
   Function_Builder *builder,
-  Scope * scope,
-  Function_Info *info,
+  const Scope * scope,
+  const Function_Info *info,
   Value *overload
 ) {
   Expected_Result instance_expected_result = expected_result_any(0);
