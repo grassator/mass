@@ -116,10 +116,6 @@ mnemonic(int3,
   encoding(0xCC, none, 0),
 );
 
-mnemonic(asm_syscall,
-  encoding(0x0F05, none, 0),
-);
-
 mnemonic(ret,
   encoding(0xC3, none, 0),
 );
