@@ -586,17 +586,6 @@ mass_print_value_with_descriptor_and_memory(
 }
 
 static void
-mass_debug_print_value(
-  Debugger_Context *debugger_context,
-  Function_Builder *builder,
-  Value *value
-) {
-  const void *memory = mass_debugger_value_memory(debugger_context, builder, value);
-  mass_print_value_with_descriptor_and_memory(value->descriptor, memory, 0);
-  printf("\n");
-}
-
-static void
 debugger_loop(
   Debugger_Context *debugger_context
 ) {
@@ -651,7 +640,9 @@ debugger_loop(
         const Symbol *variable_symbol = mass_ensure_symbol(compilation, variable_name);
         Scope_Entry *scope_entry = scope_lookup(maybe_scope, variable_symbol);
         if (scope_entry) {
-          mass_debug_print_value(debugger_context, builder, scope_entry->value);
+          const void *memory = mass_debugger_value_memory(debugger_context, builder, scope_entry->value);
+          mass_print_value_with_descriptor_and_memory(scope_entry->value->descriptor, memory, 0);
+          printf("\n");
         } else {
           printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
         }
