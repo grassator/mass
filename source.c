@@ -2880,14 +2880,12 @@ call_function_overload(
   // To make sure the target is not overwritten with the argument we move it to an empty register.
   // :InstructionQuality The move described above is not always necessary
   Storage call_target_storage = *runtime_storage;
-  if (call_setup->jump == Function_Call_Jump_Call) {
-    if (runtime_storage->tag == Storage_Tag_Register) {
-      call_target_storage = reserve_stack_storage(builder, (Bits){64});
-      call_target_storage.flags |= Storage_Flags_Temporary;
-      assert(runtime_storage->bit_size.as_u64 == 64);
-      move_value(builder, scope, source_range, &call_target_storage, runtime_storage);
-      storage_release_if_temporary(builder, runtime_storage);
-    }
+  if (runtime_storage->tag == Storage_Tag_Register) {
+    call_target_storage = reserve_stack_storage(builder, (Bits){64});
+    call_target_storage.flags |= Storage_Flags_Temporary;
+    assert(runtime_storage->bit_size.as_u64 == 64);
+    move_value(builder, scope, source_range, &call_target_storage, runtime_storage);
+    storage_release_if_temporary(builder, runtime_storage);
   }
 
   Temp_Mark temp_mark = context_temp_mark(context);
