@@ -3129,7 +3129,7 @@ call_function_overload(
       }
     } break;
     case Function_Call_Jump_Syscall: {
-      Storage syscall_number_storage = storage_register(Register_A, (Bits){64});
+      Storage syscall_number_storage = storage_register(register_acquire(builder, Register_A), (Bits){64});
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, scope,
         &(Instruction_Assembly){x64_mov, {syscall_number_storage, call_target_storage}}
@@ -3138,6 +3138,7 @@ call_function_overload(
         &builder->code_block, *source_range, scope,
         &(Instruction_Assembly){x64_asm_syscall}
       );
+      register_release(builder, Register_A);
     } break;
   }
   storage_release_if_temporary(builder, &call_target_storage);
