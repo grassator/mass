@@ -2830,6 +2830,23 @@ mass_assert_storage_is_valid_in_context(
 }
 
 static Value *
+mass_function_runtime_value_for_call(
+  Mass_Context *context,
+  Function_Builder *builder,
+  Scope * scope,
+  Function_Info *info,
+  Value *overload
+) {
+  Expected_Result instance_expected_result = expected_result_any(0);
+  if (value_is_function_literal(overload)) {
+    Function_Literal *literal = value_as_function_literal(overload);
+    return mass_function_literal_instance_for_info(context, literal, info);
+  } else {
+    return value_force(context, builder, scope, &instance_expected_result, overload);
+  }
+}
+
+static Value *
 call_function_overload(
   Mass_Context *context,
   Function_Builder *builder,
@@ -2839,15 +2856,9 @@ call_function_overload(
   const Mass_Function_Call_Lazy_Payload *payload
 ) {
   Value_View args_view = payload->args;
-
-  Expected_Result instance_expected_result = expected_result_any(0);
-  Value *runtime_value = payload->overload;
-  if (value_is_function_literal(runtime_value)) {
-    Function_Literal *literal = value_as_function_literal(runtime_value);
-    runtime_value = mass_function_literal_instance_for_info(context, literal, payload->info);
-  } else {
-    runtime_value = value_force(context, builder, scope, &instance_expected_result, payload->overload);
-  }
+  Value *runtime_value = mass_function_runtime_value_for_call(
+    context, builder, scope, payload->info, payload->overload
+  );
   if (mass_has_error(context)) return 0;
 
   const Storage *runtime_storage = &value_as_forced(runtime_value)->storage;
