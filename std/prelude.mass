@@ -215,34 +215,7 @@ using make_arithmetic_operations_module(u16)
 using make_arithmetic_operations_module(u32)
 using make_arithmetic_operations_module(u64)
 
-x86_64 :: module {
-  REX_B :: 0b0001 // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
-  REX_X :: 0b0010 // Extension of the SIB index field
-  REX_R :: 0b0100 // Extension of the ModR/M reg field
-  REX_W :: 0b1000 // 0 = Storage size determined by CS.D; 1 = 64 Bit Storage Size
-
-  Register :: MASS.Register
-  Instruction :: MASS.Instruction
-
-  op1_reg64_reg64_mr :: fn(op_code : i8, target : Register, source : Register) -> (Instruction) {
-    using MASS_I64_MATH
-
-    lhs_reg_index := zero_extend(i64, target)
-    rhs_reg_index := zero_extend(i64, source)
-
-    rex := 0x40 + REX_W
-    rex = if lhs_reg_index & 0b1000 != 0 then rex + REX_B else rex
-    rex = if rhs_reg_index & 0b1000 != 0 then rex + REX_R else rex
-
-    mod_reg_rm := cast(i8, (0b11 << 6) | ((rhs_reg_index & 0b111) << 3) | (lhs_reg_index & 0b111))
-
-    instruction : Instruction
-    instruction.tag = .Bytes
-    instruction.Bytes.memory = [cast(i8, rex), op_code, mod_reg_rm, ...0]
-    instruction.Bytes.length = 3
-    instruction
-  }
-}
+x86_64 :: import("std/x86_64")
 
 add_or_subtract :: fn(
   context : &MASS.Context,
