@@ -3120,12 +3120,7 @@ call_function_overload(
 
   switch(call_setup->jump) {
     case Function_Call_Jump_Call: {
-      if (storage_is_label(&call_target_storage)) {
-        push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, scope,
-          &(Instruction_Assembly){x64_call, {call_target_storage}}
-        );
-      } else {
+      if (call_target_storage.tag == Storage_Tag_Immediate) {
         Register temp_reg = register_acquire_temp(builder);
         Storage reg = storage_register(temp_reg, (Bits){64});
         move_value(builder, scope, source_range, &reg, &call_target_storage);
@@ -3134,6 +3129,11 @@ call_function_overload(
           &(Instruction_Assembly){x64_call, {reg}}
         );
         register_release(builder, temp_reg);
+      } else {
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range, scope,
+          &(Instruction_Assembly){x64_call, {call_target_storage}}
+        );
       }
     } break;
     case Function_Call_Jump_Syscall: {
