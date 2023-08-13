@@ -6563,6 +6563,29 @@ scope_define_enum(
 }
 
 static void
+mass_alias_operator(
+  Mass_Context *context,
+  const Source_Range *source_range,
+  Slice symbol_slice,
+  Slice alias,
+  Operator_Flags flags,
+  Operator_Fixity fixity,
+  u32 precedence
+) {
+    Operator *op = mass_allocate(context, Operator);
+    *op = (Operator){
+      .tag = Operator_Tag_Alias,
+      .flags = flags,
+      .fixity = fixity,
+      .precedence = precedence,
+      .associativity = Operator_Associativity_Left,
+      .Alias = { .symbol = mass_ensure_symbol(context->compilation, alias) },
+    };
+    const Symbol *symbol = mass_ensure_symbol(context->compilation, symbol_slice);
+    scope_define_operator(context, context->compilation->root_scope, *source_range, symbol, op);
+}
+
+static void
 mass_compilation_init_scopes(
   Compilation *compilation
 ) {
@@ -6609,27 +6632,19 @@ mass_compilation_init_scopes(
       };\
       const Symbol *symbol = mass_ensure_symbol(compilation, slice_literal(_SYMBOL_));\
       Source_Range source_range;\
-      INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));\
+      INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));                              \
       scope_define_operator(&context, root_scope, source_range, symbol, op);\
     } while(false)
 
   #define MASS_ALIAS_OPERATOR(_SYMBOL_, _FLAGS_, _FIXITY_, _PRECEDENCE_, _ALIAS_)\
     do {\
-      Operator *op = mass_allocate(&context, Operator);\
-      *op = (Operator){\
-        .tag = Operator_Tag_Alias,\
-        .flags = (_FLAGS_),\
-        .fixity = Operator_Fixity_##_FIXITY_,\
-        .precedence = (_PRECEDENCE_),\
-        .associativity = Operator_Associativity_Left,\
-        .Alias = { .symbol = mass_ensure_symbol(compilation, slice_literal(_ALIAS_)) },\
-      };\
-      const Symbol *symbol = mass_ensure_symbol(compilation, slice_literal(_SYMBOL_));\
       Source_Range source_range;\
       INIT_LITERAL_SOURCE_RANGE(&source_range, (_SYMBOL_));\
-      scope_define_operator(&context, root_scope, source_range, symbol, op);\
+      mass_alias_operator(\
+        &context, &source_range, slice_literal(_SYMBOL_), slice_literal(_ALIAS_),\
+        (_FLAGS_), Operator_Fixity_##_FIXITY_, (_PRECEDENCE_)\
+      );\
     } while(false)
-
 
   MASS_INTRINSIC_OPERATOR(".", Operator_Flags_None, Infix, 20, "get");
 
