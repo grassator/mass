@@ -2568,12 +2568,8 @@ typedef struct Common_Symbols {
   const Symbol * get;
   const Symbol * intrinsic;
   const Symbol * label;
-  const Symbol * operator;
-  const Symbol * placeholder;
   const Symbol * postfix_block;
   const Symbol * statement;
-  const Symbol * syntax;
-  const Symbol * underscore;
   const Symbol * _if;
   const Symbol * then;
   const Symbol * _while;
@@ -6575,16 +6571,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
   },
   {
     .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("operator"),
-    .offset = offsetof(Common_Symbols, operator),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("placeholder"),
-    .offset = offsetof(Common_Symbols, placeholder),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("postfix_block"),
     .offset = offsetof(Common_Symbols, postfix_block),
   },
@@ -6592,16 +6578,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(common_symbols, Common_Symbols,
     .descriptor = &descriptor_symbol_pointer,
     .name = slice_literal_fields("statement"),
     .offset = offsetof(Common_Symbols, statement),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("syntax"),
-    .offset = offsetof(Common_Symbols, syntax),
-  },
-  {
-    .descriptor = &descriptor_symbol_pointer,
-    .name = slice_literal_fields("underscore"),
-    .offset = offsetof(Common_Symbols, underscore),
   },
   {
     .descriptor = &descriptor_symbol_pointer,
