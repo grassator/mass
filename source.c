@@ -3149,7 +3149,17 @@ call_function_overload(
 
   u64 return_value_bitset = register_bitset_from_storage(&return_storage);
 
-  assert(!(return_value_bitset & saved_registers_from_arguments_bitset));
+  // If return value would be overwritten by restored registers we are saving it to the stack.
+  // This is not the most efficient way though. @InstructionQuality
+  if (return_value_bitset & saved_registers_from_arguments_bitset) {
+    Storage temp_return_storage = reserve_stack_storage(builder, return_storage.bit_size);
+    move_value(builder, scope, source_range, &temp_return_storage, &return_storage);
+    temp_return_storage.flags |= Storage_Flags_Temporary;
+    return_storage = temp_return_storage;
+  } else {
+    register_acquire_bitset(builder, (return_value_bitset & ~expected_result_bitset));
+  }
+
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
     push_eagerly_encoded_assembly(
       &builder->code_block, *source_range, scope,
@@ -3158,7 +3168,6 @@ call_function_overload(
   }
 
   register_acquire_bitset(builder, saved_registers_from_arguments_bitset);
-  register_acquire_bitset(builder, (return_value_bitset & ~expected_result_bitset));
 
   Value *fn_return_value = value_make(context, fn_info->return_descriptor, return_storage, *source_range);
 
