@@ -5,7 +5,8 @@
 
 exports [
   .op1_plus_r64_imm64,
-  .op1_reg64_reg64_mr
+  .op1_reg64_reg64_mr,
+  .syscall
 ]
 
 REX_B :: 0b0001 // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
@@ -15,6 +16,11 @@ REX_W :: 0b1000 // 0 = Storage size determined by CS.D; 1 = 64 Bit Storage Size
 
 Register :: MASS.Register
 Instruction_Bytes :: MASS.Instruction_Bytes
+
+syscall :: Instruction_Bytes [
+  .memory = [0x0F, 0x05, ...0], // syscall
+  .length = 2,
+]
 
 op1_plus_r64_imm64 :: fn(
   op_code : i8,

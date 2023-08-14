@@ -40,10 +40,7 @@ x86_64_system_v_syscall_encode_proc :: fn(
   MASS.push_instruction(&builder.code_block, [
     .tag = .Bytes,
     .scope = scope,
-    .Bytes = [
-      .memory = [0x0F, 0x05, ...0], // syscall
-      .length = 2,
-    ]
+    .Bytes = x86_64.syscall
   ])
   MASS.register_release(builder, .A);
 }
