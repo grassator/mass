@@ -75,7 +75,7 @@ class TaggedUnionPrinter:
                 if tag_name in value.type.keys():
                     yield (tag_name, value[tag_name])
                 else:
-                    yield (tag_name, '<invalid tag value>')
+                    yield (tag_name, "{}")
             else:
                 yield (key, value)
 
