@@ -30,8 +30,12 @@ x86_64_system_v_syscall_encode_proc :: fn(
   syscall_number := cast(&i64, meta.pointer_from_static_storage(&address_storage)).*
 
   // mov rax, imm64
-  move_instruction := x86_64.op1_plus_r64_imm64(scope, 0xB8, rax, syscall_number)
-  MASS.push_instruction(&builder.code_block, move_instruction)
+  encoded_mov_bytes := x86_64.op1_plus_r64_imm64(0xB8, rax, syscall_number)
+  MASS.push_instruction(&builder.code_block, [
+    .scope = scope,
+    .tag = .Bytes,
+    .Bytes = encoded_mov_bytes,
+  ])
 
   MASS.push_instruction(&builder.code_block, [
     .tag = .Bytes,
