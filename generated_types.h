@@ -1510,6 +1510,8 @@ typedef struct Storage_Memory {
 } Storage_Memory;
 typedef struct Storage_Disjoint {
   Array_Storage_Ptr pieces;
+  u32 packed;
+  u32 offset_in_bits;
 } Storage_Disjoint;
 typedef struct Storage {
   Storage_Tag tag;
@@ -4252,6 +4254,16 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_disjoint, Storage_Disjoint,
     .descriptor = &descriptor_array_storage_ptr,
     .name = slice_literal_fields("pieces"),
     .offset = offsetof(Storage_Disjoint, pieces),
+  },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("packed"),
+    .offset = offsetof(Storage_Disjoint, packed),
+  },
+  {
+    .descriptor = &descriptor_i32,
+    .name = slice_literal_fields("offset_in_bits"),
+    .offset = offsetof(Storage_Disjoint, offset_in_bits),
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_disjoint);

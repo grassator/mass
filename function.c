@@ -91,6 +91,36 @@ move_value(
   if (target == source) return;
   if (storage_equal(target, source)) return;
 
+  if (source->tag == Storage_Tag_Disjoint) {
+    if (source->Disjoint.packed) {
+      panic("TODO @DisjointPacked");
+    } else {
+      for (u64 i = 0; i < dyn_array_length(source->Disjoint.pieces); ++i) {
+        const Storage *source_piece = *dyn_array_get(source->Disjoint.pieces, i);
+        Storage target_piece = storage_with_offset_and_bit_size(
+          target, u64_to_s32(i * 8), source_piece->bit_size
+        );
+        move_value(builder, scope, source_range, &target_piece, source_piece);
+      }
+      return;
+    }
+  }
+
+  if (target->tag == Storage_Tag_Disjoint) {
+    if (target->Disjoint.packed) {
+      panic("TODO @DisjointPacked");
+    } else {
+      for (u64 i = 0; i < dyn_array_length(target->Disjoint.pieces); ++i) {
+        const Storage *target_piece = *dyn_array_get(target->Disjoint.pieces, i);
+        Storage source_piece = storage_with_offset_and_bit_size(
+          source, u64_to_s32(i * 8), target_piece->bit_size
+        );
+        move_value(builder, scope, source_range, target_piece, &source_piece);
+      }
+      return;
+    }
+  }
+
   if (target->tag == Storage_Tag_Eflags) {
     panic("Internal Error: Trying to move into Eflags");
   }
@@ -236,7 +266,7 @@ move_value(
 
   if (target->tag == Storage_Tag_Register && target->Register.packed) {
     assert(source_bit_size <= 32);
-    assert(target->Register.offset_in_bits <= 32);
+    assert(target->Register.offset_in_bits <= 64 - source_bit_size);
     if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
       panic("Expected unpacking to be handled by the recursion above");
     }

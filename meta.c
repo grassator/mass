@@ -1498,6 +1498,8 @@ main(void) {
     }),
     struct_fields("Disjoint", (Struct_Item[]){
       { "Array_Storage_Ptr", "pieces" },
+      { "u32", "packed" },
+      { "u32", "offset_in_bits" },
     }),
   }), (Struct_Item[]){
     { "Storage_Flags", "flags" },

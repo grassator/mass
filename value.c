@@ -627,6 +627,39 @@ storage_with_offset_and_bit_size(
   const Storage *base,
   s32 offset,
   Bits bit_size
+);
+
+static bool
+mass_maybe_find_disjoint_piece_for_move(
+  const Storage *base,
+  Bits offset_in_bits,
+  Bits bit_size,
+  Storage *out_storage
+) {
+  assert(base->tag == Storage_Tag_Disjoint);
+  u64 bit_start = 0;
+  for (u64 i = 0; i < dyn_array_length(base->Disjoint.pieces); ++i) {
+    const Storage *piece = *dyn_array_get(base->Disjoint.pieces, i);
+    u64 bit_end = bit_start + piece->bit_size.as_u64;
+    bool starts_in_this_piece = offset_in_bits.as_u64 >= bit_start && offset_in_bits.as_u64 < bit_end;
+    if (starts_in_this_piece) {
+      u64 offset_in_bits_in_this_piece = offset_in_bits.as_u64 - bit_start;
+      // Spans more than one piece
+      if (offset_in_bits_in_this_piece + bit_size.as_u64 > piece->bit_size.as_u64) return false;
+      s32 nested_byte_offset = u64_to_s32(offset_in_bits_in_this_piece / 8);
+      *out_storage = storage_with_offset_and_bit_size(piece, nested_byte_offset, bit_size);
+      return true;
+    }
+    bit_start = bit_end;
+  }
+  return false;
+}
+
+static inline Storage
+storage_with_offset_and_bit_size(
+  const Storage *base,
+  s32 offset,
+  Bits bit_size
 ) {
   if (offset < 0) panic("Negative offsets are not supported");
   Storage result = *base;
@@ -654,26 +687,20 @@ storage_with_offset_and_bit_size(
       return result;
     }
     case Storage_Tag_Register: {
-      result.Register.packed = bit_size.as_u64 != 64;
-      result.Register.offset_in_bits = u64_to_u16(offset_in_bits);
+      result.Register.packed |= bit_size.as_u64 != base->bit_size.as_u64;
+      result.Register.offset_in_bits += u64_to_u16(offset_in_bits);
     } break;
     case Storage_Tag_Disjoint: {
-      u64 bit_start = 0;
-      for (u64 i = 0; i < dyn_array_length(base->Disjoint.pieces); ++i) {
-        const Storage *piece = *dyn_array_get(base->Disjoint.pieces, i);
-        u64 bit_end = bit_start + piece->bit_size.as_u64;
-        bool starts_in_this_piece = offset_in_bits >= bit_start && offset_in_bits < bit_end;
-        if (starts_in_this_piece) {
-          u64 offset_in_bits_in_this_piece = offset_in_bits - bit_start;
-          if (offset_in_bits_in_this_piece + bit_size.as_u64 > piece->bit_size.as_u64) {
-            panic("Requested storage crosses a disjoint pieces boundary");
-          }
-          s32 nested_byte_offset = u64_to_s32(offset_in_bits_in_this_piece / 8);
-          return storage_with_offset_and_bit_size(piece, nested_byte_offset, bit_size);
-        }
-        bit_start = bit_end;
+      Storage maybe_piece_storage = {0};
+      bool fits_into_one_piece = mass_maybe_find_disjoint_piece_for_move(
+        base, (Bits){offset_in_bits}, bit_size, &maybe_piece_storage
+      );
+      if (fits_into_one_piece) {
+        return maybe_piece_storage;
+      } else {
+        result.Disjoint.packed |= bit_size.as_u64 != base->bit_size.as_u64;
+        result.Disjoint.offset_in_bits += u64_to_u32(offset_in_bits);
       }
-      panic("Could not find specified offset in the storage");
     } break;
     case Storage_Tag_Static: {
       const s8 *pointer = get_static_storage_with_bit_size(base, base->bit_size);
