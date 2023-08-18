@@ -1,4 +1,14 @@
 import generated_gdb
+import gdb
+
+
+# See https://stackoverflow.com/questions/68561176/converting-python-string-to-gdb-value-for-gdb-pretty-printing
+def make_char_pointer(string):
+    original_bytes = string.encode("UTF-8")
+    original = gdb.Value(original_bytes + b"\0", gdb.lookup_type("char").array(len(original_bytes)))
+    adjusted = original.cast(gdb.lookup_type("char").pointer())
+    return adjusted
+
 
 class ValueViewPrinter:
     # The constructor takes the value and stores it for later.
@@ -9,11 +19,24 @@ class ValueViewPrinter:
         data = self.val['values'].dereference()
         length = int(self.val['length'])
         for i in range(length):
-            yield ('[%d]' % i, data[i])
+            yield '[%d]' % i, data[i]
 
     @staticmethod
     def display_hint():
         return 'array'
+
+
+class SourceRangePrinter:
+    # The constructor takes the value and stores it for later.
+    def __init__(self, val):
+        self.val = val
+
+    def children(self):
+        data = self.val['file'].dereference()['text']['bytes'] + self.val['offsets']['from']
+        length = int(self.val['offsets']['to'] - self.val['offsets']['from'])
+        yield '[text]', make_char_pointer(data.string(encoding='utf-8', length=length))
+        for key in self.val.type.keys():
+            yield key, self.val[key]
 
 class SymbolPrinter:
     # The constructor takes the value and stores it for later.
@@ -22,6 +45,7 @@ class SymbolPrinter:
 
     def to_string(self):
         return f"Symbol({self.val['name'].format_string()})"
+
 
 class HashMapPrinter:
     # The constructor takes the value and stores it for later.
@@ -104,6 +128,8 @@ def printer(val):
     type_string = str(val.type.unqualified())
     if type_string == 'Value_View':
         return ValueViewPrinter(val)
+    if type_string == 'Source_Range':
+        return SourceRangePrinter(val)
     if type_string == 'Symbol':
         return SymbolPrinter(val)
     if type_string == 'Register_Bitset':
