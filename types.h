@@ -302,23 +302,4 @@ static Descriptor descriptor_never = {
 MASS_DEFINE_TYPE_VALUE(never);
 MASS_DEFINE_POINTER_DESCRIPTOR(never);
 
-typedef struct {
-  void *bytes;
-  u64 length;
-} Mass_Byte_Slice;
-
-MASS_DEFINE_STRUCT_DESCRIPTOR_WITH_BRAND(byte_slice, Mass_Byte_Slice, 0 /*no brand*/,
-  {
-    .descriptor = &descriptor_i8_pointer,
-    .name = slice_literal_fields("bytes"),
-    .offset = offsetof(Mass_Byte_Slice, bytes),
-  },
-  {
-    .descriptor = &descriptor_i64,
-    .name = slice_literal_fields("length"),
-    .offset = offsetof(Mass_Byte_Slice, length),
-  },
-);
-DEFINE_VALUE_IS_AS_HELPERS(Mass_Byte_Slice, byte_slice)
-
 #endif // C_MACRO_H

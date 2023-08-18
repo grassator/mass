@@ -2297,12 +2297,5 @@ global_scope_define_exports(
     mass_ensure_symbol(compilation, slice_literal("f64")),
     type_f64_value
   );
-  Source_Range String__source_range;
-  INIT_LITERAL_SOURCE_RANGE(&String__source_range, "String");
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, String__source_range,
-    mass_ensure_symbol(compilation, slice_literal("String")),
-    type_slice_value
-  );
 }
 

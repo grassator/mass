@@ -1683,23 +1683,18 @@ static bool
 mass_is_slice_like(
   Value *value
 ) {
-  return same_type(value->descriptor, &descriptor_slice)
-    || same_type(value->descriptor, &descriptor_byte_slice);
+  // We accept anything that has the same shape as the slice (so ignore brands)
+  return types_equal(value->descriptor, &descriptor_slice, Brand_Comparison_Mode_Ignore);
 }
 
 static Slice
 mass_slice_from_slice_like(
   Value *value
 ) {
-  if (same_type(value->descriptor, &descriptor_slice)) {
-    return *value_as_slice(value);
-  } else if (same_type(value->descriptor, &descriptor_byte_slice)) {
-    const Mass_Byte_Slice *byte_slice = value_as_byte_slice(value);
-    return (Slice){.bytes = byte_slice->bytes, .length = byte_slice->length};
-  } else {
-    panic("TODO accept any right-shaped struct, not just generic view");
-    return (Slice){0};
-  }
+  if (!mass_is_slice_like(value)) panic("Expected a slice-like value");
+  Value slice_value = *value;
+  slice_value.descriptor = &descriptor_slice;
+  return *value_as_slice(&slice_value);
 }
 
 static Value *

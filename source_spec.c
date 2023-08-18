@@ -1389,7 +1389,6 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Type_Mismatch);
       check(error->Type_Mismatch.expected == &descriptor_i64);
-      check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
     it("should be able to have access to the arguments view in user-defined intrinsics") {
@@ -1876,7 +1875,7 @@ spec("source") {
       const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn(string : String) -> (&i8) {\n"
-          "string.bytes\n"
+          "string.data\n"
         "}"
       );
       check(spec_check_mass_result(test_context.result));

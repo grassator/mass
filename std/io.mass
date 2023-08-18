@@ -12,7 +12,7 @@ native_stdout :: fn(buffer : &i8, size : i64) -> () {
 }
 
 print :: fn(string : String) -> () {
-  native_stdout(string.bytes, string.length)
+  native_stdout(string.data, string.length)
 }
 
 print :: fn(integer : s64) -> () {

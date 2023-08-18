@@ -253,17 +253,17 @@ tokenizer_push_string_literal(
 
   allocator_allocate_bulk(context->allocator, combined, {
     Descriptor bits_descriptor;
-    Mass_Byte_Slice byte_slice;
+    Slice byte_slice;
     Value string_value;
   });
 
   hash_map_set(context->compilation->static_pointer_length_map, bytes, length);
 
-  Mass_Byte_Slice *byte_slice = &combined->byte_slice;
-  *byte_slice = (Mass_Byte_Slice){bytes, length};
+  Slice *byte_slice = &combined->byte_slice;
+  *byte_slice = (Slice){bytes, length};
   Value *byte_slice_value = value_init(
     &combined->string_value,
-    &descriptor_byte_slice, storage_static(byte_slice), source_range
+    &descriptor_slice, storage_static(byte_slice), source_range
   );
   dyn_array_push(*stack, byte_slice_value);
 }

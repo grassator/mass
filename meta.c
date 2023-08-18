@@ -2659,10 +2659,10 @@ main(void) {
 
   PROCESS_NUMERIC_TYPES(DEFINE_RANGES)
 
-  export_global_custom_name("String", set_flags(push_type(type_struct("Slice", (Struct_Item[]){
+  set_flags(push_type(type_struct("Slice", (Struct_Item[]){
     { "u8 *", "bytes" },
     { "i64", "length" },
-  })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
+  })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array);
 
   export_compiler(set_flags(push_type(type_struct("Dyn_Array_Internal", (Struct_Item[]){
     { "const Allocator *", "allocator" },

@@ -10,10 +10,15 @@ is_fixed_array_type :: MASS.constraint_fixed_array_type
 is_struct_type :: MASS.constraint_struct_type
 is_function_instance_type :: MASS.constraint_function_instance_type
 
+// FIXME This is very verbose and `fn` looks weird
+// FIXME It is very awkward the the only real way to force brand-less type is through a fake variable
+Slice :: fn(@type : Type) => (Type) { result : [ data : &type, length : i64]; type_of(result) }
+String :: Slice(i8)
+
 get :: fn(string : String, offset : i64) => (i8) {
   using unsigned
   assert(offset < string.length);
-  unchecked_get_at_index(string.bytes, offset)
+  unchecked_get_at_index(string.data, offset)
 }
 
 type_pointee :: fn(t : Type) => _ { Type[type_descriptor(t).Pointer_To.descriptor] }
