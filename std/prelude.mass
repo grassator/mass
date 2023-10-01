@@ -53,7 +53,7 @@ Never :: &MASS.Descriptor[
   .own_module = 0,
   .bit_size = [0],
   .bit_alignment = [0],
-  .Pointer_To = [0], // @Hack for C unions
+  .Never = [],
 ]
 make_never :: fn(allocator : &Allocator, source_range : &MASS.Source_Range) -> (&MASS.Value) {
   value := allocate(allocator, MASS.Value)

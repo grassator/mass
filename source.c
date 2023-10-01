@@ -731,7 +731,14 @@ mass_process_tuple_as_descriptor(
       // TODO @Speed if sorting is guaranteed can look only forward and back
       for (u64 i = 0; i < dyn_array_length(fields); ++i) {
         const Struct_Field *a_field = dyn_array_get(fields, i);
-        if (range_contains(field_overlap_range, a_field->offset)) {
+
+        // In case of a zero-sized field we assume that all fields at a particular
+        // offset have been set which helps interop with c-style tagged unions
+        // where one or more of the variants do not have their own fields
+        if (
+          a_field->offset >= field_overlap_range.from &&
+          (range_length(field_overlap_range) == 0 || a_field->offset < field_overlap_range.to)
+        ) {
           hash_map_set(assigned_set, a_field, i);
         }
       }
