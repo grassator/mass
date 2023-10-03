@@ -723,9 +723,10 @@ mass_process_tuple_as_descriptor(
       );
       if (!success) goto err;
 
+      u64 field_size = descriptor_byte_size(field->descriptor);
       Range_u64 field_overlap_range = {
         .from = field->offset,
-        .to = field->offset + descriptor_byte_size(field->descriptor),
+        .to = field->offset + field_size,
       };
       // Skip overlapped fields for unions
       // TODO @Speed if sorting is guaranteed can look only forward and back
@@ -736,9 +737,9 @@ mass_process_tuple_as_descriptor(
         // offset have been set which helps interop with c-style tagged unions
         // where one or more of the variants do not have their own fields
         if (
-          a_field->offset >= field_overlap_range.from &&
-          (range_length(field_overlap_range) == 0 || a_field->offset < field_overlap_range.to)
-        ) {
+          (field_size == 0 && a_field->offset == field->offset) ||
+          range_contains(field_overlap_range, a_field->offset)
+        )  {
           hash_map_set(assigned_set, a_field, i);
         }
       }
